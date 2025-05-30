@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events
+from schemathesis.transport.prepare import get_default_headers
 
 if TYPE_CHECKING:
     import requests
@@ -134,6 +135,8 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
         request = probe.prepare_request(session, Request(), ctx.schema)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
+        for header, value in get_default_headers().items():
+            request.headers.setdefault(header, value)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
             response = session.send(request, timeout=ctx.config.request_timeout or 2)

@@ -9,6 +9,7 @@ from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.hooks import HookDispatcher, HookDispatcherMark, HookScope
 from schemathesis.pytest.plugin import SchemaHandleMark
+from schemathesis.transport.prepare import get_default_headers
 from test.utils import assert_requests_call, flaky
 
 
@@ -498,6 +499,7 @@ def test_graphql_query(graphql_schema, graphql_server_host):
         assert case.as_transport_kwargs() == {
             "cookies": {"c": "4"},
             "headers": {
+                **get_default_headers(),
                 "User-Agent": USER_AGENT,
                 "X-Schemathesis-TestCaseId": ANY,
                 "Content-Type": "application/json",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Mapping, cast
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
@@ -8,6 +9,7 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transport import USER_AGENT
+from schemathesis.generation.meta import CoveragePhaseData
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
@@ -16,15 +18,37 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseInsensitiveDict:
-    from requests.structures import CaseInsensitiveDict
+@lru_cache()
+def get_default_headers() -> CaseInsensitiveDict:
+    from requests.utils import default_headers
 
-    final_headers = case.headers.copy() if case.headers is not None else CaseInsensitiveDict()
+    headers = default_headers()
+    headers["User-Agent"] = USER_AGENT
+    return headers
+
+
+def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseInsensitiveDict:
+    default_headers = get_default_headers().copy()
+    if case.headers:
+        default_headers.update(case.headers)
+    default_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, case.id)
     if headers:
-        final_headers.update(headers)
-    final_headers.setdefault("User-Agent", USER_AGENT)
-    final_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, case.id)
-    return final_headers
+        default_headers.update(headers)
+    for header in get_exclude_headers(case):
+        default_headers.pop(header, None)
+    return default_headers
+
+
+def get_exclude_headers(case: Case) -> list[str]:
+    if (
+        case.meta is not None
+        and isinstance(case.meta.phase.data, CoveragePhaseData)
+        and case.meta.phase.data.description.startswith("Missing")
+        and case.meta.phase.data.description.endswith("at header")
+        and case.meta.phase.data.parameter is not None
+    ):
+        return [case.meta.phase.data.parameter]
+    return []
 
 
 def prepare_url(case: Case, base_url: str | None) -> str:
