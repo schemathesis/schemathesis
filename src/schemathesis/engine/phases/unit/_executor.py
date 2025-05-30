@@ -35,6 +35,7 @@ from schemathesis.engine.errors import (
     DeadlineExceeded,
     UnexpectedError,
     UnsupportedRecursiveReference,
+    clear_hypothesis_notes,
     deduplicate_errors,
 )
 from schemathesis.engine.phases import PhaseName
@@ -198,6 +199,7 @@ def run_test(
         yield non_fatal_error(InvalidRegexPattern.from_schema_error(exc, from_examples=False))
     except Exception as exc:
         status = Status.ERROR
+        clear_hypothesis_notes(exc)
         # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
         if str(exc) == "first argument must be string or compiled pattern":
             yield non_fatal_error(

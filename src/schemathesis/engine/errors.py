@@ -403,3 +403,9 @@ def canonicalize_error_message(error: Exception, with_traceback: bool = True) ->
     message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
     # Remove URL information
     return URL_IN_ERROR_MESSAGE_RE.sub("", message)
+
+
+def clear_hypothesis_notes(exc: Exception) -> None:
+    notes = getattr(exc, "__notes__", [])
+    if any("while generating" in note for note in notes):
+        notes.clear()
