@@ -1115,7 +1115,13 @@ def test_stateful_all_generation_modes(real_app_schema):
 def test_stateful_seed(real_app_schema):
     requests = []
     for _ in range(3):
-        stream = EventStream(real_app_schema, phases=[PhaseName.STATEFUL_TESTING], seed=42, **STATEFUL_KWARGS).execute()
+        stream = EventStream(
+            real_app_schema,
+            phases=[PhaseName.STATEFUL_TESTING],
+            seed=42,
+            modes=[GenerationMode.POSITIVE],
+            **STATEFUL_KWARGS,
+        ).execute()
         current = []
         interactions = stream.find(events.ScenarioFinished).recorder.interactions
         for interaction in interactions.values():

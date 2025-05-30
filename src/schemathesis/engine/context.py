@@ -80,6 +80,7 @@ class EngineContext:
         import requests
 
         session = requests.Session()
+        session.trust_env = False
         config = self.config
 
         session.verify = config.tls_verify_for(operation=operation)
