@@ -16,25 +16,17 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ⏭   Examples (in 0.00s)
-
-     ⏭  1 skipped
-
- ✅  Coverage (in 0.00s)
-
-     ✅ 1 passed
-
  ✅  Fuzzing (in 0.00s)
 
      ✅ 1 passed
 
 =================================== WARNINGS ===================================
 
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
 
   - GET /always_incorrect
 
-Tip: Check base URL or adjust data generation settings
+💡 Check your schema constraints - API validation may be stricter than documented
 
 =================================== SUMMARY ====================================
 
@@ -44,13 +36,13 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  ⏭  Examples
-  ✅ Coverage
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ✅ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
 
 Test cases:
   N generated, N passed

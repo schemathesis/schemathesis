@@ -30,11 +30,11 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
   - GET /health
 
-Tip: Check base URL or adjust data generation settings
+💡 Provide realistic parameter values in your config file so tests can access existing resources
 
 =================================== SUMMARY ====================================
 
@@ -50,7 +50,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
 
 Test cases:
   N generated, N passed

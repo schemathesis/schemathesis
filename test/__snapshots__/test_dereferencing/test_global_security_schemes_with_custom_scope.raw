@@ -30,11 +30,17 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
   - GET /test
 
-Tip: Check base URL or adjust data generation settings
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
+
+  - GET /test
+
+💡 Check your schema constraints - API validation may be stricter than documented
 
 =================================== SUMMARY ====================================
 
@@ -50,7 +56,8 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
 
 Test cases:
   N generated, N passed

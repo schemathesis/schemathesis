@@ -21,13 +21,14 @@ nav:
       - explanations/stateful.md
       - explanations/examples.md
       - explanations/checks.md
-  - API Reference:
+  - Reference:
       - Configuration Options: reference/configuration.md
       - CLI Options: reference/cli.md
       - Checks: reference/checks.md
       - Hooks: reference/hooks.md
       - Reporting: reference/reporting.md
       - Python API Reference: reference/python.md
+      - reference/warnings.md
   - External Resources: resources.md
   - Troubleshooting: troubleshooting.md
   - FAQ: faq.md

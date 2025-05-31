@@ -306,6 +306,9 @@ def test_unknown_field_name(graphql_schema, name, expected):
 def test_field_map_operations(graphql_schema):
     assert len(graphql_schema["Query"]) == 2
     assert list(iter(graphql_schema["Query"])) == ["getBooks", "getAuthors"]
+    assert graphql_schema.find_operation_by_label("Query.getBooks") is not None
+    assert graphql_schema.find_operation_by_label("Query.getBookz") is None
+    assert graphql_schema.find_operation_by_label("getBookz") is None
 
 
 def test_repr(graphql_schema):

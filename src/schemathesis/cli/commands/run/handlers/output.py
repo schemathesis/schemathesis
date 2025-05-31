@@ -16,7 +16,7 @@ from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.config import ProjectConfig, ReportFormat
+from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
@@ -325,7 +325,13 @@ class ProbingProgressManager:
 @dataclass
 class WarningData:
     missing_auth: dict[int, set[str]] = field(default_factory=dict)
-    only_4xx_responses: set[str] = field(default_factory=set)  # operations that only returned 4xx
+    missing_test_data: set[str] = field(default_factory=set)
+    # operations that only returned 4xx
+    validation_mismatch: set[str] = field(default_factory=set)
+
+    @property
+    def is_empty(self) -> bool:
+        return not bool(self.missing_auth or self.missing_test_data or self.validation_mismatch)
 
 
 @dataclass
@@ -793,7 +799,7 @@ class OutputHandler(EventHandler):
         elif isinstance(event, events.ScenarioStarted):
             self._on_scenario_started(event)
         elif isinstance(event, events.ScenarioFinished):
-            self._on_scenario_finished(event)
+            self._on_scenario_finished(ctx, event)
         if isinstance(event, events.EngineFinished):
             self._on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
@@ -1015,7 +1021,7 @@ class OutputHandler(EventHandler):
             assert self.unit_tests_manager is not None
             self.unit_tests_manager.start_operation(event.label)
 
-    def _on_scenario_finished(self, event: events.ScenarioFinished) -> None:
+    def _on_scenario_finished(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
             assert self.unit_tests_manager is not None
             if event.label:
@@ -1024,7 +1030,7 @@ class OutputHandler(EventHandler):
             self.unit_tests_manager.update_stats(event.status)
             if event.status == Status.SKIP and event.skip_reason is not None:
                 self.skip_reasons.append(event.skip_reason)
-            self._check_warnings(event)
+            self._check_warnings(ctx, event)
         elif (
             event.phase == PhaseName.STATEFUL_TESTING
             and not event.is_final
@@ -1034,15 +1040,22 @@ class OutputHandler(EventHandler):
             links_seen = {case.transition.id for case in event.recorder.cases.values() if case.transition is not None}
             self.stateful_tests_manager.update(links_seen, event.status)
 
-    def _check_warnings(self, event: events.ScenarioFinished) -> None:
+    def _check_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         statistic = aggregate_status_codes(event.recorder.interactions.values())
 
         if statistic.total == 0:
             return
 
-        for status_code in (401, 403):
-            if statistic.ratio_for(status_code) >= TOO_MANY_RESPONSES_THRESHOLD:
-                self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
+        assert ctx.find_operation_by_label is not None
+        assert event.label is not None
+        operation = ctx.find_operation_by_label(event.label)
+
+        warnings = self.config.warnings_for(operation=operation)
+
+        if SchemathesisWarning.MISSING_AUTH in warnings:
+            for status_code in (401, 403):
+                if statistic.ratio_for(status_code) >= AUTH_ERRORS_THRESHOLD:
+                    self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
 
         # Warn if all positive test cases got 4xx in return and no failure was found
         def all_positive_are_rejected(recorder: ScenarioRecorder) -> bool:
@@ -1063,11 +1076,19 @@ class OutputHandler(EventHandler):
 
         if (
             event.status == Status.SUCCESS
-            and GenerationMode.POSITIVE in self.config.generation_for(operation=None, phase=event.phase.name).modes
+            and (
+                SchemathesisWarning.MISSING_TEST_DATA in warnings or SchemathesisWarning.VALIDATION_MISMATCH in warnings
+            )
+            and GenerationMode.POSITIVE in self.config.generation_for(operation=operation, phase=event.phase.name).modes
             and all_positive_are_rejected(event.recorder)
-            and statistic.should_warn_about_only_4xx()
         ):
-            self.warnings.only_4xx_responses.add(event.recorder.label)
+            if SchemathesisWarning.MISSING_TEST_DATA in warnings and statistic.should_warn_about_missing_test_data():
+                self.warnings.missing_test_data.add(event.recorder.label)
+            if (
+                SchemathesisWarning.VALIDATION_MISMATCH in warnings
+                and statistic.should_warn_about_validation_mismatch()
+            ):
+                self.warnings.validation_mismatch.add(event.recorder.label)
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
         from rich.padding import Padding
@@ -1138,60 +1159,77 @@ class OutputHandler(EventHandler):
 
         raise click.Abort
 
+    def _display_warning_block(
+        self, title: str, operations: set[str] | dict, tips: list[str], operation_suffix: str = ""
+    ) -> None:
+        if isinstance(operations, dict):
+            total = sum(len(ops) for ops in operations.values())
+        else:
+            total = len(operations)
+
+        suffix = "" if total == 1 else "s"
+        click.echo(
+            _style(
+                f"{title}: {total} operation{suffix}{operation_suffix}\n",
+                fg="yellow",
+            )
+        )
+
+        # Print up to 3 endpoints, then "+N more"
+        def _print_up_to_three(operations_: list[str] | set[str]) -> None:
+            for operation in sorted(operations_)[:3]:
+                click.echo(_style(f"  - {operation}", fg="yellow"))
+            extra_count = len(operations_) - 3
+            if extra_count > 0:
+                click.echo(_style(f"  + {extra_count} more", fg="yellow"))
+
+        if isinstance(operations, dict):
+            for status_code, ops in operations.items():
+                status_text = "Unauthorized" if status_code == 401 else "Forbidden"
+                count = len(ops)
+                suffix = "" if count == 1 else "s"
+                click.echo(_style(f"{status_code} {status_text} ({count} operation{suffix}):", fg="yellow"))
+
+                _print_up_to_three(ops)
+        else:
+            _print_up_to_three(operations)
+
+        if tips:
+            click.echo()
+
+        for tip in tips:
+            click.echo(_style(tip, fg="yellow"))
+
+        click.echo()
+
     def display_warnings(self) -> None:
         display_section_name("WARNINGS")
         click.echo()
         if self.warnings.missing_auth:
-            total = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
-            suffix = "" if total == 1 else "s"
-            click.echo(
-                _style(
-                    f"Missing or invalid API credentials: {total} API operation{suffix} returned authentication errors\n",
-                    fg="yellow",
-                )
+            self._display_warning_block(
+                title="Missing authentication",
+                operations=self.warnings.missing_auth,
+                operation_suffix=" returned authentication errors",
+                tips=["💡 Use --auth or -H to provide authentication credentials"],
             )
 
-            for status_code, operations in self.warnings.missing_auth.items():
-                status_text = "Unauthorized" if status_code == 401 else "Forbidden"
-                count = len(operations)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"{status_code} {status_text} ({count} operation{suffix}):",
-                        fg="yellow",
-                    )
-                )
-                # Show first few API operations
-                for endpoint in sorted(operations)[:3]:
-                    click.echo(_style(f"  - {endpoint}", fg="yellow"))
-                if len(operations) > 3:
-                    click.echo(_style(f"  + {len(operations) - 3} more", fg="yellow"))
-                click.echo()
-            click.echo(_style("Tip: ", bold=True, fg="yellow"), nl=False)
-            click.echo(_style(f"Use {bold('--auth')} ", fg="yellow"), nl=False)
-            click.echo(_style(f"or {bold('-H')} ", fg="yellow"), nl=False)
-            click.echo(_style("to provide authentication credentials", fg="yellow"))
-            click.echo()
-
-        if self.warnings.only_4xx_responses:
-            count = len(self.warnings.only_4xx_responses)
-            suffix = "" if count == 1 else "s"
-            click.echo(
-                _style(
-                    f"Schemathesis configuration: {count} operation{suffix} returned only 4xx responses during unit tests\n",
-                    fg="yellow",
-                )
+        if self.warnings.missing_test_data:
+            self._display_warning_block(
+                title="Missing test data",
+                operations=self.warnings.missing_test_data,
+                operation_suffix=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
+                tips=[
+                    "💡 Provide realistic parameter values in your config file so tests can access existing resources",
+                ],
             )
 
-            for endpoint in sorted(self.warnings.only_4xx_responses)[:3]:
-                click.echo(_style(f"  - {endpoint}", fg="yellow"))
-            if len(self.warnings.only_4xx_responses) > 3:
-                click.echo(_style(f"  + {len(self.warnings.only_4xx_responses) - 3} more", fg="yellow"))
-            click.echo()
-
-            click.echo(_style("Tip: ", bold=True, fg="yellow"), nl=False)
-            click.echo(_style("Check base URL or adjust data generation settings", fg="yellow"))
-            click.echo()
+        if self.warnings.validation_mismatch:
+            self._display_warning_block(
+                title="Schema validation mismatch",
+                operations=self.warnings.validation_mismatch,
+                operation_suffix=" mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation",
+                tips=["💡 Check your schema constraints - API validation may be stricter than documented"],
+            )
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
@@ -1434,7 +1472,7 @@ class OutputHandler(EventHandler):
                 )
             )
         display_failures(ctx)
-        if self.warnings.missing_auth or self.warnings.only_4xx_responses:
+        if not self.warnings.is_empty:
             self.display_warnings()
         if ctx.statistic.extraction_failures:
             self.display_stateful_failures(ctx)
@@ -1452,21 +1490,39 @@ class OutputHandler(EventHandler):
         if self.errors:
             self.display_errors_summary()
 
-        if self.warnings.missing_auth or self.warnings.only_4xx_responses:
+        if not self.warnings.is_empty:
             click.echo(_style("Warnings:", bold=True))
 
             if self.warnings.missing_auth:
                 affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
-                click.echo(_style(f"  ⚠️ Missing authentication: {bold(str(affected))}", fg="yellow"))
+                suffix = "" if affected == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Missing authentication: {bold(str(affected))} operation{suffix} returned only 401/403 responses",
+                        fg="yellow",
+                    )
+                )
 
-            if self.warnings.only_4xx_responses:
-                count = len(self.warnings.only_4xx_responses)
+            if self.warnings.missing_test_data:
+                count = len(self.warnings.missing_test_data)
                 suffix = "" if count == 1 else "s"
                 click.echo(
-                    _style(f"  ⚠️ Schemathesis configuration: {bold(str(count))}", fg="yellow"),
-                    nl=False,
+                    _style(
+                        f"  ⚠️ Missing valid test data: {bold(str(count))} operation{suffix} repeatedly returned 404 responses",
+                        fg="yellow",
+                    )
                 )
-                click.echo(_style(f" operation{suffix} returned only 4xx responses during unit tests", fg="yellow"))
+
+            if self.warnings.validation_mismatch:
+                count = len(self.warnings.validation_mismatch)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Schema validation mismatch: {bold(str(count))} operation{suffix} mostly rejected generated data",
+                        fg="yellow",
+                    )
+                )
+
             click.echo()
 
         if ctx.summary_lines:
@@ -1477,12 +1533,6 @@ class OutputHandler(EventHandler):
         self.display_reports()
         self.display_seed()
         self.display_final_line(ctx, event)
-
-
-TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
-    "Most of the responses from {} have a {} status code. Did you specify proper API credentials?"
-)
-TOO_MANY_RESPONSES_THRESHOLD = 0.9
 
 
 @dataclass
@@ -1500,15 +1550,55 @@ class StatusCodeStatistic:
             return 0.0
         return self.counts.get(status_code, 0) / self.total
 
-    def should_warn_about_only_4xx(self) -> bool:
-        """Check if an operation should be warned about (only 4xx responses, excluding auth)."""
+    def _get_4xx_breakdown(self) -> tuple[int, int, int]:
+        """Get breakdown of 4xx responses: (404_count, other_4xx_count, total_4xx_count)."""
+        count_404 = self.counts.get(404, 0)
+        count_other_4xx = sum(
+            count for code, count in self.counts.items() if 400 <= code < 500 and code not in {401, 403, 404}
+        )
+        total_4xx = count_404 + count_other_4xx
+        return count_404, count_other_4xx, total_4xx
+
+    def _is_only_4xx_responses(self) -> bool:
+        """Check if all responses are 4xx (excluding 5xx)."""
+        return all(400 <= code < 500 for code in self.counts.keys() if code not in {500})
+
+    def _can_warn_about_4xx(self) -> bool:
+        """Check basic conditions for 4xx warnings."""
         if self.total == 0:
             return False
-        # Don't duplicate auth warnings & skip only 500
+        # Skip if only auth errors
         if set(self.counts.keys()) <= {401, 403, 500}:
             return False
-        # At this point we know we only have 4xx responses
-        return True
+        return self._is_only_4xx_responses()
+
+    def should_warn_about_missing_test_data(self) -> bool:
+        """Check if an operation should be warned about missing test data (significant 404 responses)."""
+        if not self._can_warn_about_4xx():
+            return False
+
+        count_404, _, total_4xx = self._get_4xx_breakdown()
+
+        if total_4xx == 0:
+            return False
+
+        return (count_404 / total_4xx) >= OTHER_CLIENT_ERRORS_THRESHOLD
+
+    def should_warn_about_validation_mismatch(self) -> bool:
+        """Check if an operation should be warned about validation mismatch (significant 400/422 responses)."""
+        if not self._can_warn_about_4xx():
+            return False
+
+        _, count_other_4xx, total_4xx = self._get_4xx_breakdown()
+
+        if total_4xx == 0:
+            return False
+
+        return (count_other_4xx / total_4xx) >= OTHER_CLIENT_ERRORS_THRESHOLD
+
+
+AUTH_ERRORS_THRESHOLD = 0.9
+OTHER_CLIENT_ERRORS_THRESHOLD = 0.1
 
 
 def aggregate_status_codes(interactions: Iterable[Interaction]) -> StatusCodeStatistic:

@@ -18,7 +18,13 @@ from schemathesis.cli.ext.options import (
     CustomHelpMessageChoice,
     RegistryChoice,
 )
-from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat, SchemathesisConfig
+from schemathesis.config import (
+    DEFAULT_REPORT_DIRECTORY,
+    HealthCheck,
+    ReportFormat,
+    SchemathesisConfig,
+    SchemathesisWarning,
+)
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import GenerationMode
@@ -81,6 +87,14 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     type=click.FloatRange(1.0),
     default=None,
     envvar="SCHEMATHESIS_WAIT_FOR_SCHEMA",
+)
+@grouped_option(
+    "--warnings",
+    help="Control warning display: 'off' to disable all, or comma-separated list of warning types to enable",
+    type=str,
+    default=None,
+    callback=validation.validate_warnings,
+    metavar="WARNINGS",
 )
 @group("API validation options")
 @grouped_option(
@@ -432,6 +446,7 @@ def run(
     base_url: str | None,
     wait_for_schema: float | None = None,
     suppress_health_check: list[HealthCheck] | None,
+    warnings: bool | list[SchemathesisWarning] | None,
     rate_limit: str | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
@@ -514,6 +529,7 @@ def run(
         request_cert=request_cert,
         request_cert_key=request_cert_key,
         proxy=request_proxy,
+        warnings=warnings,
     )
     # These are filters for what API operations should be tested
     filter_set = {

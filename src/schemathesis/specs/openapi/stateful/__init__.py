@@ -14,6 +14,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
+from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.stateful.control import TransitionController
@@ -32,7 +33,7 @@ class OpenAPIStateMachine(APIStateMachine):
     _transitions: ApiTransitions
 
     def __init__(self) -> None:
-        self.recorder = ScenarioRecorder(label="Stateful tests")
+        self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL)
         self.control = TransitionController(self._transitions)
         super().__init__()
 

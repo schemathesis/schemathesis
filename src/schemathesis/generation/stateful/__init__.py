@@ -7,6 +7,8 @@ if TYPE_CHECKING:
 
     from schemathesis.generation.stateful.state_machine import APIStateMachine
 
+STATEFUL_TESTS_LABEL = "Stateful tests"
+
 
 def run_state_machine_as_test(
     state_machine_factory: type[APIStateMachine], *, settings: hypothesis.settings | None = None

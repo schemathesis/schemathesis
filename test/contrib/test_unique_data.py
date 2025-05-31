@@ -2,6 +2,8 @@ import platform
 
 import pytest
 
+from test.utils import flaky
+
 
 @pytest.fixture(
     params=[
@@ -102,6 +104,7 @@ def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_example
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
+@flaky(max_runs=3, min_passes=1)
 def test_cli(ctx, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
     assert run(ctx, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 

@@ -424,6 +424,9 @@ class BaseSchema(Mapping):
             self.app = app
         return self
 
+    def find_operation_by_label(self, label: str) -> APIOperation | None:
+        raise NotImplementedError
+
 
 @dataclass
 class APIOperationMap(Mapping):

@@ -23,6 +23,9 @@ Options:
   --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the
                                  API schema to become available. Disabled by
                                  default  [x>=1.0]
+  --warnings WARNINGS            Control warning display: 'off' to disable all,
+                                 or comma-separated list of warning types to
+                                 enable
 
 API validation options:
   -c, --checks                  Comma-separated list of checks to run against

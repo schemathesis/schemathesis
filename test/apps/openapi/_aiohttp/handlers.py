@@ -290,7 +290,7 @@ async def update_user(request: web.Request) -> web.Response:
         user = request.app["users"][user_id]
         data = await request.json()
         if not isinstance(data, dict):
-            raise web.HTTPBadRequest(text='{{"detail": "Invalid input type, expected an object"}}')
+            raise web.HTTPBadRequest(text='{"detail": "Invalid input type, expected an object"}')
         for field in ("first_name", "last_name"):
             if field not in data:
                 raise web.HTTPBadRequest(text=f'{{"detail": "Missing `{field}`"}}')
