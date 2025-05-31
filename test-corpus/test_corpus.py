@@ -1,9 +1,10 @@
 import pathlib
 import sys
 from typing import NoReturn
+from unittest.mock import patch
 
 import pytest
-from flask import Flask
+import requests
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -19,6 +20,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
+from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
@@ -27,7 +29,6 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
 from corpus.tools import json_loads, read_corpus_file  # noqa: E402
-from test.fixtures import app_runner  # noqa: E402
 
 CORPUS_FILE_NAMES = (
     "swagger-2.0",
@@ -36,13 +37,15 @@ CORPUS_FILE_NAMES = (
 )
 CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
 
-
-app = Flask("test_app")
-
-
-@app.route("/")
-def default():
-    return '{"success": true}'
+RESPONSE = Response(
+    status_code=200,
+    headers={},
+    content=b"",
+    request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
+    elapsed=0.1,
+    verify=False,
+)
+patch("schemathesis.Case.call", return_value=RESPONSE).start()
 
 
 def pytest_generate_tests(metafunc):
@@ -50,7 +53,7 @@ def pytest_generate_tests(metafunc):
     metafunc.parametrize("corpus, filename", filenames)
 
 
-SLOW = {
+SLOW_DEFAULT = {
     "stripe.com/2020-08-27.json",
     "azure.com/network-applicationGateway/2018-08-01.json",
     "azure.com/network-applicationGateway/2019-06-01.json",
@@ -98,16 +101,12 @@ SLOW = {
     "bungie.net/2.18.0.json",
     "amazonaws.com/sagemaker-geospatial/2020-05-27.json",
 }
+SLOW_COVERAGE = SLOW_DEFAULT.copy().union({})
 KNOWN_ISSUES = {
     # Regex that includes surrogates which is incompatible with the default alphabet for regex in Hypothesis (UTF-8)
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /collaborations"),
     ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /configuredTables"),
 }
-
-
-@pytest.fixture(scope="session")
-def app_port():
-    return app_runner.run(app.run)
 
 
 @schemathesis.check
@@ -122,8 +121,8 @@ def combined_check(ctx, response, case):
             pass
 
 
-def test_default(corpus, filename, app_port):
-    schema = _load_schema(corpus, filename, app_port)
+def test_default(corpus, filename):
+    schema = _load_schema(corpus, filename)
     try:
         schema.as_state_machine()()
     except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
@@ -145,18 +144,18 @@ def test_coverage_phase(corpus, filename):
     modes = list(GenerationMode)
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
-            for _ in _iter_coverage_cases(operation.ok(), modes):
+            for _ in _iter_coverage_cases(operation.ok(), modes, generate_duplicate_query_parameters=False):
                 pass
 
 
-def _load_schema(corpus, filename, app_port=None):
-    if filename in SLOW:
+def _load_schema(corpus, filename):
+    if filename in SLOW_DEFAULT:
         pytest.skip("Data generation is extremely slow for this schema")
     raw_content = CORPUS_FILES[corpus].extractfile(filename)
     raw_schema = json_loads(raw_content.read())
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
-        schema.config.update(base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None)
+        schema.config.update(base_url="http://127.0.0.1:8080/")
         return schema
     except LoaderError as exc:
         assert_invalid_schema(exc)
