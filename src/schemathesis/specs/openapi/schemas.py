@@ -128,6 +128,10 @@ class BaseOpenAPISchema(BaseSchema):
         cache.insert_map(path, map)
         return map
 
+    def find_operation_by_label(self, label: str) -> APIOperation | None:
+        method, path = label.split(" ", maxsplit=1)
+        return self[path][method]
+
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         matches = get_close_matches(item, list(self))
         self._on_missing_operation(item, exc, matches)

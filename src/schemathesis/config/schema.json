@@ -121,6 +121,9 @@
     },
     "request-cert-key": {
       "type": "string"
+    },
+    "warnings": {
+      "$ref": "#/$defs/WarningConfig"
     }
   },
   "$defs": {
@@ -515,10 +518,31 @@
         },
         "request-cert-key": {
           "type": "string"
+        },
+        "warnings": {
+          "$ref": "#/$defs/WarningConfig"
         }
       },
       "required": [
         "title"
+      ]
+    },
+    "WarningConfig": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "missing_auth",
+              "missing_test_data",
+              "validation_mismatch"
+            ]
+          }
+        }
       ]
     },
     "OperationConfig": {
@@ -561,6 +585,9 @@
         },
         "request-cert-key": {
           "type": "string"
+        },
+        "warnings": {
+          "$ref": "#/$defs/WarningConfig"
         },
         "checks": {
           "$ref": "#/$defs/ChecksConfig"

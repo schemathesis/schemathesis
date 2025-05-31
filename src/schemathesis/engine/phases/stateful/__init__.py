@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import Phase, PhaseName, PhaseSkipReason
+from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -19,7 +20,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     try:
         state_machine = engine.schema.as_state_machine()
     except Exception as exc:
-        yield events.NonFatalError(error=exc, phase=phase.name, label="Stateful tests", related_to_operation=False)
+        yield events.NonFatalError(error=exc, phase=phase.name, label=STATEFUL_TESTS_LABEL, related_to_operation=False)
         yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
         return
 

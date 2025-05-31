@@ -119,6 +119,25 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     max-failures = 42
     ```
 
+#### `warnings`
+
+!!! note ""
+
+    **Type**: `Boolean` or `Array[String]`  
+    **Default**: `true` (all warnings enabled)  
+
+    Controls which warnings are displayed during test execution. Warnings highlight issues that could prevent tests from reaching your API's core logic.
+
+    ```toml
+    # Disable all warnings
+    warnings = false
+    ```
+
+    ```toml
+    # Enable specific warnings only
+    warnings = ["missing_auth", "validation_mismatch"]
+    ```
+
 ### Reporting
 
 #### `reports.directory`

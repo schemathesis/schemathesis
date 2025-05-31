@@ -22,11 +22,11 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
 
   - POST /success
 
-Tip: Check base URL or adjust data generation settings
+💡 Check your schema constraints - API validation may be stricter than documented
 
 =================================== SUMMARY ====================================
 
@@ -42,7 +42,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
 
 Test cases:
   N generated, N passed

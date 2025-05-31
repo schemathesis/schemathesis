@@ -53,11 +53,11 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
   - PATCH /users/{user_id}
 
-Tip: Check base URL or adjust data generation settings
+💡 Provide realistic parameter values in your config file so tests can access existing resources
 
 =================================== SUMMARY ====================================
 
@@ -76,7 +76,7 @@ Failures:
   ❌ Custom check failed: `always_fails`: 1
 
 Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
 
 Test cases:
   N generated, N found N unique failures, N skipped

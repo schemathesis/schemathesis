@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(warnings=[<SchemathesisWarning.MISSING_AUTH: 'missing_auth'>, <SchemathesisWarning.MISSING_TEST_DATA: 'missing_test_data'>, <SchemathesisWarning.VALIDATION_MISMATCH: 'validation_mismatch'>])))

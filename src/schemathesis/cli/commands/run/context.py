@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING, Callable, Generator
 
+from schemathesis.cli.commands.run.events import LoadingFinished
 from schemathesis.config import ProjectConfig
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
@@ -11,6 +12,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, ScenarioRecorder
 from schemathesis.generation.case import Case
+from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
@@ -177,6 +179,7 @@ class ExecutionContext:
     """Storage for the current context of the execution."""
 
     config: ProjectConfig
+    find_operation_by_label: Callable[[str], APIOperation | None] | None = None
     statistic: Statistic = field(default_factory=Statistic)
     exit_code: int = 0
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
@@ -189,6 +192,8 @@ class ExecutionContext:
         self.summary_lines.append(line)
 
     def on_event(self, event: events.EngineEvent) -> None:
+        if isinstance(event, LoadingFinished):
+            self.find_operation_by_label = event.find_operation_by_label
         if isinstance(event, events.ScenarioFinished):
             self.statistic.on_scenario_finished(event.recorder)
         elif isinstance(event, events.NonFatalError) or (

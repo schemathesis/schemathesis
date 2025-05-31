@@ -40,6 +40,11 @@ def test_configs(monkeypatch, path, snapshot_config):
         assert str(exc) == snapshot_config
 
 
+def test_warnings_for_without_operations():
+    config = SchemathesisConfig.from_dict({"warnings": False})
+    assert config.projects.default.warnings_for(operation=None) == []
+
+
 def test_project_key_config_sync():
     ignored_in_operations_config = {"operations", "hooks", "workers", "base_url"}
     for key in ProjectConfig.__slots__:
