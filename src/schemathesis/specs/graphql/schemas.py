@@ -115,6 +115,15 @@ class GraphQLSchema(BaseSchema):
                 return map
         raise KeyError(key)
 
+    def find_operation_by_label(self, label: str) -> APIOperation | None:
+        if label.startswith(("Query.", "Mutation.")):
+            ty, field = label.split(".", maxsplit=1)
+            try:
+                return self[ty][field]
+            except KeyError:
+                return None
+        return None
+
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raw_schema = self.raw_schema["__schema"]
         type_names = [type_def["name"] for type_def in raw_schema.get("types", [])]

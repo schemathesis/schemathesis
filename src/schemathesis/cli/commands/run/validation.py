@@ -10,7 +10,8 @@ from urllib.parse import urlparse
 
 import click
 
-from schemathesis.config import ReportFormat, get_workers_count
+from schemathesis.cli.ext.options import CsvEnumChoice
+from schemathesis.config import ReportFormat, SchemathesisWarning, get_workers_count
 from schemathesis.core import errors, rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
@@ -229,3 +230,17 @@ def convert_workers(ctx: click.core.Context, param: click.core.Parameter, value:
     if value == "auto":
         return get_workers_count()
     return int(value)
+
+
+WARNINGS_CHOICE = CsvEnumChoice(SchemathesisWarning)
+
+
+def validate_warnings(
+    ctx: click.core.Context, param: click.core.Parameter, value: str | None
+) -> bool | None | list[SchemathesisWarning]:
+    if value is None:
+        return None
+    boolean = string_to_boolean(value)
+    if isinstance(boolean, bool):
+        return boolean
+    return WARNINGS_CHOICE.convert(value, param, ctx)  # type: ignore[return-value]

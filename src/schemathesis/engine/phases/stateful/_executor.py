@@ -33,6 +33,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import (
     DEFAULT_STATE_MACHINE_SETTINGS,
     APIStateMachine,
@@ -293,7 +294,7 @@ def execute_state_machine_loop(
                 events.NonFatalError(
                     error=exc,
                     phase=PhaseName.STATEFUL_TESTING,
-                    label="Stateful tests",
+                    label=STATEFUL_TESTS_LABEL,
                     related_to_operation=False,
                     code_sample=code_sample,
                 )

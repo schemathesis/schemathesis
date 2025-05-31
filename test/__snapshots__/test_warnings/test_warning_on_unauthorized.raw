@@ -16,17 +16,18 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ✅  Coverage (in 0.00s)
+ ✅  Fuzzing (in 0.00s)
 
      ✅ 1 passed
 
 =================================== WARNINGS ===================================
 
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+Missing authentication: 1 operation returned authentication errors
 
-  - GET /always_incorrect
+401 Unauthorized (1 operation):
+  - GET /basic
 
-Tip: Check base URL or adjust data generation settings
+💡 Use --auth or -H to provide authentication credentials
 
 =================================== SUMMARY ====================================
 
@@ -37,16 +38,16 @@ API Operations:
 Test Phases:
   ✅ API probing
   ⏭  Examples (disabled)
-  ✅ Coverage
-  ⏭  Fuzzing (disabled)
+  ⏭  Coverage (disabled)
+  ✅ Fuzzing
   ⏭  Stateful (disabled)
 
 Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
 
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 warning in 1.00s ==============================

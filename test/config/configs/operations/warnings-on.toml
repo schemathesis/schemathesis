@@ -1,0 +1,3 @@
+[[operations]]
+include-name = "GET /users/{user_id}"
+warnings = true

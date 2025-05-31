@@ -76,6 +76,7 @@ def into_event_stream(*, location: str, config: ProjectConfig, filter_set: dict[
         schema=schema.raw_schema,
         config=schema.config,
         base_path=schema.base_path,
+        find_operation_by_label=schema.find_operation_by_label,
     )
 
     try:

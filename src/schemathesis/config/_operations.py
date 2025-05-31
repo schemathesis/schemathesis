@@ -14,6 +14,7 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
+from schemathesis.config._warnings import SchemathesisWarning, resolve_warnings
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.filters import FilterSet, HasAPIOperation, expression_to_filter_function, is_deprecated
 
@@ -207,6 +208,7 @@ class OperationConfig(DiffBase):
     request_cert: str | None
     request_cert_key: str | None
     parameters: dict[str, Any]
+    warnings: list[SchemathesisWarning] | None
     auth: AuthConfig
     checks: ChecksConfig
     phases: PhasesConfig
@@ -225,6 +227,7 @@ class OperationConfig(DiffBase):
         "request_cert",
         "request_cert_key",
         "parameters",
+        "warnings",
         "auth",
         "checks",
         "phases",
@@ -245,6 +248,7 @@ class OperationConfig(DiffBase):
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
+        warnings: bool | list[SchemathesisWarning] | None = None,
         auth: AuthConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
@@ -265,6 +269,7 @@ class OperationConfig(DiffBase):
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
         self.parameters = parameters or {}
+        self._set_warnings(warnings)
         self.auth = auth or AuthConfig()
         self.checks = checks or ChecksConfig()
         self.phases = phases or PhasesConfig()
@@ -306,8 +311,17 @@ class OperationConfig(DiffBase):
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),
+            warnings=resolve_warnings(data.get("warnings")),
             auth=AuthConfig.from_dict(data.get("auth", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {})),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
         )
+
+    def _set_warnings(self, warnings: bool | list[SchemathesisWarning] | None) -> None:
+        if warnings is False:
+            self.warnings = []
+        elif warnings is True:
+            self.warnings = list(SchemathesisWarning)
+        else:
+            self.warnings = warnings
