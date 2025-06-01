@@ -242,7 +242,7 @@ def remove_nones(value):
     verbosity=Verbosity.quiet,
     max_examples=7,
 )
-@pytest.mark.usefixtures("mocked_schema")
+@pytest.mark.usefixtures("mocked_schema", "mocked_call")
 def test_random_config(cli, config, schema_url, tmp_path):
     reports = config.get("reports", {})
     report_enabled = False
