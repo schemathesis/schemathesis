@@ -34,10 +34,9 @@ def to_csv(data):
 
 @pytest.fixture
 def csv_serializer():
-    @REQUESTS_TRANSPORT.serializer("text/csv")
-    @WSGI_TRANSPORT.serializer("text/csv")
+    @schemathesis.serializer("text/csv")
     def serialize_csv(ctx, value):
-        return {"data": to_csv(value)}
+        return to_csv(value)
 
     yield
 
