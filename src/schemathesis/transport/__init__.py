@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, TypeVar, Union
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import SerializationNotPossible
@@ -32,9 +32,13 @@ S = TypeVar("S", contravariant=True)
 
 @dataclass
 class SerializationContext:
-    """Generic context for serialization process."""
+    """Context object passed to serializer functions.
+
+    It provides access to the generated test case and any related metadata.
+    """
 
     case: Case
+    """The generated test case."""
 
     __slots__ = ("case",)
 
@@ -104,3 +108,35 @@ class BaseTransport(Generic[S]):
             # This media type is set manually. Otherwise, it should have been rejected during the data generation
             raise SerializationNotPossible.for_media_type(input_media_type)
         return pair[1]
+
+
+_Serializer = Callable[[SerializationContext, Any], Union[bytes, None]]
+
+
+def serializer(*media_types: str) -> Callable[[_Serializer], None]:
+    """Register a serializer for specified media types on HTTP, ASGI, and WSGI transports.
+
+    Args:
+        *media_types: One or more MIME types (e.g., "application/json") this serializer handles.
+
+    Returns:
+        A decorator that wraps a function taking `(ctx: SerializationContext, value: Any)` and returning `bytes` for serialized body and `None` for omitting request body.
+
+    """
+
+    def register(func: _Serializer) -> None:
+        from schemathesis.transport.asgi import ASGI_TRANSPORT
+        from schemathesis.transport.requests import REQUESTS_TRANSPORT
+        from schemathesis.transport.wsgi import WSGI_TRANSPORT
+
+        @ASGI_TRANSPORT.serializer(*media_types)
+        @REQUESTS_TRANSPORT.serializer(*media_types)
+        @WSGI_TRANSPORT.serializer(*media_types)
+        def inner(ctx: SerializationContext, value: Any) -> dict[str, bytes]:
+            result = {}
+            serialized = func(ctx, value)
+            if serialized is not None:
+                result["data"] = serialized
+            return result
+
+    return register

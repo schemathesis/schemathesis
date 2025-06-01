@@ -58,7 +58,6 @@ from io import StringIO
 @schemathesis.serializer("text/csv")
 def csv_serializer(ctx, value):
     """Convert list of dictionaries to CSV bytes"""
-    
     # Handle binary data from external examples
     if isinstance(value, bytes):
         return value
@@ -77,7 +76,7 @@ def csv_serializer(ctx, value):
     writer.writeheader()
     writer.writerows(value)
     
-    return output.getvalue().encode('utf-8')  # Must return bytes
+    return output.getvalue().encode('utf-8')  # Must return bytes or None
 ```
 
 ```bash
@@ -87,12 +86,17 @@ schemathesis run http://localhost:8000/openapi.json
 
 **Result:** Your `/upload-users` endpoint receives properly formatted CSV data instead of JSON.
 
+!!! note "Skipping Serialization"
+    If your serializer returns `None`, the resulting request will have no body.
+
 ## Essential Patterns
 
 ### Multiple aliases for the same format
 
 ```python
-@schemathesis.serializer("text/csv", "text/comma-separated-values", "application/csv")
+@schemathesis.serializer(
+    "text/csv", "text/comma-separated-values", "application/csv"
+)
 def csv_serializer(ctx, value):
     # Same implementation handles all aliases
     if isinstance(value, bytes):
@@ -106,15 +110,11 @@ def csv_serializer(ctx, value):
 @schemathesis.serializer("text/csv")
 def context_aware_csv(ctx, value):
     """Use test case information to customize serialization"""
-    
     if isinstance(value, bytes):
         return value
-    
-    # Access the full test case for context
-    case = ctx.case
-    
+
     # Different CSV format based on endpoint
-    if "/bulk-import" in case.path:
+    if "/bulk-import" in ctx.case.path:
         delimiter = '\t'  # Use tabs for bulk import
     else:
         delimiter = ','   # Use commas for regular upload
@@ -122,7 +122,11 @@ def context_aware_csv(ctx, value):
     return serialize_csv_with_delimiter(value, delimiter).encode('utf-8')
 ```
 
+!!! info "Automatic Transport Registration"
+    Serializers are automatically registered for all transport types (HTTP requests, ASGI, WSGI)
+
 ## What's Next
 
 - **[Custom Media Types](custom-media-types.md)** - Generate raw data when there's no JSON Schema
 - **[Extending Schemathesis](extending.md)** - Other customization options
+- **[Serialization API Reference](../reference/python.md#serialization)**

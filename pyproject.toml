@@ -72,7 +72,7 @@ tests = [
 ]
 cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3"]
 bench = ["pytest-codspeed==2.2.1"]
-docs = ["mkdocs-material"]
+docs = ["mkdocs-material", "mkdocstrings[python]"]
 dev = ["schemathesis[tests,cov,bench,docs]"]
 
 [project.urls]
