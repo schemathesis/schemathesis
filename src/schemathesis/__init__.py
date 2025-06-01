@@ -6,7 +6,7 @@ from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.targets import TargetContext, TargetFunction, target
+from schemathesis.generation.metrics import MetricContext, MetricFunction, metric
 from schemathesis.hooks import HookContext
 from schemathesis.schemas import BaseSchema
 from schemathesis.transport import SerializationContext, serializer
@@ -23,8 +23,6 @@ __all__ = [
     "CheckFunction",
     "GenerationMode",
     "Response",
-    "TargetContext",
-    "TargetFunction",
     "HookContext",
     "BaseSchema",
     "__version__",
@@ -38,7 +36,10 @@ __all__ = [
     "openapi",
     "pytest",
     "python",
-    "target",
+    # Targeted Property-based Testing
+    "metric",
+    "MetricContext",
+    "MetricFunction",
     # Serialization
     "serializer",
     "SerializationContext",

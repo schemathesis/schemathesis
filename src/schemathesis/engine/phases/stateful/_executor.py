@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations  # noqa: I001
 
 import queue
 import time
@@ -40,7 +40,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepInput,
     StepOutput,
 )
-from schemathesis.generation.targets import TargetMetricCollector
+from schemathesis.generation.metrics import MetricCollector
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -81,7 +81,7 @@ def execute_state_machine_loop(
     hypothesis_settings = hypothesis.settings(configured_hypothesis_settings, **kwargs)
     generation = engine.config.generation_for(phase="stateful")
 
-    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=generation.maximize))
+    ctx = StatefulContext(metric_collector=MetricCollector(metrics=generation.maximize))
     state = TestingState()
 
     # Caches for validate_response to avoid repeated config lookups per operation

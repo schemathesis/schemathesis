@@ -20,10 +20,6 @@ This approach is particularly useful for detecting:
 - Inputs that cause excessive processing
 - Potential denial-of-service vulnerabilities
 
-!!! info "Custom Metrics"
-
-    See [Extending Metrics](../guides/extending.md) for details on implementing custom metrics for targeted testing.
-
 ## Example Scenario
 
 Consider an API endpoint with a hidden performance issue where inputs containing many zeros cause progressively slower responses. At a certain threshold, the endpoint fails completely:
@@ -59,3 +55,26 @@ $ st run openapi.yaml --max-examples=10000 --generation-maximize response_time
 ```
 
 While results vary due to the random nature of property-based testing, targeted testing consistently improves efficiency on APIs with performance-related vulnerabilities.
+
+## Custom Metrics
+
+Schemathesis allows you to register your own metrics to guide targeted testing. A metric is simply a function that accepts a `MetricContext` (which contains the request `case` and its `response`) and returns a `float`. Once registered, you can use it with `--generation-maximize` just like built-in metrics.
+
+### Defining and Registering a Metric
+
+```python
+# metrics.py
+import schemathesis
+
+@schemathesis.metric
+def response_size(ctx: schemathesis.MetricContext) -> float:
+    """Favor responses with larger payloads."""
+    return float(len(ctx.response.content))
+```
+
+After defining and registering your metric, invoke Schemathesis with:
+
+```bash
+export SCHEMATHESIS_METRICS=metrics
+st run openapi.yaml --generation-maximize response_size
+```
