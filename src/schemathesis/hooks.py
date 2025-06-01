@@ -37,13 +37,15 @@ class RegisteredHook:
 
 @dataclass
 class HookContext:
-    """A context that is passed to some hook functions.
+    """A context that is passed to some hook functions."""
 
-    :ivar Optional[APIOperation] operation: API operation that is currently being processed.
-                                            Might be absent in some cases.
-    """
+    operation: APIOperation | None
+    """API operation that is currently being processed."""
 
-    operation: APIOperation | None = None
+    __slots__ = ("operation",)
+
+    def __init__(self, *, operation: APIOperation | None = None) -> None:
+        self.operation = operation
 
 
 def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
@@ -110,48 +112,29 @@ class HookDispatcher:
     _specs: ClassVar[dict[str, RegisteredHook]] = {}
 
     def __post_init__(self) -> None:
-        self.register = to_filterable_hook(self)  # type: ignore[method-assign]
+        self.hook = to_filterable_hook(self)  # type: ignore[method-assign]
 
-    def register(self, hook: str | Callable) -> Callable:
-        """Register a new hook.
-
-        :param hook: Either a hook function or a string.
-
-        Can be used as a decorator in two forms.
-        Without arguments for registering hooks and autodetecting their names:
-
-        .. code-block:: python
-
-            @schemathesis.hook
-            def before_generate_query(context, strategy):
-                ...
-
-        With a hook name as the first argument:
-
-        .. code-block:: python
-
-            @schemathesis.hook("before_generate_query")
-            def hook(context, strategy):
-                ...
-        """
+    def hook(self, hook: str | Callable) -> Callable:
         raise NotImplementedError
 
     def apply(self, hook: Callable, *, name: str | None = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
 
-        :param hook: A hook function.
-        :param Optional[str] name: A hook name.
+        Args:
+            hook: A hook function.
+            name: A hook name.
 
-        .. code-block:: python
-
-            def before_generate_query(context, strategy):
+        Example:
+            ```python
+            def filter_query(ctx, value):
                 ...
 
 
-            @schema.hooks.apply(before_generate_query)
+            @schema.hooks.apply(filter_query)
             @schema.parametrize()
             def test_api(case):
                 ...
+            ```
 
         """
         if name is None:
@@ -391,6 +374,50 @@ def after_call(context: HookContext, case: Case, response: Response) -> None:
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
-register = GLOBAL_HOOK_DISPATCHER.register
 unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
+
+
+def hook(hook: str | Callable) -> Callable:
+    """Register a new hook.
+
+    Args:
+        hook: Either a hook function (autodetecting its name) or a string matching one of the supported hook names.
+
+    Example:
+        Can be used as a decorator in two ways:
+
+        1. Without arguments (auto-detect the hook name from the function name):
+
+            ```python
+            @schemathesis.hook
+            def filter_query(ctx, query):
+                \"\"\"Skip cases where query is None or invalid\"\"\"
+                return query and "user_id" in query
+
+            @schemathesis.hook
+            def before_call(ctx, case):
+                \"\"\"Modify headers before sending each request\"\"\"
+                if case.headers is None:
+                    case.headers = {}
+                case.headers["X-Test-Mode"] = "true"
+                return None
+            ```
+
+        2. With an explicit hook name as the first argument:
+
+            ```python
+            @schemathesis.hook("map_headers")
+            def add_custom_header(ctx, headers):
+                \"\"\"Inject a test header into every request\"\"\"
+                if headers is None:
+                    headers = {}
+                headers["X-Custom"] = "value"
+                return headers
+            ```
+
+    """
+    return GLOBAL_HOOK_DISPATCHER.hook(hook)
+
+
+hook.__dict__ = GLOBAL_HOOK_DISPATCHER.hook.__dict__

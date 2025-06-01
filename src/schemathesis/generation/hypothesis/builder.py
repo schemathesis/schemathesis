@@ -232,7 +232,7 @@ def add_examples(
         strategy = operation.as_strategy()
         add_single_example(strategy, result)
 
-    context = HookContext(operation)  # context should be passed here instead
+    context = HookContext(operation=operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, result)
     operation.schema.hooks.dispatch("before_add_examples", context, result)
     if hook_dispatcher:

@@ -80,18 +80,14 @@ def openapi_cases(
     phase_name = "stateful" if __is_stateful_phase else phase.value
     generation_config = operation.schema.config.generation_for(operation=operation, phase=phase_name)
 
-    context = HookContext(operation)
+    ctx = HookContext(operation=operation)
 
     path_parameters_ = generate_parameter(
-        "path", path_parameters, operation, draw, context, hooks, generation_mode, generation_config
+        "path", path_parameters, operation, draw, ctx, hooks, generation_mode, generation_config
     )
-    headers_ = generate_parameter(
-        "header", headers, operation, draw, context, hooks, generation_mode, generation_config
-    )
-    cookies_ = generate_parameter(
-        "cookie", cookies, operation, draw, context, hooks, generation_mode, generation_config
-    )
-    query_ = generate_parameter("query", query, operation, draw, context, hooks, generation_mode, generation_config)
+    headers_ = generate_parameter("header", headers, operation, draw, ctx, hooks, generation_mode, generation_config)
+    cookies_ = generate_parameter("cookie", cookies, operation, draw, ctx, hooks, generation_mode, generation_config)
+    query_ = generate_parameter("query", query, operation, draw, ctx, hooks, generation_mode, generation_config)
 
     if body is NOT_SET:
         if operation.body:
@@ -108,7 +104,7 @@ def openapi_cases(
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
             strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config)
-            strategy = apply_hooks(operation, context, hooks, strategy, "body")
+            strategy = apply_hooks(operation, ctx, hooks, strategy, "body")
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(
                 operation.schema.transport.get_matching_media_types(parameter.media_type), key=lambda x: x[0]
@@ -219,7 +215,7 @@ def get_parameters_value(
     location: str,
     draw: Callable,
     operation: APIOperation,
-    context: HookContext,
+    ctx: HookContext,
     hooks: HookDispatcher | None,
     strategy_factory: StrategyFactory,
     generation_config: GenerationConfig,
@@ -231,10 +227,10 @@ def get_parameters_value(
     """
     if isinstance(value, NotSet) or not value:
         strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config)
-        strategy = apply_hooks(operation, context, hooks, strategy, location)
+        strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         return draw(strategy)
     strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config, exclude=value.keys())
-    strategy = apply_hooks(operation, context, hooks, strategy, location)
+    strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
         copied = deepclone(value)
@@ -272,7 +268,7 @@ def generate_parameter(
     explicit: NotSet | dict[str, Any],
     operation: APIOperation,
     draw: Callable,
-    context: HookContext,
+    ctx: HookContext,
     hooks: HookDispatcher | None,
     generator: GenerationMode,
     generation_config: GenerationConfig,
@@ -291,9 +287,7 @@ def generate_parameter(
         generator = GenerationMode.POSITIVE
     else:
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generator]
-    value = get_parameters_value(
-        explicit, location, draw, operation, context, hooks, strategy_factory, generation_config
-    )
+    value = get_parameters_value(explicit, location, draw, operation, ctx, hooks, strategy_factory, generation_config)
     used_generator: GenerationMode | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
@@ -494,11 +488,11 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
 
 def apply_hooks(
     operation: APIOperation,
-    context: HookContext,
+    ctx: HookContext,
     hooks: HookDispatcher | None,
     strategy: st.SearchStrategy,
     location: str,
 ) -> st.SearchStrategy:
     """Apply all hooks related to the given location."""
     container = LOCATION_TO_CONTAINER[location]
-    return apply_to_all_dispatchers(operation, context, hooks, strategy, container)
+    return apply_to_all_dispatchers(operation, ctx, hooks, strategy, container)

@@ -6,13 +6,6 @@ Checks
 
 .. autofunction:: schemathesis.check
 
-Data Generation
-~~~~~~~~~~~~~~~
-
-.. autoclass:: schemathesis.GenerationConfig
-   :members:
-
-
 Authentication
 ~~~~~~~~~~~~~~
 
@@ -28,15 +21,6 @@ Authentication
 
 Hooks
 ~~~~~
-
-.. autoclass:: schemathesis.HookContext
-   :members:
-
-These functions affect Schemathesis behavior globally:
-
-.. autofunction:: schemathesis.hook
-.. autofunction:: schemathesis.hooks.unregister
-.. autofunction:: schemathesis.hooks.unregister_all
 
 .. class:: schemathesis.BaseSchema
   :noindex:
