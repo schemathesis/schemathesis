@@ -95,4 +95,12 @@ markdown_extensions:
 extra_css:
   - stylesheets/extra.css
 
+plugins:
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [src]
+        options:
+          show_source: false
+
 copyright: Copyright &copy; 2020-2025 Dmitry Dygalo & Schemathesis.io

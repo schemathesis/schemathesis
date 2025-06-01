@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - A way to configure status codes for the `not_a_server_error` check. [#2539](https://github.com/schemathesis/schemathesis/issues/2539) 
+- `@schemathesis.serializer` decorator as a way to serialize data of media types not supported by Schemathesis.
 
 ### :bug: Fixed
 
