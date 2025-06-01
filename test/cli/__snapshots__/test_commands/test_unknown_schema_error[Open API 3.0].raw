@@ -38,9 +38,9 @@ Something bad happen
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in wrapped
         f(
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in test_func
-        targets.run(generation.maximize, case=case, response=response)
-      File "/package-root/generation/targets.py", line XXX, in run
-        value = target(context)
+        metrics.maximize(generation.maximize, case=case, response=response)
+      File "/package-root/generation/metrics.py", line XXX, in maximize
+        value = metric(ctx)
       File "/tmp/module.py", line XXX, in buggy
         raise AssertionError("Something bad happen")
     AssertionError: Something bad happen

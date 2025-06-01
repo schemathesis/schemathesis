@@ -17,7 +17,7 @@ from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.filters import expression_to_filter_function
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.targets import TargetFunction
+from schemathesis.generation.metrics import MetricFunction
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
@@ -201,11 +201,11 @@ def reduce_list(
 
 def convert_maximize(
     ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]
-) -> list[TargetFunction]:
-    from schemathesis.generation.targets import TARGETS
+) -> list[MetricFunction]:
+    from schemathesis.generation.metrics import METRICS
 
     names: list[str] = reduce(operator.iadd, value, [])
-    return TARGETS.get_by_names(names)
+    return METRICS.get_by_names(names)
 
 
 def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GenerationMode]:
