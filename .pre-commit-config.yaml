@@ -25,7 +25,7 @@ repos:
       - id: yamllint
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.15.0
+    rev: v1.16.0
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/|benches/).*$
@@ -33,11 +33,11 @@ repos:
         additional_dependencies: [types-requests, types-PyYAML]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.11
+    rev: v0.11.12
     hooks:
       - id: ruff-format
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.11
+    rev: v0.11.12
     hooks:
       - id: ruff-check
