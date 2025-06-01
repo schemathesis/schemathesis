@@ -292,4 +292,4 @@ def test_passing_transport_kwargs(app_schema, openapi3_base_url, mocker):
     except FailureGroup:
         pass
 
-    assert mocked.call_args.args[0].transport_kwargs == kwargs
+    assert mocked.call_args.args[0]._transport_kwargs == kwargs

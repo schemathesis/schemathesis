@@ -26,6 +26,7 @@ from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
+from schemathesis import auths, hooks
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.transport import Response
@@ -58,13 +59,13 @@ settings.register_profile("CI", max_examples=2000)
 @pytest.fixture(autouse=True)
 def reset_hooks():
     CUSTOM_HANDLERS.clear()
-    schemathesis.hooks.unregister_all()
-    schemathesis.auth.unregister()
+    hooks.unregister_all()
+    auths.unregister()
     media_types.unregister_all()
     yield
     CUSTOM_HANDLERS.clear()
-    schemathesis.hooks.unregister_all()
-    schemathesis.auth.unregister()
+    hooks.unregister_all()
+    auths.unregister()
     media_types.unregister_all()
 
 

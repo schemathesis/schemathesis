@@ -34,14 +34,34 @@ Auth = TypeVar("Auth")
 
 @dataclass
 class AuthContext:
-    """Holds state relevant for the authentication process.
+    """Runtime context passed to authentication providers during token generation.
 
-    :ivar APIOperation operation: API operation that is currently being processed.
-    :ivar app: Optional Python application if the WSGI / ASGI integration is used.
+    Provides access to the current API operation and application instance when
+    auth providers need operation-specific tokens or application state.
+
+    Example:
+        ```python
+        @schemathesis.auth()
+        class ContextAwareAuth:
+            def get(self, case, context):
+                # Access operation details
+                if "/admin/" in context.operation.path:
+                    return self.get_admin_token()
+                else:
+                    return self.get_user_token()
+
+            def set(self, case, data, context):
+                case.headers = {"Authorization": f"Bearer {data}"}
+        ```
+
     """
 
     operation: APIOperation
+    """API operation currently being processed for authentication."""
     app: Any | None
+    """Python application instance (ASGI/WSGI app) when using app integration, `None` otherwise."""
+
+    __slots__ = ("operation", "app")
 
 
 CacheKeyFunction = Callable[["Case", "AuthContext"], Union[str, int]]
@@ -289,7 +309,7 @@ class AuthStorage(Generic[Auth]):
     ) -> FilterableRegisterAuth | FilterableApplyAuth:
         if provider_class is not None:
             return self.apply(provider_class, refresh_interval=refresh_interval, cache_by_key=cache_by_key)
-        return self.register(refresh_interval=refresh_interval, cache_by_key=cache_by_key)
+        return self.auth(refresh_interval=refresh_interval, cache_by_key=cache_by_key)
 
     def set_from_requests(self, auth: requests.auth.AuthBase) -> FilterableRequestsAuth:
         """Use `requests` auth instance as an auth provider."""
@@ -333,30 +353,12 @@ class AuthStorage(Generic[Auth]):
             provider = SelectiveAuthProvider(provider, filter_set)
         self.providers.append(provider)
 
-    def register(
+    def auth(
         self,
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
     ) -> FilterableRegisterAuth:
-        """Register a new auth provider.
-
-        .. code-block:: python
-
-            @schemathesis.auth()
-            class TokenAuth:
-                def get(self, context):
-                    response = requests.post(
-                        "https://example.schemathesis.io/api/token/",
-                        json={"username": "demo", "password": "test"},
-                    )
-                    data = response.json()
-                    return data["access_token"]
-
-                def set(self, case, data, context):
-                    # Modify `case` the way you need
-                    case.headers = {"Authorization": f"Bearer {data}"}
-        """
         filter_set = FilterSet()
 
         def wrapper(provider_class: type[AuthProvider]) -> type[AuthProvider]:
@@ -451,5 +453,44 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
 
 # Global auth API
 GLOBAL_AUTH_STORAGE: AuthStorage = AuthStorage()
-register = GLOBAL_AUTH_STORAGE.register
 unregister = GLOBAL_AUTH_STORAGE.unregister
+
+
+def auth(
+    *,
+    refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+    cache_by_key: CacheKeyFunction | None = None,
+) -> FilterableRegisterAuth:
+    """Register a dynamic authentication provider for APIs with expiring tokens.
+
+    Args:
+        refresh_interval: Seconds between token refreshes. Default is `300`. Use `None` to disable caching
+        cache_by_key: Function to generate cache keys for different auth contexts (e.g., OAuth scopes)
+
+    Example:
+        ```python
+        import schemathesis
+        import requests
+
+        @schemathesis.auth()
+        class TokenAuth:
+            def get(self, case, context):
+                \"\"\"Fetch fresh authentication token\"\"\"
+                response = requests.post(
+                    "http://localhost:8000/auth/token",
+                    json={"username": "demo", "password": "test"}
+                )
+                return response.json()["access_token"]
+
+            def set(self, case, data, context):
+                \"\"\"Apply token to test case headers\"\"\"
+                case.headers = case.headers or {}
+                case.headers["Authorization"] = f"Bearer {data}"
+        ```
+
+    """
+    return GLOBAL_AUTH_STORAGE.auth(refresh_interval=refresh_interval, cache_by_key=cache_by_key)
+
+
+auth.__dict__ = GLOBAL_AUTH_STORAGE.auth.__dict__
+auth.set_from_requests = GLOBAL_AUTH_STORAGE.set_from_requests  # type: ignore[attr-defined]

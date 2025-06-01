@@ -407,7 +407,7 @@ def validate_response(
         case=case,
         response=response,
         ctx=ctx,
-        checks=ctx.checks,
+        checks=ctx._checks,
         on_failure=on_failure,
         on_success=on_success,
     )
