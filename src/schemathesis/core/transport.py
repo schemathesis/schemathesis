@@ -27,7 +27,30 @@ def prepare_urlencoded(data: Any) -> Any:
 
 
 class Response:
-    """Unified response for both testing and reporting purposes."""
+    """HTTP response wrapper that normalizes different transport implementations.
+
+    Provides a consistent interface for accessing response data whether the request
+    was made via HTTP, ASGI, or WSGI transports.
+    """
+
+    status_code: int
+    """HTTP status code (e.g., 200, 404, 500)."""
+    headers: dict[str, list[str]]
+    """Response headers with lowercase keys and list values."""
+    content: bytes
+    """Raw response body as bytes."""
+    request: requests.PreparedRequest
+    """The request that generated this response."""
+    elapsed: float
+    """Response time in seconds."""
+    verify: bool
+    """Whether TLS verification was enabled for the request."""
+    message: str
+    """HTTP status message (e.g., "OK", "Not Found")."""
+    http_version: str
+    """HTTP protocol version ("1.0" or "1.1")."""
+    encoding: str | None
+    """Character encoding for text content, if detected."""
 
     __slots__ = (
         "status_code",
@@ -90,19 +113,31 @@ class Response:
 
     @property
     def text(self) -> str:
+        """Decode response content as text using the detected or default encoding."""
         return self.content.decode(self.encoding if self.encoding else "utf-8")
 
     def json(self) -> Any:
+        """Parse response content as JSON.
+
+        Returns:
+            Parsed JSON data (dict, list, or primitive types)
+
+        Raises:
+            json.JSONDecodeError: If content is not valid JSON
+
+        """
         if self._json is None:
             self._json = json.loads(self.text)
         return self._json
 
     @property
     def body_size(self) -> int | None:
+        """Size of response body in bytes, or None if no content."""
         return len(self.content) if self.content else None
 
     @property
     def encoded_body(self) -> str | None:
+        """Base64-encoded response body for binary-safe serialization."""
         if self._encoded_body is None and self.content:
             self._encoded_body = base64.b64encode(self.content).decode()
         return self._encoded_body
