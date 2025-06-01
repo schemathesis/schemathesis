@@ -66,7 +66,7 @@ def test_register_invalid(auth_storage):
 
     with pytest.raises(TypeError, match="`Invalid` is not a valid auth provider"):
 
-        @auth_storage.register()
+        @auth_storage.auth()
         class Invalid: ...
 
 
@@ -84,14 +84,14 @@ def test_apply_twice(openapi3_schema, auth_provider_class):
 def test_register_valid(auth_storage, auth_provider_class):
     # When the class implementation is valid
     # Then it should be possible to register it without issues
-    auth_storage.register(refresh_interval=None)(auth_provider_class)
+    auth_storage.auth(refresh_interval=None)(auth_provider_class)
     assert auth_storage.providers
     assert isinstance(auth_storage.providers[0], auth_provider_class)
 
 
 def test_register_cached(auth_storage, auth_provider_class):
     # When the `refresh_interval` is not None
-    auth_storage.register()(auth_provider_class)
+    auth_storage.auth()(auth_provider_class)
     # Then the actual provider should be cached
     assert auth_storage.providers
     assert isinstance(auth_storage.providers[0], CachingAuthProvider)
@@ -211,6 +211,6 @@ def test_auth_cache_with_scopes(openapi3_base_url):
                 return
             case.headers["Authorization"] = f"Bearer {data}"
 
-    _, *ev_ = from_schema(schema).execute()
+    list(from_schema(schema).execute())
     assert counts["list"] == 1
     assert counts["create"] == 1

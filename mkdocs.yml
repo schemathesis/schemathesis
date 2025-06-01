@@ -6,32 +6,32 @@ nav:
   - Quick Start Guide: quick-start.md
   - Tutorial: tutorial.md
   - Configuration: configuration.md
+
   - How-To Guides:
       - guides/index.md
+      - guides/auth.md
       - guides/cicd.md
       - guides/graphql-custom-scalars.md
-      - guides/auth.md
-      - guides/extending.md
-      - guides/extending-cli.md
       - guides/custom-media-types.md
       - guides/custom-serializers.md
-      - Targeted Testing: guides/targeted.md
-  - Explanations:
+      - guides/targeted.md
+      - guides/extending.md
+      - guides/extending-cli.md
+
+  - Core Contcepts:
       - explanations/data-generation.md
-      - explanations/stateful.md
       - explanations/examples.md
-      - explanations/checks.md
+      - explanations/stateful.md
+
   - Reference:
-      - Configuration Options: reference/configuration.md
-      - CLI Options: reference/cli.md
-      - Checks: reference/checks.md
-      - Hooks: reference/hooks.md
-      - Reporting: reference/reporting.md
       - reference/python.md
+      - CLI Options: reference/cli.md
+      - reference/configuration.md
+      - Hooks: reference/hooks.md
       - reference/warnings.md
-  - External Resources: resources.md
-  - Troubleshooting: troubleshooting.md
+
   - FAQ: faq.md
+  - External Resources: resources.md
 
 theme:
   name: material

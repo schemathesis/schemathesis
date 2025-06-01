@@ -1,4 +1,4 @@
-# Targeted Property-Based Testing
+# Targeted Testing
 
 Schemathesis supports targeted property-based testing to guide test data generation toward specific goals. This technique helps find problematic inputs faster by directing the test generator toward areas more likely to reveal issues.
 

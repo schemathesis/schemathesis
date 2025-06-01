@@ -101,6 +101,27 @@ $ st run [OPTIONS] SCHEMA
     $ st run https://api.example.com/openapi.json --wait-for-schema 5.0
     ```
 
+#### `--warnings WARNINGS`
+
+!!! note ""
+
+    **Type**: `String or comma-separated list`  
+    **Default**: All warnings enabled  
+    **Possible values**: `off`, `missing_auth`, `missing_test_data`, `validation_mismatch`  
+
+    Control which warnings are displayed during test execution. Warnings help identify test configuration issues but don't stop execution.
+
+    ```console
+    # Disable all warnings
+    $ st run openapi.yaml --warnings off
+    
+    # Enable only authentication warnings
+    $ st run openapi.yaml --warnings missing_auth
+    
+    # Enable multiple specific warnings
+    $ st run openapi.yaml --warnings missing_auth,validation_mismatch
+    ```
+
 ### Validation
 
 #### `-c, --checks CHECKS`

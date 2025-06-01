@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from schemathesis import auths, engine, errors, graphql, openapi, pytest
+from schemathesis import errors, graphql, openapi, pytest
+from schemathesis.auths import AuthContext, auth
 from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -13,28 +14,27 @@ from schemathesis.transport import SerializationContext, serializer
 
 __version__ = SCHEMATHESIS_VERSION
 
-# Public API
-auth = auths.GLOBAL_AUTH_STORAGE
-
 __all__ = [
     "Case",
-    "CheckContext",
-    "CheckFunction",
     "GenerationMode",
     "Response",
     "BaseSchema",
     "__version__",
-    "auth",
-    "check",
-    "engine",
     "errors",
-    "graphql",
+    # Spec or usage specific namespaces
     "openapi",
-    # Pytest loader
+    "graphql",
     "pytest",
     # Hooks
     "hook",
     "HookContext",
+    # Checks
+    "check",
+    "CheckContext",
+    "CheckFunction",
+    # Auth
+    "auth",
+    "AuthContext",
     # Targeted Property-based Testing
     "metric",
     "MetricContext",

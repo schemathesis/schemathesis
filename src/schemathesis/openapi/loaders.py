@@ -20,6 +20,24 @@ if TYPE_CHECKING:
 
 
 def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> BaseOpenAPISchema:
+    """Load OpenAPI schema from an ASGI application.
+
+    Args:
+        path: Relative URL path to the OpenAPI schema endpoint (e.g., "/openapi.json")
+        app: ASGI application instance
+        config: Custom configuration. If `None`, uses auto-discovered config
+        **kwargs: Additional request parameters passed to the ASGI test client
+
+    Example:
+        ```python
+        from fastapi import FastAPI
+        import schemathesis
+
+        app = FastAPI()
+        schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+        ```
+
+    """
     require_relative_url(path)
     client = asgi.get_client(app)
     response = load_from_url(client.get, url=path, **kwargs)
@@ -29,6 +47,24 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
 
 
 def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> BaseOpenAPISchema:
+    """Load OpenAPI schema from a WSGI application.
+
+    Args:
+        path: Relative URL path to the OpenAPI schema endpoint (e.g., "/openapi.json")
+        app: WSGI application instance
+        config: Custom configuration. If `None`, uses auto-discovered config
+        **kwargs: Additional request parameters passed to the WSGI test client
+
+    Example:
+        ```python
+        from flask import Flask
+        import schemathesis
+
+        app = Flask(__name__)
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+        ```
+
+    """
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     client = wsgi.get_client(app)
@@ -42,7 +78,31 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
 def from_url(
     url: str, *, config: SchemathesisConfig | None = None, wait_for_schema: float | None = None, **kwargs: Any
 ) -> BaseOpenAPISchema:
-    """Load from URL."""
+    """Load OpenAPI schema from a URL.
+
+    Args:
+        url: Full URL to the OpenAPI schema
+        config: Custom configuration. If `None`, uses auto-discovered config
+        wait_for_schema: Maximum time in seconds to wait for schema availability
+        **kwargs: Additional parameters passed to `requests.get()` (headers, timeout, auth, etc.)
+
+    Example:
+        ```python
+        import schemathesis
+
+        # Basic usage
+        schema = schemathesis.openapi.from_url("https://api.example.com/openapi.json")
+
+        # With authentication and timeout
+        schema = schemathesis.openapi.from_url(
+            "https://api.example.com/openapi.json",
+            headers={"Authorization": "Bearer token"},
+            timeout=30,
+            wait_for_schema=10.0
+        )
+        ```
+
+    """
     import requests
 
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
@@ -54,7 +114,25 @@ def from_url(
 def from_path(
     path: PathLike | str, *, config: SchemathesisConfig | None = None, encoding: str = "utf-8"
 ) -> BaseOpenAPISchema:
-    """Load from a filesystem path."""
+    """Load OpenAPI schema from a filesystem path.
+
+    Args:
+        path: File path to the OpenAPI schema (supports JSON / YAML)
+        config: Custom configuration. If `None`, uses auto-discovered config
+        encoding: Text encoding for reading the file
+
+    Example:
+        ```python
+        import schemathesis
+
+        # Load from file
+        schema = schemathesis.openapi.from_path("./specs/openapi.yaml")
+
+        # With custom encoding
+        schema = schemathesis.openapi.from_path("./specs/openapi.json", encoding="cp1252")
+        ```
+
+    """
     with open(path, encoding=encoding) as file:
         content_type = detect_content_type(headers=None, path=str(path))
         schema = load_content(file.read(), content_type)
@@ -62,7 +140,26 @@ def from_path(
 
 
 def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> BaseOpenAPISchema:
-    """Load from file-like object or string."""
+    """Load OpenAPI schema from a file-like object or string.
+
+    Args:
+        file: File-like object or raw string containing the OpenAPI schema
+        config: Custom configuration. If `None`, uses auto-discovered config
+
+    Example:
+        ```python
+        import schemathesis
+
+        # From string
+        schema_content = '{"openapi": "3.0.0", "info": {"title": "API"}}'
+        schema = schemathesis.openapi.from_file(schema_content)
+
+        # From file object
+        with open("openapi.yaml") as f:
+            schema = schemathesis.openapi.from_file(f)
+        ```
+
+    """
     if isinstance(file, str):
         data = file
     else:
@@ -75,7 +172,26 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
 
 
 def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = None) -> BaseOpenAPISchema:
-    """Base loader that others build upon."""
+    """Load OpenAPI schema from a dictionary.
+
+    Args:
+        schema: Dictionary containing the parsed OpenAPI schema
+        config: Custom configuration. If `None`, uses auto-discovered config
+
+    Example:
+        ```python
+        import schemathesis
+
+        schema_dict = {
+            "openapi": "3.0.0",
+            "info": {"title": "My API", "version": "1.0.0"},
+            "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+        }
+
+        schema = schemathesis.openapi.from_dict(schema_dict)
+        ```
+
+    """
     from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
     if not isinstance(schema, dict):

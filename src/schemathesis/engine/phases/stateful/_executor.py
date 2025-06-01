@@ -196,7 +196,7 @@ def execute_state_machine_loop(
                 case=case,
                 stateful_ctx=ctx,
                 check_ctx=check_ctx,
-                checks=check_ctx.checks,
+                checks=check_ctx._checks,
                 control=engine.control,
                 recorder=self.recorder,
                 additional_checks=additional_checks,

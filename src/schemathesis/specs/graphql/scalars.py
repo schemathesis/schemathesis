@@ -13,10 +13,44 @@ CUSTOM_SCALARS: dict[str, st.SearchStrategy[graphql.ValueNode]] = {}
 
 
 def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
-    """Register a new strategy for generating custom scalars.
+    r"""Register a custom Hypothesis strategy for generating GraphQL scalar values.
 
-    :param str name: Scalar name. It should correspond the one used in the schema.
-    :param strategy: Hypothesis strategy you'd like to use to generate values for this scalar.
+    Args:
+        name: Scalar name that matches your GraphQL schema scalar definition
+        strategy: Hypothesis strategy that generates GraphQL AST ValueNode objects
+
+    Example:
+        ```python
+        import schemathesis
+        from hypothesis import strategies as st
+        from schemathesis.graphql import nodes
+
+        # Register email scalar
+        schemathesis.graphql.scalar("Email", st.emails().map(nodes.String))
+
+        # Register positive integer scalar
+        schemathesis.graphql.scalar(
+            "PositiveInt",
+            st.integers(min_value=1).map(nodes.Int)
+        )
+
+        # Register phone number scalar
+        schemathesis.graphql.scalar(
+            "Phone",
+            st.from_regex(r"\+1-\d{3}-\d{3}-\d{4}").map(nodes.String)
+        )
+        ```
+
+    Schema usage:
+        ```graphql
+        scalar Email
+        scalar PositiveInt
+
+        type Query {
+          getUser(email: Email!, rating: PositiveInt!): User
+        }
+        ```
+
     """
     from hypothesis.strategies import SearchStrategy
 

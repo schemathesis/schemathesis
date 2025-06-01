@@ -352,12 +352,12 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
     if response.status_code == 404 or response.status_code >= 500:
         return None
 
-    for related_case in ctx.find_related(case_id=case.id):
-        parent = ctx.find_parent(case_id=related_case.id)
+    for related_case in ctx._find_related(case_id=case.id):
+        parent = ctx._find_parent(case_id=related_case.id)
         if not parent:
             continue
 
-        parent_response = ctx.find_response(case_id=parent.id)
+        parent_response = ctx._find_response(case_id=parent.id)
 
         if (
             related_case.operation.method.lower() == "delete"
@@ -395,10 +395,10 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if not (400 <= response.status_code < 500):
         return None
 
-    parent = ctx.find_parent(case_id=case.id)
+    parent = ctx._find_parent(case_id=case.id)
     if parent is None:
         return None
-    parent_response = ctx.find_response(case_id=parent.id)
+    parent_response = ctx._find_response(case_id=parent.id)
     if parent_response is None:
         return None
 
@@ -424,8 +424,8 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
         return None
 
     # Look for any successful DELETE operations on this resource
-    for related_case in ctx.find_related(case_id=case.id):
-        related_response = ctx.find_response(case_id=related_case.id)
+    for related_case in ctx._find_related(case_id=case.id):
+        related_response = ctx._find_response(case_id=related_case.id)
         if (
             related_case.operation.method.upper() == "DELETE"
             and related_response is not None
@@ -478,25 +478,25 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
-            kwargs = ctx.transport_kwargs or {}
+            kwargs = ctx._transport_kwargs or {}
             kwargs.copy()
             if "headers" in kwargs:
                 headers = kwargs["headers"].copy()
                 _remove_auth_from_explicit_headers(headers, security_parameters)
                 kwargs["headers"] = headers
             kwargs.pop("session", None)
-            ctx.record_case(parent_id=case.id, case=no_auth_case)
+            ctx._record_case(parent_id=case.id, case=no_auth_case)
             no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
-            ctx.record_response(case_id=no_auth_case.id, response=no_auth_response)
+            ctx._record_response(case_id=no_auth_case.id, response=no_auth_response)
             if no_auth_response.status_code != 401:
                 _raise_no_auth_error(no_auth_response, no_auth_case, "that requires authentication")
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 invalid_auth_case = remove_auth(case, security_parameters)
                 _set_auth_for_case(invalid_auth_case, parameter)
-                ctx.record_case(parent_id=case.id, case=invalid_auth_case)
+                ctx._record_case(parent_id=case.id, case=invalid_auth_case)
                 invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
-                ctx.record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
+                ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
                 if invalid_auth_response.status_code != 401:
                     _raise_no_auth_error(invalid_auth_response, invalid_auth_case, "with any auth")
         elif auth == AuthKind.GENERATED:
@@ -540,7 +540,7 @@ def _contains_auth(
     from requests.cookies import RequestsCookieJar
 
     # If auth comes from explicit `auth` option or a custom auth, it is always explicit
-    if ctx.auth is not None or case._has_explicit_auth:
+    if ctx._auth is not None or case._has_explicit_auth:
         return AuthKind.EXPLICIT
     parsed = urlparse(request.url)
     query = parse_qs(parsed.query)  # type: ignore
@@ -563,19 +563,19 @@ def _contains_auth(
     for parameter in security_parameters:
         name = parameter["name"]
         if has_header(parameter):
-            if (ctx.headers is not None and name in ctx.headers) or (ctx.override and name in ctx.override.headers):
+            if (ctx._headers is not None and name in ctx._headers) or (ctx._override and name in ctx._override.headers):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_cookie(parameter):
-            if ctx.headers is not None and "Cookie" in ctx.headers:
-                cookies = cast(RequestsCookieJar, ctx.headers["Cookie"])  # type: ignore
+            if ctx._headers is not None and "Cookie" in ctx._headers:
+                cookies = cast(RequestsCookieJar, ctx._headers["Cookie"])  # type: ignore
                 if name in cookies:
                     return AuthKind.EXPLICIT
-            if ctx.override and name in ctx.override.cookies:
+            if ctx._override and name in ctx._override.cookies:
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_query(parameter):
-            if ctx.override and name in ctx.override.query:
+            if ctx._override and name in ctx._override.query:
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
 
