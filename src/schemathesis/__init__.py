@@ -15,11 +15,13 @@ from schemathesis.transport import SerializationContext, serializer
 __version__ = SCHEMATHESIS_VERSION
 
 __all__ = [
-    "Case",
-    "GenerationMode",
-    "Response",
-    "BaseSchema",
     "__version__",
+    # Core data structures
+    "Case",
+    "Response",
+    "GenerationMode",
+    "BaseSchema",
+    # Public errors
     "errors",
     # Spec or usage specific namespaces
     "openapi",
