@@ -211,7 +211,7 @@ class BaseSchema(Mapping):
         return self.statistic.operations.total
 
     def hook(self, hook: str | Callable) -> Callable:
-        return self.hooks.register(hook)
+        return self.hooks.hook(hook)
 
     def get_full_path(self, path: str) -> str:
         """Compute full path for the given path."""
@@ -653,7 +653,7 @@ class APIOperation(Generic[P]):
         strategy = self.schema.get_case_strategy(self, hooks, auth_storage, generation_mode, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
-            context = HookContext(self)
+            context = HookContext(operation=self)
             for hook in dispatcher.get_all_by_name("before_generate_case"):
                 _strategy = hook(context, _strategy)
             for hook in dispatcher.get_all_by_name("filter_case"):

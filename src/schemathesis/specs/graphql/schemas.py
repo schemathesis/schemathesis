@@ -345,7 +345,7 @@ def graphql_cases(
         RootType.QUERY: gql_st.queries,
         RootType.MUTATION: gql_st.mutations,
     }[definition.root_type]
-    hook_context = HookContext(operation)
+    hook_context = HookContext(operation=operation)
     custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
     generation = operation.schema.config.generation_for(operation=operation, phase="fuzzing")
     strategy = strategy_factory(
