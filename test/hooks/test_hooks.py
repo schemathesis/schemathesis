@@ -69,7 +69,7 @@ def test_global_query_hook(wsgi_app_schema):
 def test_case_hook(wsgi_app_schema):
     dispatcher = HookDispatcher(scope=HookScope.TEST)
 
-    @dispatcher.register
+    @dispatcher.hook
     def map_case(context, case):
         case.body["extra"] = 42
         return case
@@ -200,7 +200,7 @@ def test(case):
 def test_register_invalid_hook_name(dispatcher):
     with pytest.raises(TypeError, match="There is no hook with name 'hook'"):
 
-        @dispatcher.register
+        @dispatcher.hook
         def hook():
             pass
 
@@ -208,7 +208,7 @@ def test_register_invalid_hook_name(dispatcher):
 def test_register_invalid_hook_spec(dispatcher):
     with pytest.raises(TypeError, match="Hook 'filter_query' takes 2 arguments but 3 is defined"):
 
-        @dispatcher.register
+        @dispatcher.hook
         def filter_query(a, b, c):
             pass
 
