@@ -44,7 +44,7 @@ from schemathesis.engine.errors import (
 )
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.generation import overrides, targets
+from schemathesis.generation import metrics, overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
     InvalidHeadersExampleMark,
@@ -370,7 +370,7 @@ def test_func(
             recorder.record_request(case_id=case.id, request=error.request)
         raise
     recorder.record_response(case_id=case.id, response=response)
-    targets.run(generation.maximize, case=case, response=response)
+    metrics.maximize(generation.maximize, case=case, response=response)
     validate_response(
         case=case,
         ctx=check_ctx,

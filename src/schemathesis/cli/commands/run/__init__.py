@@ -28,7 +28,7 @@ from schemathesis.config import (
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.targets import TARGETS, TargetFunction
+from schemathesis.generation.metrics import METRICS, MetricFunction
 
 # NOTE: Need to explicitly import all registered checks
 from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
@@ -362,7 +362,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     "generation_maximize",
     multiple=True,
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
-    type=RegistryChoice(TARGETS),
+    type=RegistryChoice(METRICS),
     default=None,
     callback=validation.convert_maximize,
     show_default=True,
@@ -464,7 +464,7 @@ def run(
     generation_modes: list[GenerationMode],
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
-    generation_maximize: list[TargetFunction] | None,
+    generation_maximize: list[MetricFunction] | None,
     generation_deterministic: bool = False,
     generation_database: str | None = None,
     generation_unique_inputs: bool = False,

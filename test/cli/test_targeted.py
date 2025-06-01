@@ -2,73 +2,73 @@ import pytest
 from _pytest.main import ExitCode
 
 import schemathesis
-from schemathesis.generation.targets import TARGETS
+from schemathesis.generation.metrics import METRICS
 
 
 @pytest.fixture
-def new_target(ctx, cli):
+def new_metric(ctx, cli):
     module = ctx.write_pymodule(
         """
 import click
 
-@schemathesis.target
-def new_target(context) -> float:
-    click.echo("NEW TARGET IS CALLED")
-    assert context.case.meta.generation.mode is not None, "Empty generation mode"
-    return float(len(context.response.content))
+@schemathesis.metric
+def new_metric(ctx) -> float:
+    click.echo("NEW METRIC IS CALLED")
+    assert ctx.case.meta.generation.mode is not None, "Empty generation mode"
+    return float(len(ctx.response.content))
 """
     )
     yield module
-    TARGETS.unregister("new_target")
-    # To verify that "new_target" is unregistered
-    assert "new_target" not in cli.run("--help").stdout
+    METRICS.unregister("new_metric")
+    # To verify that "new_metric" is unregistered
+    assert "new_metric" not in cli.run("--help").stdout
 
 
-@pytest.mark.usefixtures("new_target")
+@pytest.mark.usefixtures("new_metric")
 @pytest.mark.operations("success")
-def test_custom_target(cli, new_target, openapi3_schema_url):
+def test_custom_metric(cli, new_metric, openapi3_schema_url):
     # When hooks are passed to the CLI call
-    # And it contains registering a new target
-    result = cli.main("run", "--generation-maximize", "new_target", openapi3_schema_url, hooks=new_target)
+    # And it contains registering a new metric
+    result = cli.main("run", "--generation-maximize", "new_metric", openapi3_schema_url, hooks=new_metric)
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
-    # And the specified target is called
-    assert "NEW TARGET IS CALLED" in result.stdout
+    # And the specified metric is called
+    assert "NEW METRIC IS CALLED" in result.stdout
 
 
-@pytest.mark.usefixtures("new_target")
+@pytest.mark.usefixtures("new_metric")
 @pytest.mark.operations("success")
-def test_custom_target_graphql(cli, new_target, graphql_url):
+def test_custom_metric_graphql(cli, new_metric, graphql_url):
     # When hooks are passed to the CLI call
-    # And it contains registering a new target
+    # And it contains registering a new metric
     result = cli.main(
         "run",
         "--generation-maximize",
-        "new_target",
+        "new_metric",
         graphql_url,
         "--suppress-health-check=too_slow,filter_too_much",
         "--max-examples=1",
-        hooks=new_target,
+        hooks=new_metric,
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
-    # And the specified target is called
-    assert "NEW TARGET IS CALLED" in result.stdout
+    # And the specified metric is called
+    assert "NEW METRIC IS CALLED" in result.stdout
 
 
 @pytest.fixture
-def target_function():
-    @schemathesis.target
-    def new_target(context):
+def metric_function():
+    @schemathesis.metric
+    def new_metric(context):
         return 0.5
 
-    yield target_function
+    yield metric_function
 
-    TARGETS.unregister("new_target")
+    METRICS.unregister("new_metric")
 
 
-def test_register_returns_a_value(target_function):
-    # When a function is registered via the `schemathesis.target` decorator
+def test_register_returns_a_value(metric_function):
+    # When a function is registered via the `schemathesis.metric` decorator
     # Then this function should be available for further usage
     # See #721
-    assert target_function is not None
+    assert metric_function is not None

@@ -1597,7 +1597,7 @@ def test_unknown_schema_error(ctx, schema_url, cli, snapshot_cli):
         r"""
 import schemathesis
 
-@schemathesis.target
+@schemathesis.metric
 def buggy(ctx):
     raise AssertionError("Something bad happen")
 """

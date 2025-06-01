@@ -7,7 +7,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.generation.modes import GenerationMode
 
 if TYPE_CHECKING:
-    from schemathesis.generation.targets import TargetFunction
+    from schemathesis.generation.metrics import MetricFunction
 
 
 @dataclass(repr=False)
@@ -20,7 +20,7 @@ class GenerationConfig(DiffBase):
     allow_x00: bool
     # Generate strings using the given codec
     codec: str | None
-    maximize: list[TargetFunction]
+    maximize: list[MetricFunction]
     # Whether to generate security parameters
     with_security_parameters: bool
     # Allowing using `null` for optional arguments in GraphQL queries
@@ -53,7 +53,7 @@ class GenerationConfig(DiffBase):
         deterministic: bool = False,
         allow_x00: bool = True,
         codec: str | None = "utf-8",
-        maximize: list[TargetFunction] | None = None,
+        maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool = True,
         graphql_allow_null: bool = True,
         database: str | None = None,
@@ -109,7 +109,7 @@ class GenerationConfig(DiffBase):
         deterministic: bool | None = None,
         allow_x00: bool = True,
         codec: str | None = None,
-        maximize: list[TargetFunction] | None = None,
+        maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool | None = None,
         graphql_allow_null: bool = True,
         database: str | None = None,
@@ -137,13 +137,13 @@ class GenerationConfig(DiffBase):
             self.exclude_header_characters = exclude_header_characters
 
 
-def _get_maximize(value: Any) -> list[TargetFunction]:
-    from schemathesis.generation.targets import TARGETS
+def _get_maximize(value: Any) -> list[MetricFunction]:
+    from schemathesis.generation.metrics import METRICS
 
     if isinstance(value, list):
-        targets = value
+        metrics = value
     elif isinstance(value, str):
-        targets = [value]
+        metrics = [value]
     else:
-        targets = []
-    return TARGETS.get_by_names(targets)
+        metrics = []
+    return METRICS.get_by_names(metrics)

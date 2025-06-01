@@ -7,7 +7,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.generation.case import Case
-from schemathesis.generation.targets import TargetMetricCollector
+from schemathesis.generation.metrics import MetricCollector
 
 
 @dataclass
@@ -27,7 +27,7 @@ class StatefulContext:
     # The total number of completed test scenario
     completed_scenarios: int = 0
     # Metrics collector for targeted testing
-    metric_collector: TargetMetricCollector = field(default_factory=TargetMetricCollector)
+    metric_collector: MetricCollector = field(default_factory=MetricCollector)
     step_outcomes: dict[int, BaseException | None] = field(default_factory=dict)
 
     @property

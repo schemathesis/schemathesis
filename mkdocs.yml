@@ -27,7 +27,7 @@ nav:
       - Checks: reference/checks.md
       - Hooks: reference/hooks.md
       - Reporting: reference/reporting.md
-      - Python API Reference: reference/python.md
+      - reference/python.md
       - reference/warnings.md
   - External Resources: resources.md
   - Troubleshooting: troubleshooting.md
