@@ -80,7 +80,7 @@ Easy integration:
     Deep dive into concepts:
 
      - [:octicons-arrow-right-24: Data Generation](explanations/data-generation.md)
-     - [:octicons-arrow-right-24: Stateful Testing](explanations/stateful.md)
+     - [:octicons-arrow-right-24: Example Testing](explanations/examples.md)
      - [:octicons-arrow-right-24: Checks](explanations/checks.md)
 
 -   :material-file-document-outline:{ .lg .middle style="color: #FF9800" } __Need technical details?__
@@ -97,6 +97,5 @@ Easy integration:
 
 ## Need help?
 
-* **[Troubleshooting](troubleshooting.md)** — Solve common issues
-
 * **[Resources](resources.md)** — Community articles, videos, and tutorials
+* **[FAQ](faq.md)** — Frequently Asked Questions

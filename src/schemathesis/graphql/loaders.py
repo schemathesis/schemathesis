@@ -19,6 +19,24 @@ if TYPE_CHECKING:
 
 
 def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> GraphQLSchema:
+    """Load GraphQL schema from an ASGI application via introspection.
+
+    Args:
+        path: Relative URL path to the GraphQL endpoint (e.g., "/graphql")
+        app: ASGI application instance
+        config: Custom configuration. If `None`, uses auto-discovered config
+        **kwargs: Additional request parameters passed to the ASGI test client.
+
+    Example:
+        ```python
+        from fastapi import FastAPI
+        import schemathesis
+
+        app = FastAPI()
+        schema = schemathesis.graphql.from_asgi("/graphql", app)
+        ```
+
+    """
     require_relative_url(path)
     kwargs.setdefault("json", {"query": get_introspection_query()})
     client = asgi.get_client(app)
@@ -28,6 +46,24 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
 
 
 def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> GraphQLSchema:
+    """Load GraphQL schema from a WSGI application via introspection.
+
+    Args:
+        path: Relative URL path to the GraphQL endpoint (e.g., "/graphql")
+        app: WSGI application instance
+        config: Custom configuration. If `None`, uses auto-discovered config
+        **kwargs: Additional request parameters passed to the WSGI test client.
+
+    Example:
+        ```python
+        from flask import Flask
+        import schemathesis
+
+        app = Flask(__name__)
+        schema = schemathesis.graphql.from_wsgi("/graphql", app)
+        ```
+
+    """
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     kwargs.setdefault("json", {"query": get_introspection_query()})
@@ -41,7 +77,31 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
 def from_url(
     url: str, *, config: SchemathesisConfig | None = None, wait_for_schema: float | None = None, **kwargs: Any
 ) -> GraphQLSchema:
-    """Load from URL."""
+    """Load GraphQL schema from a URL via introspection query.
+
+    Args:
+        url: Full URL to the GraphQL endpoint
+        config: Custom configuration. If `None`, uses auto-discovered config
+        wait_for_schema: Maximum time in seconds to wait for schema availability
+        **kwargs: Additional parameters passed to `requests.post()` (headers, timeout, auth, etc.).
+
+    Example:
+        ```python
+        import schemathesis
+
+        # Basic usage
+        schema = schemathesis.graphql.from_url("https://api.example.com/graphql")
+
+        # With authentication and timeout
+        schema = schemathesis.graphql.from_url(
+            "https://api.example.com/graphql",
+            headers={"Authorization": "Bearer token"},
+            timeout=30,
+            wait_for_schema=10.0
+        )
+        ```
+
+    """
     import requests
 
     kwargs.setdefault("json", {"query": get_introspection_query()})
@@ -53,13 +113,55 @@ def from_url(
 def from_path(
     path: PathLike | str, *, config: SchemathesisConfig | None = None, encoding: str = "utf-8"
 ) -> GraphQLSchema:
-    """Load from a filesystem path."""
+    """Load GraphQL schema from a filesystem path.
+
+    Args:
+        path: File path to the GraphQL schema file (.graphql, .gql)
+        config: Custom configuration. If `None`, uses auto-discovered config
+        encoding: Text encoding for reading the file
+
+    Example:
+        ```python
+        import schemathesis
+
+        # Load from GraphQL SDL file
+        schema = schemathesis.graphql.from_path("./schema.graphql")
+        ```
+
+    """
     with open(path, encoding=encoding) as file:
         return from_file(file=file, config=config).configure(location=Path(path).absolute().as_uri())
 
 
 def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
-    """Load from file-like object or string."""
+    """Load GraphQL schema from a file-like object or string.
+
+    Args:
+        file: File-like object or raw string containing GraphQL SDL
+        config: Custom configuration. If `None`, uses auto-discovered config
+
+    Example:
+        ```python
+        import schemathesis
+
+        # From GraphQL SDL string
+        schema_sdl = '''
+            type Query {
+                user(id: ID!): User
+            }
+            type User {
+                id: ID!
+                name: String!
+            }
+        '''
+        schema = schemathesis.graphql.from_file(schema_sdl)
+
+        # From file object
+        with open("schema.graphql") as f:
+            schema = schemathesis.graphql.from_file(f)
+        ```
+
+    """
     import graphql
 
     if isinstance(file, str):
@@ -87,7 +189,39 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
 
 
 def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
-    """Base loader that others build upon."""
+    """Load GraphQL schema from a dictionary containing introspection result.
+
+    Args:
+        schema: Dictionary containing GraphQL introspection result or wrapped in 'data' key
+        config: Custom configuration. If `None`, uses auto-discovered config
+
+    Example:
+        ```python
+        import schemathesis
+
+        # From introspection result
+        introspection = {
+            "__schema": {
+                "types": [...],
+                "queryType": {"name": "Query"},
+                # ... rest of introspection result
+            }
+        }
+        schema = schemathesis.graphql.from_dict(introspection)
+
+        # From GraphQL response format (with 'data' wrapper)
+        response_data = {
+            "data": {
+                "__schema": {
+                    "types": [...],
+                    "queryType": {"name": "Query"}
+                }
+            }
+        }
+        schema = schemathesis.graphql.from_dict(response_data)
+        ```
+
+    """
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
     if "data" in schema:

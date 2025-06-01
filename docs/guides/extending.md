@@ -334,4 +334,3 @@ def modify_body(body, new_field_name):
 
 - **[Authentication Guide](../guides/auth.md)** - Configure API authentication
 - **[Hook Reference](../reference/hooks.md)** - Complete list of available hooks
-- **[Checks Reference](../reference/checks.md)** - All built-in checks

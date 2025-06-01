@@ -15,10 +15,37 @@ STRING_FORMATS: dict[str, st.SearchStrategy] = {}
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
-    """Register a new strategy for generating data for specific string "format".
+    r"""Register a custom Hypothesis strategy for generating string format data.
 
-    :param str name: Format name. It should correspond the one used in the API schema as the "format" keyword value.
-    :param strategy: Hypothesis strategy you'd like to use to generate values for this format.
+    Args:
+        name: String format name that matches the "format" keyword in your API schema
+        strategy: Hypothesis strategy to generate values for this format
+
+    Example:
+        ```python
+        import schemathesis
+        from hypothesis import strategies as st
+
+        # Register phone number format
+        phone_strategy = st.from_regex(r"\+1-\d{3}-\d{3}-\d{4}")
+        schemathesis.openapi.format("phone", phone_strategy)
+
+        # Register email with specific domain
+        email_strategy = st.from_regex(r"[a-z]+@company\.com")
+        schemathesis.openapi.format("company-email", email_strategy)
+        ```
+
+    Schema usage:
+        ```yaml
+        properties:
+          phone:
+            type: string
+            format: phone          # Uses your phone_strategy
+          contact_email:
+            type: string
+            format: company-email  # Uses your email_strategy
+        ```
+
     """
     from hypothesis.strategies import SearchStrategy
 
