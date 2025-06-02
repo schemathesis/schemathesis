@@ -21,10 +21,12 @@ from schemathesis.openapi.checks import (
     JsonSchemaError,
     MalformedMediaType,
     MissingContentType,
+    MissingHeaderNotRejected,
     MissingHeaders,
     RejectedPositiveData,
     UndefinedContentType,
     UndefinedStatusCode,
+    UnsupportedMethodResponse,
     UseAfterFree,
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -289,8 +291,14 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
             config = ctx.config.missing_required_header
             expected_statuses = expand_status_codes(config.expected_statuses or [])
         if response.status_code not in expected_statuses:
-            allowed = f"Allowed statuses: {', '.join(map(str, expected_statuses))}"
-            raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}\n{allowed}")
+            allowed = ", ".join(map(str, expected_statuses))
+            raise MissingHeaderNotRejected(
+                operation=f"{case.method} {case.path}",
+                header_name=data.parameter,
+                status_code=response.status_code,
+                expected_statuses=list(expected_statuses),
+                message=f"Missing header not rejected (got {response.status_code}, expected {allowed})",
+            )
     return None
 
 
@@ -302,13 +310,24 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
     data = meta.phase.data
     if data.description and data.description.startswith("Unspecified HTTP method:"):
         if response.status_code != 405:
-            raise AssertionError(
-                f"Unexpected response status for unspecified HTTP method: {response.status_code}\nExpected: 405"
+            raise UnsupportedMethodResponse(
+                operation=case.operation.label,
+                method=cast(str, response.request.method),
+                status_code=response.status_code,
+                failure_reason="wrong_status",
+                message=f"Wrong status for unsupported method {response.request.method} (got {response.status_code}, expected 405)",
             )
 
         allow_header = response.headers.get("allow")
         if not allow_header:
-            raise AssertionError("Missing 'Allow' header in 405 Method Not Allowed response")
+            raise UnsupportedMethodResponse(
+                operation=case.operation.label,
+                method=cast(str, response.request.method),
+                status_code=response.status_code,
+                allow_header_present=False,
+                failure_reason="missing_allow_header",
+                message=f"Missing Allow header for unsupported method {response.request.method}",
+            )
     return None
 
 

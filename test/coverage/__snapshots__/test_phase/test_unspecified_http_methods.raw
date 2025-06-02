@@ -32,10 +32,9 @@ Schemathesis dev
 __________________________________ POST /foo ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `unsupported_method`
+- Unsupported method incorrect response
 
-    Unexpected response status for unspecified HTTP method: 404
-    Expected: 405
+    Wrong status for unsupported method TRACE (got 404, expected 405)
 
 [404] Not Found:
 
@@ -74,7 +73,7 @@ Test Phases:
 
 Failures:
   ❌ Custom check failed: `failed`: 1
-  ❌ Custom check failed: `unsupported_method`: 1
+  ❌ Unsupported method incorrect response: 1
 
 Test cases:
   N generated, N found N unique failures

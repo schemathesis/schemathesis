@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import textwrap
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import OutputConfig
@@ -10,24 +9,6 @@ from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
     from jsonschema import ValidationError
-
-
-@dataclass
-class NegativeDataRejectionConfig:
-    # 5xx will pass through
-    allowed_statuses: list[str] = field(
-        default_factory=lambda: ["400", "401", "403", "404", "406", "422", "428", "5xx"]
-    )
-
-
-@dataclass
-class PositiveDataAcceptanceConfig:
-    allowed_statuses: list[str] = field(default_factory=lambda: ["2xx", "401", "403", "404"])
-
-
-@dataclass
-class MissingRequiredHeaderConfig:
-    allowed_statuses: list[str] = field(default_factory=lambda: ["406"])
 
 
 class UndefinedStatusCode(Failure):
@@ -391,3 +372,84 @@ class RejectedPositiveData(Failure):
     @property
     def _unique_key(self) -> str:
         return str(self.status_code)
+
+
+class MissingHeaderNotRejected(Failure):
+    """API did not reject request without required header."""
+
+    __slots__ = (
+        "operation",
+        "header_name",
+        "status_code",
+        "expected_statuses",
+        "message",
+        "title",
+        "case_id",
+        "severity",
+    )
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        header_name: str,
+        status_code: int,
+        expected_statuses: list[int],
+        message: str,
+        title: str = "Missing header not rejected",
+        case_id: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.header_name = header_name
+        self.status_code = status_code
+        self.expected_statuses = expected_statuses
+        self.message = message
+        self.title = title
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
+
+    @property
+    def _unique_key(self) -> str:
+        return self.header_name
+
+
+class UnsupportedMethodResponse(Failure):
+    """API response for unsupported HTTP method is incorrect."""
+
+    __slots__ = (
+        "operation",
+        "method",
+        "status_code",
+        "allow_header_present",
+        "failure_reason",
+        "message",
+        "title",
+        "case_id",
+        "severity",
+    )
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        method: str,
+        status_code: int,
+        allow_header_present: bool | None = None,
+        failure_reason: str,  # "wrong_status" or "missing_allow_header"
+        message: str,
+        title: str = "Unsupported method incorrect response",
+        case_id: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.method = method
+        self.status_code = status_code
+        self.allow_header_present = allow_header_present
+        self.failure_reason = failure_reason
+        self.message = message
+        self.title = title
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
+
+    @property
+    def _unique_key(self) -> str:
+        return self.failure_reason
