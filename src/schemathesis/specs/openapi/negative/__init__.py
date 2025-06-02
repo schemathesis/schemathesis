@@ -28,16 +28,17 @@ class CacheKey:
     operation_name: str
     location: str
     schema: Schema
+    validator_cls: type[jsonschema.Validator]
 
     def __hash__(self) -> int:
         return hash((self.operation_name, self.location))
 
 
 @lru_cache
-def get_validator(cache_key: CacheKey) -> jsonschema.Draft4Validator:
+def get_validator(cache_key: CacheKey) -> jsonschema.Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
-    return jsonschema.Draft4Validator(cache_key.schema)
+    return cache_key.validator_cls(cache_key.schema)
 
 
 @lru_cache
@@ -63,6 +64,7 @@ def negative_schema(
     generation_config: GenerationConfig,
     *,
     custom_formats: dict[str, st.SearchStrategy[str]],
+    validator_cls: type[jsonschema.Validator],
 ) -> st.SearchStrategy:
     """A strategy for instances that DO NOT match the input schema.
 
@@ -70,7 +72,7 @@ def negative_schema(
     """
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
-    cache_key = CacheKey(operation_name, location, schema)
+    cache_key = CacheKey(operation_name, location, schema, validator_cls)
     validator = get_validator(cache_key)
     keywords, non_keywords = split_schema(cache_key)
 

@@ -6,7 +6,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
-from jsonschema import Draft4Validator
+from jsonschema import Draft4Validator, Draft202012Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
@@ -85,6 +85,7 @@ def test_top_level_strategy(data, location, schema):
             media_type="application/json",
             custom_formats=get_default_format_strategies(),
             generation_config=GenerationConfig(),
+            validator_cls=Draft4Validator,
         )
     )
     assert not validator.is_valid(instance)
@@ -276,21 +277,22 @@ def test_mutation_result_success(left, right, expected):
 
 
 @pytest.mark.parametrize(
-    "schema",
+    "schema, validator_cls",
     [
-        {"minimum": 5, "exclusiveMinimum": True},
-        {"maximum": 5, "exclusiveMaximum": True},
-        {"maximum": 5, "exclusiveMaximum": True, "minimum": 1, "exclusiveMinimum": True},
+        ({"minimum": 5, "exclusiveMinimum": True}, Draft4Validator),
+        ({"maximum": 5, "exclusiveMaximum": True}, Draft4Validator),
+        ({"maximum": 5, "exclusiveMaximum": True, "minimum": 1, "exclusiveMinimum": True}, Draft4Validator),
+        ({"type": "integer", "maximum": 365.0, "exclusiveMinimum": 0.0, "title": "Nights"}, Draft202012Validator),
     ],
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
-def test_negate_constraints_keep_dependencies(data, schema):
+def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
     # When `negate_constraints` is used
     schema = deepclone(schema)
     negate_constraints(MutationContext(schema, {}, "body", "application/json"), data.draw, schema)
     # Then it should always produce valid schemas
-    validate_schema(schema)
+    validator_cls.check_schema(schema)
     # E.g. `exclusiveMaximum` / `exclusiveMinimum` only work when `maximum` / `minimum` are present in the same schema
 
 
