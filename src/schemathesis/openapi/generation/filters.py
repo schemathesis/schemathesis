@@ -29,8 +29,15 @@ def is_invalid_path_parameter(value: Any) -> bool:
     return (
         value in ("/", "")
         or contains_unicode_surrogate_pair(value)
-        or isinstance(value, str)
-        and ("/" in value or "}" in value or "{" in value)
+        or (
+            isinstance(value, str)
+            and (
+                ("/" in value or "}" in value or "{" in value)
+                # Avoid situations when the path parameter contains only NULL bytes
+                # Many webservers remove such bytes and as the result, the test can target a different API operation
+                or (len(value) == value.count("\x00"))
+            )
+        )
     )
 
 
