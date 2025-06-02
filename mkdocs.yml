@@ -28,6 +28,7 @@ nav:
       - CLI Options: reference/cli.md
       - reference/configuration.md
       - Hooks: reference/hooks.md
+      - Checks: reference/checks.md
       - reference/warnings.md
 
   - FAQ: faq.md
