@@ -24,10 +24,9 @@ Schemathesis dev
 _________________________________ POST /basic __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `unsupported_method`
+- Unsupported method incorrect response
 
-    Unexpected response status for unspecified HTTP method: 401
-    Expected: 405
+    Wrong status for unsupported method GET (got 401, expected 405)
 
 [401] Unauthorized:
 
@@ -51,7 +50,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Custom check failed: `unsupported_method`: 1
+  ❌ Unsupported method incorrect response: 1
 
 Test cases:
   N generated, N found N unique failures

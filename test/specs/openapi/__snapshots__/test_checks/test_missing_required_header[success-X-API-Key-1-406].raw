@@ -24,10 +24,9 @@ Schemathesis dev
 _________________________________ GET /success _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `missing_required_header`
+- Missing header not rejected
 
-    Unexpected response status for a missing header: 200
-    Allowed statuses: 406
+    Missing header not rejected (got 200, expected 406)
 
 [200] OK:
 
@@ -51,7 +50,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Custom check failed: `missing_required_header`: 1
+  ❌ Missing header not rejected: 1
 
 Test cases:
   N generated, N found N unique failures
