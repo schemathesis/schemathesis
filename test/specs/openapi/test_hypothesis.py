@@ -3,6 +3,7 @@ import json
 import pytest
 from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
+from jsonschema import Draft4Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
@@ -148,6 +149,7 @@ def test_valid_headers(keywords):
         "header",
         None,
         GenerationConfig(),
+        Draft4Validator,
     )
 
     @given(strategy)
@@ -170,6 +172,7 @@ def test_configure_headers():
         "header",
         None,
         GenerationConfig(exclude_header_characters="".join({chr(i) for i in range(256)} - {"A", "B", "C"})),
+        Draft4Validator,
     )
 
     @given(strategy)
@@ -196,6 +199,7 @@ def test_no_much_filtering_in_headers():
         "header",
         None,
         GenerationConfig(),
+        Draft4Validator,
     )
 
     @given(strategy)

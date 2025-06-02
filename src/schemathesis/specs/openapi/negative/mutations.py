@@ -402,8 +402,8 @@ def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> 
                 if key in DEPENDENCIES:
                     # If this keyword has a dependency, then it should be also negated
                     dependency = DEPENDENCIES[key]
-                    if dependency not in negated:
-                        negated[dependency] = copied[dependency]  # Assuming the schema is valid
+                    if dependency not in negated and dependency in copied:
+                        negated[dependency] = copied[dependency]
         else:
             schema[key] = value
     if is_negated:
