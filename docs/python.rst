@@ -333,18 +333,6 @@ In this case, the test body will be used as a sub-test via the ``pytest-subtests
 How are responses checked?
 --------------------------
 
-When the received response is validated, Schemathesis runs the following checks:
-
-- ``not_a_server_error``. The response has 5xx HTTP status;
-- ``status_code_conformance``. The response status is not defined in the API schema;
-- ``content_type_conformance``. The response content type is not defined in the API schema;
-- ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
-- ``negative_data_rejection``. The API accepts data that is invalid according to the schema;
-- ``response_headers_conformance``. The response headers do not contain all defined headers or do not conform to their respective schemas.
-- ``use_after_free``. The API returned a non-404 response a successful DELETE operation on a resource. **NOTE**: At the moment it is only available in state-machine-based stateful testing.
-- ``ensure_resource_availability``. Freshly created resource is not available in related API operations. **NOTE**: Only enabled for new-style stateful testing.
-- ``ignored_auth``. The API operation does not check the specified authentication.
-
 Validation happens in the ``case.call_and_validate`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
 By default, all available checks will be applied, but you can customize it by passing a tuple of checks explicitly:
 
