@@ -110,12 +110,15 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
+        from schemathesis.checks import load_all_checks
         from schemathesis.generation.hypothesis.builder import (
             HypothesisTestConfig,
             HypothesisTestMode,
             create_test,
             make_async_test,
         )
+
+        load_all_checks()
 
         is_trio_test = False
         for mark in getattr(self.test_function, "pytestmark", []):
@@ -256,15 +259,13 @@ def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pyt
         total_frames = len(tb_entries)
 
         # Keep internal Schemathesis frames + one extra one from the caller
-        keep_from_index = 0
+        skip_frames = 0
         for i in range(total_frames - 1, -1, -1):
             entry = tb_entries[i]
 
-            if "validate_response" in str(entry):
-                keep_from_index = max(0, i - 1)
+            if not str(entry.path).endswith("schemathesis/generation/case.py"):
+                skip_frames = i
                 break
-
-        skip_frames = keep_from_index
 
         report.longrepr = "".join(format_exception(call.excinfo.value, with_traceback=True, skip_frames=skip_frames))
 

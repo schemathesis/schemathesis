@@ -937,3 +937,5 @@ def test_csv_validation(case):
             r".*/api/success\?format=csv.*",
         ]
     )
+    assert "generation/hypothesis/builder.py" not in result.stdout.str()
+    assert "res = hook_impl.function(*args)" not in result.stdout.str()
