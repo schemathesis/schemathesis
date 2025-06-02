@@ -6,7 +6,7 @@ from typing import Any, Callable
 import click
 from click.utils import LazyFile
 
-from schemathesis.checks import CHECKS
+from schemathesis.checks import CHECKS, load_all_checks
 from schemathesis.cli.commands.run import executor, validation
 from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
@@ -30,8 +30,7 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.metrics import METRICS, MetricFunction
 
-# NOTE: Need to explicitly import all registered checks
-from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
+load_all_checks()
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 

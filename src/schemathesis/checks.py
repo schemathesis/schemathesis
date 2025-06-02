@@ -91,6 +91,11 @@ class CheckContext:
 CHECKS = Registry[CheckFunction]()
 
 
+def load_all_checks() -> None:
+    # NOTE: Trigger registering all Open API checks
+    from schemathesis.specs.openapi.checks import status_code_conformance  # noqa: F401, F403
+
+
 def check(func: CheckFunction) -> CheckFunction:
     """Register a custom validation check to run against API responses.
 
