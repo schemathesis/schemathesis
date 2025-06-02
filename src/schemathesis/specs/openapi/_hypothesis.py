@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
+import jsonschema
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -42,7 +43,9 @@ from .parameters import OpenAPIBody, OpenAPIParameter, parameters_to_json_schema
 from .utils import is_header_location
 
 SLASH = "/"
-StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationConfig], st.SearchStrategy]
+StrategyFactory = Callable[
+    [Dict[str, Any], str, str, Optional[str], GenerationConfig, type[jsonschema.Validator]], st.SearchStrategy
+]
 
 
 @st.composite  # type: ignore
@@ -195,6 +198,8 @@ def _get_body_strategy(
     operation: APIOperation,
     generation_config: GenerationConfig,
 ) -> st.SearchStrategy:
+    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
     # The cache key relies on object ids, which means that the parameter should not be mutated
@@ -203,7 +208,10 @@ def _get_body_strategy(
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
     schema = parameter.as_json_schema(operation)
     schema = operation.schema.prepare_schema(schema)
-    strategy = strategy_factory(schema, operation.label, "body", parameter.media_type, generation_config)
+    assert isinstance(operation.schema, BaseOpenAPISchema)
+    strategy = strategy_factory(
+        schema, operation.label, "body", parameter.media_type, generation_config, operation.schema.validator_cls
+    )
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[strategy_factory] = strategy
@@ -337,6 +345,8 @@ def get_parameters_strategy(
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
+    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
         # The cache key relies on object ids, which means that the parameter should not be mutated
@@ -354,7 +364,10 @@ def get_parameters_strategy(
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
-            strategy = strategy_factory(schema, operation.label, location, None, generation_config)
+            assert isinstance(operation.schema, BaseOpenAPISchema)
+            strategy = strategy_factory(
+                schema, operation.label, location, None, generation_config, operation.schema.validator_cls
+            )
             serialize = operation.get_parameter_serializer(location)
             if serialize is not None:
                 strategy = strategy.map(serialize)
@@ -418,6 +431,7 @@ def make_positive_strategy(
     location: str,
     media_type: str | None,
     generation_config: GenerationConfig,
+    validator_cls: type[jsonschema.Validator],
     custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
@@ -448,6 +462,7 @@ def make_negative_strategy(
     location: str,
     media_type: str | None,
     generation_config: GenerationConfig,
+    validator_cls: type[jsonschema.Validator],
     custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(custom_formats, generation_config)
@@ -458,6 +473,7 @@ def make_negative_strategy(
         media_type=media_type,
         custom_formats=custom_formats,
         generation_config=generation_config,
+        validator_cls=validator_cls,
     )
 
 
