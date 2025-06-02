@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
-import jsonschema
+import jsonschema.protocols
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -44,7 +44,7 @@ from .utils import is_header_location
 
 SLASH = "/"
 StrategyFactory = Callable[
-    [Dict[str, Any], str, str, Optional[str], GenerationConfig, type[jsonschema.Validator]], st.SearchStrategy
+    [Dict[str, Any], str, str, Optional[str], GenerationConfig, type[jsonschema.protocols.Validator]], st.SearchStrategy
 ]
 
 
@@ -431,7 +431,7 @@ def make_positive_strategy(
     location: str,
     media_type: str | None,
     generation_config: GenerationConfig,
-    validator_cls: type[jsonschema.Validator],
+    validator_cls: type[jsonschema.protocols.Validator],
     custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
@@ -462,7 +462,7 @@ def make_negative_strategy(
     location: str,
     media_type: str | None,
     generation_config: GenerationConfig,
-    validator_cls: type[jsonschema.Validator],
+    validator_cls: type[jsonschema.protocols.Validator],
     custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(custom_formats, generation_config)
