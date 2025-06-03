@@ -354,12 +354,20 @@ def get_parameters_strategy(
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
         schema = get_schema_for_location(operation, location, parameters)
-        for name in exclude:
-            # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
-            # that may be invalid
-            schema["properties"].pop(name, None)
-            with suppress(ValueError):
-                schema["required"].remove(name)
+        if location == "header" and exclude:
+            # Remove excluded headers case-insensitively
+            exclude_lower = {name.lower() for name in exclude}
+            schema["properties"] = {
+                key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
+            }
+            if "required" in schema:
+                schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
+        elif exclude:
+            # Non-header locations: remove by exact name
+            for name in exclude:
+                schema["properties"].pop(name, None)
+                with suppress(ValueError):
+                    schema["required"].remove(name)
         if not schema["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()
