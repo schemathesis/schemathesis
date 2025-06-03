@@ -65,7 +65,7 @@ Reproduce with:
 ## What's next?
 
 !!! tip "Ready to dive deeper?"
-    **[Complete Tutorial](tutorial.md)** - 15-20 minute hands-on workflow with a realistic booking API
+    **[Complete Tutorial](tutorials/cli.md)** - 15-20 minute hands-on workflow with a realistic booking API
 
 **Reference guides:**
 

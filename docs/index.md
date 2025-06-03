@@ -35,7 +35,7 @@ Immediate results:
 
  - **🎯 Find 5-15 real bugs** in a typical API within the first test run
 
- - **⏱️ 2-minute setup** - Just point it at your OpenAPI schema
+ - **⏱️ 1-minute setup** - Just point it at your OpenAPI schema
 
  - **🔄 Zero maintenance** - Automatically tests new endpoints as you add them
 
@@ -60,14 +60,15 @@ Easy integration:
 
     Get started in minutes:
 
-    - [:octicons-arrow-right-24: Quick Start - 5 minute demo](quick-start.md)
-    - [:octicons-arrow-right-24: Tutorial - 20 minute walkthrough](tutorial.md)
+    - [:octicons-arrow-right-24: Quick Start - 5 minutes](quick-start.md)
+    - [:octicons-arrow-right-24: CLI Tutorial - 20 minutes](tutorials/cli.md)
+    - [:octicons-arrow-right-24: Pytest Tutorial - 15 minutes](tutorials/pytest.md)
 
 -   :material-puzzle:{ .lg .middle style="color: #4CAF50" } __How-To Guides__
 
     ---
 
-    Production setup guides:
+    Practical guides for common scenarios:
 
      - [:octicons-arrow-right-24: CI/CD Integration](guides/cicd.md)
      - [:octicons-arrow-right-24: Extending Schemathesis](guides/extending.md)
