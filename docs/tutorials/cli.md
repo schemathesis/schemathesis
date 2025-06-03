@@ -1,10 +1,10 @@
-# Schemathesis Tutorial
+# Schemathesis CLI Tutorial
 
 **Estimated time: 15-20 minutes**
 
 This tutorial walks you through a complete API testing workflow with Schemathesis using a booking API. You'll see how property-based testing automatically finds bugs that manual testing typically misses.
 
-If you're new to Schemathesis, check the [Quick Start Guide](quick-start.md) first.
+If you're new to Schemathesis, check the [Quick Start Guide](../quick-start.md) first.
 
 ## Prerequisites
 
@@ -142,7 +142,9 @@ The `--include-operation-id` option targets only the specific operation we fixed
 ## Generating more test cases
 
 !!! question "Want to find more bugs?"
-    By default, Schemathesis stops at the first failure per operation and runs a limited number of test cases. Let's be more thorough:
+    By default, Schemathesis stops at the first failure per operation and runs a limited number of test cases.
+
+Let's be more thorough:
 
 ```bash
 uvx schemathesis run http://127.0.0.1:8080/openapi.json \
@@ -208,5 +210,5 @@ uvx schemathesis --config-file path/to/config.toml run http://...
 
 **Continue learning:**
 
-- **[CLI Reference](reference/cli.md)** - All available CLI options
-- **[Configuration Reference](reference/configuration.md)** - Complete configuration reference
+- **[CLI Reference](../reference/cli.md)** - All available CLI options
+- **[Configuration Reference](../reference/configuration.md)** - Complete configuration reference
