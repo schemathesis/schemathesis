@@ -40,7 +40,7 @@ jobs:
   tests:
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019]
+        os: [ubuntu-22.04, windows-2022]
         python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
       fail-fast: false
 
@@ -72,7 +72,7 @@ jobs:
   tests-pipe-with-encoding:
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019]
+        os: [ubuntu-22.04, windows-2022]
       fail-fast: false
     name: Test piping output to a file with CP1252 encoding on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
