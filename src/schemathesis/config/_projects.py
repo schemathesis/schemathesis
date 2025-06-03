@@ -251,7 +251,7 @@ class ProjectConfig(DiffBase):
             return self.auth.basic
         return None
 
-    def headers_for(self, *, operation: APIOperation | None = None) -> dict[str, str] | None:
+    def headers_for(self, *, operation: APIOperation | None = None) -> dict[str, str]:
         """Get explicitly configured headers."""
         headers = self.headers.copy() if self.headers else {}
         if operation is not None:
