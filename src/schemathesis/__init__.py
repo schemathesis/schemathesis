@@ -3,6 +3,7 @@ from __future__ import annotations
 from schemathesis import errors, graphql, openapi, pytest
 from schemathesis.auths import AuthContext, auth
 from schemathesis.checks import CheckContext, CheckFunction, check
+from schemathesis.config import SchemathesisConfig as Config
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationMode
@@ -21,6 +22,7 @@ __all__ = [
     "Response",
     "GenerationMode",
     "BaseSchema",
+    "Config",
     # Public errors
     "errors",
     # Spec or usage specific namespaces

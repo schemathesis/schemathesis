@@ -4,7 +4,10 @@ repo_url: https://github.com/schemathesis/schemathesis
 nav:
   - Introduction: index.md
   - Quick Start Guide: quick-start.md
-  - Tutorial: tutorial.md
+  - Tutorials:
+      - Command-Line Interface: tutorials/cli.md
+      - Pytest: tutorials/pytest.md
+
   - Configuration: configuration.md
 
   - How-To Guides:

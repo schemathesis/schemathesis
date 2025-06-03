@@ -31,7 +31,7 @@ class BookingResponse(BaseModel):
     total_price: float
 
 
-@app.post("/bookings", response_model=BookingResponse)  # type: ignore[misc]
+@app.post("/bookings", response_model=BookingResponse, responses={400: {"description": "Invalid booking"}})  # type: ignore[misc]
 def create_booking(booking: BookingRequest, _: bool = Depends(verify_token)) -> BookingResponse:
     # Calculate price based on room type
     room_prices = {"standard": 99.99, "deluxe": 149.99, "suite": 299.99}
