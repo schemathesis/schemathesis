@@ -388,12 +388,12 @@ class CliSnapshotConfig:
             )
         if self.replace_duration:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
-            data = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 0.00s", data)
+            data = re.sub(r"\(in [0-9]+\.[0-9]{2}s\)", "(in 0.00s)", data)
             data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:
-                lines[-1] = lines[-1].rjust(80, "=")
+                lines[-1] = lines[-1].strip("=").center(80, "=")
             data = "\n".join(lines) + "\n"
         if self.remove_last_line:
             lines = data.splitlines()
