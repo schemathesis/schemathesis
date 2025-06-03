@@ -10,7 +10,9 @@
 ### :bug: Fixed
 
 - Internal error during negative testing in some cases on Open API 3.1.
-- Pytest integration not using all built-in checks by default.
+- **Pytest**: not using all built-in checks by default.
+- **Pytest**: Ignored `headers` from config file.
+- Make header overrides case-insensitive.
 
 ## [4.0.0-alpha.12](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.11...v4.0.0-alpha.12) - 2025-06-02
 

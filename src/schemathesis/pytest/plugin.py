@@ -131,14 +131,15 @@ class SchemathesisCase(PyCollector):
             if self.is_invalid_test:
                 funcobj = self.test_function
             else:
+                as_strategy_kwargs = {}
+                headers = self.schema.config.headers_for(operation=operation)
+                if headers:
+                    as_strategy_kwargs["headers"] = headers
                 override = OverrideMark.get(self.test_function)
                 if override is not None:
-                    as_strategy_kwargs = {}
                     for location, entry in override.for_operation(operation).items():
                         if entry:
                             as_strategy_kwargs[location] = entry
-                else:
-                    as_strategy_kwargs = {}
                 modes = []
                 phases = self.schema.config.phases_for(operation=operation)
                 if phases.examples.enabled:

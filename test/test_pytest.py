@@ -869,6 +869,39 @@ def test(case):
     result.assert_outcomes(passed=2)
 
 
+def test_config_using_headers(testdir):
+    testdir.make_test(
+        """
+raw_schema = {
+    "openapi": "3.1.0",
+    "paths": {
+        "/bookings": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "authorization",
+                        "in": "header",
+                        "required": False,
+                        "schema": {"type": "string"},
+                    }
+                ],
+            }
+        },
+    },
+}
+schema = schemathesis.openapi.from_dict(raw_schema)
+HEADERS = {"Authorization": "Bearer secret-token"}
+schema.config.update(headers=HEADERS)
+
+@schema.parametrize()
+def test(case):
+    assert case.headers == HEADERS
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_override_double(testdir):
     testdir.make_test(
         """
