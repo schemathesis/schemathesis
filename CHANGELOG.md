@@ -15,6 +15,7 @@
 - Internal error during negative testing in some cases on Open API 3.1.
 - **Pytest**: not using all built-in checks by default.
 - **Pytest**: Ignored `headers` from config file.
+- **Pytest**: Ignored `basic_auth` from config file.
 - Make header overrides case-insensitive.
 
 ### :fire: Removed
