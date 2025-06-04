@@ -2,17 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Iterator
 
 from schemathesis.config import ProjectConfig
-from schemathesis.core.errors import IncorrectUsage
-from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import diff
 from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-    from schemathesis.schemas import APIOperation, Parameter, ParameterSet
+    from schemathesis.schemas import APIOperation, Parameter
 
 
 @dataclass
@@ -24,13 +22,15 @@ class Override:
     cookies: dict[str, str]
     path_parameters: dict[str, str]
 
-    def for_operation(self, operation: APIOperation) -> dict[str, dict[str, str]]:
-        return {
-            "query": (_for_parameters(self.query, operation.query)),
-            "headers": (_for_parameters(self.headers, operation.headers)),
-            "cookies": (_for_parameters(self.cookies, operation.cookies)),
-            "path_parameters": (_for_parameters(self.path_parameters, operation.path_parameters)),
-        }
+    def items(self) -> Iterator[tuple[str, dict[str, str]]]:
+        for key, value in (
+            ("query", self.query),
+            ("headers", self.headers),
+            ("cookies", self.cookies),
+            ("path_parameters", self.path_parameters),
+        ):
+            if value:
+                yield key, value
 
     @classmethod
     def from_components(cls, components: dict[ComponentKind, StoredValue], case: Case) -> Override:
@@ -77,14 +77,6 @@ def _get_override_value(param: Parameter, parameters: dict[str, Any]) -> Any:
     return None
 
 
-def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[str, str]:
-    output = {}
-    for param in defined:
-        if param.name in overridden:
-            output[param.name] = overridden[param.name]
-    return output
-
-
 @dataclass
 class StoredValue:
     value: dict[str, Any] | None
@@ -122,11 +114,3 @@ def store_components(case: Case) -> dict[ComponentKind, StoredValue]:
             ComponentKind.PATH_PARAMETERS,
         ]
     }
-
-
-OverrideMark = Mark[Override](attr_name="override")
-
-
-def check_no_override_mark(test: Callable) -> None:
-    if OverrideMark.is_set(test):
-        raise IncorrectUsage(f"`{test.__name__}` has already been decorated with `override`.")

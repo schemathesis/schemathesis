@@ -17,6 +17,22 @@
 - **Pytest**: Ignored `headers` from config file.
 - Make header overrides case-insensitive.
 
+### :fire: Removed
+
+- `@schema.override`. Use `parameters` configuration option instead.
+
+Change this:
+
+```python
+@schema.override(path_parameters={"user_id": 42})
+```
+
+To:
+
+```toml
+parameters = { user_id = 42 }
+```
+
 ## [4.0.0-alpha.12](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.11...v4.0.0-alpha.12) - 2025-06-02
 
 This release features rewritten documentation, now live at https://schemathesis.github.io/schemathesis/

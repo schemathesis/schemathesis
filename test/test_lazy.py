@@ -556,12 +556,13 @@ def test_override(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema.config.update(parameters={{"key": "foo", "id": "bar"}})
+    return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.include(path_regex="path_variable|custom_format").parametrize()
-@lazy_schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
 def test(case):
     if not hasattr(case.meta.phase.data, "description"):
         if "key" in case.operation.path_parameters:

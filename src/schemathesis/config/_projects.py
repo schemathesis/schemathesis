@@ -192,6 +192,7 @@ class ProjectConfig(DiffBase):
         tls_verify: bool | str | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
+        parameters: dict[str, Any] | None = None,
         proxy: str | None = None,
         suppress_health_check: list[HealthCheck] | None = None,
         warnings: bool | list[SchemathesisWarning] | None = None,
@@ -234,6 +235,9 @@ class ProjectConfig(DiffBase):
 
         if proxy is not None:
             self.proxy = proxy
+
+        if parameters is not None:
+            self.parameters = parameters
 
         if suppress_health_check is not None:
             self.suppress_health_check = suppress_health_check
