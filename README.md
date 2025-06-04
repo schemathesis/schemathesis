@@ -84,13 +84,14 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 
 ## Documentation
 
-📚 **[Complete documentation](https://schemathesis.readthedocs.io/)** with guides, examples, and API reference.
+📚 **[Complete documentation](https://schemathesis.readthedocs.io/en/latest/)** with guides, examples, and API reference.
+
+> **Note:** See also [docs](https://schemathesis.readthedocs.io/en/stable/) for the stable V3 release
 
 ## Get Help
 
 - 💬 [Discord community](https://discord.gg/R9ASRAmHnA)
 - 🐛 [GitHub issues](https://github.com/schemathesis/schemathesis/issues)  
-- ✉️ [Email support](mailto:support@schemathesis.io)
 
 ## Contributing
 

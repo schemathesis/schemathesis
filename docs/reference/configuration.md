@@ -27,6 +27,9 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 
 This allows you to maintain a single configuration file across different environments by changing environment variables rather than the configuration itself.
 
+!!! note ""
+    If you use `pytest`, environment variables are resolved when the `SchemathesisConfig` object is initialized, which usually happens inside schema loaders like `schemathesis.openapi.from_url`.
+
 ## Operation-Specific Configuration
 
 Schemathesis allows applying custom configuration to specific API operations in a few ways:

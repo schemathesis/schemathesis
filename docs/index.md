@@ -22,12 +22,11 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 This command will immediately find real bugs in a demo API and show you exactly how to reproduce them.
 
-**Bugs that cause real problems**:
+**Bugs Schemathesis finds cause real problems**:
 
 - Registration forms that crash on legitimate international names
 - Shopping carts accepting negative quantities or invalid product IDs
 - User profiles returning incomplete data that breaks mobile apps
-- APIs that fail silently instead of showing proper error messages
 
 ## Why developers choose Schemathesis
 
@@ -41,9 +40,11 @@ Immediate results:
 
 Easy integration:
 
- - **🔌 Works with existing tools** - Integrates with pytest and CI/CD
+ - **🔌 Works with existing tools** - Supports variety of export formats like JUnit and HAR
 
  - **📑 Uses your existing docs** - Reads OpenAPI/GraphQL schemas you already have
+
+ - **🐍 Has a flexible Python API** - Integrates with `pytest` directly
 
 !!! quote "Developer feedback"
     "The tool is amazing as it can test negative scenarios instead of me and much faster!" 
