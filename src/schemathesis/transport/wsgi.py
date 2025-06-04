@@ -9,6 +9,7 @@ from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
+from schemathesis.generation.overrides import Override
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import normalize_base_url, prepare_body, prepare_headers, prepare_path
@@ -99,6 +100,12 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
             request=requests.Request(**requests_kwargs).prepare(),
             elapsed=elapsed,
             verify=False,
+            _override=Override(
+                query=kwargs.get("params") or {},
+                headers=kwargs.get("headers") or {},
+                cookies=kwargs.get("cookies") or {},
+                path_parameters={},
+            ),
         )
 
 
