@@ -469,10 +469,12 @@ def test_replace(case):
     case.{container} = {{"api_key": "42"}}
     case.call_and_validate()
 
+schema2 = schemathesis.openapi.from_asgi("/openapi.json", app)
+schema2.config.generation.update(modes=[GenerationMode.POSITIVE])
+schema2.config.update(parameters={{"api_key": "42"}})
 
-@schema.parametrize()
+@schema2.parametrize()
 @settings(max_examples=3)
-@schema.override({container}={{"api_key": "42"}})
 def test_override(case):
     case.call_and_validate()
 """,

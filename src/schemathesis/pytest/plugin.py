@@ -26,6 +26,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
+from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
     GivenKwargsMark,
@@ -34,7 +35,6 @@ from schemathesis.generation.hypothesis.given import (
     validate_given_args,
 )
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.generation.overrides import OverrideMark
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import APIOperation
 
@@ -132,12 +132,14 @@ class SchemathesisCase(PyCollector):
                 funcobj = self.test_function
             else:
                 as_strategy_kwargs = {}
+
                 headers = self.schema.config.headers_for(operation=operation)
                 if headers:
                     as_strategy_kwargs["headers"] = headers
-                override = OverrideMark.get(self.test_function)
+
+                override = overrides.for_operation(operation=operation, config=self.schema.config)
                 if override is not None:
-                    for location, entry in override.for_operation(operation).items():
+                    for location, entry in override.items():
                         if entry:
                             as_strategy_kwargs[location] = entry
                 modes = []

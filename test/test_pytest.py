@@ -852,9 +852,9 @@ def test_override(testdir, openapi3_schema_url):
     testdir.make_test(
         f"""
 schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema.config.update(parameters={{"key": "foo", "id": "bar"}})
 
 @schema.include(path_regex="path_variable|custom_format").parametrize()
-@schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
 def test(case):
     if not hasattr(case.meta.phase.data, "description"):
         if "key" in case.operation.path_parameters:
@@ -900,21 +900,6 @@ def test(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
-
-
-def test_override_double(testdir):
-    testdir.make_test(
-        """
-@schema.parametrize()
-@schema.override(path_parameters={"key": "foo"}, query={"id": "bar"})
-@schema.override(path_parameters={"key": "foo"}, query={"id": "bar"})
-def test(case):
-    pass
-"""
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(errors=1)
-    assert "`test` has already been decorated with `override`" in result.stdout.str()
 
 
 def test_csv_response_validation_direct(testdir, openapi3_base_url):

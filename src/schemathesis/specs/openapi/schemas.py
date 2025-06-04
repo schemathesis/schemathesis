@@ -39,7 +39,6 @@ from schemathesis.core.transport import Response
 from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
-from schemathesis.generation.overrides import Override, OverrideMark, check_no_override_mark
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi.stateful import links
 
@@ -258,26 +257,6 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 # Ignore errors
                 continue
-
-    def override(
-        self,
-        *,
-        query: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
-        cookies: dict[str, str] | None = None,
-        path_parameters: dict[str, str] | None = None,
-    ) -> Callable[[Callable], Callable]:
-        """Override Open API parameters with fixed values."""
-
-        def _add_override(test: Callable) -> Callable:
-            check_no_override_mark(test)
-            override = Override(
-                query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
-            )
-            OverrideMark.set(test, override)
-            return test
-
-        return _add_override
 
     def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
         while "$ref" in value:
