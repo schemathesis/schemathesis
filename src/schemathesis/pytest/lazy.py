@@ -12,6 +12,7 @@ from pytest_subtests import SubTests
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
+from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
@@ -22,7 +23,6 @@ from schemathesis.generation.hypothesis.given import (
     merge_given_args,
     validate_given_args,
 )
-from schemathesis.generation.overrides import Override, OverrideMark, check_no_override_mark
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import BaseSchema
 
@@ -174,17 +174,10 @@ class LazySchema:
                 node_id = request.node._nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
 
-                as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None
+                def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
+                    override = overrides.for_operation(config=schema.config, operation=_operation)
 
-                override = OverrideMark.get(test_func)
-                if override is not None:
-
-                    def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
-                        nonlocal override
-
-                        return {
-                            location: entry for location, entry in override.for_operation(_operation).items() if entry
-                        }
+                    return {location: entry for location, entry in override.items() if entry}
 
                 tests = list(
                     get_all_tests(
@@ -223,26 +216,6 @@ class LazySchema:
 
     def given(self, *args: GivenInput, **kwargs: GivenInput) -> Callable:
         return given_proxy(*args, **kwargs)
-
-    def override(
-        self,
-        *,
-        query: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
-        cookies: dict[str, str] | None = None,
-        path_parameters: dict[str, str] | None = None,
-    ) -> Callable[[Callable], Callable]:
-        """Override Open API parameters with fixed values."""
-
-        def _add_override(test: Callable) -> Callable:
-            check_no_override_mark(test)
-            override = Override(
-                query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
-            )
-            OverrideMark.set(test, override)
-            return test
-
-        return _add_override
 
 
 def _copy_marks(source: Callable, target: Callable) -> None:
