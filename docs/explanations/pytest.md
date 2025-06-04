@@ -114,3 +114,31 @@ __________________________ test_api[POST /bookings] ___________________________
   |  (2 sub-exceptions)
   +-+---------------- 1 ----------------
 ```
+
+## Async Support
+
+Schemathesis supports asynchronous test functions with no additional configuration beyond installing `pytest-asyncio` or `pytest-trio`:
+
+```python
+import pytest
+import schemathesis
+
+schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/openapi.json")
+
+@pytest.mark.asyncio
+@schema.parametrize()
+async def test_api_async(case, client):
+    response = await client.request(
+        case.method, case.formatted_path, headers=case.headers
+    )
+    schema[case.path][case.method].validate_response(response)
+
+# Or with trio
+@pytest.mark.trio
+@schema.parametrize()
+async def test_api_trio(case, client):
+    ...
+```
+
+!!! important "Async Network Calls"
+    Schemathesis uses synchronous network calls, therefore you need to serialize the test case yourself if you'd like to use an async test client.

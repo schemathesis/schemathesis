@@ -216,6 +216,78 @@ export SCHEMATHESIS_HOOKS=auth
 schemathesis run http://localhost:8000/openapi.json
 ```
 
+## Python Tests
+
+### Simple Authentication
+
+Use requests authentication directly with case methods:
+
+```python
+import schemathesis
+from requests.auth import HTTPDigestAuth
+
+schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
+
+@schema.parametrize()
+def test_api(case):
+    # HTTP Basic
+    case.call_and_validate(auth=("user", "password"))
+
+    # HTTP Digest
+    case.call_and_validate(auth=HTTPDigestAuth("user", "password"))
+
+    # Static headers
+    case.call_and_validate(headers={"Authorization": "Bearer your-token"})
+```
+
+### Custom Authentication Classes
+
+Register auth at the schema level for all tests:
+
+```python
+@schema.auth()
+class APITokenAuth:
+    def get(self, case, context):
+        # Same implementation as CLI examples above
+        response = requests.post("http://localhost:8000/auth/token", ...)
+        return response.json()["access_token"]
+    
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+@schema.parametrize()
+def test_api(case):
+    # Auth applied automatically
+    case.call_and_validate()
+```
+
+Or register for specific tests only:
+
+```python
+@schema.auth(MyAuth)
+@schema.parametrize() 
+def test_protected_endpoints(case):
+    case.call_and_validate()
+```
+
+### Session Management
+
+For persistent sessions or custom client configuration:
+
+```python
+import requests
+
+@schema.parametrize()
+def test_with_session(case):
+    with requests.Session() as session:
+        session.auth = ("user", "password")
+        case.call_and_validate(session=session)
+```
+
+!!! tip ""
+    Custom auth classes support the same advanced features as CLI (refresh intervals, cache keys, selective application) with identical syntax.
+
 ## What's Next
 
 - **[Configuration Reference](../reference/configuration.md)** - Complete configuration options
