@@ -20,10 +20,16 @@ if TYPE_CHECKING:
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
-SERIALIZERS_SUGGESTION_MESSAGE = (
-    "You can register your own serializer with `schemathesis.serializer` "
-    "and Schemathesis will be able to make API calls with this media type. \n"
-    "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
+SERIALIZERS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/latest/guides/custom-serializers/"
+SERIALIZERS_SUGGESTION_MESSAGE = f"Check your schema or add custom serializers: {SERIALIZERS_DOCUMENTATION_URL}"
+SERIALIZATION_NOT_POSSIBLE_MESSAGE = f"No supported serializers for media types: {{}}\n{SERIALIZERS_SUGGESTION_MESSAGE}"
+SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
+    f"Cannot serialize to '{{}}' (unsupported media type)\n{SERIALIZERS_SUGGESTION_MESSAGE}"
+)
+RECURSIVE_REFERENCE_ERROR_MESSAGE = (
+    "Currently, Schemathesis can't generate data for this operation due to "
+    "recursive references in the operation definition. See more information in "
+    "this issue - https://github.com/schemathesis/schemathesis/issues/947"
 )
 
 
@@ -275,19 +281,6 @@ class UnboundPrefix(SerializationError):
 
     def __init__(self, prefix: str):
         super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
-
-
-SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
-    f"Schemathesis can't serialize data to any of the defined media types: {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
-)
-SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
-    f"Schemathesis can't serialize data to {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
-)
-RECURSIVE_REFERENCE_ERROR_MESSAGE = (
-    "Currently, Schemathesis can't generate data for this operation due to "
-    "recursive references in the operation definition. See more information in "
-    "this issue - https://github.com/schemathesis/schemathesis/issues/947"
-)
 
 
 class SerializationNotPossible(SerializationError):

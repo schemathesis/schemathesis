@@ -1,5 +1,6 @@
 import csv
 import platform
+import re
 import string
 from contextlib import suppress
 from io import StringIO
@@ -96,7 +97,7 @@ def test_no_serialization_possible(tsv_schema):
     # Then there should be an error indicating this
     with pytest.raises(
         SerializationNotPossible,
-        match="Schemathesis can't serialize data to any of the defined media types: text/tsv",
+        match="No supported serializers for media types: text/tsv",
     ):
         test()
 
@@ -180,7 +181,8 @@ def test_serialization_not_possible_manual(ctx):
     def test(case):
         case.media_type = "application/whatever"
         with pytest.raises(
-            SerializationNotPossible, match=SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(case.media_type)
+            SerializationNotPossible,
+            match=re.escape(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(case.media_type)),
         ):
             case.as_transport_kwargs()
 
