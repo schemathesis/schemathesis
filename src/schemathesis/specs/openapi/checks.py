@@ -35,9 +35,7 @@ from schemathesis.transport.prepare import prepare_path
 from .utils import expand_status_code, expand_status_codes
 
 if TYPE_CHECKING:
-    from requests import PreparedRequest
-
-    from ...schemas import APIOperation
+    from schemathesis.schemas import APIOperation
 
 
 def is_unexpected_http_status_case(case: Case) -> bool:
@@ -492,17 +490,22 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
     security_parameters = _get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
     if security_parameters and 200 <= response.status_code < 300:
-        auth = _contains_auth(ctx, case, response.request, security_parameters)
+        auth = _contains_auth(ctx, case, response, security_parameters)
         if auth == AuthKind.EXPLICIT:
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
             kwargs = ctx._transport_kwargs or {}
             kwargs.copy()
-            if "headers" in kwargs:
-                headers = kwargs["headers"].copy()
-                _remove_auth_from_explicit_headers(headers, security_parameters)
-                kwargs["headers"] = headers
+            for location, container_name in (
+                ("header", "headers"),
+                ("cookie", "cookies"),
+                ("query", "query"),
+            ):
+                if container_name in kwargs:
+                    container = kwargs[container_name].copy()
+                    _remove_auth_from_container(container, security_parameters, location=location)
+                    kwargs[container_name] = container
             kwargs.pop("session", None)
             ctx._record_case(parent_id=case.id, case=no_auth_case)
             no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
@@ -553,7 +556,7 @@ def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]
 
 
 def _contains_auth(
-    ctx: CheckContext, case: Case, request: PreparedRequest, security_parameters: list[SecurityParameter]
+    ctx: CheckContext, case: Case, response: Response, security_parameters: list[SecurityParameter]
 ) -> AuthKind | None:
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
@@ -561,6 +564,7 @@ def _contains_auth(
     # If auth comes from explicit `auth` option or a custom auth, it is always explicit
     if ctx._auth is not None or case._has_explicit_auth:
         return AuthKind.EXPLICIT
+    request = response.request
     parsed = urlparse(request.url)
     query = parse_qs(parsed.query)  # type: ignore
     # Load the `Cookie` header separately, because it is possible that `request._cookies` and the header are out of sync
@@ -582,19 +586,35 @@ def _contains_auth(
     for parameter in security_parameters:
         name = parameter["name"]
         if has_header(parameter):
-            if (ctx._headers is not None and name in ctx._headers) or (ctx._override and name in ctx._override.headers):
+            if (
+                # Explicit CLI headers
+                (ctx._headers is not None and name in ctx._headers)
+                # Other kinds of overrides
+                or (ctx._override and name in ctx._override.headers)
+                or (response._override and name in response._override.headers)
+            ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_cookie(parameter):
-            if ctx._headers is not None and "Cookie" in ctx._headers:
-                cookies = cast(RequestsCookieJar, ctx._headers["Cookie"])  # type: ignore
-                if name in cookies:
-                    return AuthKind.EXPLICIT
-            if ctx._override and name in ctx._override.cookies:
+            for headers in [
+                ctx._headers,
+                (ctx._override.headers if ctx._override else None),
+                (response._override.headers if response._override else None),
+            ]:
+                if headers is not None and "Cookie" in headers:
+                    jar = cast(RequestsCookieJar, headers["Cookie"])
+                    if name in jar:
+                        return AuthKind.EXPLICIT
+
+            if (ctx._override and name in ctx._override.cookies) or (
+                response._override and name in response._override.cookies
+            ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_query(parameter):
-            if ctx._override and name in ctx._override.query:
+            if (ctx._override and name in ctx._override.query) or (
+                response._override and name in response._override.query
+            ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
 
@@ -631,11 +651,11 @@ def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Cas
     )
 
 
-def _remove_auth_from_explicit_headers(headers: dict, security_parameters: list[SecurityParameter]) -> None:
+def _remove_auth_from_container(container: dict, security_parameters: list[SecurityParameter], location: str) -> None:
     for parameter in security_parameters:
         name = parameter["name"]
-        if parameter["in"] == "header":
-            headers.pop(name, None)
+        if parameter["in"] == location:
+            container.pop(name, None)
 
 
 def _set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:

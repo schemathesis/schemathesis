@@ -13,6 +13,7 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.phases import PhaseName
@@ -209,9 +210,13 @@ def test_keep_tls_verification(schema_url, mocker):
         ),
     ],
 )
-def test_contains_auth(ctx, request_kwargs, parameters, expected):
-    request = requests.Request("GET", **request_kwargs).prepare()
-    assert _contains_auth(ctx, Mock(_has_explicit_auth=False), request, parameters) == expected
+def test_contains_auth(ctx, request_kwargs, parameters, expected, response_factory):
+    response = response_factory.requests()
+    response.request = requests.Request("GET", **request_kwargs).prepare()
+    assert (
+        _contains_auth(ctx, Mock(_has_explicit_auth=False), Response.from_requests(response, verify=True), parameters)
+        == expected
+    )
 
 
 @pytest.mark.parametrize(
@@ -452,6 +457,7 @@ def test_auth_via_setitem(testdir, location):
 from hypothesis import settings
 import schemathesis
 from schemathesis import GenerationMode
+from schemathesis.specs.openapi.checks import ignored_auth
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
@@ -469,6 +475,16 @@ def test_replace(case):
     case.{container} = {{"api_key": "42"}}
     case.call_and_validate()
 
+
+@schema.parametrize()
+@settings(max_examples=3)
+def test_explicit(case):
+    if "{container}" == "query":
+        key = "params"
+    else:
+        key = "{container}"
+    case.call_and_validate(checks=[ignored_auth], **{{key: {{"api_key": "42"}}}})
+
 schema2 = schemathesis.openapi.from_asgi("/openapi.json", app)
 schema2.config.generation.update(modes=[GenerationMode.POSITIVE])
 schema2.config.update(parameters={{"api_key": "42"}})
@@ -480,4 +496,4 @@ def test_override(case):
 """,
     )
     result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=3)
+    result.assert_outcomes(passed=4)

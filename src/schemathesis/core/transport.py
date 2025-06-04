@@ -9,6 +9,8 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.generation.overrides import Override
+
 USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 DEFAULT_RESPONSE_TIMEOUT = 10
 
@@ -51,6 +53,7 @@ class Response:
     """HTTP protocol version ("1.0" or "1.1")."""
     encoding: str | None
     """Character encoding for text content, if detected."""
+    _override: Override | None
 
     __slots__ = (
         "status_code",
@@ -64,6 +67,7 @@ class Response:
         "http_version",
         "encoding",
         "_encoded_body",
+        "_override",
     )
 
     def __init__(
@@ -77,6 +81,7 @@ class Response:
         message: str = "",
         http_version: str = "1.1",
         encoding: str | None = None,
+        _override: Override | None = None,
     ):
         self.status_code = status_code
         self.headers = {key.lower(): value for key, value in headers.items()}
@@ -90,9 +95,10 @@ class Response:
         self.message = message
         self.http_version = http_version
         self.encoding = encoding
+        self._override = _override
 
     @classmethod
-    def from_requests(cls, response: requests.Response, verify: bool) -> Response:
+    def from_requests(cls, response: requests.Response, verify: bool, _override: Override | None = None) -> Response:
         raw = response.raw
         raw_headers = raw.headers if raw is not None else {}
         headers = {name: response.raw.headers.getlist(name) for name in raw_headers.keys()}
@@ -109,6 +115,7 @@ class Response:
             encoding=response.encoding,
             http_version=http_version,
             verify=verify,
+            _override=_override,
         )
 
     @property
