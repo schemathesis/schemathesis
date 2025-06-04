@@ -22,22 +22,29 @@ if TYPE_CHECKING:
 
 @dataclass
 class Case:
-    """A single test case parameters."""
+    """Generated test case data for a single API operation."""
 
     operation: APIOperation
     method: str
+    """HTTP verb (`GET`, `POST`, etc.)"""
     path: str
-    # Unique test case identifier
+    """Path template from schema (e.g., `/users/{user_id}`)"""
     id: str = field(default_factory=generate_random_case_id, compare=False)
+    """Random ID sent in headers for log correlation"""
     path_parameters: dict[str, Any] | None = None
+    """Generated path variables (e.g., `{"user_id": "123"}`)"""
     headers: CaseInsensitiveDict | None = None
+    """Generated HTTP headers"""
     cookies: dict[str, Any] | None = None
+    """Generated cookies"""
     query: dict[str, Any] | None = None
+    """Generated query parameters"""
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
     body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET
-    # The media type for cases with a payload. For example, "application/json"
+    """Generated request body"""
     media_type: str | None = None
+    """Media type from OpenAPI schema (e.g., "multipart/form-data")"""
 
     meta: CaseMetadata | None = field(compare=False, default=None)
 
@@ -70,7 +77,13 @@ class Case:
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def as_curl_command(self, headers: Mapping[str, Any] | None = None, verify: bool = True) -> str:
-        """Construct a curl command for a given case."""
+        """Generate a curl command that reproduces this test case.
+
+        Args:
+            headers: Additional headers to include in the command.
+            verify: When False, adds `--insecure` flag to curl command.
+
+        """
         request_data = prepare_request(self, headers, config=self.operation.schema.config.output.sanitization)
         return curl.generate(
             method=str(request_data.method),
@@ -82,7 +95,6 @@ class Case:
         )
 
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        """Convert the test case into a dictionary acceptable by the underlying transport call."""
         return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)
 
     def call(
@@ -94,6 +106,19 @@ class Case:
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Response:
+        """Make an HTTP request using this test case's data without validation.
+
+        Use when you need to validate response separately
+
+        Args:
+            base_url: Override the schema's base URL.
+            session: Reuse an existing requests session.
+            headers: Additional headers.
+            params: Additional query parameters.
+            cookies: Additional cookies.
+            **kwargs: Additional transport-level arguments.
+
+        """
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self, **kwargs)
         if self.operation.app is not None:
@@ -119,15 +144,16 @@ class Case:
         headers: dict[str, Any] | None = None,
         transport_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        """Validate application response.
+        """Validate a response against the API schema and built-in checks.
 
-        By default, all available checks will be applied.
+        Args:
+            response: Response to validate.
+            checks: Explicit set of checks to run.
+            additional_checks: Additional custom checks to run.
+            excluded_checks: Built-in checks to skip.
+            headers: Headers used in the original request.
+            transport_kwargs: Transport arguments used in the original request.
 
-        :param response: Application response.
-        :param checks: A tuple of check functions that accept ``response`` and ``case``.
-        :param additional_checks: A tuple of additional checks that will be executed after ones from the ``checks``
-            argument.
-        :param excluded_checks: Checks excluded from the default ones.
         """
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
@@ -180,6 +206,18 @@ class Case:
         excluded_checks: list[CheckFunction] | None = None,
         **kwargs: Any,
     ) -> Response:
+        """Make an HTTP request and validates the response automatically.
+
+        Args:
+            base_url: Override the schema's base URL.
+            session: Reuse an existing requests session.
+            headers: Additional headers to send.
+            checks: Explicit set of checks to run.
+            additional_checks: Additional custom checks to run.
+            excluded_checks: Built-in checks to skip.
+            **kwargs: Additional transport-level arguments.
+
+        """
         __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(

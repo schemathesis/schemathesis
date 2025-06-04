@@ -481,48 +481,6 @@ The ``as_strategy`` method also accepts the ``data_generation_method`` argument 
 
 The test above will generate test cases for the ``POST /pet/`` operation and will execute the ``test_pets`` function body with every generated test sample.
 
-Anatomy of a test
------------------
-
-Schemathesis tests are very similar to regular tests you might write with ``pytest``. The main feature is that it
-seamlessly combines your API schema with ``pytest``-style parametrization and property-based testing provided by `Hypothesis <http://hypothesis.works/>`_.
-
-.. code:: python
-
-    import schemathesis
-
-    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
-
-
-    @schema.parametrize()
-    def test_api(case):
-        case.call_and_validate()
-
-Such test consists of four main parts:
-
-1. Schema preparation; In this case, the schema is loaded via the ``openapi.from_url`` function.
-2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all path/method combinations available in the schema.
-3. A network call to the running application; ``case.call_and_validate()`` does it.
-4. Verifying a property you'd like to test; In this example, we run all built-in checks.
-
-Each test function where you use ``schema.parametrize`` should have the ``case`` fixture, representing a single test case.
-
-.. note::
-
-    Data generation happens outside of the test function body. It means that the ``case`` object is final, and any modifications on it
-    won't trigger data-generation. If you want to update it partially (e.g., replacing a single field in the payload), keep in mind that
-    it may require some sort of "merging" logic.
-
-
-Important ``Case`` attributes:
-
-- ``method`` - HTTP method
-- ``formatted_path`` - full API operation path
-- ``path_parameters`` - parameters that are used in ``formatted_path``
-- ``headers`` - HTTP headers
-- ``query`` - query parameters
-- ``body`` - request body
-
 For convenience, you can explore the schemas and strategies manually:
 
 .. code:: python
