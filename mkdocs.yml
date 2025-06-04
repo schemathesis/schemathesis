@@ -25,6 +25,7 @@ nav:
       - explanations/data-generation.md
       - explanations/examples.md
       - explanations/stateful.md
+      - Pytest Integration: explanations/pytest.md
 
   - Reference:
       - reference/python.md

@@ -262,3 +262,5 @@ schema = schemathesis.openapi.from_url(
 
 - **[Python API](../reference/python.md)** - Complete Python API reference
 - **[Configuration Reference](../reference/configuration.md)** - All configuration options
+- **[How Schemathesis Integrates with Pytest
+](../explanations/pytest.md)**
