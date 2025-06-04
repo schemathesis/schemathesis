@@ -11,7 +11,7 @@ from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
-from schemathesis.transport.prepare import prepare_request
+from schemathesis.transport.prepare import prepare_path, prepare_request
 
 if TYPE_CHECKING:
     import requests.auth
@@ -75,6 +75,11 @@ class Case:
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
+    @property
+    def formatted_path(self) -> str:
+        """Path template with variables substituted (e.g., /users/{user_id} → /users/123)."""
+        return prepare_path(self.path, self.path_parameters)
 
     def as_curl_command(self, headers: Mapping[str, Any] | None = None, verify: bool = True) -> str:
         """Generate a curl command that reproduces this test case.
