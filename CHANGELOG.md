@@ -6,6 +6,7 @@
 
 - Generate at least one non-NULL character in path parameters. [#2790](https://github.com/schemathesis/schemathesis/issues/2790)  
 - Improved failure messages for `unsupported_method` and `missing_required_header` checks.
+- Restore `Case.formatted_path`.
 
 ### :bug: Fixed
 
