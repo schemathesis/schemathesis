@@ -19,6 +19,7 @@ nav:
       - guides/custom-serializers.md
       - guides/targeted.md
       - guides/extending.md
+      - Hypothesis Strategies: guides/hypothesis-strategies.md
       - guides/extending-cli.md
 
   - Core Contcepts:
