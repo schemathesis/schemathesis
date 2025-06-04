@@ -475,7 +475,7 @@ def _iter_coverage_cases(
             data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
                 **data.kwargs,
-                meta=CaseMetadata(
+                _meta=CaseMetadata(
                     generation=GenerationInfo(
                         time=elapsed,
                         mode=value.generation_mode,
@@ -497,7 +497,7 @@ def _iter_coverage_cases(
                     data = template.with_body(value=next_value, media_type=body.media_type)
                     yield operation.Case(
                         **data.kwargs,
-                        meta=CaseMetadata(
+                        _meta=CaseMetadata(
                             generation=GenerationInfo(
                                 time=instant.elapsed,
                                 mode=next_value.generation_mode,
@@ -518,7 +518,7 @@ def _iter_coverage_cases(
         seen_positive.insert(data.kwargs)
         yield operation.Case(
             **data.kwargs,
-            meta=CaseMetadata(
+            _meta=CaseMetadata(
                 generation=GenerationInfo(
                     time=template_time,
                     mode=GenerationMode.POSITIVE,
@@ -546,7 +546,7 @@ def _iter_coverage_cases(
 
             yield operation.Case(
                 **data.kwargs,
-                meta=CaseMetadata(
+                _meta=CaseMetadata(
                     generation=GenerationInfo(time=instant.elapsed, mode=value.generation_mode),
                     components=data.components,
                     phase=PhaseInfo.coverage(
@@ -566,7 +566,7 @@ def _iter_coverage_cases(
             yield operation.Case(
                 **data.kwargs,
                 method=method.upper(),
-                meta=CaseMetadata(
+                _meta=CaseMetadata(
                     generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                     components=data.components,
                     phase=PhaseInfo.coverage(description=f"Unspecified HTTP method: {method.upper()}"),
@@ -588,7 +588,7 @@ def _iter_coverage_cases(
                     )
                     yield operation.Case(
                         **data.kwargs,
-                        meta=CaseMetadata(
+                        _meta=CaseMetadata(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                             components=data.components,
                             phase=PhaseInfo.coverage(
@@ -613,7 +613,7 @@ def _iter_coverage_cases(
                 )
                 yield operation.Case(
                     **data.kwargs,
-                    meta=CaseMetadata(
+                    _meta=CaseMetadata(
                         generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                         components=data.components,
                         phase=PhaseInfo.coverage(
@@ -655,7 +655,7 @@ def _iter_coverage_cases(
             )
             return operation.Case(
                 **data.kwargs,
-                meta=CaseMetadata(
+                _meta=CaseMetadata(
                     generation=GenerationInfo(
                         time=_instant.elapsed,
                         mode=_generation_mode,

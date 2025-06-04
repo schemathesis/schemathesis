@@ -162,7 +162,7 @@ def openapi_cases(
         cookies=cookies_.value,
         query=query_.value,
         body=body_.value,
-        meta=CaseMetadata(
+        _meta=CaseMetadata(
             generation=GenerationInfo(
                 time=time.monotonic() - start,
                 mode=generation_mode,

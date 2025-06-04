@@ -135,13 +135,13 @@ def sample_schema(ctx):
     [
         ({}, False),
         (
-            {"meta": build_metadata(body=GenerationMode.NEGATIVE)},
+            {"_meta": build_metadata(body=GenerationMode.NEGATIVE)},
             False,
         ),
         (
             {
                 "query": {"key": 1},
-                "meta": build_metadata(query=GenerationMode.NEGATIVE),
+                "_meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             False,
         ),
@@ -149,14 +149,14 @@ def sample_schema(ctx):
             {
                 "query": {"key": 1},
                 "headers": {"X-Key": 42},
-                "meta": build_metadata(query=GenerationMode.NEGATIVE),
+                "_meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             False,
         ),
         (
             {
                 "query": {"key": 5, "unknown": 3},
-                "meta": build_metadata(query=GenerationMode.NEGATIVE),
+                "_meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             True,
         ),
@@ -164,7 +164,7 @@ def sample_schema(ctx):
             {
                 "query": {"key": 5, "unknown": 3},
                 "headers": {"X-Key": 42},
-                "meta": build_metadata(query=GenerationMode.NEGATIVE),
+                "_meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             True,
         ),
@@ -183,7 +183,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
     case = operation.Case(
-        meta=build_metadata(
+        _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
             generation_mode=GenerationMode.NEGATIVE,
         ),
@@ -225,7 +225,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
     schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
     case = operation.Case(
-        meta=CaseMetadata(
+        _meta=CaseMetadata(
             generation=GenerationInfo(
                 time=0.1,
                 mode=GenerationMode.NEGATIVE,
@@ -289,7 +289,7 @@ def test_positive_data_acceptance(
     operation = schema["/test"]["POST"]
     response = response_factory.requests(status_code=status_code)
     case = operation.Case(
-        meta=build_metadata(
+        _meta=build_metadata(
             query=GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE,
             generation_mode=GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE,
         ),

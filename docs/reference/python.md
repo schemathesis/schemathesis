@@ -63,6 +63,7 @@ Reference for Schemathesis public Python API.
       members:
       - Response
       - Case
+      - APIOperation
 
 ## Hooks
 

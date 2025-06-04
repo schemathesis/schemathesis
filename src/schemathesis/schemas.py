@@ -563,16 +563,7 @@ class OperationDefinition(Generic[D]):
 
 @dataclass(eq=False)
 class APIOperation(Generic[P]):
-    """A single operation defined in an API.
-
-    You can get one via a ``schema`` instance.
-
-    .. code-block:: python
-
-        # Get the POST /items operation
-        operation = schema["/items"]["POST"]
-
-    """
+    """An API operation (e.g., `GET /users`)."""
 
     # `path` does not contain `basePath`
     # Example <scheme>://<host>/<basePath>/users - "/users" is path
@@ -610,7 +601,6 @@ class APIOperation(Generic[P]):
         return self.schema.get_tags(self)
 
     def iter_parameters(self) -> Iterator[P]:
-        """Iterate over all operation's parameters."""
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 
     def _lookup_container(self, location: str) -> ParameterSet[P] | PayloadAlternatives[P] | None:
@@ -623,11 +613,6 @@ class APIOperation(Generic[P]):
         }.get(location)
 
     def add_parameter(self, parameter: P) -> None:
-        """Add a new processed parameter to an API operation.
-
-        :param parameter: A parameter that will be used with this operation.
-        :rtype: None
-        """
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
         # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
         # In this case, we still might generate some tests for an API operation, but without this parameter,
@@ -649,7 +634,18 @@ class APIOperation(Generic[P]):
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
-        """Turn this API operation into a Hypothesis strategy."""
+        """Convert to Hypothesis strategy for custom testing workflows.
+
+        Returns a strategy that generates `Case` objects for this operation.
+        Use with `@given` in non-Schemathesis tests.
+
+        Args:
+            hooks: Custom hooks to apply during generation.
+            auth_storage: Authentication configuration.
+            generation_mode: Whether to generate positive or negative test data.
+            **kwargs: Extra arguments to the underlying strategy function.
+
+        """
         strategy = self.schema.get_case_strategy(self, hooks, auth_storage, generation_mode, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
@@ -677,15 +673,9 @@ class APIOperation(Generic[P]):
         return self.schema.get_security_requirements(self)
 
     def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
-        """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self, **kwargs)
 
     def get_parameter_serializer(self, location: str) -> Callable | None:
-        """Get a function that serializes parameters for the given location.
-
-        It handles serializing data into various `collectionFormat` options and similar.
-        Note that payload is handled by this function - it is handled by serializers.
-        """
         return self.schema.get_parameter_serializer(self, location)
 
     def prepare_multipart(self, form_data: dict[str, Any]) -> tuple[list | None, dict[str, Any] | None]:
@@ -717,11 +707,19 @@ class APIOperation(Generic[P]):
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
-        meta: CaseMetadata | None = None,
+        _meta: CaseMetadata | None = None,
     ) -> Case:
-        """Create a new example for this API operation.
+        """Create a test case with specific data instead of generated values.
 
-        The main use case is constructing Case instances completely manually, without data generation.
+        Args:
+            method: Override HTTP method.
+            path_parameters: Override path variables.
+            headers: Override HTTP headers.
+            cookies: Override cookies.
+            query: Override query parameters.
+            body: Override request body.
+            media_type: Override media type.
+
         """
         return self.schema.make_case(
             operation=self,
@@ -732,7 +730,7 @@ class APIOperation(Generic[P]):
             query=query,
             body=body,
             media_type=media_type,
-            meta=meta,
+            meta=_meta,
         )
 
     @property
@@ -741,14 +739,21 @@ class APIOperation(Generic[P]):
         return f"#/paths/{path}/{self.method}"
 
     def validate_response(self, response: Response) -> bool | None:
-        """Validate API response for conformance.
+        """Check response against API schema.
 
-        :raises FailureGroup: If the response does not conform to the API schema.
+        Raises:
+            FailureGroup: When response violates schema.
+
         """
         return self.schema.validate_response(self, response)
 
     def is_response_valid(self, response: Response) -> bool:
-        """Validate API response for conformance."""
+        """Check if response passes schema validation.
+
+        Returns:
+            `True` if response is valid, `False` otherwise.
+
+        """
         try:
             self.validate_response(response)
             return True
