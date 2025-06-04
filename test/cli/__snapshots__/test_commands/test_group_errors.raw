@@ -30,9 +30,8 @@ Schemathesis dev
 __________________________________ POST /test __________________________________
 Serialization not possible
 
-Schemathesis can't serialize data to any of the defined media types: application/x-json-smile, text/csv
-You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type.
-See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information.
+No supported serializers for media types: application/x-json-smile, text/csv
+Check your schema or add custom serializers: https://schemathesis.readthedocs.io/en/latest/guides/custom-serializers/
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

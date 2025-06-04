@@ -671,7 +671,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     [
         (
             [PhaseName.FUZZING],
-            "Schemathesis can't serialize data to any of the defined media types",
+            "No supported serializers for media types",
         ),
         (
             [PhaseName.EXAMPLES],
