@@ -376,7 +376,7 @@ def graphql_cases(
         cookies=cookies_,
         query=query_,
         body=body,
-        meta=CaseMetadata(
+        _meta=CaseMetadata(
             generation=GenerationInfo(
                 time=time.monotonic() - start,
                 mode=generation_mode,

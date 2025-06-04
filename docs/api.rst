@@ -37,15 +37,6 @@ Schema
   .. automethod:: given
   .. automethod:: as_state_machine
 
-.. autoclass:: schemathesis.models.APIOperation()
-
-  :members:
-
-  .. automethod:: validate_response
-  .. automethod:: is_response_valid
-  .. automethod:: make_case
-  .. automethod:: as_strategy
-
 Open API-specific API
 
 .. autoclass:: schemathesis.specs.openapi.schemas.BaseOpenAPISchema()
