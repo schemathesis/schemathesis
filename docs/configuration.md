@@ -58,6 +58,9 @@ headers = { "X-API-Key" = "${API_KEY}" }
 
 This allows you to maintain a single configuration file that works across different testing environments by changing environment variables rather than the configuration itself.
 
+!!! note ""
+    If you use `pytest`, environment variables are resolved when the `SchemathesisConfig` object is initialized, which usually happens inside schema loaders like `schemathesis.openapi.from_url`.
+
 !!! tip "Multi-Project Support"
 
     Schemathesis also supports multi-project configurations, where you can define separate settings for different APIs within the same configuration file. See [Multi-Project Configuration](#multi-project-configuration) for details.

@@ -2,17 +2,17 @@
 
 **Estimated time: 15-20 minutes**
 
-This tutorial shows how to integrate Schemathesis into your pytest test suite using the same booking API from the CLI tutorial. The pytest integration is ideal for teams who want to embed API testing into existing Python test workflows.
+This tutorial shows how to integrate Schemathesis into your `pytest` test suite using a Booking API.
 
 !!! note "CLI vs Pytest Integration"
-    The CLI offers more features (API probes, multiple phases, advanced reporting). Use pytest integration when you need direct integration with existing pytest suites.
+    The CLI offers more features (API probes, multiple phases, advanced reporting). Use pytest integration when you need direct integration with existing `pytest` test suites.
 
 ## Prerequisites
 
 - **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API repository
 - **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - Install Docker Desktop which includes Docker Compose  
  - **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - Python package manager to install pytest and Schemathesis
-- **Python 3.9+** - this tutorial uses Python 3.13.1
+- **Python 3.9+** - this tutorial uses Python 3.13
 
 **Install dependencies:**
 
@@ -204,6 +204,9 @@ def test_api(case):
 **`max_examples=500`** generates more test cases per operation, increasing the chance of finding edge cases that smaller test runs might miss.
 
 The trade-off is longer execution time, but you'll get more chances to find bugs.
+
+!!! tip "Hypothesis configuration"
+    See the whole list of available settings in the [Hypothesis documentation](https://hypothesis.readthedocs.io/en/latest/reference/api.html#settings).
 
 ## Configuration File
 

@@ -1,53 +1,6 @@
 Writing Python tests
 ====================
 
-Schemathesis is written in Python and provides a Python interface that allows you to integrate it into your existing test suite.
-
-Basic usage
------------
-
-The following test will load the API schema from ``http://0.0.0.0:8080/swagger.json`` and execute tests for all operations:
-
-
-.. code:: python
-
-    import schemathesis
-
-    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
-
-
-    @schema.parametrize()
-    def test_api(case):
-        case.call_and_validate()
-
-Each test set includes up to 100 test cases by default, depending on the API operation definition.
-
-We recommend running your tests with the latest `pytest <https://docs.pytest.org/en/stable/>`_ version.
-
-.. code:: text
-
-    $ pytest -v test_api.py
-    ====================== test session starts ======================
-    platform linux -- Python 3.8.5, pytest-5.4.3
-    cachedir: .pytest_cache
-    hypothesis profile 'default'
-    rootdir: /tmp, inifile: pytest.ini
-    plugins: hypothesis-5.23.0, schemathesis-2.5.0
-    collected 3 items
-
-    test_api.py::test_api[GET /api/path_variable/{key}] PASSED [ 33%]
-    test_api.py::test_api[GET /api/success] PASSED             [ 66%]
-    test_api.py::test_api[POST /api/users/] PASSED             [100%]
-
-    ======================= 3 passed in 1.55s =======================
-
-Running these tests requires your app running at ``http://0.0.0.0:8080/`` and a valid Open API schema available at ``https://example.schemathesis.io/openapi.json``.
-
-Narrowing the testing scope
----------------------------
-
-By default, Schemathesis tests all operations in your API. However, you can fine-tune your test scope to include or exclude specific operations based on paths, methods, names, tags, and operation IDs.
-
 Include and Exclude Options
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -166,109 +119,6 @@ This decorator overrides the ``apiKey`` query parameter and ``user_id`` path par
 .. note::
 
     Of course, you can override them inside the test function body, but it requires checking whether the ones you want to override valid for the tested endpoint, and it has a performance penalty.
-
-Tests configuration
--------------------
-
-As Schemathesis tests are regular Hypothesis tests, you can use ``hypothesis.settings`` decorator with them.
-For example, in the following test, Schemathesis will test each API operation with up to 1000 test cases:
-
-.. code:: python
-
-    from hypothesis import settings, Phase
-
-    schema = ...  # Load the API schema here
-
-
-    @schema.parametrize()
-    @settings(max_examples=1000)
-    def test_api(case):
-        ...
-
-See the whole list of available options in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
-
-Loading schemas
----------------
-
-To start testing, you need to load your API schema first.
-It could be a file on your local machine or a web resource or a simple Python dictionary - Schemathesis supports loading API schemas from different location types.
-
-Remote URL
-~~~~~~~~~~
-
-The most common way to load the API schema is from the running application via a network request.
-If your application is running at ``http://app.com`` and the schema is available at the ``/api/openapi.json`` path, then
-you can load it by using the ``schemathesis.openapi.from_url`` loader:
-
-.. code:: python
-
-    schema = schemathesis.openapi.from_url("http://app.com/api/openapi.json")
-
-Local path
-~~~~~~~~~~
-
-Sometimes you store the schema in a separate file, then it might be easier to load it from there, instead of a running application:
-
-.. code:: python
-
-    schema = schemathesis.openapi.from_path("/tmp/openapi.json")
-
-Schemathesis will load the API schema from the ``/tmp/openapi.json`` file and will use ``host`` or ``servers`` keyword values to send requests to.
-If you don't need this behavior, you can specify the ``base_url`` argument to send testing requests elsewhere.
-
-For example, if you have the following Open API 2 schema:
-
-.. code:: yaml
-
-    swagger: "2.0"
-    host: "petstore.swagger.io"
-    basePath: "/v2"
-
-But want to send requests to a local test server which is running at ``http://127.0.0.1:8000``, then your schema loading code may look like this:
-
-.. code:: python
-
-    schema = schemathesis.openapi.from_path(
-        "/tmp/openapi.json", base_url="http://127.0.0.1:8000/v2"
-    )
-
-Note that you need to provide the full base URL, which includes the ``basePath`` part.
-It works similarly for Open API 3, where the ``servers`` keyword contains a list of URLs:
-
-.. code:: yaml
-
-    openapi: 3.0.0
-    servers:
-      - url: https://petstore.swagger.io/v2
-      - url: http://petstore.swagger.io/v2
-
-With Open API 3, Schemathesis uses the first value from this list to send requests to.
-To use another server, you need to provide it explicitly, the same way as in the example above.
-
-Raw string
-~~~~~~~~~~
-
-This loader serves as a basic block for the previous two. It loads a schema from a string or generic IO handle (like one returned by the ``open`` call):
-
-.. code:: python
-
-    # The first argument is a valid Open API schema as a JSON string
-    schema = schemathesis.openapi.from_file('{"paths": {}, ...}')
-
-Python dictionary
-~~~~~~~~~~~~~~~~~
-
-If you maintain your API schema in Python code or your web framework (for example, Fast API) generates it this way, then you can load it directly to Schemathesis:
-
-.. code:: python
-
-    raw_schema = {
-        "swagger": "2.0",
-        "paths": {
-            # Open API operations here
-        },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
 
 Web applications
 ~~~~~~~~~~~~~~~~
@@ -630,29 +480,6 @@ The ``as_strategy`` method also accepts the ``data_generation_method`` argument 
             case.call_and_validate()
 
 The test above will generate test cases for the ``POST /pet/`` operation and will execute the ``test_pets`` function body with every generated test sample.
-
-Rate limiting
--------------
-
-APIs implement rate limiting to prevent misuse of their resources.
-Schema loaders accept the ``rate_limit`` argument that can be used to set the maximum number of requests per second, minute, hour, or day during testing to avoid hitting these limits.
-
-.. code-block:: python
-
-    import schemathesis
-
-    # 3 requests per second - `3/s`
-    # 100 requests per minute - `100/m`
-    # 1000 requests per hour - `1000/h`
-    # 10000 requests per day - `10000/d`
-    RATE_LIMIT = "3/s"
-
-    schema = schemathesis.openapi.from_url(
-        "https://example.schemathesis.io/openapi.json",
-        rate_limit=RATE_LIMIT,
-    )
-
-    ...
 
 Anatomy of a test
 -----------------
