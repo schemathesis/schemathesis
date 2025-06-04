@@ -133,6 +133,11 @@ class SchemathesisCase(PyCollector):
             else:
                 as_strategy_kwargs = {}
 
+                auth = self.schema.config.auth_for(operation=operation)
+                if auth is not None:
+                    from requests.auth import _basic_auth_str
+
+                    as_strategy_kwargs["headers"] = {"Authorization": _basic_auth_str(*auth)}
                 headers = self.schema.config.headers_for(operation=operation)
                 if headers:
                     as_strategy_kwargs["headers"] = headers
