@@ -4,7 +4,7 @@
 
 ### :wrench: Changed
 
-- Generate at least one non-NULL character in path parameters. [#2790](https://github.com/schemathesis/schemathesis/issues/2790)  
+- Generate at least one non-NULL character in path parameters. [#2790](https://github.com/schemathesis/schemathesis/issues/2790)
 - Improved failure messages for `unsupported_method` and `missing_required_header` checks.
 - Restore `Case.formatted_path`.
 - Update serialization error messages.
@@ -17,6 +17,8 @@
 - **Pytest**: Ignored `headers` from config file.
 - **Pytest**: Ignored `basic_auth` from config file.
 - Make header overrides case-insensitive.
+- Incorrect auth detection in `ignored_auth` when it is passed to `call` or `call_and_validate`. [#2846](https://github.com/schemathesis/schemathesis/issues/2846)
+- Incorrect check for cookie and query param based authorization in `ignored_auth`.
 
 ### :fire: Removed
 

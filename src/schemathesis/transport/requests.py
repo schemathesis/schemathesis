@@ -11,6 +11,7 @@ from schemathesis.core import NotSet
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import deepclone, merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
+from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import prepare_body, prepare_headers, prepare_url
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
@@ -104,7 +105,17 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             rate_limit = config.rate_limit_for(operation=case.operation)
             with ratelimit(rate_limit, config.base_url):
                 response = session.request(**data)  # type: ignore
-            return Response.from_requests(response, verify=verify)
+            return Response.from_requests(
+                response,
+                verify=verify,
+                _override=Override(
+                    query=kwargs.get("params") or {},
+                    headers=kwargs.get("headers") or {},
+                    cookies=kwargs.get("cookies") or {},
+                    path_parameters={},
+                ),
+            )
+
         finally:
             if close_session:
                 session.close()
