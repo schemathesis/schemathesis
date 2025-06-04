@@ -39,7 +39,7 @@ def test_as_strategy(swagger_20):
     strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
     assert strategy.example() == operation.Case(
-        meta=CaseMetadata(
+        _meta=CaseMetadata(
             generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.generate()
         ),
     )

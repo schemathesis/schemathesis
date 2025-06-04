@@ -10,7 +10,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.metrics import MetricContext, MetricFunction, metric
 from schemathesis.hooks import HookContext, hook
-from schemathesis.schemas import BaseSchema
+from schemathesis.schemas import APIOperation, BaseSchema
 from schemathesis.transport import SerializationContext, serializer
 
 __version__ = SCHEMATHESIS_VERSION
@@ -20,9 +20,10 @@ __all__ = [
     # Core data structures
     "Case",
     "Response",
-    "GenerationMode",
+    "APIOperation",
     "BaseSchema",
     "Config",
+    "GenerationMode",
     # Public errors
     "errors",
     # Spec or usage specific namespaces
