@@ -27,7 +27,7 @@ Unknown GraphQL Scalar
 Scalar type 'FooBar' is not recognized
 
 Tip: Define a custom strategy for it.
-For guidance, visit: https://schemathesis.readthedocs.io/en/stable/graphql.html#custom-scalars
+For guidance, visit: https://schemathesis.readthedocs.io/en/latest/guides/graphql-custom-scalars/
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
