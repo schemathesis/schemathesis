@@ -12,7 +12,7 @@ def test_get_user():
     schema["/users/{id}"]["GET"].validate_response(response)
 ```
 
-### `is_response_valid()` - Returns Boolean
+### `is_valid_response()` - Returns Boolean
 
 ```python
 def test_with_conditional_logic():
@@ -20,7 +20,7 @@ def test_with_conditional_logic():
         "http://api.example.com/users", json={"name": "Alice"}
     )
 
-    assert schema["/users"]["POST"].is_response_valid(response):
+    assert schema["/users"]["POST"].is_valid_response(response):
 ```
 
 ## Integration Example

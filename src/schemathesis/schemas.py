@@ -824,7 +824,7 @@ class APIOperation(Generic[P]):
             response_ = response
         return self.schema.validate_response(self, response_)
 
-    def is_response_valid(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool:
+    def is_valid_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool:
         """Check if the provided response is valid against the API schema.
 
         Args:
