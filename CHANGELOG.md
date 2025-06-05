@@ -16,6 +16,7 @@
 - **Pytest**: not using all built-in checks by default.
 - **Pytest**: Ignored `headers` from config file.
 - **Pytest**: Ignored `basic_auth` from config file.
+- **Pytest**: Ignored Hypothesis settings from config file.
 - Make header overrides case-insensitive.
 - Incorrect auth detection in `ignored_auth` when it is passed to `call` or `call_and_validate`. [#2846](https://github.com/schemathesis/schemathesis/issues/2846)
 - Incorrect check for cookie and query param based authorization in `ignored_auth`.
