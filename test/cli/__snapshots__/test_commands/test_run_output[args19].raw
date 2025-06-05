@@ -3,10 +3,12 @@ Exit code: 0
 Stdout:
 Usage: schemathesis run [OPTIONS] LOCATION
 
-  Run tests against an API using a specified SCHEMA.
+  Generate and run property-based tests against your API.
 
-  [Required] SCHEMA: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file,
-  or a URL pointing to such specifications
+  LOCATION can be:
+      - Local file: ./openapi.json, ./schema.yaml, ./schema.graphql
+      - OpenAPI URL: https://api.example.com/openapi.json
+      - GraphQL URL: https://api.example.com/graphql/
 
 Options:
   -u, --url URL                  API base URL (required for file-based schemas)
