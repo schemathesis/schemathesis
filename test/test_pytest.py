@@ -934,6 +934,54 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
+def test_config_generation(testdir):
+    MAX_EXAMPLES_A = 14
+    MAX_EXAMPLES_B = 42
+    testdir.make_test(
+        f"""
+raw_schema = {{
+    "openapi": "3.1.0",
+    "paths": {{
+        "/bookings": {{
+            "post": {{
+                "parameters": [
+                    {{
+                        "name": "key",
+                        "in": "query",
+                        "required": False,
+                        "schema": {{"type": "string"}},
+                    }}
+                ]
+            }}
+        }},
+    }},
+}}
+schema = schemathesis.openapi.from_dict(raw_schema)
+schema.config.generation.update(
+    modes=[GenerationMode.POSITIVE],
+    max_examples={MAX_EXAMPLES_A},
+)
+
+@schema.parametrize()
+def test_a(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+
+
+@schema.parametrize()
+@settings(max_examples={MAX_EXAMPLES_B})
+def test_b(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2)
+    result.stdout.re_match_lines(
+        [
+            rf"Hypothesis calls: {MAX_EXAMPLES_A + MAX_EXAMPLES_B + 2}",
+        ]
+    )
+
+
 def test_csv_response_validation_direct(testdir, openapi3_base_url):
     testdir.make_test(
         f"""

@@ -161,6 +161,7 @@ class SchemathesisCase(PyCollector):
                     test_func=self.test_function,
                     config=HypothesisTestConfig(
                         modes=modes,
+                        settings=self.schema.config.get_hypothesis_settings(operation=operation),
                         given_kwargs=self.given_kwargs,
                         project=self.schema.config,
                         as_strategy_kwargs=as_strategy_kwargs,
