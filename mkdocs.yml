@@ -23,6 +23,7 @@ nav:
       - Hypothesis Strategies: guides/hypothesis-strategies.md
       - guides/python-apps.md
       - guides/schema-conformance.md
+      - guides/stateful-testing.md
 
   - Core Contcepts:
       - explanations/data-generation.md
