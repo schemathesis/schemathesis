@@ -317,7 +317,7 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
     response = Response.from_requests(response_factory.requests(content=content), True)
     case = make_case(swagger_20, definition)
     assert response_schema_conformance(CTX, response, case) is None
-    assert case.operation.is_response_valid(response)
+    assert case.operation.is_valid_response(response)
 
 
 @pytest.mark.parametrize(
@@ -378,7 +378,7 @@ def test_response_schema_conformance_openapi(openapi_30, content, definition, re
     response = Response.from_requests(response_factory.requests(content=content), True)
     case = make_case(openapi_30, definition)
     assert response_schema_conformance(CTX, response, case) is None
-    assert case.operation.is_response_valid(response)
+    assert case.operation.is_valid_response(response)
 
 
 def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_factory):
@@ -400,7 +400,7 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
     )
     openapi_30.raw_schema["openapi"] = "3.1.0"
     assert response_schema_conformance(CTX, response, case) is None
-    assert case.operation.is_response_valid(response)
+    assert case.operation.is_valid_response(response)
 
 
 @pytest.mark.parametrize(
@@ -499,7 +499,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
     case = make_case(swagger_20, definition)
     with pytest.raises(JsonSchemaError):
         response_schema_conformance(CTX, response, case)
-    assert not case.operation.is_response_valid(response)
+    assert not case.operation.is_valid_response(response)
 
 
 @pytest.mark.parametrize(
@@ -554,7 +554,7 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, con
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(CTX, response, case)
-    assert not case.operation.is_response_valid(response)
+    assert not case.operation.is_valid_response(response)
 
 
 def test_no_schema(openapi_30, response_factory):
@@ -572,7 +572,7 @@ def test_no_schema(openapi_30, response_factory):
     case = make_case(openapi_30, definition)
     # Then the check should be ignored
     response_schema_conformance(CTX, response, case)
-    assert case.operation.is_response_valid(response)
+    assert case.operation.is_valid_response(response)
 
 
 @pytest.mark.hypothesis_nested
@@ -585,7 +585,7 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
         response = Response.from_requests(response_factory.requests(content=json.dumps({"foo": 1}).encode()), True)
         with pytest.raises(FailureGroup):
             case.validate_response(response)
-        assert not case.operation.is_response_valid(response)
+        assert not case.operation.is_valid_response(response)
 
     test()
 
