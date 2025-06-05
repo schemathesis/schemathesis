@@ -452,16 +452,14 @@ class BaseSchema(Mapping):
 
     def as_strategy(
         self,
-        hooks: HookDispatcher | None = None,
-        auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
         """Create a Hypothesis strategy that generates test cases for all schema operations.
 
+        Use with `@given` in non-Schemathesis tests.
+
         Args:
-            hooks: Hook dispatcher.
-            auth_storage: Authentication configuration.
             generation_mode: Whether to generate positive or negative test data.
             **kwargs: Additional keywords for each strategy.
 
@@ -470,12 +468,7 @@ class BaseSchema(Mapping):
 
         """
         _strategies = [
-            operation.ok().as_strategy(
-                hooks=hooks,
-                auth_storage=auth_storage,
-                generation_mode=generation_mode,
-                **kwargs,
-            )
+            operation.ok().as_strategy(generation_mode=generation_mode, **kwargs)
             for operation in self.get_all_operations()
             if isinstance(operation, Ok)
         ]
@@ -513,20 +506,23 @@ class APIOperationMap(Mapping):
 
     def as_strategy(
         self,
-        hooks: HookDispatcher | None = None,
-        auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
-        """Build a strategy for generating test cases for all API operations defined in this subset."""
+        """Create a Hypothesis strategy that generates test cases for all schema operations in this subset.
+
+        Use with `@given` in non-Schemathesis tests.
+
+        Args:
+            generation_mode: Whether to generate positive or negative test data.
+            **kwargs: Additional keywords for each strategy.
+
+        Returns:
+            Combined Hypothesis strategy for all valid operations in the schema.
+
+        """
         _strategies = [
-            operation.as_strategy(
-                hooks=hooks,
-                auth_storage=auth_storage,
-                generation_mode=generation_mode,
-                **kwargs,
-            )
-            for operation in self._data.values()
+            operation.as_strategy(generation_mode=generation_mode, **kwargs) for operation in self._data.values()
         ]
         return strategies.combine(_strategies)
 
@@ -698,24 +694,19 @@ class APIOperation(Generic[P]):
 
     def as_strategy(
         self,
-        hooks: HookDispatcher | None = None,
-        auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
-        """Convert to Hypothesis strategy for custom testing workflows.
+        """Create a Hypothesis strategy that generates test cases for this API operation.
 
-        Returns a strategy that generates `Case` objects for this operation.
         Use with `@given` in non-Schemathesis tests.
 
         Args:
-            hooks: Custom hooks to apply during generation.
-            auth_storage: Authentication configuration.
             generation_mode: Whether to generate positive or negative test data.
             **kwargs: Extra arguments to the underlying strategy function.
 
         """
-        strategy = self.schema.get_case_strategy(self, hooks, auth_storage, generation_mode, **kwargs)
+        strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
             context = HookContext(operation=self)
@@ -734,6 +725,7 @@ class APIOperation(Generic[P]):
 
         strategy = _apply_hooks(GLOBAL_HOOK_DISPATCHER, strategy)
         strategy = _apply_hooks(self.schema.hooks, strategy)
+        hooks = kwargs.get("hooks")
         if hooks is not None:
             strategy = _apply_hooks(hooks, strategy)
         return strategy
