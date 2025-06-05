@@ -7,6 +7,19 @@ if TYPE_CHECKING:
 
     from schemathesis.generation.stateful.state_machine import APIStateMachine
 
+__all__ = [
+    "APIStateMachine",
+]
+
+
+def __getattr__(name: str) -> type[APIStateMachine]:
+    if name == "APIStateMachine":
+        from schemathesis.generation.stateful.state_machine import APIStateMachine
+
+        return APIStateMachine
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 STATEFUL_TESTS_LABEL = "Stateful tests"
 
 

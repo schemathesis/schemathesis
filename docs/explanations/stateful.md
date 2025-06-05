@@ -76,3 +76,83 @@ paths:
 - Create resource → Get resource → Update resource → Delete resource
 - Create user → Create user's orders → Get order details
 - Create parent → Create children → Get parent with children
+
+## How Schemathesis Extends OpenAPI Links
+
+### Regex Extraction from Headers and Query Parameters
+
+Standard OpenAPI links can extract string data from various places, but only exact values. Schemathesis adds regex support for pattern-based extraction for a part of a string:
+
+```yaml
+paths:
+  /users:
+    post:
+      responses:
+        '201':
+          headers:
+            Location:
+              schema:
+                type: string
+          links:
+            GetUserByUserId:
+              operationId: getUser
+              parameters:
+                userId: '$response.header.Location#regex:/users/(.+)'
+```
+
+**How it works:**
+
+- If `Location` header is `/users/42`, the `userId` parameter becomes `42`
+- The regex must be valid Python regex with exactly one capturing group
+- If regex doesn't match, the parameter is set to empty string
+
+### Enhanced RequestBody Support
+
+OpenAPI standard does not allow recursive expressions in `requestBody`:
+
+```yaml
+SetManagerId:
+  operationId: setUserManager
+  # only plain or embedded expression or literals
+  requestBody: "$response.body#/id"
+```
+
+Schemathesis allows for nested expressions:
+
+```json
+
+SetManagerId:
+  operationId: setUserManager
+  requestBody: {
+    "user_id": "$response.body#/id",
+    "metadata": {
+      "created_by": "$response.body#/author",
+      "tags": ["$response.body#/category", "static-value"]
+    }
+  }
+```
+
+If response body is `{"id": 123, "author": "alice", "category": "blog"}`, the request body becomes:
+
+```json
+{
+  "user_id": 123,
+  "metadata": {
+    "created_by": "alice",
+    "tags": ["blog", "static-value"]
+  }
+}
+```
+
+### Backwards Compatibility
+
+**OpenAPI 2.0 Support:** Use `x-links` extension with identical syntax:
+```yaml
+# OpenAPI 3.0
+links:
+  GetUser: ...
+
+# OpenAPI 2.0
+x-links:
+  GetUser: ...  # Same syntax, including regex support
+```
