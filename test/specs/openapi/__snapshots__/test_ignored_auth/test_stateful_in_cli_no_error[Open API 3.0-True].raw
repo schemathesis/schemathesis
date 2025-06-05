@@ -27,9 +27,9 @@ Schemathesis dev
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Authentication declared but not enforced
+- API accepts requests without authentication
 
-    The API returned `200 OK` for `GET /ignored_auth` that requires authentication.
+    Expected 401, got `200 OK` for `GET /ignored_auth`
 
 [200] OK:
 
@@ -54,7 +54,7 @@ Test Phases:
   ❌ Stateful
 
 Failures:
-  ❌ Authentication declared but not enforced: 1
+  ❌ API accepts requests without authentication: 1
 
 Test cases:
   N generated, N found N unique failures, N skipped
