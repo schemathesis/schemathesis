@@ -9,6 +9,7 @@
 - Restore `Case.formatted_path`.
 - Update serialization error messages.
 - Update documentation links in error messages.
+- Improved failure messages for `ignored_auth`. [#2779](https://github.com/schemathesis/schemathesis/issues/2779) 
 
 ### :bug: Fixed
 

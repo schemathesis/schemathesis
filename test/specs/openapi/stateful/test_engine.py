@@ -603,7 +603,7 @@ def test_ignored_auth_invalid(engine_factory):
     result = collect_result(engine)
     # Then it should be reported
     assert result.events[-1].status == Status.FAILURE
-    assert result.failures[0].failure_info.failure.title == "Authentication declared but not enforced"
+    assert result.failures[0].failure_info.failure.title == "API accepts requests without authentication"
 
 
 def test_multiple_incoming_link_without_override(app_factory):

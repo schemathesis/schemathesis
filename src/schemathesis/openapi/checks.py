@@ -304,7 +304,7 @@ class IgnoredAuth(Failure):
         *,
         operation: str,
         message: str,
-        title: str = "Authentication declared but not enforced",
+        title: str = "API accepts requests without authentication",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
