@@ -475,6 +475,12 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     )
 
 
+class AuthScenario(str, enum.Enum):
+    NO_AUTH = "no_auth"
+    INVALID_AUTH = "invalid_auth"
+    GENERATED_AUTH = "generated_auth"
+
+
 class AuthKind(str, enum.Enum):
     EXPLICIT = "explicit"
     GENERATED = "generated"
@@ -511,7 +517,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
             ctx._record_response(case_id=no_auth_case.id, response=no_auth_response)
             if no_auth_response.status_code != 401:
-                _raise_no_auth_error(no_auth_response, no_auth_case, "that requires authentication")
+                _raise_no_auth_error(no_auth_response, no_auth_case, AuthScenario.NO_AUTH)
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 invalid_auth_case = remove_auth(case, security_parameters)
@@ -520,22 +526,38 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                 invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
                 ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
                 if invalid_auth_response.status_code != 401:
-                    _raise_no_auth_error(invalid_auth_response, invalid_auth_case, "with any auth")
+                    _raise_no_auth_error(invalid_auth_response, invalid_auth_case, AuthScenario.INVALID_AUTH)
         elif auth == AuthKind.GENERATED:
             # If this auth is generated which means it is likely invalid, then
             # this request should have been an error
-            _raise_no_auth_error(response, case, "with invalid auth")
+            _raise_no_auth_error(response, case, AuthScenario.GENERATED_AUTH)
         else:
             # Successful response when there is no auth
-            _raise_no_auth_error(response, case, "that requires authentication")
+            _raise_no_auth_error(response, case, AuthScenario.NO_AUTH)
     return None
 
 
-def _raise_no_auth_error(response: Response, case: Case, suffix: str) -> NoReturn:
+def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> NoReturn:
     reason = http.client.responses.get(response.status_code, "Unknown")
+
+    if auth == AuthScenario.NO_AUTH:
+        title = "API accepts requests without authentication"
+        detail = None
+    elif auth == AuthScenario.INVALID_AUTH:
+        title = "API accepts invalid authentication"
+        detail = "invalid credentials provided"
+    else:
+        title = "API accepts invalid authentication"
+        detail = "generated auth likely invalid"
+
+    message = f"Expected 401, got `{response.status_code} {reason}` for `{case.operation.label}`"
+    if detail is not None:
+        message = f"{message} ({detail})"
+
     raise IgnoredAuth(
         operation=case.operation.label,
-        message=f"The API returned `{response.status_code} {reason}` for `{case.operation.label}` {suffix}.",
+        message=message,
+        title=title,
         case_id=case.id,
     )
 

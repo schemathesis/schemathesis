@@ -257,14 +257,20 @@ def test_proper_session(ignores_auth):
     if ignores_auth:
         with pytest.raises(FailureGroup) as exc:
             test()
-        assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced")
+        assert str(exc.value.exceptions[0]).startswith("API accepts invalid authentication")
     else:
         test()
 
 
-@pytest.mark.parametrize("ignores_auth", [True, False])
+@pytest.mark.parametrize(
+    ["ignores_auth", "expected"],
+    [
+        (True, "API accepts requests without authentication"),
+        (False, "API accepts invalid authentication"),
+    ],
+)
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
-def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
+def test_accepts_any_auth_if_explicit_is_present(ignores_auth, expected):
     app = FastAPI()
 
     @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
@@ -272,7 +278,7 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
         credentials: HTTPAuthorizationCredentials | None = Security(APIKeyHeader(name="x-api-key", auto_error=False)),
     ):
         # Accept any auth, but raise an error if Authorization header is missing
-        if ignores_auth and credentials is None:
+        if not ignores_auth and credentials is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Authorization header is missing",
@@ -289,7 +295,7 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
 
     with pytest.raises(FailureGroup) as exc:
         test()
-    assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced")
+    assert str(exc.value.exceptions[0]).startswith(expected)
 
 
 @pytest.mark.openapi_version("3.0")
