@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING, Any, Mapping
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 if TYPE_CHECKING:
+    import httpx
     import requests
+    from werkzeug.test import TestResponse
 
     from schemathesis.generation.overrides import Override
 
@@ -116,6 +118,63 @@ class Response:
             http_version=http_version,
             verify=verify,
             _override=_override,
+        )
+
+    @classmethod
+    def from_httpx(cls, response: httpx.Response, verify: bool) -> Response:
+        import requests
+
+        request = requests.Request(
+            method=response.request.method,
+            url=str(response.request.url),
+            headers=dict(response.request.headers),
+            params=dict(response.request.url.params),
+            data=response.request.content,
+        ).prepare()
+        return Response(
+            status_code=response.status_code,
+            headers={key: [value] for key, value in response.headers.items()},
+            content=response.content,
+            request=request,
+            elapsed=response.elapsed.total_seconds(),
+            message=response.reason_phrase,
+            encoding=response.encoding,
+            http_version=response.http_version,
+            verify=verify,
+        )
+
+    @classmethod
+    def from_wsgi(cls, response: TestResponse) -> Response:
+        import http.client
+
+        import requests
+
+        reason = http.client.responses.get(response.status_code, "Unknown")
+        data = response.get_data()
+        if response.response == []:
+            # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
+            encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
+        else:
+            encoding = None
+        request = requests.Request(
+            method=response.request.method,
+            url=str(response.request.url),
+            headers=dict(response.request.headers),
+            params=dict(response.request.args),
+            # Request body is not available
+            data=b"",
+        ).prepare()
+        return Response(
+            status_code=response.status_code,
+            headers={name: response.headers.getlist(name) for name in response.headers.keys()},
+            content=data,
+            request=request,
+            # Elapsed time is not available
+            elapsed=0.0,
+            message=reason,
+            encoding=encoding,
+            http_version="1.1",
+            verify=False,
         )
 
     @property

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import io
 import logging
 import os
@@ -24,6 +25,9 @@ from click.testing import CliRunner, Result
 from hypothesis import settings
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from urllib3 import HTTPResponse
+from werkzeug import Request
+from werkzeug.datastructures import Headers
+from werkzeug.test import TestResponse
 
 import schemathesis.cli
 from schemathesis import auths, hooks
@@ -1078,12 +1082,14 @@ def response_factory():
         headers = headers or {}
         if content_type:
             headers.setdefault("Content-Type", content_type)
-        return httpx.Response(
+        response = httpx.Response(
             status_code=status_code,
             headers=headers,
             content=content,
             request=httpx.Request(method="POST", url="http://127.0.0.1", headers=headers),
         )
+        response.elapsed = datetime.timedelta(seconds=1)
+        return response
 
     def requests_factory(
         *,
@@ -1105,7 +1111,23 @@ def response_factory():
         response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
         return response
 
-    return SimpleNamespace(httpx=httpx_factory, requests=requests_factory)
+    def werkzeug_factory(
+        *,
+        content: bytes = b"{}",
+        content_type: str | None = "application/json",
+        status_code: int = 200,
+        headers: dict[str, Any] | None = None,
+    ):
+        request = Request.from_values(method="POST", base_url="http://127.0.0.1", path="/test", headers=headers)
+        response = TestResponse(
+            response=iter([content]),
+            status=str(status_code),
+            headers=Headers({"Content-Type": content_type, **(headers or {})}),
+            request=request,
+        )
+        return response
+
+    return SimpleNamespace(httpx=httpx_factory, requests=requests_factory, wsgi=werkzeug_factory)
 
 
 @pytest.fixture

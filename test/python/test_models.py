@@ -324,7 +324,7 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.parametrize("factory_type", ["httpx", "requests"])
+@pytest.mark.parametrize("factory_type", ["httpx", "requests", "wsgi"])
 @pytest.mark.parametrize(
     ("response_schema", "payload", "schema_path", "instance", "instance_path"),
     [
@@ -366,19 +366,9 @@ def test_validate_response_schema_path(
     )
     schema = schemathesis.openapi.from_dict(schema)
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
-    if factory_type == "requests":
-        response = Response.from_requests(response, True)
-    else:
-        response = Response(
-            status_code=response.status_code,
-            headers={key: [value] for key, value in response.headers.items()},
-            content=response.content,
-            request=response.request,
-            elapsed=1.0,
-            verify=False,
-        )
     with pytest.raises(Failure) as exc:
         schema["/test"]["POST"].validate_response(response)
+    assert not schema["/test"]["POST"].is_response_valid(response)
     failure = exc.value
     assert failure.schema_path == schema_path
     assert failure.schema == {"type": "object"}
