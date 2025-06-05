@@ -8,7 +8,9 @@ Schemathesis generates three types of data:
 - **Valid test data** that follows schema constraints  
 - **Invalid test data** that deliberately breaks constraints
 
-The data covers all JSON Schema types for OpenAPI and valid queries for GraphQL. Some generated data may be rejected by validation rules not expressed in your schema.
+The data covers all JSON Schema types for OpenAPI and valid queries for GraphQL. 
+
+Note, that some generated data may be rejected by your API if the validation rules are not expressed in your schema.
 
 ## What types of API issues can Schemathesis find?
 
@@ -33,7 +35,7 @@ Schemathesis identifies problems in three main categories:
 
 ## How should I run Schemathesis?
 
-- **CLI tool**: Complete feature set with all test phases, reporting, and stateful testing. Recommended for most users.
+- **CLI**: Complete feature set with all test phases, and reporting. Recommended for most users.
 - **Python library**: Integrates with pytest test suites but has fewer features than the CLI.
 
 ## What if my application doesn't have an API schema?

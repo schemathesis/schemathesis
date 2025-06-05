@@ -103,11 +103,11 @@ def create_test(
     if config.settings is not None:
         # Merge the user-provided settings with the current ones
         settings = hypothesis.settings(
-            settings,
+            config.settings,
             **{
-                item: getattr(config.settings, item)
+                item: getattr(settings, item)
                 for item in all_settings
-                if getattr(config.settings, item) != getattr(default, item)
+                if getattr(settings, item) != getattr(default, item)
             },
         )
 
