@@ -11,6 +11,7 @@
 - Update documentation links in error messages.
 - Improved failure messages for `ignored_auth`. [#2779](https://github.com/schemathesis/schemathesis/issues/2779) 
 - Do not show the "Missing test data" warning if stateful testing has non-404 responses. [#2795](https://github.com/schemathesis/schemathesis/issues/2795)
+- Restore support for validating `requests` / `httpx` / `werkzeug` responses in `validate_response` and `is_response_valid`.
 
 ### :bug: Fixed
 

@@ -40,8 +40,11 @@ from .filters import (
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 
 if TYPE_CHECKING:
+    import httpx
+    import requests
     from hypothesis.strategies import SearchStrategy
     from typing_extensions import Self
+    from werkzeug.test import TestResponse
 
     from schemathesis.core import Specification
     from schemathesis.generation.stateful.state_machine import APIStateMachine
@@ -804,17 +807,37 @@ class APIOperation(Generic[P]):
         path = self.path.replace("~", "~0").replace("/", "~1")
         return f"#/paths/{path}/{self.method}"
 
-    def validate_response(self, response: Response) -> bool | None:
-        """Check response against API schema.
+    def validate_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool | None:
+        """Validate a response against the API schema.
+
+        Args:
+            response: The HTTP response to validate. Can be a `requests.Response`,
+                `httpx.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
 
         Raises:
-            FailureGroup: When response violates schema.
+            FailureGroup: If the response does not conform to the schema.
 
         """
-        return self.schema.validate_response(self, response)
+        import httpx
+        import requests
+        from werkzeug.test import TestResponse
 
-    def is_response_valid(self, response: Response) -> bool:
-        """Check if response passes schema validation.
+        if isinstance(response, requests.Response):
+            response_ = Response.from_requests(response, verify=True)
+        elif isinstance(response, httpx.Response):
+            response_ = Response.from_httpx(response, verify=True)
+        elif isinstance(response, TestResponse):
+            response_ = Response.from_wsgi(response)
+        else:
+            response_ = response
+        return self.schema.validate_response(self, response_)
+
+    def is_response_valid(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool:
+        """Check if the provided response is valid against the API schema.
+
+        Args:
+            response: The HTTP response to validate. Can be a `requests.Response`,
+                `httpx.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
 
         Returns:
             `True` if response is valid, `False` otherwise.
