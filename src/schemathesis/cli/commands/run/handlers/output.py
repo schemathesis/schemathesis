@@ -1039,6 +1039,7 @@ class OutputHandler(EventHandler):
             assert self.stateful_tests_manager is not None
             links_seen = {case.transition.id for case in event.recorder.cases.values() if case.transition is not None}
             self.stateful_tests_manager.update(links_seen, event.status)
+            self._check_stateful_warnings(ctx, event)
 
     def _check_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         statistic = aggregate_status_codes(event.recorder.interactions.values())
@@ -1089,6 +1090,18 @@ class OutputHandler(EventHandler):
                 and statistic.should_warn_about_validation_mismatch()
             ):
                 self.warnings.validation_mismatch.add(event.recorder.label)
+
+    def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+        # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
+        # warnings, then remove them from warnings
+        for key, node in event.recorder.cases.items():
+            if not self.warnings.missing_test_data:
+                break
+            if node.value.operation.label in self.warnings.missing_test_data and key in event.recorder.interactions:
+                response = event.recorder.interactions[key].response
+                if response is not None and response.status_code < 300:
+                    self.warnings.missing_test_data.remove(node.value.operation.label)
+                    continue
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
         from rich.padding import Padding
