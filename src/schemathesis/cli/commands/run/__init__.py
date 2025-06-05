@@ -476,10 +476,14 @@ def run(
     no_color: bool = False,
     **__kwargs: Any,
 ) -> None:
-    """Run tests against an API using a specified SCHEMA.
+    """Generate and run property-based tests against your API.
 
-    [Required] SCHEMA: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file, or a URL pointing to such specifications
-    """
+    \b
+    LOCATION can be:
+        - Local file: ./openapi.json, ./schema.yaml, ./schema.graphql
+        - OpenAPI URL: https://api.example.com/openapi.json
+        - GraphQL URL: https://api.example.com/graphql/
+    """  # noqa: D301
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
 
