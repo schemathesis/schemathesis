@@ -368,7 +368,7 @@ def test_validate_response_schema_path(
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
     with pytest.raises(Failure) as exc:
         schema["/test"]["POST"].validate_response(response)
-    assert not schema["/test"]["POST"].is_response_valid(response)
+    assert not schema["/test"]["POST"].is_valid_response(response)
     failure = exc.value
     assert failure.schema_path == schema_path
     assert failure.schema == {"type": "object"}
