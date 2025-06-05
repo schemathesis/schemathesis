@@ -10,6 +10,7 @@
 - Update serialization error messages.
 - Update documentation links in error messages.
 - Improved failure messages for `ignored_auth`. [#2779](https://github.com/schemathesis/schemathesis/issues/2779) 
+- Do not show the "Missing test data" warning if stateful testing has non-404 responses. [#2795](https://github.com/schemathesis/schemathesis/issues/2795)
 
 ### :bug: Fixed
 

@@ -51,15 +51,6 @@ Reproduce with:
 
     <PLACEHOLDER>
 
-=================================== WARNINGS ===================================
-
-Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
-
-  - GET /users/{user_id}
-  - PATCH /users/{user_id}
-
-💡 Provide realistic parameter values in your config file so tests can access existing resources
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -75,9 +66,6 @@ Test Phases:
 
 Failures:
   ❌ Server error: 1
-
-Warnings:
-  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
 
 Test cases:
   N generated, N found N unique failures, N skipped
