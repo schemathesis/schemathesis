@@ -17,7 +17,8 @@
 - Do not show the "Missing test data" warning if stateful testing has non-404 responses. [#2795](https://github.com/schemathesis/schemathesis/issues/2795)
 - Restore support for validating `requests` / `httpx` / `werkzeug` responses in `validate_response` and `is_response_valid`.
 - Rename `is_response_valid` to `is_valid_response` for consistency with other functions in the codebase.
-- Change default values for `query` / `path_parameters` / `headers` / `cookies` to an empty dict instead of `None`
+- Change default values for `query` / `path_parameters` / `headers` / `cookies` to an empty dict instead of `None`.
+- **INTERNAL**: Add `Case.__slots__`.
 
 ### :bug: Fixed
 
