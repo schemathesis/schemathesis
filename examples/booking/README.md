@@ -64,4 +64,3 @@ Retrieve booking:
 curl -H "Authorization: Bearer secret-token" \
   http://localhost:8080/bookings/42
 ```
-
