@@ -781,7 +781,7 @@ def _case_to_kwargs(case: Case) -> dict:
     kwargs = {}
     for container_name in LOCATION_TO_CONTAINER.values():
         value = getattr(case, container_name)
-        if isinstance(value, CaseInsensitiveDict):
+        if isinstance(value, CaseInsensitiveDict) and value:
             kwargs[container_name] = dict(value)
         elif value and value is not NOT_SET:
             kwargs[container_name] = value

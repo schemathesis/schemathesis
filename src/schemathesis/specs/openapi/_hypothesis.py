@@ -11,6 +11,7 @@ import jsonschema.protocols
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
+from requests.structures import CaseInsensitiveDict
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
@@ -157,10 +158,10 @@ def openapi_cases(
 
     instance = operation.Case(
         media_type=media_type,
-        path_parameters=path_parameters_.value,
-        headers=headers_.value,
-        cookies=cookies_.value,
-        query=query_.value,
+        path_parameters=path_parameters_.value or {},
+        headers=headers_.value or CaseInsensitiveDict(),
+        cookies=cookies_.value or {},
+        query=query_.value or {},
         body=body_.value,
         _meta=CaseMetadata(
             generation=GenerationInfo(

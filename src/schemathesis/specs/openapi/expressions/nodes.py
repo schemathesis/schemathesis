@@ -87,7 +87,7 @@ class NonBodyRequest(Node):
     extractor: Extractor | None = None
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
-        container: dict | CaseInsensitiveDict = {
+        container = {
             "query": output.case.query,
             "path": output.case.path_parameters,
             "header": output.case.headers,
