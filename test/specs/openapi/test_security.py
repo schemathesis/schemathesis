@@ -102,6 +102,6 @@ def test_without_security_parameters(with_security_parameters):
         if with_security_parameters:
             assert "Authorization" in case.headers
         else:
-            assert case.headers is None
+            assert case.headers == {}
 
     test()

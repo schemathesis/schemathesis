@@ -23,6 +23,12 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
+def _default_headers() -> CaseInsensitiveDict:
+    from requests.structures import CaseInsensitiveDict
+
+    return CaseInsensitiveDict()
+
+
 @dataclass
 class Case:
     """Generated test case data for a single API operation."""
@@ -34,13 +40,13 @@ class Case:
     """Path template from schema (e.g., `/users/{user_id}`)"""
     id: str = field(default_factory=generate_random_case_id, compare=False)
     """Random ID sent in headers for log correlation"""
-    path_parameters: dict[str, Any] | None = None
+    path_parameters: dict[str, Any] = field(default_factory=dict)
     """Generated path variables (e.g., `{"user_id": "123"}`)"""
-    headers: CaseInsensitiveDict | None = None
+    headers: CaseInsensitiveDict = field(default_factory=_default_headers)
     """Generated HTTP headers"""
-    cookies: dict[str, Any] | None = None
+    cookies: dict[str, Any] = field(default_factory=dict)
     """Generated cookies"""
-    query: dict[str, Any] | None = None
+    query: dict[str, Any] = field(default_factory=dict)
     """Generated query parameters"""
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
@@ -66,6 +72,8 @@ class Case:
         first = True
         for name in ("path_parameters", "headers", "cookies", "query", "body"):
             value = getattr(self, name)
+            if name != "body" and not value:
+                continue
             if value is not None and not isinstance(value, NotSet):
                 if first:
                     first = False

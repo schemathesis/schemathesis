@@ -849,10 +849,8 @@ def test_array_in_header_path_query(ctx):
             {
                 "headers": {"X-API-Key-1": "0"},
                 "path_parameters": {"bar": "0"},
-                "query": {},
             },
             {
-                "headers": {},
                 "path_parameters": {"bar": "0"},
                 "query": {"key": "0"},
             },
@@ -1264,9 +1262,7 @@ def test_optional_parameter_without_type(ctx):
                     "query": "0",
                 },
             },
-            {
-                "query": {},
-            },
+            {},
             {
                 "query": {
                     "query": [
@@ -1325,7 +1321,7 @@ def test_incorrect_headers_with_enum(ctx):
         [GenerationMode.NEGATIVE],
         (
             [
-                {"headers": {}},
+                {},
                 {"headers": {"X-API-Key-1": "{}"}},
                 {"headers": {"X-API-Key-1": "null,null"}},
                 {"headers": {"X-API-Key-1": "null"}},
@@ -1333,14 +1329,14 @@ def test_incorrect_headers_with_enum(ctx):
                 {"headers": {"X-API-Key-1": "0"}},
             ],
             [
-                {"headers": {}},
+                {},
                 {"headers": {"X-API-Key-1": "{}"}},
                 {"headers": {"X-API-Key-1": "null,null"}},
                 {"headers": {"X-API-Key-1": "false"}},
                 {"headers": {"X-API-Key-1": "0"}},
             ],
             [
-                {"headers": {}},
+                {},
                 {"headers": {"X-API-Key-1": "{}"}},
                 {"headers": {"X-API-Key-1": "null,null"}},
                 {"headers": {"X-API-Key-1": "null"}},
@@ -1376,7 +1372,7 @@ def test_generate_empty_headers_too(ctx):
         schema,
         [GenerationMode.NEGATIVE],
         [
-            {"headers": {}},
+            {},
             {"headers": {"X-API-Key-1": "{}"}},
             {"headers": {"X-API-Key-1": "null,null"}},
             {"headers": {"X-API-Key-1": "null"}},
@@ -1963,6 +1959,8 @@ def assert_coverage(schema, modes, expected, path=None):
         output = {}
         for container in LOCATION_TO_CONTAINER.values():
             value = getattr(case, container)
+            if container != "body" and not value:
+                continue
             if value is not None and value is not NOT_SET:
                 output[container] = value
         cases.append(output)

@@ -127,7 +127,7 @@ def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
     assert data == {
         "headers": {**get_default_headers(), "User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
         "method": "GET",
-        "params": None,
+        "params": {},
         "cookies": {"TOKEN": "secret"},
         "url": f"http://127.0.0.1:{server['port']}/api/success",
     }
@@ -158,7 +158,7 @@ def test_reserved_characters_in_operation_name(swagger_20):
 @pytest.mark.parametrize(
     ("headers", "expected"),
     [
-        (None, {"User-Agent": USER_AGENT, "X-Key": "foo"}),
+        ({}, {"User-Agent": USER_AGENT, "X-Key": "foo"}),
         ({"User-Agent": "foo/1.0"}, {"User-Agent": "foo/1.0", "X-Key": "foo"}),
         ({"X-Value": "bar"}, {"X-Value": "bar", "User-Agent": USER_AGENT, "X-Key": "foo"}),
         ({"UsEr-agEnT": "foo/1.0"}, {"UsEr-agEnT": "foo/1.0", "X-Key": "foo"}),
@@ -166,15 +166,15 @@ def test_reserved_characters_in_operation_name(swagger_20):
 )
 def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
-    original_headers = headers.copy() if headers is not None else headers
+    original_headers = headers.copy()
     case = operation.Case(headers=headers)
     data = case.as_transport_kwargs(headers={"X-Key": "foo"})
     expected[SCHEMATHESIS_TEST_CASE_HEADER] = ANY
     assert data == {
         "headers": {**get_default_headers(), **expected},
         "method": "GET",
-        "params": None,
-        "cookies": None,
+        "params": {},
+        "cookies": {},
         "url": f"http://127.0.0.1:{server['port']}/api/success",
     }
     assert case.headers == original_headers
@@ -206,8 +206,8 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
     assert data == {
         "method": "POST",
         "data": b"<html></html>",
-        "params": None,
-        "cookies": None,
+        "params": {},
+        "cookies": {},
         "headers": {
             **get_default_headers(),
             header: "text/html",
