@@ -29,7 +29,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 # Different auth for specific endpoints
 [[operations]]
 include-path = "/admin/"
-headers = { 
+headers = {
   Authorization = "Bearer ${ADMIN_TOKEN}",
   X-Client-ID = "${CLIENT_ID}"
 }
@@ -51,14 +51,14 @@ import schemathesis
 
 @schemathesis.auth()
 class TokenAuth:
-    def get(self, case, context):
+    def get(self, case, ctx):
         response = requests.post(
             "http://localhost:8000/auth/token",
             json={"username": "demo", "password": "test"}
         )
         return response.json()["access_token"]
-    
-    def set(self, case, data, context):
+
+    def set(self, case, data, ctx):
         case.headers = case.headers or {}
         case.headers["Authorization"] = f"Bearer {data}"
 ```
@@ -72,8 +72,8 @@ Schemathesis caches tokens for 300 seconds by default.
 class RefreshableAuth:
     def __init__(self):
         self.refresh_token = None
-    
-    def get(self, case, context):
+
+    def get(self, case, ctx):
         if self.refresh_token:
             return self.refresh_access_token()
         else:
@@ -87,7 +87,7 @@ class RefreshableAuth:
         data = response.json()
         self.refresh_token = data["refresh_token"]
         return data["access_token"]
-    
+
     def refresh_access_token(self):
         response = requests.post(
             "http://localhost:8000/auth/refresh",
@@ -97,7 +97,7 @@ class RefreshableAuth:
         if "refresh_token" in data:
             self.refresh_token = data["refresh_token"]
         return data["access_token"]
-    
+
     # Define `set` as before ... 
 ```
 
@@ -111,10 +111,10 @@ class RefreshableAuth:
 Cache different tokens based on specific criteria like OAuth scopes:
 
 ```python
-@schemathesis.auth(cache_by_key=lambda case, context: get_required_scopes(context))
+@schemathesis.auth(cache_by_key=lambda case, ctx: get_required_scopes(ctx))
 class ScopedAuth:
-    def get(self, case, context):
-        scopes = get_required_scopes(context)
+    def get(self, case, ctx):
+        scopes = get_required_scopes(ctx)
         response = requests.post(
             "http://localhost:8000/auth/token",
             json={
@@ -124,24 +124,24 @@ class ScopedAuth:
             }
         )
         return response.json()["access_token"]
-    
+
     # Define `set` as before ... 
 
-def get_required_scopes(context):
+def get_required_scopes(ctx):
     """Extract required OAuth scopes from operation security requirements"""
-    security = context.operation.definition.raw.get("security", [])
+    security = ctx.operation.definition.raw.get("security", [])
     if not security:
         return ""
-    
+
     # Get first security requirement
     security_req = security[0]
     if not security_req:
         return ""
-    
+
     # Get scopes for the first scheme
     scheme_name = list(security_req.keys())[0]
     scopes = security_req.get(scheme_name, [])
-    
+
     return ",".join(sorted(scopes))
 ```
 
@@ -154,7 +154,7 @@ Apply authentication only to specific endpoints:
 ```python
 @schemathesis.auth().apply_to(path="/users/").skip_for(method="POST")
 class UserAuth:
-    def get(self, case, context):
+    def get(self, case, ctx):
         response = requests.post(
             "http://localhost:8000/auth/user-token",
             json={"username": "demo", "password": "test"}
@@ -165,7 +165,7 @@ class UserAuth:
 
 @schemathesis.auth().apply_to(path="/admin/")
 class AdminAuth:
-    def get(self, case, context):
+    def get(self, case, ctx):
         response = requests.post(
             "http://localhost:8000/auth/admin-token",
             json={"username": "admin", "password": "admin-pass"}
@@ -220,7 +220,7 @@ schemathesis run http://localhost:8000/openapi.json
 
 ### Simple Authentication
 
-Use requests authentication directly with case methods:
+Use requests authentication directly with `Case.call_and_validate` or `Case.call`:
 
 ```python
 import schemathesis
@@ -247,12 +247,12 @@ Register auth at the schema level for all tests:
 ```python
 @schema.auth()
 class APITokenAuth:
-    def get(self, case, context):
+    def get(self, case, ctx):
         # Same implementation as CLI examples above
         response = requests.post("http://localhost:8000/auth/token", ...)
         return response.json()["access_token"]
-    
-    def set(self, case, data, context):
+
+    def set(self, case, data, ctx):
         case.headers = case.headers or {}
         case.headers["Authorization"] = f"Bearer {data}"
 

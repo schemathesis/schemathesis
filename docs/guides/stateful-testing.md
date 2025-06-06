@@ -167,11 +167,11 @@ Create realistic test data at the start of each scenario:
 class APIWorkflow(schema.as_state_machine()):
     def setup(self):
         # Create a test user for this scenario
-        case = schema["/users"]["POST"].make_case(body={
+        case = schema["/users"]["POST"].Case(body={
             "username": "test_user",
             "email": "test@example.com"
         })
-        response = self.step(case)
+        response = case.call()
         self.user_id = response.json()["id"]
 
     def before_call(self, case):
@@ -199,5 +199,5 @@ class APIWorkflow(schema.as_state_machine()):
 
     def before_call(self, case):
         # Add auth to every request
-        case.headers = {**(case.headers or {}), **self.auth_headers}
+        case.headers = {**case.headers, **self.auth_headers}
 ```

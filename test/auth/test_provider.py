@@ -64,7 +64,7 @@ def test_register_invalid(auth_storage):
     # When the class implementation is wrong
     # Then it should not be possible to register it
 
-    with pytest.raises(TypeError, match="`Invalid` is not a valid auth provider"):
+    with pytest.raises(TypeError, match="`Invalid` does not implement the `AuthProvider` protocol"):
 
         @auth_storage.auth()
         class Invalid: ...

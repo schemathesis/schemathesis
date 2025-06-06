@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from schemathesis import errors, graphql, openapi, pytest
-from schemathesis.auths import AuthContext, auth
+from schemathesis.auths import AuthContext, AuthProvider, auth
 from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.config import SchemathesisConfig as Config
 from schemathesis.core.transport import Response
@@ -41,6 +41,7 @@ __all__ = [
     # Auth
     "auth",
     "AuthContext",
+    "AuthProvider",
     # Targeted Property-based Testing
     "metric",
     "MetricContext",

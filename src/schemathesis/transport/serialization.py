@@ -82,10 +82,6 @@ def serialize_xml(
     """Serialize a generated Python object as an XML string.
 
     Schemas may contain additional information for fine-tuned XML serialization.
-
-    :param value: Generated value
-    :param raw_schema: The payload definition with not resolved references.
-    :param resolved_schema: The payload definition with all references resolved.
     """
     if isinstance(value, (bytes, str)):
         return {"data": value}

@@ -66,6 +66,11 @@ from starlette.testclient import TestClient
 import schemathesis
 
 app = FastAPI()
+
+@app.get("/users")
+async def get_users():
+    return [{"id": 1, "name": "Alice"}]
+
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 @schema.parametrize()
@@ -132,9 +137,8 @@ class AppAuth:
             "password": "test_password"
         })
         return response.json()["access_token"]
-    
+
     def set(self, case, data, context):
-        case.headers = case.headers or {}
         case.headers["Authorization"] = f"Bearer {data}"
 ```
 

@@ -119,8 +119,8 @@ Schemathesis supports many common media types out of the box, including JSON, XM
 # Generated Python object
 {"user_id": 123, "name": "test"}
 
-# For application/json → {"user_id": 123, "name": "test"}
-# For application/xml → <data><user_id>123</user_id><name>test</name></data>
+# For application/json -> {"user_id": 123, "name": "test"}
+# For application/xml -> <data><user_id>123</user_id><name>test</name></data>
 ```
 
 If Schemathesis can't serialize data for a media type, those test cases are skipped. This keeps your test runs focused on actually testable scenarios.
