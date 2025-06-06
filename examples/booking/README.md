@@ -1,15 +1,15 @@
 # Booking API Example
 
-A sample booking API that demonstrates how Schemathesis automatically discovers validation bugs that manual testing typically misses.
+A sample booking API that demonstrates how Schemathesis automatically discovers various types of bugs that manual testing typically misses.
 
-> **Tutorial available:** This API is used in the **[Schemathesis Tutorial](../../docs/tutorial.md)** - a complete 15-20 minute walkthrough of property-based API testing.
+> 📚 **Tutorial available:** This API is used in the **[Schemathesis Tutorial](../../docs/tutorial.md)** - a 15-20 minute walkthrough of its core features.
 
-## Features
+## Overview
 
 - Hotel booking creation and retrieval
-- Bearer token authentication  
-- Room type validation with intentional edge cases
-- OpenAPI 3.1 schema with FastAPI
+- Bearer token authentication
+- Room type validation with an intentional bug
+- Open API 3.1 schema provided by FastAPI
 
 ## Quick Start
 
@@ -38,13 +38,12 @@ Authorization: Bearer secret-token
 
 ## Test with Schemathesis
 
-Find bugs automatically:
 ```bash
 uvx schemathesis run http://localhost:8080/openapi.json \
   --header 'Authorization: Bearer secret-token'
 ```
 
-Schemathesis will discover validation edge cases that cause 500 errors.
+Schemathesis will discover an edge case that causes a 500 error.
 
 ## Example Usage
 
@@ -54,7 +53,7 @@ curl -X POST "http://localhost:8080/bookings" \
   -H "Authorization: Bearer secret-token" \
   -H "Content-Type: application/json" \
   -d '{
-    "guest_name": "John Doe", 
+    "guest_name": "John Doe",
     "room_type": "deluxe",
     "nights": 3
   }'
@@ -63,8 +62,6 @@ curl -X POST "http://localhost:8080/bookings" \
 Retrieve booking:
 ```bash
 curl -H "Authorization: Bearer secret-token" \
-  http://localhost:8080/bookings/{booking_id}
+  http://localhost:8080/bookings/42
 ```
----
 
-**📖 Follow the [tutorial](../../docs/tutorial.md) to learn the complete testing workflow!**
