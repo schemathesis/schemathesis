@@ -316,7 +316,7 @@ def test_(case):
     request = requests.PreparedRequest()
     request.prepare("GET", "http://127.0.0.1")
     response.request = request
-    assert case.validate_response(Response.from_requests(response, True)) is None
+    assert case.validate_response(response) is None
 """,
         generation_modes=[GenerationMode.POSITIVE],
     )
@@ -498,7 +498,8 @@ def test_iter_parameters(ctx):
     assert params[1].name == "q"
 
 
-def test_checks_errors_deduplication(ctx):
+@pytest.mark.parametrize("factory_type", ["httpx", "requests", "wsgi"])
+def test_checks_errors_deduplication(ctx, response_factory, factory_type):
     # See GH-1394
     schema = ctx.openapi.build_schema(
         {
@@ -513,11 +514,7 @@ def test_checks_errors_deduplication(ctx):
     )
     schema = schemathesis.openapi.from_dict(schema)
     case = schema["/data"]["GET"].Case()
-    response = requests.Response()
-    response.status_code = 200
-    response.request = requests.PreparedRequest()
-    response._content = b"42"
-    response.request.prepare(method="GET", url="http://example.com", json={})
+    response = getattr(response_factory, factory_type)(content=b"42", content_type=None)
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup) as exc:
         case.validate_response(response, checks=(content_type_conformance, response_schema_conformance))

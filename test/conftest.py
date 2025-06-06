@@ -1118,11 +1118,14 @@ def response_factory():
         status_code: int = 200,
         headers: dict[str, Any] | None = None,
     ):
+        headers = headers or {}
+        if content_type:
+            headers.setdefault("Content-Type", content_type)
         request = Request.from_values(method="POST", base_url="http://127.0.0.1", path="/test", headers=headers)
         response = TestResponse(
             response=iter([content]),
             status=str(status_code),
-            headers=Headers({"Content-Type": content_type, **(headers or {})}),
+            headers=Headers(headers),
             request=request,
         )
         return response
