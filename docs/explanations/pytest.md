@@ -63,7 +63,7 @@ When you need pytest fixtures for schema setup, use `schemathesis.pytest.from_fi
 ```python
 @pytest.fixture
 def api_schema(database):
-    return schemathesis.openapi.from_dict(app.openapi(), app)
+    return schemathesis.openapi.from_asgi("/openapi.json", app)
 
 schema = schemathesis.pytest.from_fixture("api_schema")
 

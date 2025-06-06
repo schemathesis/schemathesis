@@ -206,6 +206,7 @@ def map_headers(context, headers):
 # Only apply to a specific operation
 @schemathesis.hook.apply_to(name="GET /orders/{order_id}")
 def map_path_parameters(context, path_parameters):
+    path_parameters = path_parameters or {}
     path_parameters["order_id"] = "order_12345"  # Known test order
     return path_parameters
 ```
@@ -216,17 +217,12 @@ For complex scenarios, modify the entire request:
 
 ```python
 @schemathesis.hook
-def before_call(context, case):
+def before_call(context, case, **kwargs):
     """Modify the request just before it's sent"""
     # Add correlation ID for tracing
-    if case.headers is None:
-        case.headers = {}
     case.headers["X-Correlation-ID"] = f"test-{uuid.uuid4()}"
-    
-    # Ensure test environment
-    if case.query is None:
-        case.query = {}
-    case.query["test_mode"] = "true"
+    # Set `mode=testing` for every request
+    case.query["mode"] = "testing"
 ```
 
 ## Advanced: Schema Modification Patterns
@@ -240,7 +236,7 @@ def before_init_operation(context, operation):
     for parameter in operation.iter_parameters():
         schema = parameter.definition.get("schema", {})
         remove_optional_properties(schema)
-    
+
     for alternative in operation.body:
         schema = alternative.definition.get("schema", {})
         remove_optional_properties(schema)
@@ -249,18 +245,18 @@ def remove_optional_properties(schema):
     """Recursively remove non-required properties from schema"""
     if not isinstance(schema, dict):
         return
-    
+
     required = schema.get("required", [])
     properties = schema.get("properties", {})
-    
+
     # Remove optional properties
     for name in list(properties.keys()):
         if name not in required:
             del properties[name]
-    
+
     # Recurse into remaining properties
-    for prop_schema in properties.values():
-        remove_optional_properties(prop_schema)
+    for subschema in properties.values():
+        remove_optional_properties(subschema)
 ```
 
 **When to use:** When you want to focus on core functionality testing and reduce test execution time.

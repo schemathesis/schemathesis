@@ -986,12 +986,6 @@ class SwaggerV20(BaseOpenAPISchema):
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
-        """Prepare form data for sending with `requests`.
-
-        :param form_data: Raw generated data as a dictionary.
-        :param operation: The tested API operation for which the data was generated.
-        :return: `files` and `data` values for `requests.request`.
-        """
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
         # explicitly, then use it., but if "multipart/form-data" is specified, then use it
@@ -1058,12 +1052,6 @@ class SwaggerV20(BaseOpenAPISchema):
         )
 
     def _get_consumes_for_operation(self, definition: dict[str, Any]) -> list[str]:
-        """Get the `consumes` value for the given API operation.
-
-        :param definition: Raw API operation definition.
-        :return: A list of media-types for this operation.
-        :rtype: List[str]
-        """
         global_consumes = self.raw_schema.get("consumes", [])
         consumes = definition.get("consumes", [])
         if not consumes:
@@ -1162,12 +1150,6 @@ class OpenApi30(SwaggerV20):
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
-        """Prepare form data for sending with `requests`.
-
-        :param form_data: Raw generated data as a dictionary.
-        :param operation: The tested API operation for which the data was generated.
-        :return: `files` and `data` values for `requests.request`.
-        """
         files = []
         definition = operation.definition.raw
         if "$ref" in definition["requestBody"]:

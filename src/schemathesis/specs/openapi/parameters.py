@@ -314,9 +314,6 @@ def parameters_to_json_schema(
 ) -> dict[str, Any]:
     """Create an "object" JSON schema from a list of Open API parameters.
 
-    :param List[OpenAPIParameter] parameters: A list of Open API parameters related to the same location. All of
-        them are expected to have the same "in" value.
-
     For each input parameter, there will be a property in the output schema.
 
     This:

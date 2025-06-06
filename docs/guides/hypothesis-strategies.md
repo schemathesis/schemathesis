@@ -64,11 +64,15 @@ Each test will run multiple Hypothesis examples, so your custom data will be sam
 ### Database Setup with Cleanup
 
 ```python
-@schema.given(user_data=st.fixed_dictionaries({
-    "name": st.text(min_size=1, max_size=50),
-    "email": st.emails(),
-    "role": st.sampled_from(["user", "admin"])
-}))
+@schema.given(
+    user_data=st.fixed_dictionaries(
+        {
+            "name": st.text(min_size=1, max_size=50),
+            "email": st.emails(),
+            "role": st.sampled_from(["user", "admin"]),
+        }
+    )
+)
 @schema.parametrize()
 def test_api_with_db_setup(db, case, user_data):
     # Create user in database for each Hypothesis example
