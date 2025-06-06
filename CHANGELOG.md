@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.12...HEAD) - TBD
 
+### :rocket: Added
+
+- Support for validating `requests` / `httpx` / `werkzeug` responses in `Case.validate_response`. [#1718](https://github.com/schemathesis/schemathesis/issues/1718)
+
 ### :wrench: Changed
 
 - Generate at least one non-NULL character in path parameters. [#2790](https://github.com/schemathesis/schemathesis/issues/2790)

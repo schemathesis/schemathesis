@@ -14,8 +14,11 @@ from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
 
 if TYPE_CHECKING:
+    import httpx
+    import requests
     import requests.auth
     from requests.structures import CaseInsensitiveDict
+    from werkzeug.test import TestResponse
 
     from schemathesis.schemas import APIOperation
 
@@ -142,7 +145,7 @@ class Case:
 
     def validate_response(
         self,
-        response: Response,
+        response: Response | httpx.Response | requests.Response | TestResponse,
         checks: list[CheckFunction] | None = None,
         additional_checks: list[CheckFunction] | None = None,
         excluded_checks: list[CheckFunction] | None = None,
@@ -162,6 +165,8 @@ class Case:
         """
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
+
+        response = Response.from_any(response)
 
         checks = [
             check

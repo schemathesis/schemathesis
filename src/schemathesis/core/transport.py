@@ -100,6 +100,20 @@ class Response:
         self._override = _override
 
     @classmethod
+    def from_any(cls, response: Response | httpx.Response | requests.Response | TestResponse) -> Response:
+        import httpx
+        import requests
+        from werkzeug.test import TestResponse
+
+        if isinstance(response, requests.Response):
+            return Response.from_requests(response, verify=True)
+        elif isinstance(response, httpx.Response):
+            return Response.from_httpx(response, verify=True)
+        elif isinstance(response, TestResponse):
+            return Response.from_wsgi(response)
+        return response
+
+    @classmethod
     def from_requests(cls, response: requests.Response, verify: bool, _override: Override | None = None) -> Response:
         raw = response.raw
         raw_headers = raw.headers if raw is not None else {}
