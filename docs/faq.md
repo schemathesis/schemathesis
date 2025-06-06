@@ -90,3 +90,23 @@ Schemathesis has the following limitations:
   Schemathesis does not support generating invalid inputs for GraphQL endpoints. The `--mode negative` and `--mode all` options are applicable only to OpenAPI schemas.
 
 If you encounter issues not listed here, please report them on our [GitHub issues page](https://github.com/schemathesis/schemathesis/issues).
+
+## Can I use Schemathesis with Allure?
+
+Yes, through JUnit XML export. Allure can generate rich visual reports from Schemathesis test results.
+
+```bash
+# 1. Run Schemathesis with JUnit output  
+schemathesis run your_schema.yaml --report-junit-path=results.xml
+
+# 2. Set up Allure directory and move results
+mkdir allure-results
+mv results.xml allure-results/
+
+# 3. Generate and view Allure report
+allure generate allure-results --clean
+allure open
+```
+
+!!! note "Prerequisites"
+    Install Allure from [their website](https://allurereport.org/docs/install/){target=_blank}
