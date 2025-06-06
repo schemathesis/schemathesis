@@ -63,12 +63,13 @@ def csv_serializer(ctx, value):
         return value
     
     # Handle unexpected types in negative testing  
-    if not isinstance(value, list):
+    if not isinstance(value, list) or \
+      not all(isinstance(item, dict) for item in value):
         return str(value).encode('utf-8')
-    
+
     if not value:
         return b""  # Empty CSV
-    
+
     # Convert dictionaries to CSV
     output = StringIO()
     field_names = sorted(value[0].keys()) if value else []

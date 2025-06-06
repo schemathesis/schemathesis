@@ -648,9 +648,9 @@ def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Cas
 
     It mutates `case` in place.
     """
-    headers = case.headers.copy() if case.headers else None
-    query = case.query.copy() if case.query else None
-    cookies = case.cookies.copy() if case.cookies else None
+    headers = case.headers.copy()
+    query = case.query.copy()
+    cookies = case.cookies.copy()
     for parameter in security_parameters:
         name = parameter["name"]
         if parameter["in"] == "header" and headers:
@@ -663,7 +663,7 @@ def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Cas
         operation=case.operation,
         method=case.method,
         path=case.path,
-        path_parameters=case.path_parameters.copy() if case.path_parameters else None,
+        path_parameters=case.path_parameters.copy(),
         headers=headers,
         cookies=cookies,
         query=query,

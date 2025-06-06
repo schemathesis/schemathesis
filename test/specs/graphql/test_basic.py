@@ -53,7 +53,7 @@ def test_as_wsgi_kwargs(graphql_strategy):
     expected = {
         "method": "POST",
         "path": "/graphql",
-        "query_string": None,
+        "query_string": {},
         "json": {"query": case.body},
         "headers": {
             **get_default_headers(),
