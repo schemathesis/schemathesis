@@ -810,19 +810,7 @@ class APIOperation(Generic[P]):
             FailureGroup: If the response does not conform to the schema.
 
         """
-        import httpx
-        import requests
-        from werkzeug.test import TestResponse
-
-        if isinstance(response, requests.Response):
-            response_ = Response.from_requests(response, verify=True)
-        elif isinstance(response, httpx.Response):
-            response_ = Response.from_httpx(response, verify=True)
-        elif isinstance(response, TestResponse):
-            response_ = Response.from_wsgi(response)
-        else:
-            response_ = response
-        return self.schema.validate_response(self, response_)
+        return self.schema.validate_response(self, Response.from_any(response))
 
     def is_valid_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool:
         """Check if the provided response is valid against the API schema.
