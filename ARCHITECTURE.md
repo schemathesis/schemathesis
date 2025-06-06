@@ -1,17 +1,16 @@
 # Architecture
 
-This document outlines the internal structure of Schemathesis for developers working on the core codebase.
+This document outlines the internal structure of Schemathesis for developers working on the codebase.
 
 ## Overview
 
-- **Core**: Foundation layer with no external dependencies
-- **Intermediate**: Hypothesis-powered primitives
-- **Internal subsystems**: Engine, OpenAPI, and GraphQL
-- **Public API**: Curated interface combining functionality from all layers
+Schemathesis aims to separate concerns and isolates logic into multiple layers:
+
+- **Core**: Basic utilities and data structures with no external dependencies
+- **Intermediate**: Hypothesis-powered primitives for data generation
+- **Engine**: A test runner to orchestrate test execution and failure reporting
 
 ## Core Layer
-
-Independent utilities that form the foundation of Schemathesis without external dependencies.
 
 ### `core/marks`
 
@@ -19,23 +18,15 @@ Attaches Schemathesis-specific metadata to test functions, enabling integration 
 
 ### `core/loaders`
 
-Schema loading functionality, supporting multiple sources:
-
-- File-based schemas
-- HTTP-based schema retrieval
+Load API schemas from various sources and transform them into an internal representation which is used throughout the codebase.
 
 ### `core/transports`
 
-Network communication primitives for test execution
-
-- Unified response structure
+Set of primitives for communicating with the tested API, including unified `Response` structure.
 
 ### `core/output`
 
-Output processing utilities:
-
-- Response formatting
-- Data sanitization
+Logic for formatting and sanitizing Schemathesis output.
 
 ## Intermediate Layer
 
@@ -46,20 +37,19 @@ Building blocks for test generation and execution:
 Core test generation machinery:
 
 - Hypothesis test creation
-- Example generation
-- Test execution control
+- Collecting examples from API schemas
 
 ### `generation/case`
 
-Defines the `Case` class - the fundamental container for test data that flows through the system.
+Defines the `Case` data structure - the fundamental container for generated data which is serialized and sent to the tested API.
 
 ### `generation/stateful`
 
-State machine implementations for API sequence testing.
+State machine implementations for stateful API testing.
 
 ### `transport`
 
-Higher-level transport implementations building on core primitives.
+Higher-level transport implementations building on core primitives - it connects external transport libraries (like `requests`) with the rest of Schemathesis codebase.
 
 ## Internal Subsystems
 
@@ -67,17 +57,10 @@ Higher-level transport implementations building on core primitives.
 
 - Test execution orchestration
 - Event system for tracking test progress
-- Testing phases management
+- Test phases management
 
 ### API Specifications
 
 - OpenAPI implementation
 - GraphQL implementation
 
-## Public API
-
-Python API for end users:
-
-- Re-exports from lower layers
-- Common extension points
-- Entry points for running tests
