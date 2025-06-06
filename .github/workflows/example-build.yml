@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/example-build.yml"
-      - "example/**"
+      - "examples/**"
   push:
     branches:
       - master
@@ -20,19 +20,19 @@ jobs:
 
       - name: Start containers
         run: docker compose up -d --build
-        working-directory: "./example"
+        working-directory: "./examples/booking"
 
       # Runs positive Schemathesis tests
       - uses: schemathesis/action@v1
         continue-on-error: true
         with:
           # A local API schema location
-          schema: "http://127.0.0.1:5123/openapi.json"
+          schema: "http://127.0.0.1:8080/openapi.json"
           max-examples: "10"
           # To avoid failing the build
-          args: "-E does-not-exist"
+          args: "--include-path does-not-exist --experimental=openapi-3.1"
 
       - name: Stop containers
         if: always()
         run: docker compose down
-        working-directory: "./example"
+        working-directory: "./examples/booking"
