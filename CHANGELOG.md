@@ -29,6 +29,7 @@
 - Make header overrides case-insensitive.
 - Incorrect auth detection in `ignored_auth` when it is passed to `call` or `call_and_validate`. [#2846](https://github.com/schemathesis/schemathesis/issues/2846)
 - Incorrect check for cookie and query param based authorization in `ignored_auth`.
+- Do not include `parameters` in error message about missing HTTP method.
 
 ### :fire: Removed
 

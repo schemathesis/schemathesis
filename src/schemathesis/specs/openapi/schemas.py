@@ -888,7 +888,7 @@ class MethodMap(Mapping):
         try:
             return self._init_operation(item)
         except LookupError as exc:
-            available_methods = ", ".join(map(str.upper, self))
+            available_methods = ", ".join(key.upper() for key in self if key in HTTP_METHODS)
             message = f"Method `{item.upper()}` not found."
             if available_methods:
                 message += f" Available methods: {available_methods}"

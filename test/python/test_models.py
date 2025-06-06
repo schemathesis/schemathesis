@@ -404,6 +404,13 @@ def test_method_suggestion(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
+def test_method_suggestion_without_parameters(swagger_20):
+    swagger_20.raw_schema["paths"]["/users"]["parameters"] = []
+    swagger_20.raw_schema["paths"]["/users"]["x-ext"] = []
+    with pytest.raises(LookupError, match="Method `PUT` not found. Available methods: GET$"):
+        swagger_20["/users"]["PUT"]
+
+
 @pytest.mark.parametrize("mode", list(GenerationMode))
 @pytest.mark.hypothesis_nested
 def test_generation_mode_is_available(ctx, mode):
