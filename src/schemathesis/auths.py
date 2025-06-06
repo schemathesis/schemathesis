@@ -69,22 +69,28 @@ CacheKeyFunction = Callable[["Case", "AuthContext"], Union[str, int]]
 
 @runtime_checkable
 class AuthProvider(Generic[Auth], Protocol):
-    """Get authentication data for an API and set it on the generated test cases."""
+    """Protocol for implementing custom authentication in API tests."""
 
-    def get(self, case: Case, context: AuthContext) -> Auth | None:
-        """Get the authentication data.
+    def get(self, case: Case, ctx: AuthContext) -> Auth | None:
+        """Obtain authentication data for the test case.
 
-        :param Case case: Generated test case.
-        :param AuthContext context: Holds state relevant for the authentication process.
-        :return: Any authentication data you find useful for your use case. For example, it could be an access token.
+        Args:
+            case: Generated test case requiring authentication.
+            ctx: Authentication state and configuration.
+
+        Returns:
+            Authentication data (e.g., token, credentials) or `None`.
+
         """
 
-    def set(self, case: Case, data: Auth, context: AuthContext) -> None:
-        """Set authentication data on a generated test case.
+    def set(self, case: Case, data: Auth, ctx: AuthContext) -> None:
+        """Apply authentication data to the test case.
 
-        :param Optional[Auth] data: Authentication data you got from the ``get`` method.
-        :param Case case: Generated test case.
-        :param AuthContext context: Holds state relevant for the authentication process.
+        Args:
+            case: Test case to modify.
+            data: Authentication data from the `get` method.
+            ctx: Authentication state and configuration.
+
         """
 
 
@@ -333,8 +339,9 @@ class AuthStorage(Generic[Auth]):
     ) -> None:
         if not issubclass(provider_class, AuthProvider):
             raise TypeError(
-                f"`{provider_class.__name__}` is not a valid auth provider. "
-                f"Check `schemathesis.auths.AuthProvider` documentation for examples."
+                f"`{provider_class.__name__}` does not implement the `AuthProvider` protocol. "
+                f"Auth providers must have `get` and `set` methods. "
+                f"See `schemathesis.AuthProvider` documentation for examples."
             )
         provider: AuthProvider
         # Apply caching if desired
@@ -389,23 +396,6 @@ class AuthStorage(Generic[Auth]):
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
     ) -> FilterableApplyAuth:
-        """Register auth provider only on one test function.
-
-        :param Type[AuthProvider] provider_class: Authentication provider class.
-        :param Optional[int] refresh_interval: Cache duration in seconds.
-
-        .. code-block:: python
-
-            class Auth:
-                ...
-
-
-            @schema.auth(Auth)
-            @schema.parametrize()
-            def test_api(case):
-                ...
-
-        """
         filter_set = FilterSet()
 
         def wrapper(test: Callable) -> Callable:

@@ -8,7 +8,7 @@ Use Schemathesis to validate API responses in your existing test suite without c
 def test_get_user():
     response = requests.get("http://api.example.com/users/123")
 
-    # Raises detailed validation errors if response doesn't match schema
+    # Raises validation errors if response doesn't match schema
     schema["/users/{id}"]["GET"].validate_response(response)
 ```
 
@@ -23,7 +23,7 @@ def test_with_conditional_logic():
     assert schema["/users"]["POST"].is_valid_response(response):
 ```
 
-## Integration Example
+## Example
 
 ```python
 import pytest
@@ -34,17 +34,15 @@ def api_schema():
     return schemathesis.openapi.from_url("http://api.example.com/openapi.json")
 
 def test_user_workflow(api_schema):
-    # Your existing test logic
     create_response = requests.post(
         "http://api.example.com/users", json={"name": "Test"}
     )
     user_id = create_response.json()["id"]
 
-    # Add schema validation 
     api_schema["/users"]["POST"].validate_response(create_response)
-    
+
     get_response = requests.get(f"http://api.example.com/users/{user_id}")
     api_schema["/users/{id}"]["GET"].validate_response(get_response)
 ```
 
-This approach adds schema validation to any HTTP client code while preserving your existing test patterns.
+This approach adds schema validation while preserving your existing code.
