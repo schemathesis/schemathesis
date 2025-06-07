@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     import requests
     from hypothesis.strategies import SearchStrategy
     from requests.structures import CaseInsensitiveDict
-    from typing_extensions import Self
     from werkzeug.test import TestResponse
 
     from schemathesis.core import Specification
@@ -474,18 +473,6 @@ class BaseSchema(Mapping):
             if isinstance(operation, Ok)
         ]
         return strategies.combine(_strategies)
-
-    def configure(
-        self,
-        *,
-        location: str | None | NotSet = NOT_SET,
-        app: Any | NotSet = NOT_SET,
-    ) -> Self:
-        if not isinstance(location, NotSet):
-            self.location = location
-        if not isinstance(app, NotSet):
-            self.app = app
-        return self
 
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         raise NotImplementedError

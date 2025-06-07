@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
 
+from schemathesis import transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
@@ -201,8 +202,12 @@ class Case:
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self, **kwargs)
         if self.operation.app is not None:
-            kwargs["app"] = self.operation.app
-        response = self.operation.schema.transport.send(
+            kwargs.setdefault("app", self.operation.app)
+        if "app" in kwargs:
+            transport_ = transport.get(kwargs["app"])
+        else:
+            transport_ = self.operation.schema.transport
+        response = transport_.send(
             self,
             session=session,
             base_url=base_url,

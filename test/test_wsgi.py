@@ -36,8 +36,6 @@ def test_cookies(flask_app):
                 }
             },
         },
-    ).configure(
-        app=flask_app,
     )
 
     strategy = schema["/cookies"]["GET"].as_strategy()
@@ -45,7 +43,7 @@ def test_cookies(flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call()
+        response = case.call(app=flask_app)
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 
@@ -86,15 +84,13 @@ def test_binary_body(mocker, flask_app):
                 }
             },
         },
-    ).configure(
-        app=flask_app,
     )
     strategy = schema["/api/upload_file"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call()
+        response = case.call(app=flask_app)
         assert response.status_code == 200
         assert response.json() == {"size": mocker.ANY}
 

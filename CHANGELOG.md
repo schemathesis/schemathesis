@@ -35,6 +35,7 @@
 ### :fire: Removed
 
 - `Schema.add_link`. Adjust your API schema manually instead.
+- `Schema.configure`. Use the config file instead. If you used to pass `app` to `config`, pass it to `Case.call` or `Case.call_and_validate` instead.
 - `@schema.override`. Use `parameters` configuration option instead.
 
 Change this:
