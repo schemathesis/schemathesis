@@ -12,6 +12,7 @@ nav:
 
   - How-To Guides:
       - guides/index.md
+      - Config Optimization: guides/config-optimization.md
       - guides/auth.md
       - guides/cicd.md
       - guides/graphql-custom-scalars.md
