@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(headers={'Authorization': 'Bearer secret-token!'}, operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [tag='admin']>}, _excludes=set()), headers={'Authorization': 'Bearer secret-admin-key'})])))

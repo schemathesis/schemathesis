@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [filter_function]>}, _excludes=set()), enabled=False), OperationConfig(filter_set=FilterSet(_includes=set(), _excludes={<Filter: [filter_function]>}), checks=ChecksConfig(response_schema_conformance=SimpleCheckConfig(enabled=False)))])))

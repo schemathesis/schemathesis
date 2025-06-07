@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(bearer='secret'))))

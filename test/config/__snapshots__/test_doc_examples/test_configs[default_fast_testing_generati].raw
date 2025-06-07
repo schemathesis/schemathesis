@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(generation=GenerationConfig(max_examples=100), operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [path_regex=re.compile('/(payments|users)/')]>}, _excludes=set()), generation=GenerationConfig(max_examples=500))])))
