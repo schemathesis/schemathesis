@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(checks=ChecksConfig(content_type_conformance=SimpleCheckConfig(enabled=False)), operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='POST /uploads']>}, _excludes=set()), checks=ChecksConfig(positive_data_acceptance=PositiveDataAcceptanceConfig(expected_statuses=['200', '201', '202'])))])))

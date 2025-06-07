@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(stateful=StatefulPhaseConfig(generation=GenerationConfig(max_examples=30))), generation=GenerationConfig(max_examples=200))))

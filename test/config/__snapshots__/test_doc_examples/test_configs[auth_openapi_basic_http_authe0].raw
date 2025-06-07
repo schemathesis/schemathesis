@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(openapi={'BasicAuth': {'username': 'user-1', 'password': 'secret-password'}, 'BearerAuth': {'token': 'secret'}, 'ApiKeyAuth': {'value': 'secret-key'}, 'OAuth2': {'client_id': 'admin', 'client_secret': 'secret!'}}))))

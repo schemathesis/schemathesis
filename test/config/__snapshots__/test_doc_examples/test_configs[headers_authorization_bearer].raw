@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(headers={'Authorization': 'Bearer secret-token!'})))

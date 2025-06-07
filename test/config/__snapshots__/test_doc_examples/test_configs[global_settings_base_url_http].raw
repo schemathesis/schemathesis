@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(base_url='https://api.example.com', generation=GenerationConfig(max_examples=100), operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='GET /users']>}, _excludes=set()), request_timeout=5.0, generation=GenerationConfig(max_examples=200))])))

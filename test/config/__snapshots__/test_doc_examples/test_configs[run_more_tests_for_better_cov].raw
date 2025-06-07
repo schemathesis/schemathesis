@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(request_timeout=10.0, auth=AuthConfig(basic=('user-1', 'secret-password')), generation=GenerationConfig(max_examples=500))))

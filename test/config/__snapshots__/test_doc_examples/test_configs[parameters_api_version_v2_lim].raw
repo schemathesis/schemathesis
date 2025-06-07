@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(parameters={'api_version': 'v2', 'limit': 50, 'offset': 0})))

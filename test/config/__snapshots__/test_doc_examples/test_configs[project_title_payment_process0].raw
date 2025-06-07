@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(named={'Payment Processing API': ProjectConfig(base_url='https://payments.example.com', hooks='test.config.hooks.example', workers=4, generation=GenerationConfig(max_examples=200)), 'User Management API': ProjectConfig(base_url='https://users.example.com', workers=2)}))
