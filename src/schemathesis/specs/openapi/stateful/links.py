@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Callable, Generator, Literal, Union, cast
+from typing import Any, Callable, Generator, Literal, cast
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError
@@ -12,10 +12,6 @@ from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.references import RECURSION_DEPTH_LIMIT
-
-if TYPE_CHECKING:
-    from jsonschema import RefResolver
-
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
@@ -211,61 +207,3 @@ def get_all_links(
                 yield status_code, Ok(link)
             except InvalidTransition as exc:
                 yield status_code, Err(exc)
-
-
-StatusCode = Union[str, int]
-
-
-def _get_response_by_status_code(responses: dict[StatusCode, dict[str, Any]], status_code: str | int) -> dict:
-    if isinstance(status_code, int):
-        # Invalid schemas may contain status codes as integers
-        if status_code in responses:
-            return responses[status_code]
-        # Passed here as an integer, but there is no such status code as int
-        # We cast it to a string because it is either there already and we'll get relevant responses, otherwise
-        # a new dict will be created because there is no such status code in the schema (as an int or a string)
-        return responses.setdefault(str(status_code), {})
-    if status_code.isnumeric():
-        # Invalid schema but the status code is passed as a string
-        numeric_status_code = int(status_code)
-        if numeric_status_code in responses:
-            return responses[numeric_status_code]
-    # All status codes as strings, including `default` and patterned values like `5XX`
-    return responses.setdefault(status_code, {})
-
-
-def add_link(
-    resolver: RefResolver,
-    responses: dict[StatusCode, dict[str, Any]],
-    links_field: str,
-    parameters: dict[str, str] | None,
-    request_body: Any,
-    status_code: StatusCode,
-    target: str | APIOperation,
-    name: str | None = None,
-) -> None:
-    response = _get_response_by_status_code(responses, status_code)
-    if "$ref" in response:
-        _, response = resolver.resolve(response["$ref"])
-    links_definition = response.setdefault(links_field, {})
-    new_link: dict[str, str | dict[str, str]] = {}
-    if parameters is not None:
-        new_link["parameters"] = parameters
-    if request_body is not None:
-        new_link["requestBody"] = request_body
-    if isinstance(target, str):
-        name = name or target
-        new_link["operationRef"] = target
-    else:
-        name = name or f"{target.method.upper()} {target.path}"
-        # operationId is a dict lookup which is more efficient than using `operationRef`, since it
-        # doesn't involve reference resolving when we will look up for this target during testing.
-        if "operationId" in target.definition.raw:
-            new_link["operationId"] = target.definition.raw["operationId"]
-        else:
-            new_link["operationRef"] = target.operation_reference
-    # The name is arbitrary, so we don't really case what it is,
-    # but it should not override existing links
-    while name in links_definition:
-        name += "_new"
-    links_definition[name] = new_link

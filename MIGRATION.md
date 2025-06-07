@@ -37,3 +37,7 @@ The following options have alternatives:
 | `--operation-id` | `--include-operation-id` / `--exclude-operation-id` |
 | `--skip-deprecated-operations` | `--exclude-deprecated` |
 | `--pre-run` | Use the `SCHEMATHESIS_HOOKS` environment variable instead |
+
+## Python API
+
+- `Schema.add_link`. Adjust your API schema manually instead.

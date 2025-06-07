@@ -575,52 +575,6 @@ class BaseOpenAPISchema(BaseSchema):
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
 
-    def add_link(
-        self,
-        source: APIOperation,
-        target: str | APIOperation,
-        status_code: str | int,
-        parameters: dict[str, str] | None = None,
-        request_body: Any = None,
-        name: str | None = None,
-    ) -> None:
-        """Add a new Open API link to the schema definition.
-
-        :param APIOperation source: This operation is the source of data
-        :param target: This operation will receive the data from this link.
-            Can be an ``APIOperation`` instance or a reference like this - ``#/paths/~1users~1{userId}/get``
-        :param str status_code: The link is triggered when the source API operation responds with this status code.
-        :param parameters: A dictionary that describes how parameters should be extracted from the matched response.
-            The key represents the parameter name in the target API operation, and the value is a runtime
-            expression string.
-        :param request_body: A literal value or runtime expression to use as a request body when
-            calling the target operation.
-        :param str name: Explicit link name.
-
-        .. code-block:: python
-
-            schema = schemathesis.openapi.from_url("http://0.0.0.0/schema.yaml")
-
-            schema.add_link(
-                source=schema["/users/"]["POST"],
-                target=schema["/users/{userId}"]["GET"],
-                status_code="201",
-                parameters={"userId": "$response.body#/id"},
-            )
-        """
-        if parameters is None and request_body is None:
-            raise ValueError("You need to provide `parameters` or `request_body`.")
-        links.add_link(
-            resolver=self.resolver,
-            responses=self[source.path][source.method].definition.raw["responses"],
-            links_field=self.links_field,
-            parameters=parameters,
-            request_body=request_body,
-            status_code=status_code,
-            target=target,
-            name=name,
-        )
-
     def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = defaultdict(dict)
         for status_code, link in links.get_all_links(operation):

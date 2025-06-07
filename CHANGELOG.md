@@ -34,6 +34,7 @@
 
 ### :fire: Removed
 
+- `Schema.add_link`. Adjust your API schema manually instead.
 - `@schema.override`. Use `parameters` configuration option instead.
 
 Change this:
