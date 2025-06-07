@@ -119,28 +119,26 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
 
     if factory_name == "asgi_app_factory":
         schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
-        schema.add_link(
-            source=schema["/users/"]["POST"],
-            target=schema["/users/{user_id}"]["GET"],
-            status_code="201",
-            parameters={
-                "path.user_id": "$response.body#/id",
-                "query.uid": "$response.body#/id",
+        schema.raw_schema["paths"]["/users/"]["post"]["responses"]["201"]["links"] = {
+            "GET /users/{user_id}": {
+                "parameters": {
+                    "path.user_id": "$response.body#/id",
+                    "query.uid": "$response.body#/id",
+                },
+                "operationId": "get_user_users__user_id__get",
             },
-        )
-        schema.add_link(
-            source=schema["/users/"]["POST"],
-            target=schema["/users/{user_id}"]["PATCH"],
-            status_code="201",
-            parameters={"user_id": "$response.body#/id"},
-        )
-        schema.add_link(
-            source=schema["/users/{user_id}"]["GET"],
-            target="#/paths/~1users~1{user_id}/patch",
-            status_code="200",
-            parameters={"user_id": "$response.body#/id"},
-            request_body={"first_name": "foo", "last_name": "bar"},
-        )
+            "PATCH /users/{user_id}": {
+                "parameters": {"user_id": "$response.body#/id"},
+                "operationId": "update_user_users__user_id__patch",
+            },
+        }
+        schema.raw_schema["paths"]["/users/{user_id}"]["get"]["responses"]["200"]["links"] = {
+            "#/paths/~1users~1{user_id}/patch": {
+                "parameters": {"user_id": "$response.body#/id"},
+                "requestBody": {"first_name": "foo", "last_name": "bar"},
+                "operationRef": "#/paths/~1users~1{user_id}/patch",
+            }
+        }
     else:
         schema = schemathesis.openapi.from_wsgi("/schema.yaml", app=app)
 
