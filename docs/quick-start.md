@@ -67,6 +67,8 @@ Reproduce with:
 !!! tip "Ready to dive deeper?"
     **[Complete Tutorial](tutorials/cli.md)** - 15-20 minute hands-on workflow with a realistic booking API
 
+For release testing and security assessments, see [Optimizing for Maximum Bug Detection](guides/config-optimization.md)
+
 **Reference guides:**
 
 - **[CLI Reference](reference/cli.md)** - All available CLI options
