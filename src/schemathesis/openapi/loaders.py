@@ -43,7 +43,10 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(response.text, content_type)
-    return from_dict(schema=schema, config=config).configure(app=app, location=path)
+    loaded = from_dict(schema=schema, config=config)
+    loaded.app = app
+    loaded.location = path
+    return loaded
 
 
 def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> BaseOpenAPISchema:
@@ -72,7 +75,10 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     raise_for_status(response)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(response.text, content_type)
-    return from_dict(schema=schema, config=config).configure(app=app, location=path)
+    loaded = from_dict(schema=schema, config=config)
+    loaded.app = app
+    loaded.location = path
+    return loaded
 
 
 def from_url(
@@ -108,7 +114,9 @@ def from_url(
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=url)
     schema = load_content(response.text, content_type)
-    return from_dict(schema=schema, config=config).configure(location=url)
+    loaded = from_dict(schema=schema, config=config)
+    loaded.location = url
+    return loaded
 
 
 def from_path(
@@ -136,7 +144,9 @@ def from_path(
     with open(path, encoding=encoding) as file:
         content_type = detect_content_type(headers=None, path=str(path))
         schema = load_content(file.read(), content_type)
-        return from_dict(schema=schema, config=config).configure(location=Path(path).absolute().as_uri())
+    loaded = from_dict(schema=schema, config=config)
+    loaded.location = Path(path).absolute().as_uri()
+    return loaded
 
 
 def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> BaseOpenAPISchema:
