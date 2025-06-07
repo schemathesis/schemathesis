@@ -49,6 +49,9 @@ uvx schemathesis run https://your-api.com/openapi.json
 - 🚪 **Validation bypasses** where invalid data gets accepted
 - 🔗 **Integration failures** when responses don't match client expectations
 
+
+> ⚠️ **Upgrading from older versions?** Check our [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
+
 # Installation & Usage
 
 **Command Line:**
