@@ -42,7 +42,10 @@ def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     client = asgi.get_client(app)
     response = load_from_url(client.post, url=path, **kwargs)
     schema = extract_schema_from_response(response, lambda r: r.json())
-    return from_dict(schema=schema, config=config).configure(app=app, location=path)
+    loaded = from_dict(schema=schema, config=config)
+    loaded.app = app
+    loaded.location = path
+    return loaded
 
 
 def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> GraphQLSchema:
@@ -71,7 +74,10 @@ def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, 
     response = client.post(path=path, **kwargs)
     raise_for_status(response)
     schema = extract_schema_from_response(response, lambda r: r.json)
-    return from_dict(schema=schema, config=config).configure(app=app, location=path)
+    loaded = from_dict(schema=schema, config=config)
+    loaded.app = app
+    loaded.location = path
+    return loaded
 
 
 def from_url(
@@ -107,7 +113,9 @@ def from_url(
     kwargs.setdefault("json", {"query": get_introspection_query()})
     response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **kwargs)
     schema = extract_schema_from_response(response, lambda r: r.json())
-    return from_dict(schema, config=config).configure(location=url)
+    loaded = from_dict(schema, config=config)
+    loaded.location = url
+    return loaded
 
 
 def from_path(
@@ -130,7 +138,9 @@ def from_path(
 
     """
     with open(path, encoding=encoding) as file:
-        return from_file(file=file, config=config).configure(location=Path(path).absolute().as_uri())
+        loaded = from_file(file=file, config=config)
+    loaded.location = Path(path).absolute().as_uri()
+    return loaded
 
 
 def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> GraphQLSchema:

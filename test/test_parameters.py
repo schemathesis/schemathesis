@@ -535,8 +535,7 @@ def api_schema(ctx, request, openapi_version):
         base_url = request.getfixturevalue("base_url")
         schema.config.update(base_url=base_url)
         return schema
-    app = request.getfixturevalue("flask_app")
-    schema = schema.configure(app=app)
+    schema.app = request.getfixturevalue("flask_app")
     schema.config.update(base_url="http://127.0.0.1/api")
     return schema
 

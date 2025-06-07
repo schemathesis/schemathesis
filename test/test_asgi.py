@@ -35,14 +35,14 @@ def test_cookies(fastapi_app):
                 }
             },
         },
-    ).configure(app=fastapi_app)
+    )
 
     strategy = schema["/cookies"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call()
+        response = case.call(app=fastapi_app)
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 
@@ -119,13 +119,13 @@ def test_base_url():
     def read_root():
         return {"Hello": "World"}
 
-    schema = schemathesis.openapi.from_dict(raw_schema).configure(app=app)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     strategy = schema["/foo"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=1, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call()
+        response = case.call(app=app)
         # Then the base path should be respected and calls should not lead to 404
         assert response.status_code == 200
 
