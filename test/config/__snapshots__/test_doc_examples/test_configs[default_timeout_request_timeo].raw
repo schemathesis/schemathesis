@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(request_timeout=5.0, operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [tag='slow']>}, _excludes=set()), request_timeout=30.0)])))

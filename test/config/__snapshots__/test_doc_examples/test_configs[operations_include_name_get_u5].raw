@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='GET /users/{user_id}']>}, _excludes=set()), parameters={'path.user_id': 42, 'query.user_id': 100})])))

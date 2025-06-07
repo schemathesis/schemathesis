@@ -36,6 +36,7 @@ def test_configs(monkeypatch, config, snapshot_config):
     monkeypatch.setenv("API_HOST", "http://example.schemathesis.io")
     monkeypatch.setenv("API_TOKEN", "secret")
     monkeypatch.setenv("API_KEY", "secret-key")
+    monkeypatch.setenv("ADMIN_TOKEN", "secret-admin-key")
     monkeypatch.setenv("USERNAME", "user-1")
     monkeypatch.setenv("PASSWORD", "secret-password")
     monkeypatch.setenv("CLIENT_ID", "admin")
@@ -43,7 +44,7 @@ def test_configs(monkeypatch, config, snapshot_config):
     monkeypatch.setenv("TOKEN", "secret-token!")
     monkeypatch.setenv("SESSION_ID", "secret-session-id!")
     monkeypatch.setenv("USER_ID", "42")
-    monkeypatch.setenv("IDEMPOTENCY_KEY", "key!")
+    monkeypatch.setenv("ENVIRONMENT", "test")
     try:
         config = SchemathesisConfig.from_str(config)
         assert config == snapshot_config

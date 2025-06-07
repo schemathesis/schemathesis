@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='POST /orders']>}, _excludes=set()), phases=PhasesConfig(fuzzing=PhaseConfig(generation=GenerationConfig(max_examples=500)), stateful=StatefulPhaseConfig(generation=GenerationConfig(max_examples=20))))])))
