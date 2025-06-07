@@ -112,6 +112,7 @@ schemathesis run --phases=examples,coverage <SCHEMA_URL>
 - `schemathesis.runner`. The Schemathesis engine is not a public API anymore.
 - `add_case` hook.
 - `SCHEMA_ANALYSIS` experimental feature. Parts of this feature will be open sourced in the future.
+- `as_requests_kwargs` / `as_werkzeug_kwargs`. Use `as_transport_kwargs` instead.
 
 Schema loaders are moved to namespaces:
 
