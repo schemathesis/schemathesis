@@ -231,10 +231,7 @@ class HookDispatcher:
             hook(context, *args, **kwargs)
 
     def unregister(self, hook: Callable) -> None:
-        """Unregister a specific hook.
-
-        :param hook: A hook function to unregister.
-        """
+        """Unregister a specific hook."""
         # It removes this function from all places
         for hooks in self._hooks.values():
             hooks[:] = [item for item in hooks if item is not hook]
