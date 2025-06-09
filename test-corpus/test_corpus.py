@@ -456,7 +456,7 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "FailedHealthCheck" in formatted:
         return True
-    if "Schemathesis can't serialize data" in formatted:
+    if "Serialization not possible" in formatted:
         return True
     if "Malformed media type" in formatted:
         return True
