@@ -829,6 +829,7 @@ The following settings control how Schemathesis generates test data for your API
     Guide input generation to values more likely to expose bugs via targeted property-based testing.
     
     Possible values:
+
     - `"response_time"`: Focus on generating inputs that maximize response time
     
     ```toml
@@ -872,6 +873,7 @@ The following settings control how Schemathesis generates test data for your API
     **Default:** `.hypothesis/examples`  
     
     Storage for examples discovered by Schemathesis. Options:
+
     - `"none"`: Disable storage
     - `":memory:"`: Use temporary in-memory storage
     - File path: For persistent storage in a custom location
