@@ -77,7 +77,7 @@ dev = ["schemathesis[tests,cov,bench,docs]"]
 
 [project.urls]
 Documentation = "https://schemathesis.readthedocs.io/en/stable/"
-Changelog = "https://schemathesis.readthedocs.io/en/stable/changelog.html"
+Changelog = "https://github.com/schemathesis/schemathesis/blob/master/CHANGELOG.md"
 "Bug Tracker" = "https://github.com/schemathesis/schemathesis"
 Funding = "https://github.com/sponsors/Stranger6667"
 "Source Code" = "https://github.com/schemathesis/schemathesis"
