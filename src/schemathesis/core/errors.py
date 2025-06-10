@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
-SERIALIZERS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/latest/guides/custom-serializers/"
+SERIALIZERS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/guides/custom-serializers/"
 SERIALIZERS_SUGGESTION_MESSAGE = f"Check your schema or add custom serializers: {SERIALIZERS_DOCUMENTATION_URL}"
 SERIALIZATION_NOT_POSSIBLE_MESSAGE = f"No supported serializers for media types: {{}}\n{SERIALIZERS_SUGGESTION_MESSAGE}"
 SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
