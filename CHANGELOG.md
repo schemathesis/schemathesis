@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-beta.1...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0...HEAD) - TBD
+
+## [4.0.0](https://github.com/schemathesis/schemathesis/compare/v4.0.0-beta.1...v4.0.0) - 2025-06-10
+
+This release only includes documentation & URLs updates.
 
 ## [4.0.0-beta.1](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.12...v4.0.0-beta.1) - 2025-06-07
 
