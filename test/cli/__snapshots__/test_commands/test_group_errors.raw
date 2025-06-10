@@ -31,7 +31,7 @@ __________________________________ POST /test __________________________________
 Serialization not possible
 
 No supported serializers for media types: application/x-json-smile, text/csv
-Check your schema or add custom serializers: https://schemathesis.readthedocs.io/en/latest/guides/custom-serializers/
+Check your schema or add custom serializers: https://schemathesis.readthedocs.io/en/stable/guides/custom-serializers/
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

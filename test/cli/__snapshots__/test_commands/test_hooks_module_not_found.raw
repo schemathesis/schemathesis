@@ -7,4 +7,4 @@ An attempt to import the module 'hook' failed because it could not be found.
 
 Ensure the module name is correctly spelled and reachable from the current directory.
 
-For more information on how to work with hooks, visit https://schemathesis.readthedocs.io/en/latest/guides/extending/
+For more information on how to work with hooks, visit https://schemathesis.readthedocs.io/en/stable/guides/extending/

@@ -10,4 +10,4 @@ Traceback (most recent call last):
     import something_else
 ModuleNotFoundError: No module named 'something_else'
 
-For more information on how to work with hooks, visit https://schemathesis.readthedocs.io/en/latest/guides/extending/
+For more information on how to work with hooks, visit https://schemathesis.readthedocs.io/en/stable/guides/extending/
