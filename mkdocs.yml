@@ -14,17 +14,17 @@ nav:
       - guides/index.md
       - Config Optimization: guides/config-optimization.md
       - guides/auth.md
+      - guides/schema-conformance.md
       - guides/cicd.md
-      - guides/graphql-custom-scalars.md
+      - guides/python-apps.md
       - guides/custom-media-types.md
       - guides/custom-serializers.md
-      - guides/targeted.md
+      - guides/graphql-custom-scalars.md
       - guides/extending.md
       - guides/extending-cli.md
-      - Hypothesis Strategies: guides/hypothesis-strategies.md
-      - guides/python-apps.md
-      - guides/schema-conformance.md
       - guides/stateful-testing.md
+      - Hypothesis Strategies: guides/hypothesis-strategies.md
+      - guides/targeted.md
 
   - Core Contcepts:
       - explanations/data-generation.md
