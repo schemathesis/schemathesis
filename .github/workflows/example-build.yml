@@ -30,7 +30,7 @@ jobs:
           schema: "http://127.0.0.1:8080/openapi.json"
           max-examples: "10"
           # To avoid failing the build
-          args: "--include-path does-not-exist --experimental=openapi-3.1"
+          args: "--include-path does-not-exist"
 
       - name: Stop containers
         if: always()

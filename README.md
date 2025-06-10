@@ -96,7 +96,7 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 
 ## Contributing
 
-We welcome contributions! See our [contributing guidelines](CONTRIBUTING.rst) and join discussions in [issues](https://github.com/schemathesis/schemathesis/issues) or [Discord](https://discord.gg/R9ASRAmHnA).
+We welcome contributions! See our [contributing guidelines](CONTRIBUTING.md) and join discussions in [issues](https://github.com/schemathesis/schemathesis/issues) or [Discord](https://discord.gg/R9ASRAmHnA).
 
 ## Acknowledgements
 
