@@ -129,7 +129,7 @@ export ENVIRONMENT="prod"
 **Skip Problematic Endpoints in Development:**
 ```toml
 [[operations]]
-exclude-path = "/billing/charge"
+include-path = "/billing/charge"
 enabled = false
 ```
 
