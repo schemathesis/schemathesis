@@ -49,6 +49,9 @@ exclude-method = "POST"
 enabled = false
 ```
 
+!!! note "Applying filters"
+    The config above will disable all operations matching the set of filters.
+
 ## Parameter Overrides
 
 Parameters can be overridden at the global or operation level:
