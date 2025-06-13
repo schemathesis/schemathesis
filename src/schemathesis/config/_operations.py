@@ -167,26 +167,21 @@ class OperationsConfig(DiffBase):
 
         final = FilterSet()
 
-        # Get a stable reference to operations
         operations = list(self.operations)
 
-        # Define a closure that implements our priority logic
         def priority_filter(ctx: HasAPIOperation) -> bool:
             """Filter operations according to CLI and config priority."""
-            # 1. CLI includes override everything if present
             if not include_set.is_empty():
-                return include_set.match(ctx)
+                if exclude_set.is_empty():
+                    return include_set.match(ctx)
+                return include_set.match(ctx) and not exclude_set.match(ctx)
+            elif not exclude_set.is_empty():
+                return not exclude_set.match(ctx)
 
-            # 2. CLI excludes take precedence over config
-            if not exclude_set.is_empty() and exclude_set.match(ctx):
-                return False
-
-            # 3. Check config operations in priority order (first match wins)
             for op_config in operations:
                 if op_config._filter_set.match(ctx):
                     return op_config.enabled
 
-            # 4. Default to include if no rule matches
             return True
 
         # Add our priority function as the filter
