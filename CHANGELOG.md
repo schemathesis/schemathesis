@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- **CLI**: Combining `--include-*` & `--exclude-*`. [#2894](https://github.com/schemathesis/schemathesis/issues/2894) 
+
 ## [4.0.0](https://github.com/schemathesis/schemathesis/compare/v4.0.0-beta.1...v4.0.0) - 2025-06-10
 
 This release only includes documentation & URLs updates.
