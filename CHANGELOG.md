@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Config file validation for `operations` that don't include any configuration options.
+
 ### :bug: Fixed
 
 - **CLI**: Combining `--include-*` & `--exclude-*`. [#2894](https://github.com/schemathesis/schemathesis/issues/2894) 

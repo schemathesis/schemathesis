@@ -273,24 +273,30 @@ class OperationConfig(DiffBase):
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> OperationConfig:
         filter_set = FilterSet()
+        seen = set()
         for key_suffix, arg_suffix in (("", ""), ("-regex", "_regex")):
             for attr, arg_name in FILTER_ATTRIBUTES:
                 key = f"include-{attr}{key_suffix}"
                 if key in data:
+                    seen.add(key)
                     with reraise_filter_error(attr):
                         filter_set.include(**{f"{arg_name}{arg_suffix}": data[key]})
                 key = f"exclude-{attr}{key_suffix}"
                 if key in data:
+                    seen.add(key)
                     with reraise_filter_error(attr):
                         filter_set.exclude(**{f"{arg_name}{arg_suffix}": data[key]})
         for key, method in (("include-by", filter_set.include), ("exclude-by", filter_set.exclude)):
             if key in data:
+                seen.add(key)
                 expression = data[key]
                 try:
                     func = expression_to_filter_function(expression)
                     method(func)
                 except ValueError:
                     raise ConfigError(f"Invalid filter expression: '{expression}'") from None
+        if not set(data) - seen:
+            raise ConfigError("Operation filters defined, but no settings are being overridden")
 
         return cls(
             filter_set=filter_set,

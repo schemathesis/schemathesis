@@ -46,6 +46,7 @@ exclude-method = "POST"
 # include-tag = "admin"
 # By Open API operation ID
 # include-operation-id = "delete-user"
+enabled = false
 ```
 
 ## Parameter Overrides
