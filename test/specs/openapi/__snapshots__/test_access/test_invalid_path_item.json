@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Path item should be an object, got str: invalid",
+    "method": null,
+    "path": "/users"
+  }
+}

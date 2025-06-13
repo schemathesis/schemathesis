@@ -1,6 +1,7 @@
 from dataclasses import fields
 
 import pytest
+from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
 from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
@@ -157,3 +158,8 @@ def assert_parameters():
         assert [item.as_json_schema(operation) for item in container] == json_schemas
 
     return check
+
+
+@pytest.fixture
+def snapshot_json(snapshot):
+    return snapshot.use_extension(JSONSnapshotExtension)

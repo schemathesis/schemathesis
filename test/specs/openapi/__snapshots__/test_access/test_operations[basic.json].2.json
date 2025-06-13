@@ -1,0 +1,24 @@
+{
+  "_accessor": {
+    "media_types": []
+  },
+  "definition": {
+    "parameters": [
+      {
+        "in": "path",
+        "name": "userId",
+        "required": true,
+        "type": "string"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Ok"
+      }
+    }
+  },
+  "method": "get",
+  "path": "/users/{userId}",
+  "resolver": "Resolver(_base_uri='', _registry=<Registry (1 uncrawled resource)>)",
+  "shared_parameters": []
+}

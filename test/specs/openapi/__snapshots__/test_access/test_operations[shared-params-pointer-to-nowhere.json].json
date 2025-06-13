@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Failed to resolve reference: /x-unknown/q",
+    "method": null,
+    "path": "/users"
+  }
+}

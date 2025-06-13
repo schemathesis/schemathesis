@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "Failed to resolve reference: unknown/parameters.json#/q",
+    "method": null,
+    "path": "/users"
+  }
+}

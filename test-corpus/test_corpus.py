@@ -29,6 +29,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
+from schemathesis.specs.openapi._access import OpenApi
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -403,6 +404,30 @@ def test_default(corpus, filename, tmp_path):
     finally:
         for handler in handlers:
             handler.shutdown(ctx)
+
+
+def test_access(corpus, filename):
+    raw_content = CORPUS_FILES[corpus].extractfile(filename)
+    raw_schema = json_loads(raw_content.read())
+    spec = OpenApi(raw_schema)
+    try:
+        for operation in spec:
+            if isinstance(operation, Ok):
+                operation = operation.ok()
+                method, path = operation.label.split(" ", 1)
+
+                for response in operation.responses.values():
+                    _ = response.schema
+
+                resolved = spec[path][method]
+
+                for instance in [operation, resolved]:
+                    for _ in instance.iter_parameters():
+                        pass
+                    for _ in instance.body:
+                        pass
+    except InvalidSchema:
+        pass
 
 
 def test_coverage_phase(corpus, filename):

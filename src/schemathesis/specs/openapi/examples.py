@@ -381,12 +381,10 @@ def _produce_parameter_combinations(parameters: dict[str, dict[str, list]]) -> G
 def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]]:
     """Find schema examples in responses."""
     output: dict[str, list[dict[str, Any]]] = {}
-    for status_code, response in operation.definition.raw.get("responses", {}).items():
-        if not str(status_code).startswith("2"):
+    for status_code, response in operation.responses.items():
+        if not status_code.startswith("2"):
             # Check only 2xx responses
             continue
-        if isinstance(response, dict) and "$ref" in response:
-            _, response = operation.schema.resolver.resolve_in_scope(response, operation.definition.scope)  # type:ignore[attr-defined]
         for media_type, definition in response.get("content", {}).items():
             schema_ref = definition.get("schema", {}).get("$ref")
             if schema_ref:

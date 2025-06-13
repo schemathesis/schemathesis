@@ -1,0 +1,70 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Test API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/users": {
+      "$ref": "#/x-operations/UsersOperations"
+    },
+    "/users/{userId}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ok"
+          }
+        }
+      }
+    }
+  },
+  "x-parameters": {
+    "Q": {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "type": "string"
+    }
+  },
+  "x-operations": {
+    "UsersOperations": {
+      "parameters": [
+        {
+          "$ref": "#/x-parameters/Q"
+        }
+      ],
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Ok"
+          }
+        }
+      },
+      "post": {
+        "parameters": [
+          {
+            "name": "user",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Ok"
+          }
+        }
+      }
+    }
+  }
+}

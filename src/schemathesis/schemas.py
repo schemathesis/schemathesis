@@ -28,6 +28,7 @@ from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark
+from schemathesis.specs.openapi._access import ApiOperation
 
 from .auths import AuthStorage
 from .filters import (
@@ -627,6 +628,7 @@ class APIOperation(Generic[P]):
     method: str
     definition: OperationDefinition = field(repr=False)
     schema: BaseSchema
+    inner: ApiOperation
     label: str = None  # type: ignore
     app: Any = None
     base_url: str | None = None
@@ -837,3 +839,11 @@ class APIOperation(Generic[P]):
 
     def get_resolved_payload_schema(self, media_type: str) -> dict[str, Any] | None:
         return self.schema._get_payload_schema(self.definition.resolved, media_type)
+
+    @property
+    def responses(self) -> dict[str, Any]:
+        return self.inner.responses
+
+    @property
+    def security(self) -> list | None:
+        return self.inner.security
