@@ -1,0 +1,36 @@
+{
+  "_accessor": {
+    "media_types": []
+  },
+  "definition": {
+    "parameters": [
+      {
+        "in": "body",
+        "name": "user",
+        "required": true,
+        "schema": {
+          "type": "object"
+        }
+      }
+    ],
+    "responses": {
+      "201": {
+        "description": "Ok"
+      }
+    }
+  },
+  "method": "post",
+  "path": "/users",
+  "resolver": "Resolver(_base_uri='paths.json', _registry=<Registry (2 resources, 1 uncrawled)>)",
+  "shared_parameters": [
+    {
+      "definition": {
+        "in": "query",
+        "name": "q",
+        "required": true,
+        "type": "string"
+      },
+      "resolver": "Resolver(_base_uri='parameters.json', _registry=<Registry (3 resources, 1 uncrawled)>)"
+    }
+  ]
+}

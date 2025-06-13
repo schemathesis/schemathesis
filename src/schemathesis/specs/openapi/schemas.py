@@ -29,7 +29,7 @@ from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
-from schemathesis.core import NOT_SET, NotSet, Specification, media_types
+from schemathesis.core import HTTP_METHODS, NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -40,6 +40,7 @@ from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.specs.openapi._access import OpenApi
 from schemathesis.specs.openapi.stateful import links
 
 from ...generation import GenerationMode
@@ -69,7 +70,6 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
     from schemathesis.generation.stateful import APIStateMachine
 
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema)
 
@@ -153,6 +153,7 @@ class BaseOpenAPISchema(BaseSchema):
                 label="",
                 definition=OperationDefinition(raw=None, resolved=None, scope=""),
                 schema=None,  # type: ignore
+                inner=None,
             )
         ),
     ) -> bool:
@@ -311,35 +312,57 @@ class BaseOpenAPISchema(BaseSchema):
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
         make_operation = self.make_operation
-        for path, path_item in paths.items():
-            method = None
-            try:
-                dispatch_hook("before_process_path", context, path, path_item)
-                scope, path_item = resolve_path_item(path_item)
-                with in_scope(self.resolver, scope):
-                    shared_parameters = resolve_shared_parameters(path_item)
-                    for method, entry in path_item.items():
-                        if method not in HTTP_METHODS:
-                            continue
-                        try:
-                            resolved = resolve_operation(entry)
-                            if should_skip(path, method, resolved):
-                                continue
-                            parameters = resolved.get("parameters", ())
-                            parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-                            operation = make_operation(
-                                path,
-                                method,
-                                parameters,
-                                entry,
-                                resolved,
-                                scope,
-                            )
-                            yield Ok(operation)
-                        except SCHEMA_PARSING_ERRORS as exc:
-                            yield self._into_err(exc, path, method)
-            except SCHEMA_PARSING_ERRORS as exc:
-                yield self._into_err(exc, path, method)
+        schema = OpenApi(self.raw_schema)
+        base_url = self.get_base_url()
+        for operation in schema:
+            if isinstance(operation, Ok):
+                operation: APIOperation[OpenAPIParameter] = APIOperation(
+                    path=operation.ok().path,
+                    method=operation.ok().method,
+                    definition=None,
+                    base_url=base_url,
+                    app=self.app,
+                    schema=self,
+                    inner=operation.ok(),
+                )
+                # for parameter in parameters:
+                #     operation.add_parameter(parameter)
+                # config = self.config.generation_for(operation=operation)
+                # if config.with_security_parameters:
+                #     self.security.process_definitions(self.raw_schema, operation, self.resolver)
+                # self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
+                yield Ok(operation)
+            else:
+                yield operation
+        # for path, path_item in paths.items():
+        #     method = None
+        #     try:
+        #         dispatch_hook("before_process_path", context, path, path_item)
+        #         scope, path_item = resolve_path_item(path_item)
+        #         with in_scope(self.resolver, scope):
+        #             shared_parameters = resolve_shared_parameters(path_item)
+        #             for method, entry in path_item.items():
+        #                 if method not in HTTP_METHODS:
+        #                     continue
+        #                 try:
+        #                     resolved = resolve_operation(entry)
+        #                     if should_skip(path, method, resolved):
+        #                         continue
+        #                     parameters = resolved.get("parameters", ())
+        #                     parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
+        #                     operation = make_operation(
+        #                         path,
+        #                         method,
+        #                         parameters,
+        #                         entry,
+        #                         resolved,
+        #                         scope,
+        #                     )
+        #                     yield Ok(operation)
+        #                 except SCHEMA_PARSING_ERRORS as exc:
+        #                     yield self._into_err(exc, path, method)
+        #     except SCHEMA_PARSING_ERRORS as exc:
+        #         yield self._into_err(exc, path, method)
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
         __tracebackhide__ = True
@@ -398,6 +421,7 @@ class BaseOpenAPISchema(BaseSchema):
         raw: dict[str, Any],
         resolved: dict[str, Any],
         scope: str,
+        inner,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
@@ -409,6 +433,7 @@ class BaseOpenAPISchema(BaseSchema):
             base_url=base_url,
             app=self.app,
             schema=self,
+            inner=inner,
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
@@ -435,10 +460,6 @@ class BaseOpenAPISchema(BaseSchema):
     def get_security_requirements(self, operation: APIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
         return self.security.get_security_requirements(self.raw_schema, operation)
-
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        """Extract response schema from `responses`."""
-        raise NotImplementedError
 
     def get_operation_by_id(self, operation_id: str) -> APIOperation:
         """Get an `APIOperation` instance by its `operationId`."""
@@ -548,29 +569,16 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def _get_response_definitions(
-        self, operation: APIOperation, response: Response
-    ) -> tuple[list[str], dict[str, Any]] | None:
-        try:
-            responses = operation.definition.raw["responses"]
-        except KeyError as exc:
-            path = operation.path
-            self._raise_invalid_schema(exc, path, operation.method)
+    def _get_response_definitions(self, operation: APIOperation, response: Response):
         status_code = str(response.status_code)
-        if status_code in responses:
-            return self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
-        if "default" in responses:
-            return self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
-        return None
+        responses = operation.responses
+        return responses.get(status_code) or responses.get("default")
 
-    def get_headers(
-        self, operation: APIOperation, response: Response
-    ) -> tuple[list[str], dict[str, dict[str, Any]] | None] | None:
+    def get_headers(self, operation: APIOperation, response: Response) -> dict[str, Any] | None:
         resolved = self._get_response_definitions(operation, response)
         if not resolved:
             return None
-        scopes, definitions = resolved
-        return scopes, definitions.get("headers")
+        return resolved.headers
 
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
@@ -597,16 +605,13 @@ class BaseOpenAPISchema(BaseSchema):
 
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         __tracebackhide__ = True
-        responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
-        status_code = str(response.status_code)
-        if status_code in responses:
-            definition = responses[status_code]
-        elif "default" in responses:
-            definition = responses["default"]
-        else:
+        responses = operation.responses
+        definition = responses.get(str(response.status_code)) or responses.get("default")
+        if definition is None:
             # No response defined for the received response status code
             return None
-        scopes, schema = self.get_response_schema(definition, operation.definition.scope)
+
+        schema = definition.schema
         if not schema:
             # No schema to check against
             return None
@@ -628,24 +633,23 @@ class BaseOpenAPISchema(BaseSchema):
         except JSONDecodeError as exc:
             failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
             _maybe_raise_one_or_more(failures)
-        with self._validating_response(scopes) as resolver:
-            try:
-                jsonschema.validate(
-                    data,
-                    schema,
-                    cls=self.validator_cls,
-                    resolver=resolver,
-                    # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
-                    format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+        try:
+            jsonschema.validate(
+                data,
+                schema,
+                cls=self.validator_cls,
+                _resolver=definition.resolver,
+                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
+                format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+            )
+        except jsonschema.ValidationError as exc:
+            failures.append(
+                JsonSchemaError.from_exception(
+                    operation=operation.label,
+                    exc=exc,
+                    config=operation.schema.config.output,
                 )
-            except jsonschema.ValidationError as exc:
-                failures.append(
-                    JsonSchemaError.from_exception(
-                        operation=operation.label,
-                        exc=exc,
-                        config=operation.schema.config.output,
-                    )
-                )
+            )
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 
@@ -834,7 +838,8 @@ class MethodMap(Mapping):
         finally:
             schema.resolver.pop_scope()
         parameters = schema._collect_operation_parameters(self._path_item, resolved)
-        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope)
+        inner = OpenApi(self._parent._schema.raw_schema)[path][method]
+        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope, inner)
         cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=resolved.get("operationId"))
         return initialized
 
@@ -916,17 +921,6 @@ class SwaggerV20(BaseOpenAPISchema):
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
-
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
-        schema = definition.get("schema")
-        if not schema:
-            return scopes, None
-        # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-        # because it is not converted
-        return scopes, to_json_schema_recursive(
-            schema, self.nullable_name, is_response_schema=True, update_quantifiers=False
-        )
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         produces = operation.definition.raw.get("produces", None)
@@ -1070,19 +1064,6 @@ class OpenApi30(SwaggerV20):
                 )
         return collected
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
-        options = iter(definition.get("content", {}).values())
-        option = next(options, None)
-        # "schema" is an optional key in the `MediaType` object
-        if option and "schema" in option:
-            # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-            # because it is not converted
-            return scopes, to_json_schema_recursive(
-                option["schema"], self.nullable_name, is_response_schema=True, update_quantifiers=False
-            )
-        return scopes, None
-
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
@@ -1091,8 +1072,7 @@ class OpenApi30(SwaggerV20):
         resolved = self._get_response_definitions(operation, response)
         if not resolved:
             return []
-        _, definitions = resolved
-        return list(definitions.get("content", {}).keys())
+        return list(resolved.definition.get("content", {}).keys())
 
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return serialization.serialize_openapi3_parameters(definitions)

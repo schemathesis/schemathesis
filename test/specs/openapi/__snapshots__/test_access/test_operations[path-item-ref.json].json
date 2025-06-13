@@ -1,0 +1,26 @@
+{
+  "_accessor": {
+    "media_types": []
+  },
+  "definition": {
+    "responses": {
+      "200": {
+        "description": "Ok"
+      }
+    }
+  },
+  "method": "get",
+  "path": "/users",
+  "resolver": "Resolver(_base_uri='', _registry=<Registry (1 uncrawled resource)>)",
+  "shared_parameters": [
+    {
+      "definition": {
+        "in": "query",
+        "name": "q",
+        "required": true,
+        "type": "string"
+      },
+      "resolver": "Resolver(_base_uri='', _registry=<Registry (1 uncrawled resource)>)"
+    }
+  ]
+}
