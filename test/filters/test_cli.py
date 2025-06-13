@@ -2,6 +2,29 @@ import pytest
 import yaml
 
 RESPONSES = {"responses": {"default": {"description": "OK"}}}
+SCHEMA = {
+    "/a": {
+        "post": {
+            "tags": ["Example"],
+            **RESPONSES,
+        }
+    },
+    "/b": {
+        "get": {
+            "tags": ["Example"],
+            **RESPONSES,
+        }
+    },
+    "/c": {
+        "get": RESPONSES,
+    },
+    "/d": {
+        "get": {
+            "tags": ["Example", "Other"],
+            **RESPONSES,
+        }
+    },
+}
 
 
 @pytest.fixture
@@ -43,32 +66,8 @@ def load_cassette(path):
         ),
     ),
 )
-def test_filters(ctx, cli, args, expected, cassette_path, openapi3_base_url):
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/a": {
-                "post": {
-                    "tags": ["Example"],
-                    **RESPONSES,
-                }
-            },
-            "/b": {
-                "get": {
-                    "tags": ["Example"],
-                    **RESPONSES,
-                }
-            },
-            "/c": {
-                "get": RESPONSES,
-            },
-            "/d": {
-                "get": {
-                    "tags": ["Example", "Other"],
-                    **RESPONSES,
-                }
-            },
-        }
-    )
+def test_filters_with_cli_options(ctx, cli, args, expected, cassette_path, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(SCHEMA)
 
     assert_filtered(
         cli,
@@ -78,6 +77,45 @@ def test_filters(ctx, cli, args, expected, cassette_path, openapi3_base_url):
         expected,
         args=[f"--{key}={value}" for key, value in args.items()],
         kwargs={},
+    )
+
+
+@pytest.mark.parametrize(
+    ["args", "expected"],
+    (
+        # Disable all NOT POST operations
+        (
+            [{"exclude-method": "POST"}],
+            ["POST /a"],
+        ),
+        # Disable all operations tagged with "Example"
+        (
+            [{"include-tag": "Example"}],
+            ["GET /c"],
+        ),
+        # Disable only `GET /b` explicitly
+        (
+            [{"include-name": "GET /b"}],
+            ["POST /a", "GET /c", "GET /d"],
+        ),
+        # Disable everything NOT tagged Example
+        (
+            [{"exclude-tag": "Example"}],
+            ["POST /a", "GET /b", "GET /d"],
+        ),
+    ),
+)
+def test_filters_with_config(ctx, cli, args, expected, cassette_path, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(SCHEMA)
+
+    assert_filtered(
+        cli,
+        schema_path,
+        cassette_path,
+        openapi3_base_url,
+        expected,
+        args=[],
+        kwargs={"config": {"operations": [{**arg, "enabled": False} for arg in args]}},
     )
 
 

@@ -1,0 +1,3 @@
+[[operations]]
+# It does not change anything
+include-name = "GET /users/{user_id}"
