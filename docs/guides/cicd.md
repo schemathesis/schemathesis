@@ -35,7 +35,7 @@ jobs:
       - name: Start services
         run: docker compose up -d
         
-      - uses: schemathesis/action@v1
+      - uses: schemathesis/action@v2
         with:
           schema: 'http://localhost:8080/openapi.json'
           args: >-

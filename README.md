@@ -73,7 +73,7 @@ def test_api(case):
 
 **CI/CD:**
 ```yaml
-- uses: schemathesis/action@v1
+- uses: schemathesis/action@v2
   with:
     schema: "https://your-api.com/openapi.json"
 ```
