@@ -1,0 +1,776 @@
+import json
+from dataclasses import asdict
+from pathlib import Path
+
+import pytest
+from referencing import Resource
+from referencing.exceptions import NoSuchResource
+
+from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.result import Err, Ok
+from schemathesis.specs.openapi._access import OpenApi
+from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
+
+HERE = Path(__file__).parent.absolute()
+SCHEMAS_DIR = HERE / "schemas"
+
+
+def read_schema(name):
+    with open(SCHEMAS_DIR / name) as fd:
+        return json.load(fd)
+
+
+@pytest.fixture
+def schema(request):
+    schema = read_schema(request.param)
+    if "swagger" in schema:
+        SWAGGER_20_VALIDATOR.validate(schema)
+    elif schema["openapi"].startswith("3.0"):
+        OPENAPI_30_VALIDATOR.validate(schema)
+    else:
+        OPENAPI_31_VALIDATOR.validate(schema)
+
+    return OpenApi(schema, retrieve=retrieve)
+
+
+def retrieve(uri: str):
+    if uri == "paths.json":
+        contents = {
+            "UsersPaths": {
+                "parameters": [{"$ref": "parameters.json#/Q"}],
+                "get": {"responses": {"200": {"description": "Ok"}}},
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "user",
+                            "in": "body",
+                            "required": True,
+                            "schema": {"type": "object"},
+                        }
+                    ],
+                    "responses": {"201": {"description": "Ok"}},
+                },
+            },
+        }
+    elif uri == "parameters.json":
+        contents = {
+            "Q": {
+                "name": "q",
+                "in": "query",
+                "required": True,
+                "type": "string",
+            },
+        }
+    else:
+        raise NoSuchResource(ref=uri)
+    return Resource.opaque(contents)
+
+
+@pytest.mark.parametrize("schema", SCHEMAS_DIR.iterdir(), ids=lambda x: x.name, indirect=True)
+def test_operations(schema, snapshot_json):
+    for operation in schema:
+        if isinstance(operation, Ok):
+            assert asdict(operation.ok()) == snapshot_json
+        else:
+            error = operation.err()
+            assert {
+                "error": {
+                    "message": error.message,
+                    "path": error.path,
+                    "method": error.method,
+                }
+            } == snapshot_json
+
+
+def test_invalid_path_item(snapshot_json):
+    interface = OpenApi(
+        {
+            "swagger": "2.0",
+            "paths": {
+                "/users": "invalid",
+            },
+        }
+    )
+    items = list(interface)
+    assert len(items) == 1
+    assert isinstance(items[0], Err)
+    error = items[0].err()
+    assert {
+        "error": {
+            "message": error.message,
+            "path": error.path,
+            "method": error.method,
+        }
+    } == snapshot_json
+
+
+def test_access_openapi_3():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users/{id}": {
+                "parameters": [
+                    {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                    {"name": "version", "in": "header", "schema": {"type": "string"}},
+                ],
+                "get": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "schema": {"type": "string"}},
+                        {"name": "sessionId", "in": "cookie", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            },
+                            "application/xml": {"schema": {"type": "string"}},
+                        }
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                },
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    raw_users = raw_schema["paths"]["/users/{id}"]
+
+    get_users = schema["/users/{id}"]["GET"]
+    assert [p.definition for p in get_users.query] == [raw_users["get"]["parameters"][0]]
+    assert [p.definition for p in get_users.path_parameters] == [raw_users["parameters"][0]]
+    assert [p.definition for p in get_users.headers] == [raw_users["parameters"][1]]
+    assert [p.definition for p in get_users.cookies] == [raw_users["get"]["parameters"][1]]
+    assert list(get_users.body) == []
+
+    post_users = schema["/users/{id}"]["POST"]
+    assert list(post_users.query) == []
+    assert list(post_users.cookies) == []
+    body_params = [b.definition for b in post_users.body]
+    assert body_params == [
+        raw_users["post"]["requestBody"]["content"]["application/json"],
+        raw_users["post"]["requestBody"]["content"]["application/xml"],
+    ]
+
+
+def test_access_swagger_2():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users/{id}": {
+                "parameters": [
+                    {"name": "id", "in": "path", "required": True, "type": "integer"},
+                ],
+                "post": {
+                    "parameters": [
+                        # Likely won't happen in reality if `body` & `formData` are present simultaneously,
+                        # but it is simpler to test it this way
+                        {"name": "user", "in": "body", "required": True, "schema": {"type": "object"}},
+                        {"name": "file", "in": "formData", "type": "file"},
+                        {"name": "name", "in": "formData", "type": "string"},
+                    ],
+                    "responses": {"201": {"description": "Created"}},
+                },
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users/{id}"]["POST"]
+
+    assert [p.definition for p in operation.path_parameters] == [raw_schema["paths"]["/users/{id}"]["parameters"][0]]
+
+    # Body should contain both body param and composite formData
+    bodies = [b.definition for b in operation.body]
+    assert len(bodies) == 2
+    # First should be the body parameter
+    assert bodies[0] == raw_schema["paths"]["/users/{id}"]["post"]["parameters"][0]
+    # Second should be composite formData parameters (list)
+    assert bodies[1] == raw_schema["paths"]["/users/{id}"]["post"]["parameters"][1:3]
+
+
+def test_parameter_references():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "components": {
+            "parameters": {
+                "QueryParam": {"name": "q", "in": "query", "schema": {"type": "string"}},
+                "HeaderParam": {"name": "auth", "in": "header", "schema": {"type": "string"}},
+            }
+        },
+        "paths": {
+            "/items": {
+                "parameters": [{"$ref": "#/components/parameters/HeaderParam"}],
+                "get": {
+                    "parameters": [{"$ref": "#/components/parameters/QueryParam"}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/items"]["GET"]
+
+    # References should be resolved
+    assert [p.definition for p in operation.query] == [raw_schema["components"]["parameters"]["QueryParam"]]
+    assert [p.definition for p in operation.headers] == [raw_schema["components"]["parameters"]["HeaderParam"]]
+
+
+def test_swagger_2_media_types():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "consumes": ["application/xml", "text/plain"],
+        "paths": {
+            "/data": {
+                "post": {
+                    "parameters": [
+                        {"name": "payload", "in": "body", "schema": {"type": "string"}},
+                    ],
+                    "consumes": ["application/json"],  # Override global
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+            "/form": {
+                "post": {
+                    "parameters": [
+                        {"name": "field", "in": "formData", "type": "string"},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # Body operation should use operation-level consumes
+    data = list(schema["/data"]["POST"].body)
+    assert len(data) == 1
+    assert data[0].media_type == "application/json"
+
+    # Form operation should use global consumes for formData
+    form_bodies = list(schema["/form"]["POST"].body)
+    assert len(form_bodies) == 2
+    assert {b.media_type for b in form_bodies} == {"application/xml", "text/plain"}
+
+
+def test_openapi_3_body_references():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "components": {
+            "requestBodies": {
+                "UserBody": {
+                    "content": {
+                        "application/json": {"schema": {"type": "object"}},
+                    }
+                }
+            },
+            "schemas": {"UserSchema": {"type": "object", "properties": {"name": {"type": "string"}}}},
+        },
+        "paths": {
+            "/users": {
+                "post": {
+                    "requestBody": {"$ref": "#/components/requestBodies/UserBody"},
+                    "responses": {"201": {"description": "Created"}},
+                },
+            },
+            "/profiles": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {"$ref": "#/components/schemas/UserSchema"},
+                        }
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                },
+            },
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # RequestBody reference should be resolved
+    users = list(schema["/users"]["POST"].body)
+    assert len(users) == 1
+    assert users[0].definition == {"schema": {"type": "object"}}
+
+    # Content reference should be resolved
+    profiles = list(schema["/profiles"]["POST"].body)
+    assert len(profiles) == 1
+    assert profiles[0].definition == raw_schema["components"]["schemas"]["UserSchema"]
+
+
+def test_parameter_override():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/items/{id}": {
+                "parameters": [
+                    {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                    {"name": "version", "in": "header", "schema": {"type": "string", "default": "v1"}},
+                    {"name": "global-query", "in": "query", "schema": {"type": "string"}},
+                ],
+                "get": {
+                    "parameters": [
+                        # Override the header parameter (same name + location)
+                        {"name": "version", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "local-query", "in": "query", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+    }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/items/{id}"]["GET"]
+
+    # Path parameters should include inherited path-level parameter
+    path_params = [p.definition for p in operation.path_parameters]
+    assert path_params == [raw_schema["paths"]["/items/{id}"]["parameters"][0]]
+
+    # Headers should have the operation-level version (overriding path-level)
+    headers = [p.definition for p in operation.headers]
+    assert len(headers) == 1
+    assert headers[0] == raw_schema["paths"]["/items/{id}"]["get"]["parameters"][0]
+    assert headers[0]["required"] is True  # Operation-level override
+
+    # Query should have both inherited and operation-level parameters
+    queries = [p.definition for p in operation.query]
+    assert len(queries) == 2
+    query_names = {q["name"] for q in queries}
+    assert query_names == {"global-query", "local-query"}
+
+
+def test_empty_cases():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/simple": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+            "/empty-body": {
+                "post": {
+                    "requestBody": {"content": {}},  # Empty content
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # Simple operation should have no parameters
+    simple = schema["/simple"]["GET"]
+    assert list(simple.query) == []
+    assert list(simple.path_parameters) == []
+    assert list(simple.headers) == []
+    assert list(simple.cookies) == []
+    assert list(simple.body) == []
+
+    # Empty body content should yield nothing
+    assert list(schema["/empty-body"]["POST"].body) == []
+
+
+def test_invalid_request_body():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/broken": {
+                "post": {
+                    "requestBody": {},  # Missing required 'content' key
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = next(op.ok() for op in schema if isinstance(op, Ok))
+
+    with pytest.raises(InvalidSchema, match="Missing required key `content`"):
+        list(operation.body)
+
+
+def test_mapping_interface_no_cache():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"201": {"description": "Created"}}},
+            },
+            "/users/{id}": {
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "get": {"responses": {"200": {"description": "OK"}}},
+            },
+        },
+    }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+
+    get_users_1 = schema["/users"]["GET"]
+    get_users_2 = schema["/users"]["GET"]
+
+    assert get_users_1.label == get_users_2.label == "GET /users"
+
+    # Test parameter inheritance works
+    get_user = schema["/users/{id}"]["GET"]
+    path_params = list(get_user.path_parameters)
+    assert len(path_params) == 1
+    assert path_params[0].definition["name"] == "id"
+
+    # Test path operations interface
+    users = schema["/users"]
+    assert "GET" in users
+    assert "POST" in users
+    assert "DELETE" not in users
+    assert "WHATEVER" not in users
+    assert list(users) == ["GET", "POST"]
+
+    with pytest.raises(KeyError, match="Path '/nonexistent' not found"):
+        schema["/nonexistent"]
+
+    with pytest.raises(KeyError, match="Method 'DELETE' not found"):
+        schema["/users"]["DELETE"]
+
+    with pytest.raises(KeyError, match="Invalid HTTP method 'WHATEVER'"):
+        schema["/users"]["WHATEVER"]
+
+
+def test_response_access_openapi_3():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                            "headers": {"X-Rate-Limit": {"schema": {"type": "integer"}}},
+                        },
+                        "404": {"description": "Not found", "content": {"text/plain": {"schema": {"type": "string"}}}},
+                    }
+                }
+            }
+        },
+    }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+    responses = operation.responses
+
+    # Should have both status codes
+    assert set(responses.keys()) == {"200", "404"}
+
+    # Test 200 response
+    assert responses["200"].schema == {"type": "object", "properties": {"id": {"type": "integer"}}}
+    assert responses["200"].headers == {"X-Rate-Limit": {"schema": {"type": "integer"}}}
+
+    # Test 404 response
+    assert responses["404"].schema == {"type": "string"}
+    assert responses["404"].headers is None
+
+
+def test_response_access_swagger_2():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "schema": {"type": "array", "items": {"type": "object"}},
+                            "headers": {"X-Total-Count": {"type": "integer"}},
+                        },
+                        "400": {
+                            "description": "Bad request"
+                            # No schema
+                        },
+                    }
+                }
+            }
+        },
+    }
+    SWAGGER_20_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+    responses = operation.responses
+
+    # Test 200 response with schema
+    assert responses["200"].schema == {"type": "array", "items": {"type": "object"}}
+    assert responses["200"].headers == {"X-Total-Count": {"type": "integer"}}
+
+    # Test 400 response without schema
+    assert responses["400"].schema is None
+    assert responses["400"].headers is None
+
+
+def test_response_references():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "components": {
+            "responses": {
+                "ErrorResponse": {
+                    "description": "Error",
+                    "content": {
+                        "application/json": {"schema": {"type": "object", "properties": {"error": {"type": "string"}}}}
+                    },
+                }
+            }
+        },
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        },
+                        "500": {"$ref": "#/components/responses/ErrorResponse"},
+                    }
+                }
+            }
+        },
+    }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+    responses = operation.responses
+
+    # Referenced response should be resolved
+    assert responses["500"].schema == {"type": "object", "properties": {"error": {"type": "string"}}}
+
+
+def test_openapi_3_response_edge_cases():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "Empty content", "content": {}},
+                        "201": {
+                            "description": "No content key"
+                            # Missing content entirely
+                        },
+                        "202": {
+                            "description": "Multiple content types",
+                            "content": {
+                                "application/json": {"schema": {"type": "object"}},
+                                "application/xml": {"schema": {"type": "string"}},
+                            },
+                        },
+                    }
+                }
+            }
+        },
+    }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/test"]["GET"]
+    responses = operation.responses
+
+    # Empty content should return None
+    assert responses["200"].schema is None
+
+    # Missing content should return None
+    assert responses["201"].schema is None
+
+    # Multiple content types should return first one
+    assert responses["202"].schema == {"type": "object"}
+
+
+def test_response_status_codes():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/test": {
+                "get": {
+                    "responses": {
+                        200: {  # Integer status code
+                            "description": "Success",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        },
+                        "4XX": {  # Wildcard status code
+                            "description": "Client error",
+                            "content": {"application/json": {"schema": {"type": "string"}}},
+                        },
+                        "default": {  # Default response
+                            "description": "Other",
+                            "content": {"application/json": {"schema": {"type": "null"}}},
+                        },
+                    }
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/test"]["GET"]
+    responses = operation.responses
+
+    # All status codes should be converted to strings
+    assert set(responses.keys()) == {"200", "4XX", "default"}
+
+    # Each should have correct schema
+    assert responses["200"].schema == {"type": "object"}
+    assert responses["4XX"].schema == {"type": "string"}
+    assert responses["default"].schema == {"type": "null"}
+
+
+def test_no_responses():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/test": {
+                "get": {
+                    # No responses defined
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/test"]["GET"]
+
+    # Should return empty dict when no responses
+    assert operation.responses == {}
+
+
+def test_failed_shared_parameter_reference():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "parameters": [
+                    {"$ref": "#/components/parameters/NonExistent"}  # Invalid reference
+                ],
+                "get": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # Should raise InvalidSchema when trying to access the operation
+    with pytest.raises(InvalidSchema, match="Failed to resolve reference"):
+        schema["/users"]["GET"]
+
+
+def test_failed_path_item_reference():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {"$ref": "#/paths/NonExistentPath"}  # Invalid path item reference
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # Should raise InvalidSchema when trying to access any operation
+    with pytest.raises(InvalidSchema, match="Failed to resolve reference"):
+        schema["/users"]["GET"]
+
+    # Should also fail when checking if method exists
+    with pytest.raises(InvalidSchema, match="Failed to resolve reference"):
+        _ = "GET" in schema["/users"]
+
+    # Should also fail when iterating methods
+    with pytest.raises(InvalidSchema, match="Failed to resolve reference"):
+        list(schema["/users"])
+
+
+def test_path_item_not_dict_mapping():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": "invalid_path_item"  # Should be dict, not string
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # Should raise InvalidSchema when accessing via mapping interface
+    with pytest.raises(InvalidSchema, match="Path item should be an object, got str: invalid_path_item"):
+        schema["/users"]
+
+    # But path should still be considered to exist for __contains__
+    assert "/users" not in schema
+
+
+def test_iter_parameters():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "parameters": [
+                    {"name": "version", "in": "header", "type": "string"},
+                    {"name": "id", "in": "path", "required": True, "type": "integer"},
+                ],
+                "post": {
+                    "parameters": [
+                        {"name": "q", "in": "query", "type": "string"},
+                        {"name": "auth", "in": "header", "type": "string"},
+                        {"name": "session", "in": "cookie", "type": "string"},
+                        {"name": "user", "in": "body", "schema": {"type": "object"}},
+                        {"name": "file", "in": "formData", "type": "file"},
+                    ],
+                    "responses": {"201": {"description": "Created"}},
+                },
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["POST"]
+
+    # iter_parameters should exclude body and formData parameters
+    filtered_params = list(operation.iter_parameters())
+    param_locations = [p.location for p in filtered_params]
+    param_names = [p.definition["name"] for p in filtered_params]
+
+    # Should have query, path, header, cookie - but NOT body or formData
+    assert set(param_locations) == {"query", "path", "header", "cookie"}
+    assert set(param_names) == {"q", "id", "version", "auth", "session"}
+
+    # Verify body and formData are excluded
+    all_params = list(operation._iter_parameters())
+    all_locations = [p.location for p in all_params]
+    assert "body" in all_locations
+    assert "formData" in all_locations
+    assert len(all_params) == len(filtered_params) + 2  # +2 for body and formData

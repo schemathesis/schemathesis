@@ -53,7 +53,7 @@ def status_code_conformance(ctx: CheckContext, response: Response, case: Case) -
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    responses = case.operation.definition.raw.get("responses", {})
+    responses = case.operation.responses
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return None
@@ -136,10 +136,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    resolved = case.operation.schema.get_headers(case.operation, response)
-    if not resolved:
-        return None
-    scopes, defined_headers = resolved
+    defined_headers = case.operation.schema.get_headers(case.operation, response)
     if not defined_headers:
         return None
 
