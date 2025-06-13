@@ -159,28 +159,22 @@ class OperationsConfig(DiffBase):
         if exclude_deprecated:
             exclude_set.include(is_deprecated)
 
-        # Also update operations list for consistency with config structure
-        if not include_set.is_empty():
-            self.operations.insert(0, OperationConfig(filter_set=include_set, enabled=True))
-        if not exclude_set.is_empty():
-            self.operations.insert(0, OperationConfig(filter_set=exclude_set, enabled=False))
+        operations = list(self.operations)
 
         final = FilterSet()
 
-        operations = list(self.operations)
-
         def priority_filter(ctx: HasAPIOperation) -> bool:
             """Filter operations according to CLI and config priority."""
+            for op_config in operations:
+                if op_config._filter_set.match(ctx) and not op_config.enabled:
+                    return False
+
             if not include_set.is_empty():
                 if exclude_set.is_empty():
                     return include_set.match(ctx)
                 return include_set.match(ctx) and not exclude_set.match(ctx)
             elif not exclude_set.is_empty():
                 return not exclude_set.match(ctx)
-
-            for op_config in operations:
-                if op_config._filter_set.match(ctx):
-                    return op_config.enabled
 
             return True
 

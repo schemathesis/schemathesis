@@ -119,6 +119,49 @@ def test_filters_with_config(ctx, cli, args, expected, cassette_path, openapi3_b
     )
 
 
+@pytest.mark.parametrize(
+    "cli_args, config, expected",
+    [
+        # CLI includes only GET, Config disables everything not tagged 'Example'
+        (
+            {"include-method": "GET"},
+            [{"exclude-tag": "Example"}],
+            ["GET /b", "GET /d"],
+        ),
+        # CLI excludes POST, config disables only `GET /b`
+        (
+            {"exclude-method": "POST"},
+            [{"include-name": "GET /b"}],
+            ["GET /c", "GET /d"],
+        ),
+        # CLI includes only POST, config disables everything NOT tagged Example
+        (
+            {"include-method": "POST"},
+            [{"exclude-tag": "Example"}],
+            ["POST /a"],
+        ),
+        # CLI includes only GET, config disables tag=Other
+        (
+            {"include-method": "GET"},
+            [{"include-tag": "Other"}],
+            ["GET /b", "GET /c"],
+        ),
+    ],
+)
+def test_cli_and_config_intersection(ctx, cli, cli_args, config, expected, cassette_path, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(SCHEMA)
+
+    assert_filtered(
+        cli,
+        schema_path,
+        cassette_path,
+        openapi3_base_url,
+        expected,
+        args=[f"--{key}={value}" for key, value in cli_args.items()],
+        kwargs={"config": {"operations": [{**item, "enabled": False} for item in config]}},
+    )
+
+
 def assert_filtered(cli, schema_path, cassette_path, openapi3_base_url, expected, *, args, kwargs):
     cli.run(
         str(schema_path),
