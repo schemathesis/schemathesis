@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - **CLI**: Combining `--include-*` & `--exclude-*`. [#2894](https://github.com/schemathesis/schemathesis/issues/2894) 
+- Combining CLI filter options with config file-based filtering.
 
 ## [4.0.0](https://github.com/schemathesis/schemathesis/compare/v4.0.0-beta.1...v4.0.0) - 2025-06-10
 
