@@ -4,7 +4,7 @@ import binascii
 import inspect
 import os
 from io import BytesIO
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, MutableMapping
 from urllib.parse import urlparse
 
 from schemathesis.core import NotSet
@@ -13,7 +13,7 @@ from schemathesis.core.transforms import deepclone, merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
-from schemathesis.transport.prepare import prepare_body, prepare_headers, prepare_url
+from schemathesis.transport.prepare import get_exclude_headers, prepare_body, prepare_headers, prepare_url
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
@@ -85,18 +85,36 @@ class RequestsTransport(BaseTransport["requests.Session"]):
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         import requests
 
+        if session is not None and session.headers:
+            # These headers are explicitly provided via config or CLI args.
+            # They have lower priority than ones provided via `kwargs`
+            headers = kwargs.setdefault("headers", {}) or {}
+            for name, value in session.headers.items():
+                headers.setdefault(name, value)
+            kwargs["headers"] = headers
+
         data = self.serialize_case(case, **kwargs)
         kwargs.pop("base_url", None)
         data.update({key: value for key, value in kwargs.items() if key not in data})
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
 
+        excluded_headers = get_exclude_headers(case)
+        for name in excluded_headers:
+            data["headers"].pop(name, None)
+        current_session_headers: MutableMapping[str, Any] = {}
+        current_session_auth = None
+
         if session is None:
             validate_vanilla_requests_kwargs(data)
             session = requests.Session()
-            session.headers = {}
             close_session = True
         else:
+            current_session_headers = session.headers
+            if isinstance(session.auth, tuple) and "Authorization" in excluded_headers:
+                current_session_auth = session.auth
+                session.auth = None
             close_session = False
+        session.headers = {}
 
         verify = data.get("verify", True)
 
@@ -115,8 +133,10 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                     path_parameters={},
                 ),
             )
-
         finally:
+            session.headers = current_session_headers
+            if current_session_auth is not None:
+                session.auth = current_session_auth
             if close_session:
                 session.close()
 

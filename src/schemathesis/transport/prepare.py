@@ -34,8 +34,6 @@ def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseIn
     default_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, case.id)
     if headers:
         default_headers.update(headers)
-    for header in get_exclude_headers(case):
-        default_headers.pop(header, None)
     return default_headers
 
 

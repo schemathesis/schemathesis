@@ -347,6 +347,38 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
     )
 
 
+def verify_missing_required_header(cassette_path, header, expected_status):
+    with cassette_path.open(encoding="utf-8") as fd:
+        cassette = yaml.safe_load(fd)
+    interactions = cassette["http_interactions"]
+
+    missing_header_interaction = next(
+        (
+            interaction
+            for interaction in interactions
+            if (
+                interaction["phase"]["name"] == "coverage"
+                and interaction["generation"]["mode"] == "negative"
+                and interaction["phase"]["data"]["description"] == f"Missing `{header}` at header"
+            )
+        ),
+        None,
+    )
+
+    assert missing_header_interaction is not None, f"Should find missing required header: {header}"
+    phase_data = missing_header_interaction["phase"]["data"]
+    assert phase_data["parameter"] == header
+    assert phase_data["parameter_location"] == "header"
+
+    request_headers = missing_header_interaction["request"]["headers"]
+    assert header not in request_headers, f"{header} header should be missing, but found: {request_headers}"
+
+    checks = missing_header_interaction["checks"]
+    missing_header_check = next((c for c in checks if c["name"] == "missing_required_header"), None)
+    assert missing_header_check is not None
+    assert missing_header_check["status"] == expected_status
+
+
 @pytest.mark.operations("success")
 def test_missing_required_accept_header(ctx, cli, openapi3_base_url, tmp_path):
     cassette_path = tmp_path / "missing_accept_header.yaml"
@@ -379,33 +411,31 @@ def test_missing_required_accept_header(ctx, cli, openapi3_base_url, tmp_path):
         "--max-examples=1",
     )
 
-    # Load and verify the cassette
-    with cassette_path.open(encoding="utf-8") as fd:
-        cassette = yaml.safe_load(fd)
-    interactions = cassette["http_interactions"]
+    verify_missing_required_header(cassette_path, "Accept", "FAILURE")
 
-    missing_header_interaction = None
-    for interaction in interactions:
-        if (
-            interaction["phase"]["name"] == "coverage"
-            and interaction["generation"]["mode"] == "negative"
-            and interaction["phase"]["data"]["description"] == "Missing `Accept` at header"
-        ):
-            missing_header_interaction = interaction
-            break
 
-    assert missing_header_interaction is not None, "Should find missing required header test case"
-    phase_data = missing_header_interaction["phase"]["data"]
-    assert phase_data["parameter"] == "Accept"
-    assert phase_data["parameter_location"] == "header"
+@pytest.mark.parametrize(
+    "arg",
+    [
+        "--header=Authorization: ABC",
+        "--auth=test:test",
+    ],
+)
+@pytest.mark.operations("basic")
+def test_missing_required_authorization_if_provided_explicitly(cli, openapi3_schema_url, tmp_path, arg):
+    cassette_path = tmp_path / "missing_authorization_header.yaml"
 
-    request_headers = missing_header_interaction["request"]["headers"]
-    assert "Accept" not in request_headers, f"Accept header should be missing, but found: {request_headers}"
+    cli.run(
+        openapi3_schema_url,
+        f"--report-vcr-path={cassette_path}",
+        "--phases=coverage",
+        "--mode=negative",
+        "--checks=missing_required_header",
+        "--max-examples=1",
+        arg,
+    )
 
-    checks = missing_header_interaction["checks"]
-    missing_header_check = next((c for c in checks if c["name"] == "missing_required_header"), None)
-    assert missing_header_check is not None
-    assert missing_header_check["status"] == "FAILURE"
+    verify_missing_required_header(cassette_path, "Authorization", "SUCCESS")
 
 
 @pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])
