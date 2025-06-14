@@ -12,7 +12,13 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.overrides import Override
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
-from schemathesis.transport.prepare import normalize_base_url, prepare_body, prepare_headers, prepare_path
+from schemathesis.transport.prepare import (
+    get_exclude_headers,
+    normalize_base_url,
+    prepare_body,
+    prepare_headers,
+    prepare_path,
+)
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
@@ -72,6 +78,10 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         data = self.serialize_case(case, headers=headers, params=params)
         data.update({key: value for key, value in kwargs.items() if key not in data})
+
+        excluded_headers = get_exclude_headers(case)
+        for name in excluded_headers:
+            data["headers"].pop(name, None)
 
         client = session or wsgi.get_client(application)
         cookies = {**(case.cookies or {}), **(cookies or {})}
