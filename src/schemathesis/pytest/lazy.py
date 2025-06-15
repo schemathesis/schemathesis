@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from inspect import signature
 from typing import TYPE_CHECKING, Any, Callable, Generator, Type
 
@@ -71,7 +71,17 @@ def get_all_tests(
 @dataclass
 class LazySchema:
     fixture_name: str
-    filter_set: FilterSet = field(default_factory=FilterSet)
+    filter_set: FilterSet
+
+    __slots__ = ("fixture_name", "filter_set")
+
+    def __init__(
+        self,
+        fixture_name: str,
+        filter_set: FilterSet | None = None,
+    ) -> None:
+        self.fixture_name = fixture_name
+        self.filter_set = filter_set or FilterSet()
 
     def include(
         self,

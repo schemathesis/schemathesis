@@ -74,6 +74,8 @@ class MutationContext:
     # Payload media type, if available
     media_type: str | None
 
+    __slots__ = ("keywords", "non_keywords", "location", "media_type")
+
     @property
     def is_header_location(self) -> bool:
         return is_header_location(self.location)

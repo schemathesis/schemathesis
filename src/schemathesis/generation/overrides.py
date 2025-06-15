@@ -22,6 +22,8 @@ class Override:
     cookies: dict[str, str]
     path_parameters: dict[str, str]
 
+    __slots__ = ("query", "headers", "cookies", "path_parameters")
+
     def items(self) -> Iterator[tuple[str, dict[str, str]]]:
         for key, value in (
             ("query", self.query),

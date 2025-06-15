@@ -32,6 +32,8 @@ class RegisteredHook:
     signature: inspect.Signature
     scopes: list[HookScope]
 
+    __slots__ = ("signature", "scopes")
+
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
 

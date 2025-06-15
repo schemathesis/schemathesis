@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
 from itertools import combinations
@@ -53,11 +53,39 @@ class HypothesisTestMode(str, Enum):
 class HypothesisTestConfig:
     project: ProjectConfig
     modes: list[HypothesisTestMode]
-    settings: hypothesis.settings | None = None
-    seed: int | None = None
-    as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
-    given_args: tuple[GivenInput, ...] = ()
-    given_kwargs: dict[str, GivenInput] = field(default_factory=dict)
+    settings: hypothesis.settings | None
+    seed: int | None
+    as_strategy_kwargs: dict[str, Any]
+    given_args: tuple[GivenInput, ...]
+    given_kwargs: dict[str, GivenInput]
+
+    __slots__ = (
+        "project",
+        "modes",
+        "settings",
+        "seed",
+        "as_strategy_kwargs",
+        "given_args",
+        "given_kwargs",
+    )
+
+    def __init__(
+        self,
+        project: ProjectConfig,
+        modes: list[HypothesisTestMode],
+        settings: hypothesis.settings | None = None,
+        seed: int | None = None,
+        as_strategy_kwargs: dict[str, Any] | None = None,
+        given_args: tuple[GivenInput, ...] = (),
+        given_kwargs: dict[str, GivenInput] | None = None,
+    ) -> None:
+        self.project = project
+        self.modes = modes
+        self.settings = settings
+        self.seed = seed
+        self.as_strategy_kwargs = as_strategy_kwargs or {}
+        self.given_args = given_args
+        self.given_kwargs = given_kwargs or {}
 
 
 def create_test(
@@ -393,6 +421,7 @@ class Template:
 class TemplateValue:
     kwargs: dict[str, Any]
     components: dict[ComponentKind, ComponentInfo]
+
     __slots__ = ("kwargs", "components")
 
 

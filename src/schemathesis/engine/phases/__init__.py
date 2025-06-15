@@ -60,8 +60,18 @@ class Phase:
 
     name: PhaseName
     is_supported: bool
-    is_enabled: bool = True
-    skip_reason: PhaseSkipReason | None = None
+    is_enabled: bool
+    skip_reason: PhaseSkipReason | None
+
+    __slots__ = ("name", "is_supported", "is_enabled", "skip_reason")
+
+    def __init__(
+        self, name: PhaseName, is_supported: bool, is_enabled: bool = True, skip_reason: PhaseSkipReason | None = None
+    ) -> None:
+        self.name = name
+        self.is_supported = is_supported
+        self.is_enabled = is_enabled
+        self.skip_reason = skip_reason
 
     def should_execute(self, ctx: EngineContext) -> bool:
         """Determine if phase should run based on context & configuration."""

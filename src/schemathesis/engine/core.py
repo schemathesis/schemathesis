@@ -18,6 +18,8 @@ from .phases import Phase, PhaseName, PhaseSkipReason
 class Engine:
     schema: BaseSchema
 
+    __slots__ = ("schema",)
+
     def execute(self) -> EventStream:
         """Execute all test phases."""
         # Unregister auth if explicitly provided
@@ -103,6 +105,8 @@ class ExecutionPlan:
 
     phases: Sequence[Phase]
 
+    __slots__ = ("phases",)
+
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
         yield events.EngineStarted()
@@ -149,6 +153,8 @@ class EventStream:
 
     generator: EventGenerator
     stop_event: threading.Event
+
+    __slots__ = ("generator", "stop_event")
 
     def __next__(self) -> events.EngineEvent:
         return next(self.generator)

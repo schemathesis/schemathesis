@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,8 +9,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class OperationCache:
-    _maps: dict[str, APIOperationMap] = field(default_factory=dict)
-    _operations: dict[str, APIOperation] = field(default_factory=dict)
+    _maps: dict[str, APIOperationMap]
+    _operations: dict[str, APIOperation]
+
+    __slots__ = ("_maps", "_operations")
+
+    def __init__(
+        self,
+        _maps: dict[str, APIOperationMap] | None = None,
+        _operations: dict[str, APIOperation] | None = None,
+    ) -> None:
+        self._maps = _maps or {}
+        self._operations = _operations or {}
 
     def get_map(self, key: str) -> APIOperationMap | None:
         return self._maps.get(key)

@@ -68,6 +68,8 @@ class Probe:
 
     name: str
 
+    __slots__ = ("name",)
+
     def prepare_request(
         self, session: requests.Session, request: requests.Request, schema: BaseSchema
     ) -> requests.PreparedRequest:
@@ -92,9 +94,25 @@ class ProbeOutcome(str, enum.Enum):
 class ProbeRun:
     probe: Probe
     outcome: ProbeOutcome
-    request: requests.PreparedRequest | None = None
-    response: requests.Response | None = None
-    error: Exception | None = None
+    request: requests.PreparedRequest | None
+    response: requests.Response | None
+    error: Exception | None
+
+    __slots__ = ("probe", "outcome", "request", "response", "error")
+
+    def __init__(
+        self,
+        probe: Probe,
+        outcome: ProbeOutcome,
+        request: requests.PreparedRequest | None = None,
+        response: requests.Response | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.probe = probe
+        self.outcome = outcome
+        self.request = request
+        self.response = response
+        self.error = error
 
     @property
     def is_failure(self) -> bool:
@@ -105,7 +123,10 @@ class ProbeRun:
 class NullByteInHeader(Probe):
     """Support NULL bytes in headers."""
 
-    name: str = "Supports NULL byte in headers"
+    __slots__ = ("name",)
+
+    def __init__(self) -> None:
+        self.name = "Supports NULL byte in headers"
 
     def prepare_request(
         self, session: requests.Session, request: requests.Request, schema: BaseSchema

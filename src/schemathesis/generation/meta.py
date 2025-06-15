@@ -37,10 +37,14 @@ class ComponentInfo:
 class GeneratePhaseData:
     """Metadata specific to generate phase."""
 
+    __slots__ = ()
+
 
 @dataclass
 class ExplicitPhaseData:
     """Metadata specific to explicit phase."""
+
+    __slots__ = ()
 
 
 @dataclass

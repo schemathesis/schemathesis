@@ -71,6 +71,8 @@ class GraphQLOperationDefinition(OperationDefinition):
     type_: graphql.GraphQLType
     root_type: RootType
 
+    __slots__ = ("raw", "resolved", "scope", "field_name", "type_", "root_type")
+
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     @property

@@ -16,6 +16,8 @@ class RegexExtractor(Extractor):
 
     value: re.Pattern
 
+    __slots__ = ("value",)
+
     def extract(self, value: str) -> str | None:
         match = self.value.search(value)
         if match is None:

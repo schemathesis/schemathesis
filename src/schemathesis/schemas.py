@@ -50,9 +50,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import APIStateMachine
 
 
-C = TypeVar("C", bound=Case)
-
-
 @lru_cache
 def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path, quote(path.lstrip("/"))))
@@ -483,6 +480,8 @@ class APIOperationMap(Mapping):
     _schema: BaseSchema
     _data: Mapping
 
+    __slots__ = ("_schema", "_data")
+
     def __getitem__(self, item: str) -> APIOperation:
         return self._data[item]
 
@@ -526,6 +525,8 @@ class Parameter:
     # The parameter definition in the language acceptable by the API
     definition: Any
 
+    __slots__ = ("definition",)
+
     @property
     def location(self) -> str:
         """Where this parameter is located.
@@ -556,7 +557,12 @@ P = TypeVar("P", bound=Parameter)
 class ParameterSet(Generic[P]):
     """A set of parameters for the same location."""
 
-    items: list[P] = field(default_factory=list)
+    items: list[P]
+
+    __slots__ = ("items",)
+
+    def __init__(self, items: list[P] | None = None) -> None:
+        self.items = items or []
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

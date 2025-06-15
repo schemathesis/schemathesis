@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import platform
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -16,7 +16,13 @@ from schemathesis.engine import Status, events
 @dataclass
 class JunitXMLHandler(EventHandler):
     path: Path
-    test_cases: dict = field(default_factory=dict)
+    test_cases: dict
+
+    __slots__ = ("path", "test_cases")
+
+    def __init__(self, path: Path, test_cases: dict | None = None) -> None:
+        self.path = path
+        self.test_cases = test_cases or {}
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):

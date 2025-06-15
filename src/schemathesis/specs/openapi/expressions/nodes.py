@@ -39,6 +39,8 @@ class String(Node):
 
     value: str
 
+    __slots__ = ("value",)
+
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         """String tokens are passed as they are.
 
@@ -53,6 +55,8 @@ class String(Node):
 class URL(Node):
     """A node for `$url` expression."""
 
+    __slots__ = ()
+
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         import requests
 
@@ -66,6 +70,8 @@ class URL(Node):
 class Method(Node):
     """A node for `$method` expression."""
 
+    __slots__ = ()
+
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         return output.case.operation.method.upper()
 
@@ -73,6 +79,8 @@ class Method(Node):
 @dataclass
 class StatusCode(Node):
     """A node for `$statusCode` expression."""
+
+    __slots__ = ()
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         return str(output.response.status_code)
@@ -84,7 +92,14 @@ class NonBodyRequest(Node):
 
     location: str
     parameter: str
-    extractor: Extractor | None = None
+    extractor: Extractor | None
+
+    __slots__ = ("location", "parameter", "extractor")
+
+    def __init__(self, location: str, parameter: str, extractor: Extractor | None = None) -> None:
+        self.location = location
+        self.parameter = parameter
+        self.extractor = extractor
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         container = {
@@ -106,7 +121,12 @@ class NonBodyRequest(Node):
 class BodyRequest(Node):
     """A node for `$request` expressions where location is `body`."""
 
-    pointer: str | None = None
+    pointer: str | None
+
+    __slots__ = ("pointer",)
+
+    def __init__(self, pointer: str | None = None) -> None:
+        self.pointer = pointer
 
     def evaluate(self, output: StepOutput) -> Any | Unresolvable:
         document = output.case.body
@@ -120,7 +140,13 @@ class HeaderResponse(Node):
     """A node for `$response.header` expressions."""
 
     parameter: str
-    extractor: Extractor | None = None
+    extractor: Extractor | None
+
+    __slots__ = ("parameter", "extractor")
+
+    def __init__(self, parameter: str, extractor: Extractor | None = None) -> None:
+        self.parameter = parameter
+        self.extractor = extractor
 
     def evaluate(self, output: StepOutput) -> str | Unresolvable:
         value = output.response.headers.get(self.parameter.lower())
@@ -135,7 +161,12 @@ class HeaderResponse(Node):
 class BodyResponse(Node):
     """A node for `$response.body` expressions."""
 
-    pointer: str | None = None
+    pointer: str | None
+
+    __slots__ = ("pointer",)
+
+    def __init__(self, pointer: str | None = None) -> None:
+        self.pointer = pointer
 
     def evaluate(self, output: StepOutput) -> Any:
         document = output.response.json()
