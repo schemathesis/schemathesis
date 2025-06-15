@@ -28,6 +28,8 @@ class Specification:
     kind: SpecificationKind
     version: str
 
+    __slots__ = ("kind", "version")
+
     @classmethod
     def openapi(cls, version: str) -> Specification:
         return cls(kind=SpecificationKind.OPENAPI, version=version)

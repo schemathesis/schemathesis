@@ -12,8 +12,16 @@ class ExecutionControl:
 
     stop_event: threading.Event
     max_failures: int | None
-    _failures_counter: int = 0
-    has_reached_the_failure_limit: bool = False
+    _failures_counter: int
+    has_reached_the_failure_limit: bool
+
+    __slots__ = ("stop_event", "max_failures", "_failures_counter", "has_reached_the_failure_limit")
+
+    def __init__(self, stop_event: threading.Event, max_failures: int | None) -> None:
+        self.stop_event = stop_event
+        self.max_failures = max_failures
+        self._failures_counter = 0
+        self.has_reached_the_failure_limit = False
 
     @property
     def is_stopped(self) -> bool:

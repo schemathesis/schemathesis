@@ -186,6 +186,7 @@ class StepOutputWrapper:
     """Wrapper for StepOutput that uses only case_id for hash-based caching."""
 
     output: StepOutput
+
     __slots__ = ("output",)
 
     def __hash__(self) -> int:

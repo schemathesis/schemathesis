@@ -4,7 +4,7 @@ import datetime
 import json
 import sys
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from pathlib import Path
 from queue import Queue
@@ -35,10 +35,23 @@ class CassetteWriter(EventHandler):
     format: ReportFormat
     path: Path
     config: ProjectConfig
-    queue: Queue = field(default_factory=Queue)
-    worker: threading.Thread = field(init=False)
+    queue: Queue
+    worker: threading.Thread
 
-    def __post_init__(self) -> None:
+    __slots__ = ("format", "path", "config", "queue", "worker")
+
+    def __init__(
+        self,
+        format: ReportFormat,
+        path: Path,
+        config: ProjectConfig,
+        queue: Queue | None = None,
+    ) -> None:
+        self.format = format
+        self.path = path
+        self.config = config
+        self.queue = queue or Queue()
+
         kwargs = {
             "path": self.path,
             "config": self.config,
@@ -49,7 +62,12 @@ class CassetteWriter(EventHandler):
             writer = har_writer
         else:
             writer = vcr_writer
-        self.worker = threading.Thread(name="SchemathesisCassetteWriter", target=writer, kwargs=kwargs)
+
+        self.worker = threading.Thread(
+            name="SchemathesisCassetteWriter",
+            target=writer,
+            kwargs=kwargs,
+        )
         self.worker.start()
 
     def start(self, ctx: ExecutionContext) -> None:

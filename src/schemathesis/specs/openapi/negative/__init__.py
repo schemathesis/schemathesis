@@ -30,6 +30,8 @@ class CacheKey:
     schema: Schema
     validator_cls: type[jsonschema.Validator]
 
+    __slots__ = ("operation_name", "location", "schema", "validator_cls")
+
     def __hash__(self) -> int:
         return hash((self.operation_name, self.location))
 

@@ -23,6 +23,8 @@ class Token:
     end: int
     type_: TokenType
 
+    __slots__ = ("value", "end", "type_")
+
     # Helpers for cleaner instantiation
 
     @classmethod
