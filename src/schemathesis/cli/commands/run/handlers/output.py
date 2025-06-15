@@ -324,10 +324,21 @@ class ProbingProgressManager:
 
 @dataclass
 class WarningData:
-    missing_auth: dict[int, set[str]] = field(default_factory=dict)
-    missing_test_data: set[str] = field(default_factory=set)
-    # operations that only returned 4xx
-    validation_mismatch: set[str] = field(default_factory=set)
+    missing_auth: dict[int, set[str]]
+    missing_test_data: set[str]
+    validation_mismatch: set[str]
+
+    __slots__ = ("missing_auth", "missing_test_data", "validation_mismatch")
+
+    def __init__(
+        self,
+        missing_auth: dict[int, set[str]] | None = None,
+        missing_test_data: set[str] | None = None,
+        validation_mismatch: set[str] | None = None,
+    ) -> None:
+        self.missing_auth = missing_auth or {}
+        self.missing_test_data = missing_test_data or set()
+        self.validation_mismatch = validation_mismatch or set()
 
     @property
     def is_empty(self) -> bool:

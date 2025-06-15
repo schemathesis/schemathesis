@@ -35,6 +35,8 @@ class ParameterExample:
     name: str
     value: Any
 
+    __slots__ = ("container", "name", "value")
+
 
 @dataclass
 class BodyExample:
@@ -42,6 +44,8 @@ class BodyExample:
 
     value: Any
     media_type: str
+
+    __slots__ = ("value", "media_type")
 
 
 Example = Union[ParameterExample, BodyExample]
