@@ -1,10 +1,12 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.1...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.2...HEAD) - TBD
+
+## [4.0.2](https://github.com/schemathesis/schemathesis/compare/v4.0.1...v4.0.2) - 2025-06-15
 
 ### :bug: Fixed
 
-- Don't send explicitly passed headers for the `missing_required_header` check. [#2898](https://github.com/schemathesis/schemathesis/issues/2898)  
+- Don't send explicitly passed headers for the `missing_required_header` check. [#2898](https://github.com/schemathesis/schemathesis/issues/2898)
 
 ## [4.0.1](https://github.com/schemathesis/schemathesis/compare/v4.0.0...v4.0.1) - 2025-06-13
 
