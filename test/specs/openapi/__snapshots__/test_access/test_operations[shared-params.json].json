@@ -1,6 +1,7 @@
 {
   "_accessor": {
-    "media_types": []
+    "consumes": [],
+    "produces": []
   },
   "definition": {
     "responses": {
