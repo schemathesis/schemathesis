@@ -227,6 +227,8 @@ class ApiOperation:
     @property
     def security(self) -> list | None:
         security = self.definition.get("security")
+        if security is None:
+            return security
         assert isinstance(security, list)
         return security
 
