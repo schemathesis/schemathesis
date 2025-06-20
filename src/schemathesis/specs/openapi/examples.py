@@ -385,25 +385,8 @@ def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]
         if not status_code.startswith("2"):
             # Check only 2xx responses
             continue
-        for media_type, definition in response.get("content", {}).items():
-            schema_ref = definition.get("schema", {}).get("$ref")
-            if schema_ref:
-                name = schema_ref.split("/")[-1]
-            else:
-                name = f"{status_code}/{media_type}"
-            for examples_field, example_field in (
-                ("examples", "example"),
-                ("x-examples", "x-example"),
-            ):
-                examples = definition.get(examples_field, {})
-                if isinstance(examples, dict):
-                    for example in examples.values():
-                        if "value" in example:
-                            output.setdefault(name, []).append(example["value"])
-                elif isinstance(examples, list):
-                    output.setdefault(name, []).extend(examples)
-                if example_field in definition:
-                    output.setdefault(name, []).append(definition[example_field])
+        for example in response.examples:
+            output.setdefault(example.name, []).append(example.value)
     return output
 
 

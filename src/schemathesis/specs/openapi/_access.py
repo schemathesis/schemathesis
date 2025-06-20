@@ -36,7 +36,13 @@ class SpecAccessor(Protocol):
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
         raise NotImplementedError
 
+    def extract_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
+        raise NotImplementedError
+
     def extract_response_schema(self, response: Response) -> dict[str, Any] | None:
+        raise NotImplementedError
+
+    def extract_response_examples(self, response: Response) -> Iterator[Example]:
         raise NotImplementedError
 
 
@@ -46,15 +52,16 @@ OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 
 @dataclass
 class V2:
-    media_types: list[str]
+    produces: list[str]
+    consumes: list[str]
 
-    __slots__ = ("media_types",)
+    __slots__ = ("produces", "consumes")
 
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
         consumes = operation.definition.get("consumes", [])
         assert isinstance(consumes, list)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
-        body_media_types: list[str] = consumes or self.media_types or [OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE]
+        body_media_types: list[str] = consumes or self.consumes or [OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE]
         form_parameters = []
         for param in operation._iter_parameters():
             if param.location == "body":
@@ -66,7 +73,7 @@ class V2:
             # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
             # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
             # the default because it is broader since it allows us to upload files.
-            form_data_media_types = consumes or self.media_types or [OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE]
+            form_data_media_types = consumes or self.consumes or [OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE]
             resolver = form_parameters[0].resolver
             for media_type in form_data_media_types:
                 # Individual `formData` parameters are joined into a single "composite" one.
@@ -76,6 +83,17 @@ class V2:
 
     def extract_response_schema(self, response: Response) -> dict[str, Any] | None:
         return response.definition.get("schema")
+
+    def extract_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
+        produces = operation.definition.get("produces", [])
+        assert isinstance(produces, list)
+        return produces or self.produces
+
+    def extract_response_examples(self, response: Response) -> Iterator:
+        # In Swagger 2.0, examples are directly in the response under "examples"
+        examples = response.definition.get("examples", {})
+        for name, value in examples.items():
+            yield Example(name=name, value=value)
 
 
 class V3:
@@ -111,6 +129,31 @@ class V3:
         if isinstance(option, dict):
             return option.get("schema")
         return None
+
+    def extract_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
+        return list(response.definition.get("content", {}).keys())
+
+    def extract_response_examples(self, response: Response) -> Iterator[Example]:
+        # In OpenAPI 3.0, examples are in content -> media type -> examples/example
+        content = response.definition.get("content", {})
+        for media_type, definition in content.items():
+            # Try to get a more descriptive example name from the `$ref` value
+            schema_ref = definition.get("schema", {}).get("$ref")
+            if schema_ref:
+                name = schema_ref.split("/")[-1]
+            else:
+                name = f"{response.status_code}/{media_type}"
+
+            for examples_field, example_field in (
+                ("examples", "example"),
+                ("x-examples", "x-example"),
+            ):
+                examples = definition.get(examples_field, {})
+                for example in examples.values():
+                    if "value" in example:
+                        yield Example(name=name, value=example["value"])
+                if example_field in definition:
+                    yield Example(name=name, value=definition[example_field])
 
 
 @dataclass
@@ -172,21 +215,36 @@ class ApiOperation:
         responses = {}
         for key, response in self.definition.get("responses", {}).items():
             response, resolver = _maybe_resolve(response, self.resolver)
-            responses[str(key)] = Response(definition=response, resolver=resolver, _accessor=self._accessor)
+            responses[str(key)] = Response(
+                status_code=str(key), definition=response, resolver=resolver, _accessor=self._accessor
+            )
         return responses
+
+    def get_response_definition(self, status_code: int) -> Response | None:
+        responses = self.responses
+        return responses.get(str(status_code)) or responses.get("default")
 
     @property
     def security(self) -> list | None:
-        return self.definition.get("security")
+        security = self.definition.get("security")
+        assert isinstance(security, list)
+        return security
+
+    def get_content_types(self, status_code: int) -> list[str]:
+        response = self.get_response_definition(status_code)
+        if not response:
+            return []
+        return self._accessor.extract_content_types(self, response)
 
 
 @dataclass
 class Response:
+    status_code: str
     definition: dict[str, Any]
     resolver: Resolver
     _accessor: SpecAccessor
 
-    __slots__ = ("definition", "resolver", "_accessor")
+    __slots__ = ("status_code", "definition", "resolver", "_accessor")
 
     @property
     def schema(self) -> dict[str, Any] | None:
@@ -195,6 +253,19 @@ class Response:
     @property
     def headers(self) -> dict[str, Any] | None:
         return self.definition.get("headers")
+
+    @property
+    def examples(self) -> Iterator[Example]:
+        """Iterate over all examples defined in this response."""
+        return self._accessor.extract_response_examples(self)
+
+
+@dataclass
+class Example:
+    name: str
+    value: Any
+
+    __slots__ = ("name", "value")
 
 
 @dataclass
@@ -234,7 +305,7 @@ class OpenApi:
     def __init__(self, raw: dict[str, Any], retrieve: Retrieve | None = None) -> None:
         self._raw = raw
         if "swagger" in raw:
-            self._accessor = V2(media_types=raw.get("consumes", []))
+            self._accessor = V2(produces=raw.get("produces", []), consumes=raw.get("consumes", []))
         else:
             self._accessor = V3()
         if retrieve is not None:

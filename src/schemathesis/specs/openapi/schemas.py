@@ -435,10 +435,6 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
-    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
-        """Content types available for this API operation."""
-        raise NotImplementedError
-
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
@@ -560,7 +556,7 @@ class BaseOpenAPISchema(BaseSchema):
         content_types = response.headers.get("content-type")
         failures: list[Failure] = []
         if content_types is None:
-            all_media_types = self.get_content_types(operation, response)
+            all_media_types = operation.inner.get_content_types(response.status_code)
             formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             failures.append(MissingContentType(operation=operation.label, message=message, media_types=all_media_types))
@@ -892,12 +888,6 @@ class SwaggerV20(BaseOpenAPISchema):
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
 
-    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
-        produces = operation.definition.raw.get("produces", None)
-        if produces:
-            return produces
-        return self.raw_schema.get("produces", [])
-
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return serialization.serialize_swagger2_parameters(definitions)
 
@@ -1037,12 +1027,6 @@ class OpenApi30(SwaggerV20):
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
-
-    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
-        resolved = self._get_response_definitions(operation, response)
-        if not resolved:
-            return []
-        return list(resolved.definition.get("content", {}).keys())
 
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return serialization.serialize_openapi3_parameters(definitions)

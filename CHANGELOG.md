@@ -242,6 +242,10 @@ These improvements come from removing unnecessary memory allocations in unnecess
 - **Pytest**: Issue where enabling or disabling checks via the config file had no effect.
 - **Pytest**: Ignored `tls-verify`, `request-timeout`, `request-cert`, and `request-cert-key` options supplied via the config file.
 
+### :bug: Fixed
+
+- Properly search for `examples` in Open API 2.0 responses.
+
 ## [4.0.2](https://github.com/schemathesis/schemathesis/compare/v4.0.1...v4.0.2) - 2025-06-15
 
 ### :bug: Fixed
