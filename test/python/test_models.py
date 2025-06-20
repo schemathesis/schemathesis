@@ -15,6 +15,7 @@ from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi._access import OpenApi
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
 
@@ -108,7 +109,7 @@ def test_make_case_missing_media_type(ctx):
     ],
 )
 def test_case_repr(swagger_20, kwargs, expected):
-    operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
+    operation = APIOperation("/users/{name}", "GET", {}, swagger_20, inner=None)
     case = operation.Case(**kwargs)
     assert repr(case) == expected
 
@@ -117,7 +118,7 @@ def test_case_repr(swagger_20, kwargs, expected):
 @pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
 def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
-    operation = APIOperation("/success", "GET", {}, swagger_20)
+    operation = APIOperation("/success", "GET", {}, swagger_20, inner=None)
     case = operation.Case(cookies={"TOKEN": "secret"})
     if override:
         data = case.as_transport_kwargs(base_url)
@@ -149,7 +150,7 @@ def test_mutate_body(openapi3_schema):
 def test_reserved_characters_in_operation_name(swagger_20):
     # See GH-992
     # When an API operation name contains `:`
-    operation = APIOperation("/foo:bar", "GET", {}, swagger_20)
+    operation = APIOperation("/foo:bar", "GET", {}, swagger_20, inner=None)
     case = operation.Case()
     # Then it should not be truncated during API call
     assert case.as_transport_kwargs("/")["url"] == "/foo:bar"
@@ -165,7 +166,7 @@ def test_reserved_characters_in_operation_name(swagger_20):
     ],
 )
 def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
-    operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
+    operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url, inner=None)
     original_headers = headers.copy()
     case = operation.Case(headers=headers)
     data = case.as_transport_kwargs(headers={"X-Key": "foo"})
@@ -220,7 +221,7 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
 
 @pytest.mark.parametrize("override", [False, True])
 def test_call(override, base_url, swagger_20):
-    operation = APIOperation("/success", "GET", {}, swagger_20)
+    operation = APIOperation("/success", "GET", {}, swagger_20, inner=None)
     case = operation.Case()
     if override:
         response = case.call(base_url)

@@ -774,3 +774,258 @@ def test_iter_parameters():
     assert "body" in all_locations
     assert "formData" in all_locations
     assert len(all_params) == len(filtered_params) + 2  # +2 for body and formData
+
+
+def test_response_examples_swagger_2_with_names():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "schema": {"type": "object"},
+                            "examples": {
+                                "application/json": {"id": 1, "name": "John"},
+                                "application/xml": "<user><id>1</id></user>",
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+    response = operation.responses["200"]
+
+    examples = list(response.examples)
+    assert len(examples) == 2
+
+    # Check names and values
+    example_dict = {ex.name: ex.value for ex in examples}
+    assert example_dict["application/json"] == {"id": 1, "name": "John"}
+    assert example_dict["application/xml"] == "<user><id>1</id></user>"
+
+
+def test_response_examples_openapi_3_with_names():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object"},
+                                    "example": {"id": 1, "name": "John"},
+                                    "examples": {
+                                        "user1": {"value": {"id": 1, "name": "John"}},
+                                        "user2": {"value": {"id": 2, "name": "Jane"}},
+                                    },
+                                },
+                                "text/plain": {
+                                    "schema": {"type": "string"},
+                                    "x-example": "Simple text",
+                                    "x-examples": {
+                                        "ex1": {"value": "Text 1"},
+                                        "ex2": "Text 2",  # Direct value
+                                    },
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+    response = operation.responses["200"]
+
+    examples = {}
+    for example in response.examples:
+        examples.setdefault(example.name, []).append(example.value)
+
+    assert examples == {
+        "200/application/json": [{"id": 1, "name": "John"}, {"id": 2, "name": "Jane"}, {"id": 1, "name": "John"}],
+        "200/text/plain": ["Text 1", "Simple text"],
+    }
+
+
+def test_response_examples_naming_scheme():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "components": {"schemas": {"Foo": {"type": "integer"}}},
+        "paths": {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "example": "single_example",
+                                    "examples": {"named_example": {"value": "from_examples"}},
+                                    "x-example": "extension_example",
+                                    "x-examples": {"ext_named": {"value": "from_x_examples"}},
+                                },
+                                "text/plain": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Foo",
+                                    },
+                                    "example": "single_example",
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    response = schema["/test"]["GET"].responses["200"]
+
+    examples = {}
+    for example in response.examples:
+        examples.setdefault(example.name, []).append(example.value)
+
+    assert examples == {
+        "200/application/json": ["from_examples", "single_example", "from_x_examples", "extension_example"],
+        "Foo": ["single_example"],
+    }
+
+
+def test_content_types_swagger_2():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "produces": ["application/json", "application/xml"],  # Global produces
+        "paths": {
+            "/users": {
+                "get": {
+                    "produces": ["text/plain"],  # Operation-level override
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "post": {
+                    # No operation-level produces - should use global
+                    "responses": {"201": {"description": "Created"}}
+                },
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    # Operation with specific produces
+    get_op = schema["/users"]["GET"]
+    assert get_op.get_content_types(200) == ["text/plain"]
+
+    # Operation using global produces
+    post_op = schema["/users"]["POST"]
+    assert post_op.get_content_types(201) == ["application/json", "application/xml"]
+
+
+def test_content_types_swagger_2_no_global():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        # No global produces
+        "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+
+    # Should return empty list when no produces defined
+    assert operation.get_content_types(200) == []
+
+
+def test_content_types_openapi_3():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {"schema": {"type": "object"}},
+                                "application/xml": {"schema": {"type": "object"}},
+                                "text/csv": {"schema": {"type": "string"}},
+                            },
+                        },
+                        "400": {
+                            "description": "Error",
+                            "content": {"application/problem+json": {"schema": {"type": "object"}}},
+                        },
+                        "404": {
+                            "description": "Not found"
+                            # No content
+                        },
+                    }
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+
+    # Multiple content types
+    assert operation.get_content_types(200) == ["application/json", "application/xml", "text/csv"]
+
+    # Single content type
+    assert operation.get_content_types(400) == ["application/problem+json"]
+
+    # No content
+    assert operation.get_content_types(404) == []
+
+    # Not defined
+    assert operation.get_content_types(422) == []
+
+
+def test_content_types_default_response():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        },
+                        "default": {
+                            "description": "Error",
+                            "content": {"application/problem+json": {"schema": {"type": "object"}}},
+                        },
+                    }
+                }
+            }
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+
+    # Specific status code
+    assert operation.get_content_types(200) == ["application/json"]
+
+    # Non-existent status code should use default
+    assert operation.get_content_types(500) == ["application/problem+json"]
+
+    # Another non-existent should also use default
+    assert operation.get_content_types(404) == ["application/problem+json"]
