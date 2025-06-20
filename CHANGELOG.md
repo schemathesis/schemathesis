@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Properly search for `examples` in Open API 2.0 responses.
+
 ## [4.0.2](https://github.com/schemathesis/schemathesis/compare/v4.0.1...v4.0.2) - 2025-06-15
 
 ### :bug: Fixed
