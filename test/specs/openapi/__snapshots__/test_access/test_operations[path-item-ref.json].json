@@ -15,6 +15,10 @@
   "resolver": "Resolver(_base_uri='', _registry=<Registry (1 uncrawled resource)>)",
   "shared_parameters": [
     {
+      "_accessor": {
+        "consumes": [],
+        "produces": []
+      },
       "definition": {
         "in": "query",
         "name": "q",
