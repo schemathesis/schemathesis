@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Iterator, Protocol, TypedDict, cast
+from functools import lru_cache
+from typing import Any, ClassVar, Iterator, Protocol, TypedDict, cast
 
+import requests
 from referencing import Registry, Resource, Specification
 from referencing._core import Resolver
 from referencing.exceptions import Unresolvable
@@ -11,6 +14,8 @@ from referencing.typing import Retrieve
 from schemathesis.core import HTTP_METHODS
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Err, Ok
+from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.specs._access import ApiOperationResult
 
 PathItem = dict
@@ -32,11 +37,18 @@ class OperationParameter(Protocol):
         raise NotImplementedError
 
     @property
+    def examples(self) -> Iterator[Example]:
+        raise NotImplementedError
+
+    @property
     def resolver(self) -> Resolver:
         raise NotImplementedError
 
 
 class SpecAccessor(Protocol):
+    example_field: ClassVar[str]
+    examples_field: ClassVar[str]
+
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
         raise NotImplementedError
 
@@ -58,6 +70,8 @@ OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 class V2:
     produces: list[str]
     consumes: list[str]
+    example_field: ClassVar[str] = "x-example"
+    examples_field: ClassVar[str] = "x-examples"
 
     __slots__ = ("produces", "consumes")
 
@@ -101,6 +115,9 @@ class V2:
 
 
 class V3:
+    example_field: ClassVar[str] = "example"
+    examples_field: ClassVar[str] = "examples"
+
     __slots__ = ()
 
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
@@ -183,7 +200,7 @@ class ApiOperation:
         seen = set()
 
         # Operation-level parameters take precedence - process them first
-        for param in _prepare_parameters(self.definition, self.resolver):
+        for param in _prepare_parameters(self.definition, self.resolver, self._accessor):
             key = (param.definition["name"], param.definition["in"])
             seen.add(key)
             yield param
@@ -195,20 +212,20 @@ class ApiOperation:
                 yield param
 
     @property
-    def query(self) -> Iterator[OperationParameter]:
-        return (param for param in self._iter_parameters() if param.location == "query")
+    def query(self) -> ParameterContainer:
+        return ParameterContainer(param for param in self._iter_parameters() if param.location == "query")
 
     @property
-    def path_parameters(self) -> Iterator[OperationParameter]:
-        return (param for param in self._iter_parameters() if param.location == "path")
+    def path_parameters(self) -> ParameterContainer:
+        return ParameterContainer(param for param in self._iter_parameters() if param.location == "path")
 
     @property
-    def headers(self) -> Iterator[OperationParameter]:
-        return (param for param in self._iter_parameters() if param.location == "header")
+    def headers(self) -> ParameterContainer:
+        return ParameterContainer(param for param in self._iter_parameters() if param.location == "header")
 
     @property
-    def cookies(self) -> Iterator[OperationParameter]:
-        return (param for param in self._iter_parameters() if param.location == "cookie")
+    def cookies(self) -> ParameterContainer:
+        return ParameterContainer(param for param in self._iter_parameters() if param.location == "cookie")
 
     @property
     def body(self) -> Iterator[Body]:
@@ -241,6 +258,34 @@ class ApiOperation:
         if not response:
             return []
         return self._accessor.extract_content_types(self, response)
+
+
+@dataclass
+class ParameterContainer:
+    _iter: Iterator[OperationParameter]
+    _cache: dict[str, OperationParameter]
+
+    __slots__ = ("_iter", "_cache")
+
+    def __init__(self, _iter: Iterator[OperationParameter]) -> None:
+        self._iter = _iter
+        self._cache = {}
+
+    def _ensure_cache(self) -> None:
+        if not self._cache:
+            self._cache = {param.name: param for param in self._iter}
+
+    def __contains__(self, name: str) -> bool:
+        self._ensure_cache()
+        return name in self._cache
+
+    def __getitem__(self, name: str) -> OperationParameter:
+        self._ensure_cache()
+        return self._cache[name]
+
+    def __iter__(self) -> Iterator[OperationParameter]:
+        self._ensure_cache()
+        yield from iter(self._cache.values())
 
 
 @dataclass
@@ -278,8 +323,9 @@ class Example:
 class Parameter:
     definition: dict[str, Any]
     resolver: Resolver
+    _accessor: SpecAccessor
 
-    __slots__ = ("definition", "resolver")
+    __slots__ = ("definition", "resolver", "_accessor")
 
     @property
     def name(self) -> str:
@@ -290,6 +336,85 @@ class Parameter:
     def location(self) -> str:
         """Where this parameter is located."""
         return self.definition["in"]
+
+    @property
+    def examples(self) -> Iterator[Example]:
+        parameters_or_media_types = [self.definition]
+        schemas = list(_expand_subschemas(self.definition))
+        content = self.definition.get("content", _MISSING)
+        if content is not _MISSING:
+            media_type = next(iter(content.values()))
+            parameters_or_media_types.append(media_type)
+            schemas.extend(_expand_subschemas(media_type))
+        # Look up for "example" / "x-example" fields
+        idx = 0
+        for definition in parameters_or_media_types:
+            for field, value in _extract_single_example(definition, self._accessor.example_field):
+                yield Example(name=f"{field}_{idx}", value=value)
+                idx += 1
+            examples = definition.get(self._accessor.examples_field)
+            if isinstance(examples, dict):
+                for name, example in examples.items():
+                    example, _ = _maybe_resolve(example, self.resolver)
+                    value = example.get("value", _MISSING)
+                    if value is not _MISSING:
+                        yield Example(name=f"{name}_{idx}", value=value)
+                        idx += 1
+                    external = example.get("externalValue", _MISSING)
+                    if external is not _MISSING:
+                        with suppress(requests.RequestException):
+                            value = load_external_example(external)
+                            yield Example(name=f"{name}_{idx}", value=value)
+                            idx += 1
+        for schema in schemas:
+            for field, value in _extract_single_example(schema, self._accessor.example_field):
+                yield Example(name=f"{field}_{idx}", value=value)
+                idx += 1
+            # These `examples` are expected to be arrays as in JSON Schema
+            for field in {"examples", self._accessor.examples_field}:
+                values = schema.get(field, _MISSING)
+                if values is not _MISSING:
+                    for value in values:
+                        yield Example(name=f"{field}_{idx}", value=value)
+                        idx += 1
+
+
+def _extract_single_example(item: dict, extra_field: str) -> Iterator[tuple[str, Any]]:
+    for field in {"example", extra_field}:
+        value = item.get(field, _MISSING)
+        if value is not _MISSING:
+            yield field, value
+
+
+def _expand_subschemas(definition: dict) -> Iterator[dict[str, Any]]:
+    schema = definition.get("schema", _MISSING)
+    if schema is not _MISSING:
+        yield schema
+        for key in ("anyOf", "oneOf"):
+            subschemas = schema.get(key, _MISSING)
+            if subschemas is not _MISSING:
+                yield from subschemas
+        all_of = schema.get("allOf", _MISSING)
+        if all_of is not _MISSING:
+            subschema = deepclone(all_of[0])
+            for sub in schema["allOf"][1:]:
+                for key, value in sub.items():
+                    if key == "examples":
+                        subschema.setdefault("examples", []).extend(value)
+                    elif key == "example":
+                        subschema.setdefault("examples", []).append(value)
+            yield subschema
+
+
+@lru_cache
+def load_external_example(url: str) -> bytes:
+    """Load examples the `externalValue` keyword."""
+    response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT)
+    response.raise_for_status()
+    return response.content
+
+
+_MISSING = object()
 
 
 @dataclass
@@ -366,7 +491,7 @@ class OpenApi:
             path_item = resolved.contents
         resolved_path_item = cast(PathItem, path_item)
         try:
-            shared_parameters = list(_prepare_parameters(resolved_path_item, resolver))
+            shared_parameters = list(_prepare_parameters(resolved_path_item, resolver, self._accessor))
         except Unresolvable as exc:
             yield Err(InvalidSchema(f"Failed to resolve reference: {exc.ref}", path=path))
             return
@@ -398,7 +523,7 @@ class PathOperations:
 
     def _get_shared_parameters(self, path_item: PathItem, resolver: Resolver) -> list[Parameter]:
         try:
-            return list(_prepare_parameters(path_item, resolver))
+            return list(_prepare_parameters(path_item, resolver, self._accessor))
         except Unresolvable as exc:
             raise InvalidSchema(f"Failed to resolve reference: {exc.ref}", path=self._path) from exc
 
@@ -438,16 +563,16 @@ class PathOperations:
         return (method.upper() for method in resolved_path_item.keys() if method in HTTP_METHODS)
 
 
-def _prepare_parameters(item: PathItem | Operation, resolver: Resolver) -> Iterator[Parameter]:
+def _prepare_parameters(item: PathItem | Operation, resolver: Resolver, accessor: SpecAccessor) -> Iterator[Parameter]:
     defined = item.get("parameters", [])
     assert isinstance(defined, list)
     for parameter in defined:
         ref = parameter.get("$ref")
         if ref is not None:
             resolved = resolver.lookup(ref)
-            yield Parameter(definition=resolved.contents, resolver=resolved.resolver)
+            yield Parameter(definition=resolved.contents, resolver=resolved.resolver, _accessor=accessor)
         else:
-            yield Parameter(definition=parameter, resolver=resolver)
+            yield Parameter(definition=parameter, resolver=resolver, _accessor=accessor)
 
 
 def _maybe_resolve(item: dict, resolver: Resolver, **kwargs: str) -> tuple[dict, Resolver]:

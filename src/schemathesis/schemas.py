@@ -632,10 +632,6 @@ class APIOperation(Generic[P]):
     label: str = None  # type: ignore
     app: Any = None
     base_url: str | None = None
-    path_parameters: ParameterSet[P] = field(default_factory=ParameterSet)
-    cookies: ParameterSet[P] = field(default_factory=ParameterSet)
-    query: ParameterSet[P] = field(default_factory=ParameterSet)
-    body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
 
     def __post_init__(self) -> None:
         if self.label is None:
@@ -665,8 +661,20 @@ class APIOperation(Generic[P]):
         return self.schema.get_tags(self)
 
     @property
+    def path_parameters(self):
+        return self.inner.path_parameters
+
+    @property
+    def query(self):
+        return self.inner.query
+
+    @property
     def headers(self):
         return self.inner.headers
+
+    @property
+    def cookies(self):
+        return self.inner.cookies
 
     def iter_parameters(self) -> Iterator[P]:
         return chain(self.path_parameters, self.headers, self.cookies, self.query)

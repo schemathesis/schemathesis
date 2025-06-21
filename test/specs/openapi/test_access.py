@@ -429,10 +429,14 @@ def test_mapping_interface_no_cache():
     assert get_users_1.label == get_users_2.label == "GET /users"
 
     # Test parameter inheritance works
-    get_user = schema["/users/{id}"]["GET"]
-    path_params = list(get_user.path_parameters)
+    path_params = list(schema["/users/{id}"]["GET"].path_parameters)
     assert len(path_params) == 1
     assert path_params[0].definition["name"] == "id"
+
+    params = schema["/users/{id}"]["GET"].path_parameters
+    assert "id" in params
+    assert "id" in params  # cached
+    assert list(params) == list(params)
 
     # Test path operations interface
     users = schema["/users"]
@@ -979,6 +983,7 @@ def test_content_types_openapi_3():
             }
         },
     }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
 
     schema = OpenApi(raw_schema)
     operation = schema["/users"]["GET"]
@@ -1017,6 +1022,7 @@ def test_content_types_default_response():
             }
         },
     }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
 
     schema = OpenApi(raw_schema)
     operation = schema["/users"]["GET"]
@@ -1029,3 +1035,131 @@ def test_content_types_default_response():
 
     # Another non-existent should also use default
     assert operation.get_content_types(404) == ["application/problem+json"]
+
+
+def test_parameter_examples_openapi_3(server):
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "components": {
+            "examples": {
+                "RefExample": {"value": "referenced_value"},
+                "ExternalRef": {"externalValue": f"http://127.0.0.1:{server['port']}/answer.json"},
+            },
+        },
+        "paths": {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "basic",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                            "example": "single_value",
+                        },
+                        {
+                            "name": "multiple",
+                            "in": "query",
+                            "schema": {"type": "string"},
+                            "examples": {
+                                "direct": {"value": "direct_value"},
+                                "referenced": {"$ref": "#/components/examples/RefExample"},
+                                "external": {"$ref": "#/components/examples/ExternalRef"},
+                            },
+                        },
+                        {
+                            "name": "content_single",
+                            "in": "query",
+                            "content": {"application/json": {"schema": {"type": "object"}, "example": "content_ex1"}},
+                        },
+                        {
+                            "name": "content_multiple",
+                            "in": "query",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object"},
+                                    "examples": {
+                                        "content_ex1": {"value": "ex1"},
+                                        "content_ex2": {"value": "ex2"},
+                                    },
+                                }
+                            },
+                        },
+                        {
+                            "name": "schema_any_of",
+                            "in": "query",
+                            "schema": {
+                                "anyOf": [
+                                    {"type": "string", "example": 1},
+                                    {"type": "integer", "example": 2},
+                                    {
+                                        "type": "object",
+                                        "allOf": [
+                                            {"properties": {"base": {"type": "string"}}, "example": {"base": "nested"}},
+                                            {
+                                                "properties": {"extra": {"type": "string"}},
+                                                "example": {"extra": "addon"},
+                                            },
+                                        ],
+                                    },
+                                ]
+                            },
+                        },
+                        {
+                            "name": "schema_all_of",
+                            "in": "query",
+                            "schema": {
+                                "type": "object",
+                                "allOf": [
+                                    {"properties": {"base": {"type": "string"}}, "example": {"base": "nested"}},
+                                    {
+                                        "properties": {"extra": {"type": "string"}},
+                                        "example": {"extra": "addon"},
+                                    },
+                                    {
+                                        "properties": {"more": {"type": "string"}},
+                                        "examples": [{"more": "A"}, {"more": "B"}],
+                                    },
+                                ],
+                            },
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    OPENAPI_31_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["GET"]
+
+    assert {ex.name: ex.value for ex in operation.query["basic"].examples} == {"example_0": "single_value"}
+    assert {ex.name: ex.value for ex in operation.query["multiple"].examples} == {
+        "direct_0": "direct_value",
+        "external_2": b"42",
+        "referenced_1": "referenced_value",
+    }
+    assert {ex.name: ex.value for ex in operation.query["content_single"].examples} == {"example_0": "content_ex1"}
+    assert {ex.name: ex.value for ex in operation.query["content_multiple"].examples} == {
+        "content_ex1_0": "ex1",
+        "content_ex2_1": "ex2",
+    }
+    assert {ex.name: ex.value for ex in operation.query["schema_any_of"].examples} == {
+        "example_0": 1,
+        "example_1": 2,
+    }
+    assert {ex.name: ex.value for ex in operation.query["schema_all_of"].examples} == {
+        "example_0": {
+            "base": "nested",
+        },
+        "examples_1": {
+            "extra": "addon",
+        },
+        "examples_2": {
+            "more": "A",
+        },
+        "examples_3": {
+            "more": "B",
+        },
+    }
