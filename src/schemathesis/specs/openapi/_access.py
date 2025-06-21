@@ -24,6 +24,10 @@ class OperationParameter(Protocol):
         raise NotImplementedError
 
     @property
+    def name(self) -> str:
+        raise NotImplementedError
+
+    @property
     def location(self) -> str:
         raise NotImplementedError
 
@@ -276,6 +280,11 @@ class Parameter:
     resolver: Resolver
 
     __slots__ = ("definition", "resolver")
+
+    @property
+    def name(self) -> str:
+        """Parameter name."""
+        return self.definition["name"]
 
     @property
     def location(self) -> str:
