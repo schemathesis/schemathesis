@@ -15,6 +15,10 @@
   "resolver": "Resolver(_base_uri='paths.json', _registry=<Registry (2 resources, 1 uncrawled)>)",
   "shared_parameters": [
     {
+      "_accessor": {
+        "consumes": [],
+        "produces": []
+      },
       "definition": {
         "in": "query",
         "name": "q",

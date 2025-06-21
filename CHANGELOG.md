@@ -165,6 +165,7 @@
 ### :bug: Fixed
 
 - Properly search for `examples` in Open API 2.0 responses.
+- Search for examples inside `content` key in parameters.
 
 ## [4.0.2](https://github.com/schemathesis/schemathesis/compare/v4.0.1...v4.0.2) - 2025-06-15
 
