@@ -26,7 +26,7 @@ nav:
       - Hypothesis Strategies: guides/hypothesis-strategies.md
       - guides/targeted.md
 
-  - Core Contcepts:
+  - Core Concepts:
       - explanations/data-generation.md
       - explanations/examples.md
       - explanations/stateful.md
