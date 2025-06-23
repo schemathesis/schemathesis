@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import get_close_matches
 from enum import unique
 from types import SimpleNamespace
@@ -12,7 +12,6 @@ from typing import (
     Callable,
     Generator,
     Iterator,
-    Mapping,
     NoReturn,
     Union,
     cast,
@@ -43,14 +42,11 @@ from schemathesis.generation.meta import (
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.schemas import (
     APIOperation,
-    APIOperationMap,
     ApiStatistic,
     BaseSchema,
-    OperationDefinition,
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
-from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
@@ -65,29 +61,8 @@ class RootType(enum.Enum):
     MUTATION = enum.auto()
 
 
-@dataclass(repr=False)
-class GraphQLOperationDefinition(OperationDefinition):
-    field_name: str
-    type_: graphql.GraphQLType
-    root_type: RootType
-
-    __slots__ = ("raw", "resolved", "scope", "field_name", "type_", "root_type")
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    @property
-    def is_query(self) -> bool:
-        return self.root_type == RootType.QUERY
-
-    @property
-    def is_mutation(self) -> bool:
-        return self.root_type == RootType.MUTATION
-
-
 @dataclass
 class GraphQLSchema(BaseSchema):
-    _operation_cache: OperationCache = field(default_factory=OperationCache)
-
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
@@ -99,23 +74,6 @@ class GraphQLSchema(BaseSchema):
         ):
             if operation_type is not None:
                 yield operation_type.name
-
-    def _get_operation_map(self, key: str) -> APIOperationMap:
-        cache = self._operation_cache
-        map = cache.get_map(key)
-        if map is not None:
-            return map
-        schema = self.client_schema
-        for root_type, operation_type in (
-            (RootType.QUERY, schema.query_type),
-            (RootType.MUTATION, schema.mutation_type),
-        ):
-            if operation_type and operation_type.name == key:
-                map = APIOperationMap(self, {})
-                map._data = FieldMap(map, root_type, operation_type)
-                cache.insert_map(key, map)
-                return map
-        raise KeyError(key)
 
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         if label.startswith(("Query.", "Mutation.")):
@@ -280,49 +238,6 @@ class GraphQLSchema(BaseSchema):
 
     def validate(self) -> None:
         return None
-
-
-@dataclass
-class FieldMap(Mapping):
-    """Container for accessing API operations.
-
-    Provides a more specific error message if API operation is not found.
-    """
-
-    _parent: APIOperationMap
-    _root_type: RootType
-    _operation_type: graphql.GraphQLObjectType
-
-    __slots__ = ("_parent", "_root_type", "_operation_type")
-
-    def __len__(self) -> int:
-        return len(self._operation_type.fields)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._operation_type.fields)
-
-    def _init_operation(self, field_name: str) -> APIOperation:
-        schema = cast(GraphQLSchema, self._parent._schema)
-        cache = schema._operation_cache
-        operation = cache.get_operation(field_name)
-        if operation is not None:
-            return operation
-        operation_type = self._operation_type
-        field_ = operation_type.fields[field_name]
-        operation = schema._build_operation(self._root_type, operation_type, field_name, field_)
-        cache.insert_operation(field_name, operation)
-        return operation
-
-    def __getitem__(self, item: str) -> APIOperation:
-        try:
-            return self._init_operation(item)
-        except KeyError as exc:
-            field_names = list(self._operation_type.fields)
-            matches = get_close_matches(item, field_names)
-            message = f"`{item}` field not found"
-            if matches:
-                message += f". Did you mean `{matches[0]}`?"
-            raise KeyError(message) from exc
 
 
 @st.composite  # type: ignore

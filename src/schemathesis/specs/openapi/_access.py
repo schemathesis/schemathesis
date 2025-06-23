@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from contextlib import suppress
 from dataclasses import dataclass
+from difflib import get_close_matches
 from functools import lru_cache
-from typing import Any, ClassVar, Iterator, Protocol, TypedDict, cast
+from typing import Any, ClassVar, Iterable, Iterator, NoReturn, Optional, Protocol, TypedDict, cast
 
 import requests
 from referencing import Registry, Resource, Specification
@@ -12,7 +13,7 @@ from referencing.exceptions import Unresolvable
 from referencing.typing import Retrieve
 
 from schemathesis.core import HTTP_METHODS
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -48,6 +49,7 @@ class OperationParameter(Protocol):
 class SpecAccessor(Protocol):
     example_field: ClassVar[str]
     examples_field: ClassVar[str]
+    links_field: ClassVar[str]
 
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
         raise NotImplementedError
@@ -72,6 +74,7 @@ class V2:
     consumes: list[str]
     example_field: ClassVar[str] = "x-example"
     examples_field: ClassVar[str] = "x-examples"
+    links_field: ClassVar[str] = "x-links"
 
     __slots__ = ("produces", "consumes")
 
@@ -117,6 +120,7 @@ class V2:
 class V3:
     example_field: ClassVar[str] = "example"
     examples_field: ClassVar[str] = "examples"
+    links_field: ClassVar[str] = "links"
 
     __slots__ = ()
 
@@ -189,11 +193,12 @@ class ApiOperation:
     __slots__ = ("method", "path", "definition", "shared_parameters", "resolver", "_accessor")
 
     @property
+    def id(self) -> str | None:
+        return cast(Optional[str], self.definition.get("operationId"))
+
+    @property
     def label(self) -> str:
         return f"{self.method.upper()} {self.path}"
-
-    def iter_parameters(self) -> Iterator[OperationParameter]:
-        return (param for param in self._iter_parameters() if param.location in ("query", "path", "header", "cookie"))
 
     def _iter_parameters(self) -> Iterator[OperationParameter]:
         """Iterate over all `parameters` containers applicable to this API operation."""
@@ -210,6 +215,12 @@ class ApiOperation:
             key = (param.definition["name"], param.definition["in"])
             if key not in seen:
                 yield param
+
+    @property
+    def parameters(self) -> ParameterContainer:
+        return ParameterContainer(
+            param for param in self._iter_parameters() if param.location in ("query", "path", "header", "cookie")
+        )
 
     @property
     def query(self) -> ParameterContainer:
@@ -309,6 +320,25 @@ class Response:
     def examples(self) -> Iterator[Example]:
         """Iterate over all examples defined in this response."""
         return self._accessor.extract_response_examples(self)
+
+    @property
+    def links(self) -> dict[str, Link]:
+        links = self.definition.get(self._accessor.links_field)
+        if links is None:
+            return {}
+        output = {}
+        for name, definition in links.items():
+            definition, _ = _maybe_resolve(definition, self.resolver)
+            output[name] = Link(name=name, definition=definition)
+        return output
+
+
+@dataclass
+class Link:
+    name: str
+    definition: Any
+
+    __slots__ = ("name", "definition")
 
 
 @dataclass
@@ -453,7 +483,7 @@ class OpenApi:
     def __getitem__(self, path: str) -> PathOperations:
         paths = self._raw.get("paths", {})
         if path not in paths:
-            raise KeyError(f"Path '{path}' not found")
+            _on_missing(path, paths)
 
         path_item = paths[path]
         if not isinstance(path_item, dict):
@@ -509,6 +539,54 @@ class OpenApi:
                 )
             )
 
+    def find_operation_by_label(self, label: str) -> ApiOperation | None:
+        try:
+            method, path = label.split(" ", maxsplit=1)
+            return self[path][method]
+        except (ValueError, OperationNotFound):
+            return None
+
+    def find_operation_by_id(self, id: str) -> ApiOperation | None:
+        # NOTE: O(n) for now to lower memory usage by not using a cache.
+        for result in self:
+            if isinstance(result, Ok):
+                operation = result.ok()
+                if operation.id == id:
+                    return operation
+        return None
+
+    def find_operation_by_ref(self, ref: str) -> ApiOperation | None:
+        try:
+            _, relative = ref.split("#", 1)
+            if relative.count("/") != 3:
+                # Does not point to an Operation
+                return None
+        except ValueError:
+            return None
+        try:
+            resolved = self._registry.resolver().lookup(ref)
+            # `#/paths/~1users/get` -> ('get', `/users`)
+            path, method = ref.rsplit("/", maxsplit=2)[-2:]
+            path = path.replace("~1", "/").replace("~0", "~")
+            return ApiOperation(
+                method=method,
+                path=path,
+                definition=resolved.contents,
+                shared_parameters=[],
+                resolver=resolved.resolver,
+                _accessor=self._accessor,
+            )
+        except Unresolvable:
+            return None
+
+
+def _on_missing(item: str, options: Iterable[str]) -> NoReturn:
+    message = f"`{item}` not found"
+    matches = get_close_matches(item, options)
+    if matches:
+        message += f". Did you mean `{matches[0]}`?"
+    raise OperationNotFound(message=message, item=item)
+
 
 @dataclass
 class PathOperations:
@@ -535,7 +613,8 @@ class PathOperations:
         path_item, resolver = _maybe_resolve(self._path_item, self._resolver, path=self._path)
 
         if method.lower() not in path_item:
-            raise KeyError(f"Method '{method}' not found for path '{self._path}'")
+            available = ", ".join(item.upper() for item in path_item if item in HTTP_METHODS)
+            raise LookupError(f"Method `{method}` not found. Available methods: {available}")
 
         operation = path_item[method.lower()]
         shared_parameters = self._get_shared_parameters(path_item, resolver)

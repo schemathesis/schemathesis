@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache, partial
 from itertools import chain
@@ -9,10 +8,8 @@ from typing import (
     Any,
     Callable,
     Generator,
-    Generic,
     Iterator,
     NoReturn,
-    TypeVar,
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
@@ -99,7 +96,7 @@ class ApiOperationsCount:
 
 
 @dataclass(eq=False)
-class BaseSchema(Mapping):
+class BaseSchema:
     raw_schema: dict[str, Any]
     config: ProjectConfig
     location: str | None = None
@@ -230,19 +227,6 @@ class BaseSchema(Mapping):
         return self.clone(filter_set=filter_set)
 
     def __iter__(self) -> Iterator[str]:
-        raise NotImplementedError
-
-    def __getitem__(self, item: str) -> APIOperationMap:
-        __tracebackhide__ = True
-        try:
-            return self._get_operation_map(item)
-        except KeyError as exc:
-            self.on_missing_operation(item, exc)
-
-    def _get_operation_map(self, key: str) -> APIOperationMap:
-        raise NotImplementedError
-
-    def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raise NotImplementedError
 
     def __len__(self) -> int:
@@ -476,45 +460,6 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
 
-@dataclass
-class APIOperationMap(Mapping):
-    _schema: BaseSchema
-    _data: Mapping
-
-    __slots__ = ("_schema", "_data")
-
-    def __getitem__(self, item: str) -> APIOperation:
-        return self._data[item]
-
-    def __len__(self) -> int:
-        return len(self._data)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._data)
-
-    def as_strategy(
-        self,
-        generation_mode: GenerationMode = GenerationMode.POSITIVE,
-        **kwargs: Any,
-    ) -> SearchStrategy:
-        """Create a Hypothesis strategy that generates test cases for all schema operations in this subset.
-
-        Use with `@given` in non-Schemathesis tests.
-
-        Args:
-            generation_mode: Whether to generate positive or negative test data.
-            **kwargs: Additional keywords for each strategy.
-
-        Returns:
-            Combined Hypothesis strategy for all valid operations in the schema.
-
-        """
-        _strategies = [
-            operation.as_strategy(generation_mode=generation_mode, **kwargs) for operation in self._data.values()
-        ]
-        return strategies.combine(_strategies)
-
-
 @dataclass(eq=False)
 class Parameter:
     """A logically separate parameter bound to a location (e.g., to "query string").
@@ -546,83 +491,9 @@ class Parameter:
         """Whether the parameter is required for a successful API call."""
         raise NotImplementedError
 
-    def serialize(self, operation: APIOperation) -> str:
-        """Get parameter's string representation."""
-        raise NotImplementedError
-
-
-P = TypeVar("P", bound=Parameter)
-
-
-@dataclass
-class ParameterSet(Generic[P]):
-    """A set of parameters for the same location."""
-
-    items: list[P]
-
-    __slots__ = ("items",)
-
-    def __init__(self, items: list[P] | None = None) -> None:
-        self.items = items or []
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    def add(self, parameter: P) -> None:
-        """Add a new parameter."""
-        self.items.append(parameter)
-
-    def get(self, name: str) -> P | None:
-        for parameter in self:
-            if parameter.name == name:
-                return parameter
-        return None
-
-    def contains(self, name: str) -> bool:
-        return self.get(name) is not None
-
-    def __contains__(self, item: str) -> bool:
-        return self.contains(item)
-
-    def __bool__(self) -> bool:
-        return bool(self.items)
-
-    def __iter__(self) -> Generator[P, None, None]:
-        yield from iter(self.items)
-
-    def __len__(self) -> int:
-        return len(self.items)
-
-    def __getitem__(self, item: int) -> P:
-        return self.items[item]
-
-
-class PayloadAlternatives(ParameterSet[P]):
-    """A set of alternative payloads."""
-
-
-D = TypeVar("D", bound=dict)
-
-
-@dataclass(repr=False)
-class OperationDefinition(Generic[D]):
-    """A wrapper to store not resolved API operation definitions.
-
-    To prevent recursion errors we need to store definitions without resolving references. But operation definitions
-    itself can be behind a reference (when there is a ``$ref`` in ``paths`` values), therefore we need to store this
-    scope change to have a proper reference resolving later.
-    """
-
-    raw: D
-    resolved: D
-    scope: str
-
-    __slots__ = ("raw", "resolved", "scope")
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
 
 @dataclass(eq=False)
-class APIOperation(Generic[P]):
+class APIOperation:
     """An API operation (e.g., `GET /users`)."""
 
     # `path` does not contain `basePath`
@@ -630,7 +501,6 @@ class APIOperation(Generic[P]):
     # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
     path: str
     method: str
-    definition: OperationDefinition = field(repr=False)
     schema: BaseSchema
     inner: ApiOperation
     label: str = None  # type: ignore
@@ -641,7 +511,7 @@ class APIOperation(Generic[P]):
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore
 
-    def __deepcopy__(self, memo: dict) -> APIOperation[P]:
+    def __deepcopy__(self, memo: dict) -> APIOperation:
         return self
 
     @property
@@ -672,32 +542,12 @@ class APIOperation(Generic[P]):
     def cookies(self):
         return self.inner.cookies
 
-    def iter_parameters(self) -> Iterator[P]:
+    @property
+    def body(self):
+        return self.inner.body
+
+    def iter_parameters(self) -> Iterator:
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
-
-    def _lookup_container(self, location: str) -> ParameterSet[P] | PayloadAlternatives[P] | None:
-        return {
-            "path": self.path_parameters,
-            "header": self.headers,
-            "cookie": self.cookies,
-            "query": self.query,
-            "body": self.body,
-        }.get(location)
-
-    def add_parameter(self, parameter: P) -> None:
-        # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
-        # But if the user wants to skip schema validation, we choose to ignore a malformed parameter.
-        # In this case, we still might generate some tests for an API operation, but without this parameter,
-        # which is better than skip the whole operation from testing.
-        container = self._lookup_container(parameter.location)
-        if container is not None:
-            container.add(parameter)
-
-    def get_parameter(self, name: str, location: str) -> P | None:
-        container = self._lookup_container(location)
-        if container is not None:
-            return container.get(name)
-        return None
 
     def as_strategy(
         self,
@@ -839,10 +689,10 @@ class APIOperation(Generic[P]):
             return False
 
     def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition.raw, media_type)
+        raise NotImplementedError
 
     def get_resolved_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition.resolved, media_type)
+        raise NotImplementedError
 
     @property
     def responses(self) -> dict[str, Any]:
