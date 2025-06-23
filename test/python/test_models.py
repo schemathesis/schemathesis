@@ -16,7 +16,6 @@ from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import ComponentKind
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi._access import OpenApi
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
 
@@ -520,7 +519,7 @@ def test_iter_parameters(ctx):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    params = list(schema["/data"]["POST"].iter_parameters())
+    params = list(schema["/data"]["POST"].parameters)
     assert len(params) == 2
     assert params[0].name == "X-id"
     assert params[1].name == "q"
@@ -600,19 +599,16 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
 
 
 @pytest.mark.parametrize(
-    ("name", "location", "exists"),
+    ("name", "exists"),
     [
-        ("X-Key", "header", True),
-        ("X-Key2", "header", False),
-        ("X-Key", "cookie", False),
-        ("X-Key", "query", False),
-        ("key", "query", True),
-        ("bla", "body", False),
-        ("body", "body", True),
-        ("unknown", "unknown", False),
+        ("X-Key", True),
+        ("X-Key2", False),
+        ("key", True),
+        ("bla", False),
+        ("unknown", False),
     ],
 )
-def test_get_parameter(ctx, name, location, exists):
+def test_get_parameter(ctx, name, exists):
     schema = ctx.openapi.build_schema(
         {
             "/data/": {
@@ -649,8 +645,8 @@ def test_get_parameter(ctx, name, location, exists):
     )
     schema = schemathesis.openapi.from_dict(schema)
 
-    parameter = schema["/data/"]["GET"].get_parameter(name, location)
-    assert (parameter is not None) is exists
     if exists:
-        assert parameter.name == name
-        assert parameter.location == location
+        assert schema["/data/"]["GET"].parameters[name].name == name
+    else:
+        with pytest.raises(KeyError):
+            schema["/data/"]["GET"].parameters[name]

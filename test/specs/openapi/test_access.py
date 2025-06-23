@@ -6,7 +6,7 @@ import pytest
 from referencing import Resource
 from referencing.exceptions import NoSuchResource
 
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Err, Ok
 from schemathesis.specs.openapi._access import OpenApi
 from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
@@ -446,10 +446,13 @@ def test_mapping_interface_no_cache():
     assert "WHATEVER" not in users
     assert list(users) == ["GET", "POST"]
 
-    with pytest.raises(KeyError, match="Path '/nonexistent' not found"):
+    with pytest.raises(OperationNotFound, match="`/nonexistent` not found"):
         schema["/nonexistent"]
 
-    with pytest.raises(KeyError, match="Method 'DELETE' not found"):
+    with pytest.raises(OperationNotFound, match="`/userz` not found. Did you mean `/users`?"):
+        schema["/userz"]
+
+    with pytest.raises(LookupError, match="Method `DELETE` not found. Available methods: GET, POST"):
         schema["/users"]["DELETE"]
 
     with pytest.raises(KeyError, match="Invalid HTTP method 'WHATEVER'"):
@@ -764,7 +767,7 @@ def test_iter_parameters():
     operation = schema["/users"]["POST"]
 
     # iter_parameters should exclude body and formData parameters
-    filtered_params = list(operation.iter_parameters())
+    filtered_params = list(operation.parameters)
     param_locations = [p.location for p in filtered_params]
     param_names = [p.definition["name"] for p in filtered_params]
 
@@ -1163,3 +1166,239 @@ def test_parameter_examples_openapi_3(server):
             "more": "B",
         },
     }
+
+
+def test_find_operation_by_id_or_label():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {"operationId": "getUsers", "responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"201": {"description": "Created"}}},  # No operationId
+            },
+            "/users/{id}": {"get": {"operationId": "getUserById", "responses": {"200": {"description": "OK"}}}},
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    assert schema.find_operation_by_id("getUsers").label == "GET /users"
+    assert schema.find_operation_by_id("getUserById").label == "GET /users/{id}"
+    assert schema.find_operation_by_id("nonExistent") is None
+    assert schema.find_operation_by_label("GET /users").label == "GET /users"
+    assert schema.find_operation_by_label("GET /users/{id}").label == "GET /users/{id}"
+    assert schema.find_operation_by_label("nonExistent") is None
+    assert schema.find_operation_by_label("GET /unknown") is None
+
+
+def test_find_operation_by_id_swagger_2():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {"/users": {"get": {"operationId": "listUsers", "responses": {"200": {"description": "OK"}}}}},
+    }
+
+    schema = OpenApi(raw_schema)
+    assert schema.find_operation_by_id("listUsers").label == "GET /users"
+
+
+def test_find_operation_by_id_with_references():
+    def retrieve(uri: str):
+        if uri == "path-items.json":
+            return Resource.opaque(
+                {
+                    "UsersPaths": {
+                        "get": {"operationId": "getUsersFromRef", "responses": {"200": {"description": "OK"}}},
+                        "post": {"$ref": "operations.json#/CreateUser"},
+                    }
+                }
+            )
+        else:
+            raise NoSuchResource(ref=uri)
+
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {"$ref": "path-items.json#/UsersPaths"},
+        },
+    }
+
+    schema = OpenApi(raw_schema, retrieve=retrieve)
+
+    assert schema.find_operation_by_id("getUsersFromRef").label == "GET /users"
+
+
+def test_find_operation_by_id_broken_references():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {"$ref": "missing.json#/PathItem"},
+        },
+    }
+
+    schema = OpenApi(raw_schema)
+
+    assert schema.find_operation_by_id("brokenOp") is None
+
+
+def test_find_operation_by_reference():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {"operationId": "getUsers", "responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"201": {"description": "Created"}}},
+            },
+            "/users/{user_id}": {
+                "patch": {"operationId": "updateUser", "responses": {"200": {"description": "OK"}}},
+                "delete": {"responses": {"204": {"description": "Deleted"}}},
+            },
+            "/special/~path": {"get": {"responses": {"200": {"description": "OK"}}}},
+        },
+    }
+
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+    schema = OpenApi(raw_schema)
+
+    assert schema.find_operation_by_ref("#/paths/~1users/get").label == "GET /users"
+    assert schema.find_operation_by_ref("#/paths/~1users/post").label == "POST /users"
+    assert schema.find_operation_by_ref("#/paths/~1users~1{user_id}/patch").label == "PATCH /users/{user_id}"
+    assert schema.find_operation_by_ref("#/paths/~1users~1{user_id}/delete").label == "DELETE /users/{user_id}"
+    assert schema.find_operation_by_ref("#/paths/~1special~1~0path/get").label == "GET /special/~path"
+    assert schema.find_operation_by_ref("#/paths/~1users/put") is None
+    assert schema.find_operation_by_ref("#/paths/~1nonexistent/get") is None
+    assert schema.find_operation_by_ref("#/paths/~1users") is None
+    assert schema.find_operation_by_ref("#/info/title") is None
+    assert schema.find_operation_by_ref("invalid-reference") is None
+
+
+def test_response_links_openapi_3():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "components": {
+            "links": {"RefLink": {"operationId": "getUserById", "parameters": {"userId": "$response.body#/id"}}}
+        },
+        "paths": {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "User created",
+                            "links": {
+                                "GetUser": {
+                                    "operationId": "getUserById",
+                                    "parameters": {"userId": "$response.body#/id"},
+                                    "description": "Get the created user",
+                                },
+                                "GetUserRepos": {
+                                    "operationRef": "#/paths/~1users~1{userId}~1repos/get",
+                                    "parameters": {"userId": "$response.body#/id"},
+                                },
+                                "ReferencedLink": {"$ref": "#/components/links/RefLink"},
+                            },
+                        },
+                        "400": {
+                            "description": "Bad request"
+                            # No links
+                        },
+                    }
+                }
+            }
+        },
+    }
+
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    operation = schema["/users"]["POST"]
+
+    assert (
+        operation.responses["201"].links["GetUser"].definition
+        == raw_schema["paths"]["/users"]["post"]["responses"]["201"]["links"]["GetUser"]
+    )
+
+    assert set(operation.responses["201"].links) == {"GetUser", "GetUserRepos", "ReferencedLink"}
+
+    assert len(operation.responses["400"].links) == 0
+    assert list(operation.responses["400"].links) == []
+
+
+def test_response_links_swagger_2():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "User created",
+                            "x-links": {
+                                "GetCreatedUser": {
+                                    "operationId": "getUserById",
+                                    "parameters": {"id": "$response.body#/userId"},
+                                },
+                                "ListUsers": {"operationId": "listUsers"},
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+
+    SWAGGER_20_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema)
+    response = schema["/users"]["POST"].responses["201"]
+
+    assert (
+        response.links["GetCreatedUser"].definition
+        == raw_schema["paths"]["/users"]["post"]["responses"]["201"]["x-links"]["GetCreatedUser"]
+    )
+    assert (
+        response.links["ListUsers"].definition
+        == raw_schema["paths"]["/users"]["post"]["responses"]["201"]["x-links"]["ListUsers"]
+    )
+    assert set(response.links) == {"GetCreatedUser", "ListUsers"}
+
+
+def test_response_links_references():
+    def retrieve(uri: str):
+        if uri == "links.json":
+            return Resource.opaque(
+                {
+                    "UserLink": {
+                        "operationRef": "#/paths/~1users~1{id}/get",
+                        "parameters": {"id": "$response.body#/userId"},
+                    }
+                }
+            )
+        else:
+            raise NoSuchResource(ref=uri)
+
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {"description": "Created", "links": {"ExternalRef": {"$ref": "links.json#/UserLink"}}}
+                    }
+                }
+            }
+        },
+    }
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
+    schema = OpenApi(raw_schema, retrieve=retrieve)
+    response = schema["/users"]["POST"].responses["201"]
+
+    assert response.links["ExternalRef"].definition["operationRef"] == "#/paths/~1users~1{id}/get"
+    assert len(response.links) == 1

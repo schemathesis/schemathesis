@@ -12,7 +12,6 @@ from typing import (
     Callable,
     Generator,
     Iterator,
-    Mapping,
     NoReturn,
     Union,
     cast,
@@ -43,10 +42,8 @@ from schemathesis.generation.meta import (
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.schemas import (
     APIOperation,
-    APIOperationMap,
     ApiStatistic,
     BaseSchema,
-    OperationDefinition,
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
@@ -62,25 +59,6 @@ if TYPE_CHECKING:
 class RootType(enum.Enum):
     QUERY = enum.auto()
     MUTATION = enum.auto()
-
-
-@dataclass(repr=False)
-class GraphQLOperationDefinition(OperationDefinition):
-    field_name: str
-    type_: graphql.GraphQLType
-    root_type: RootType
-
-    __slots__ = ("raw", "resolved", "scope", "field_name", "type_", "root_type")
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    @property
-    def is_query(self) -> bool:
-        return self.root_type == RootType.QUERY
-
-    @property
-    def is_mutation(self) -> bool:
-        return self.root_type == RootType.MUTATION
 
 
 @dataclass

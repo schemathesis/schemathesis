@@ -96,14 +96,14 @@ def openapi_cases(
             body_generator = generation_mode
             if generation_mode.is_negative:
                 # Consider only schemas that are possible to negate
-                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
+                candidates = [item for item in operation.body if can_negate(item.as_json_schema(operation))]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
-                    candidates = operation.body.items
+                    candidates = list(operation.body)
                     strategy_factory = make_positive_strategy
                     body_generator = GenerationMode.POSITIVE
             else:
-                candidates = operation.body.items
+                candidates = list(operation.body)
             parameter = draw(st.sampled_from(candidates))
             strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config)
             strategy = apply_hooks(operation, ctx, hooks, strategy, "body")

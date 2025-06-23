@@ -40,7 +40,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
 )
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
-from schemathesis.schemas import APIOperation, ParameterSet
+from schemathesis.schemas import APIOperation
 
 setup()
 
@@ -767,9 +767,7 @@ def _iter_coverage_cases(
                 ),
             )
 
-        def _combination_schema(
-            combination: dict[str, Any], _required: set[str], _parameter_set: ParameterSet
-        ) -> dict[str, Any]:
+        def _combination_schema(combination: dict[str, Any], _required: set[str], _parameter_set) -> dict[str, Any]:
             return {
                 "properties": {
                     parameter.name: parameter.as_json_schema(operation)
