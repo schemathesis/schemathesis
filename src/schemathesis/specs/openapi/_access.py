@@ -54,7 +54,10 @@ class SpecAccessor(Protocol):
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
         raise NotImplementedError
 
-    def extract_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
+    def extract_input_content_types(self, operation: ApiOperation) -> list[str]:
+        raise NotImplementedError
+
+    def extract_output_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
         raise NotImplementedError
 
     def extract_response_schema(self, response: Response) -> dict[str, Any] | None:
@@ -79,10 +82,9 @@ class V2:
     __slots__ = ("produces", "consumes")
 
     def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
-        consumes = operation.definition.get("consumes", [])
-        assert isinstance(consumes, list)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
-        body_media_types: list[str] = consumes or self.consumes or [OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE]
+        input_content_types = self.extract_input_content_types(operation)
+        body_media_types: list[str] = input_content_types or [OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE]
         form_parameters = []
         for param in operation._iter_parameters():
             if param.location == "body":
@@ -94,7 +96,7 @@ class V2:
             # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
             # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
             # the default because it is broader since it allows us to upload files.
-            form_data_media_types = consumes or self.consumes or [OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE]
+            form_data_media_types = input_content_types or [OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE]
             resolver = form_parameters[0].resolver
             for media_type in form_data_media_types:
                 # Individual `formData` parameters are joined into a single "composite" one.
@@ -105,7 +107,12 @@ class V2:
     def extract_response_schema(self, response: Response) -> dict[str, Any] | None:
         return response.definition.get("schema")
 
-    def extract_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
+    def extract_input_content_types(self, operation: ApiOperation) -> list[str]:
+        consumes = operation.definition.get("consumes", [])
+        assert isinstance(consumes, list)
+        return consumes or self.consumes
+
+    def extract_output_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
         produces = operation.definition.get("produces", [])
         assert isinstance(produces, list)
         return produces or self.produces
@@ -124,10 +131,10 @@ class V3:
 
     __slots__ = ()
 
-    def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
+    def _extract_content(self, operation: ApiOperation) -> tuple[dict[str, Any], Resolver] | None:
         body = operation.definition.get("requestBody")
         if body is None:
-            return
+            return None
         resolver = operation.resolver
         assert isinstance(body, dict)
         ref = body.get("$ref")
@@ -136,10 +143,16 @@ class V3:
             body = resolved.contents
             resolver = resolved.resolver
         try:
-            content = body["content"]
+            return body["content"], resolver
         except KeyError:
             # It is rare, but happens in real schemas
             raise InvalidSchema("Missing required key `content`") from None
+
+    def extract_body(self, operation: ApiOperation) -> Iterator[Body]:
+        content_and_resolver = self._extract_content(operation)
+        if content_and_resolver is None:
+            return
+        content, resolver = content_and_resolver
         for media_type, body in content.items():
             ref = body.get("$ref")
             if ref is not None:
@@ -155,7 +168,14 @@ class V3:
             return option.get("schema")
         return None
 
-    def extract_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
+    def extract_input_content_types(self, operation: ApiOperation) -> list[str]:
+        content_and_resolver = self._extract_content(operation)
+        if content_and_resolver is None:
+            return []
+        content, _ = content_and_resolver
+        return list(content)
+
+    def extract_output_content_types(self, operation: ApiOperation, response: Response) -> list[str]:
         return list(response.definition.get("content", {}).keys())
 
     def extract_response_examples(self, response: Response) -> Iterator[Example]:
@@ -199,6 +219,20 @@ class ApiOperation:
     @property
     def label(self) -> str:
         return f"{self.method.upper()} {self.path}"
+
+    @property
+    def input_content_types(self) -> list[str]:
+        return self._accessor.extract_input_content_types(self)
+
+    def output_content_types_for(self, status_code: int) -> list[str]:
+        response = self.get_response_definition(status_code)
+        if not response:
+            return []
+        return self._accessor.extract_output_content_types(self, response)
+
+    @property
+    def tags(self) -> list[str] | None:
+        return cast(Optional[list[str]], self.definition.get("tags"))
 
     def _iter_parameters(self) -> Iterator[OperationParameter]:
         """Iterate over all `parameters` containers applicable to this API operation."""
@@ -263,12 +297,6 @@ class ApiOperation:
             return security
         assert isinstance(security, list)
         return security
-
-    def get_content_types(self, status_code: int) -> list[str]:
-        response = self.get_response_definition(status_code)
-        if not response:
-            return []
-        return self._accessor.extract_content_types(self, response)
 
 
 @dataclass
@@ -479,6 +507,14 @@ class OpenApi:
         else:
             registry = Registry()
         self._registry = registry.with_resource("", Resource(contents=raw, specification=Specification.OPAQUE))
+
+    @property
+    def title(self) -> str:
+        return self._raw["info"]["title"]
+
+    @property
+    def version(self) -> str:
+        return self._raw["info"]["version"]
 
     def __getitem__(self, path: str) -> PathOperations:
         paths = self._raw.get("paths", {})

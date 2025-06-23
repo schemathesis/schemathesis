@@ -233,9 +233,6 @@ class GraphQLSchema(BaseSchema):
             meta=meta,
         )
 
-    def get_tags(self, operation: APIOperation) -> list[str] | None:
-        return None
-
     def validate(self) -> None:
         return None
 
