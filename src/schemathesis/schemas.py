@@ -379,9 +379,6 @@ class BaseSchema:
     ) -> tuple[list | None, dict[str, Any] | None]:
         raise NotImplementedError
 
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        raise NotImplementedError
-
     def make_case(
         self,
         *,
@@ -415,12 +412,6 @@ class BaseSchema:
             APIStateMachine subclass configured for this schema.
 
         """
-        raise NotImplementedError
-
-    def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
-        raise NotImplementedError
-
-    def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
@@ -597,12 +588,8 @@ class APIOperation:
         return self.schema.get_full_path(self.path)
 
     @property
-    def links(self) -> dict[str, dict[str, Any]]:
-        return self.schema.get_links(self)
-
-    @property
     def tags(self) -> list[str] | None:
-        return self.schema.get_tags(self)
+        return self.inner.tags
 
     @property
     def path_parameters(self):
@@ -680,12 +667,13 @@ class APIOperation:
     def prepare_multipart(self, form_data: dict[str, Any]) -> tuple[list | None, dict[str, Any] | None]:
         return self.schema.prepare_multipart(form_data, self)
 
-    def get_request_payload_content_types(self) -> list[str]:
-        return self.schema.get_request_payload_content_types(self)
+    @property
+    def input_content_types(self) -> list[str]:
+        return self.inner.input_content_types
 
     def _get_default_media_type(self) -> str:
         # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
-        media_types = self.get_request_payload_content_types()
+        media_types = self.inner.input_content_types
         if len(media_types) == 1:
             # The only available option
             return media_types[0]

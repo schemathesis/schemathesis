@@ -119,6 +119,7 @@ def test_access_openapi_3():
                         {"name": "q", "in": "query", "schema": {"type": "string"}},
                         {"name": "sessionId", "in": "cookie", "schema": {"type": "string"}},
                     ],
+                    "tags": ["users"],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "post": {
@@ -136,7 +137,13 @@ def test_access_openapi_3():
         },
     }
 
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+
     schema = OpenApi(raw_schema)
+
+    assert schema.title == raw_schema["info"]["title"]
+    assert schema.version == raw_schema["info"]["version"]
+
     raw_users = raw_schema["paths"]["/users/{id}"]
 
     get_users = schema["/users/{id}"]["GET"]
@@ -145,6 +152,7 @@ def test_access_openapi_3():
     assert [p.definition for p in get_users.headers] == [raw_users["parameters"][1]]
     assert [p.definition for p in get_users.cookies] == [raw_users["get"]["parameters"][1]]
     assert list(get_users.body) == []
+    assert get_users.tags == ["users"]
 
     post_users = schema["/users/{id}"]["POST"]
     assert list(post_users.query) == []
@@ -154,6 +162,7 @@ def test_access_openapi_3():
         raw_users["post"]["requestBody"]["content"]["application/json"],
         raw_users["post"]["requestBody"]["content"]["application/xml"],
     ]
+    assert post_users.tags is None
 
 
 def test_access_swagger_2():
@@ -935,11 +944,11 @@ def test_content_types_swagger_2():
 
     # Operation with specific produces
     get_op = schema["/users"]["GET"]
-    assert get_op.get_content_types(200) == ["text/plain"]
+    assert get_op.output_content_types_for(200) == ["text/plain"]
 
     # Operation using global produces
     post_op = schema["/users"]["POST"]
-    assert post_op.get_content_types(201) == ["application/json", "application/xml"]
+    assert post_op.output_content_types_for(201) == ["application/json", "application/xml"]
 
 
 def test_content_types_swagger_2_no_global():
@@ -954,7 +963,7 @@ def test_content_types_swagger_2_no_global():
     operation = schema["/users"]["GET"]
 
     # Should return empty list when no produces defined
-    assert operation.get_content_types(200) == []
+    assert operation.output_content_types_for(200) == []
 
 
 def test_content_types_openapi_3():
@@ -992,16 +1001,16 @@ def test_content_types_openapi_3():
     operation = schema["/users"]["GET"]
 
     # Multiple content types
-    assert operation.get_content_types(200) == ["application/json", "application/xml", "text/csv"]
+    assert operation.output_content_types_for(200) == ["application/json", "application/xml", "text/csv"]
 
     # Single content type
-    assert operation.get_content_types(400) == ["application/problem+json"]
+    assert operation.output_content_types_for(400) == ["application/problem+json"]
 
     # No content
-    assert operation.get_content_types(404) == []
+    assert operation.output_content_types_for(404) == []
 
     # Not defined
-    assert operation.get_content_types(422) == []
+    assert operation.output_content_types_for(422) == []
 
 
 def test_content_types_default_response():
@@ -1031,13 +1040,13 @@ def test_content_types_default_response():
     operation = schema["/users"]["GET"]
 
     # Specific status code
-    assert operation.get_content_types(200) == ["application/json"]
+    assert operation.output_content_types_for(200) == ["application/json"]
 
     # Non-existent status code should use default
-    assert operation.get_content_types(500) == ["application/problem+json"]
+    assert operation.output_content_types_for(500) == ["application/problem+json"]
 
     # Another non-existent should also use default
-    assert operation.get_content_types(404) == ["application/problem+json"]
+    assert operation.output_content_types_for(404) == ["application/problem+json"]
 
 
 def test_parameter_examples_openapi_3(server):

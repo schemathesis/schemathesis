@@ -112,7 +112,7 @@ def openapi_cases(
                 operation.schema.transport.get_matching_media_types(parameter.media_type), key=lambda x: x[0]
             )
             if not possible_media_types:
-                all_media_types = operation.get_request_payload_content_types()
+                all_media_types = operation.input_content_types
                 if all(
                     operation.schema.transport.get_first_matching_media_type(media_type) is None
                     for media_type in all_media_types
@@ -137,7 +137,7 @@ def openapi_cases(
         # This explicit body payload comes for a media type that has a custom strategy registered
         # Such strategies only support binary payloads, otherwise they can't be serialized
         if not isinstance(body, bytes) and media_type in MEDIA_TYPES:
-            all_media_types = operation.get_request_payload_content_types()
+            all_media_types = operation.input_content_types
             raise SerializationNotPossible.from_media_types(*all_media_types)
         body_ = ValueContainer(value=body, location="body", generator=None)
 

@@ -82,7 +82,7 @@ def content_type_conformance(ctx: CheckContext, response: Response, case: Case) 
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    documented_content_types = case.operation.inner.get_content_types(response.status_code)
+    documented_content_types = case.operation.inner.output_content_types_for(response.status_code)
     if not documented_content_types:
         return None
     content_types = response.headers.get("content-type")
