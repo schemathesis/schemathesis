@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import itertools
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field
-from difflib import get_close_matches
 from hashlib import sha1
 from json import JSONDecodeError
 from threading import RLock
@@ -15,25 +13,19 @@ from typing import (
     Callable,
     ClassVar,
     Generator,
-    Iterable,
-    Iterator,
-    Mapping,
-    NoReturn,
-    cast,
 )
 from urllib.parse import urlsplit
 
 import jsonschema
-from packaging import version
 from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
 from schemathesis.core import HTTP_METHODS, NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
+from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
-from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.result import Ok, Result
 from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
 from schemathesis.core.transport import Response
 from schemathesis.core.validation import INVALID_HEADER_RE
@@ -44,22 +36,14 @@ from schemathesis.specs.openapi._access import OpenApi
 from schemathesis.specs.openapi.stateful import links
 
 from ...generation import GenerationMode
-from ...hooks import HookContext, HookDispatcher
-from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
+from ...hooks import HookDispatcher
+from ...schemas import APIOperation, ApiStatistic, BaseSchema
 from . import serialization
-from ._cache import OperationCache
 from ._hypothesis import openapi_cases
-from .converter import to_json_schema, to_json_schema_recursive
+from .converter import to_json_schema
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
-from .parameters import (
-    OpenAPI20Body,
-    OpenAPI20CompositeBody,
-    OpenAPI20Parameter,
-    OpenAPI30Body,
-    OpenAPI30Parameter,
-    OpenAPIParameter,
-)
+from .parameters import OpenAPI20CompositeBody
 from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
@@ -91,16 +75,22 @@ def check_header(parameter: dict[str, Any]) -> None:
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
+    _spec: OpenApi = field(init=False)
     nullable_name: ClassVar[str] = ""
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
-    _operation_cache: OperationCache = field(default_factory=OperationCache)
     _inline_reference_cache: dict[str, Any] = field(default_factory=dict)
     # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
     # excessive resolving
     _inline_reference_cache_lock: RLock = field(default_factory=RLock)
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
+
+    def __post_init__(self) -> None:
+        self._spec = OpenApi(self.raw_schema)
+
+    def __getitem__(self, path: str):
+        return self._spec[path]
 
     @property
     def specification(self) -> Specification:
@@ -110,36 +100,8 @@ class BaseOpenAPISchema(BaseSchema):
         info = self.raw_schema["info"]
         return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
 
-    def __iter__(self) -> Iterator[str]:
-        return iter(self.raw_schema.get("paths", {}))
-
-    def _get_operation_map(self, path: str) -> APIOperationMap:
-        cache = self._operation_cache
-        map = cache.get_map(path)
-        if map is not None:
-            return map
-        path_item = self.raw_schema.get("paths", {})[path]
-        with in_scope(self.resolver, self.location or ""):
-            scope, path_item = self._resolve_path_item(path_item)
-        self.dispatch_hook("before_process_path", HookContext(), path, path_item)
-        map = APIOperationMap(self, {})
-        map._data = MethodMap(map, scope, path, CaseInsensitiveDict(path_item))
-        cache.insert_map(path, map)
-        return map
-
     def find_operation_by_label(self, label: str) -> APIOperation | None:
-        method, path = label.split(" ", maxsplit=1)
-        return OpenApi(self.raw_schema)[path][method]
-
-    def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
-        matches = get_close_matches(item, list(self))
-        self._on_missing_operation(item, exc, matches)
-
-    def _on_missing_operation(self, item: str, exc: KeyError, matches: list[str]) -> NoReturn:
-        message = f"`{item}` not found"
-        if matches:
-            message += f". Did you mean `{matches[0]}`?"
-        raise OperationNotFound(message=message, item=item) from exc
+        return self._spec.find_operation_by_label(label)
 
     def _should_skip(
         self,
@@ -151,7 +113,6 @@ class BaseOpenAPISchema(BaseSchema):
                 method="",
                 path="",
                 label="",
-                definition=OperationDefinition(raw=None, resolved=None, scope=""),
                 schema=None,  # type: ignore
                 inner=None,
             )
@@ -173,15 +134,8 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
-        try:
-            paths = self.raw_schema["paths"]
-        except KeyError:
-            return statistic
 
-        resolve = self.resolver.resolve
-        resolve_path_item = self._resolve_path_item
         should_skip = self._should_skip
-        links_field = self.links_field
 
         # For operationId lookup
         selected_operations_by_id: set[str] = set()
@@ -189,93 +143,43 @@ class BaseOpenAPISchema(BaseSchema):
         selected_operations_by_path: set[tuple[str, str]] = set()
         collected_links: list[dict] = []
 
-        for path, path_item in paths.items():
-            try:
-                scope, path_item = resolve_path_item(path_item)
-                self.resolver.push_scope(scope)
-                try:
-                    for method, definition in path_item.items():
-                        if method not in HTTP_METHODS:
-                            continue
-                        statistic.operations.total += 1
-                        is_selected = not should_skip(path, method, definition)
-                        if is_selected:
-                            statistic.operations.selected += 1
-                            # Store both identifiers
-                            if "operationId" in definition:
-                                selected_operations_by_id.add(definition["operationId"])
-                            selected_operations_by_path.add((method, path))
-                        for response in definition.get("responses", {}).values():
-                            if "$ref" in response:
-                                _, response = resolve(response["$ref"])
-                            defined_links = response.get(links_field)
-                            if defined_links is not None:
-                                statistic.links.total += len(defined_links)
-                                if is_selected:
-                                    collected_links.extend(defined_links.values())
-                finally:
-                    self.resolver.pop_scope()
-            except SCHEMA_PARSING_ERRORS:
+        for result in self._spec:
+            statistic.operations.total += 1
+            if not isinstance(result, Ok):
                 continue
+            operation = result.ok()
 
-        def is_link_selected(link: dict) -> bool:
-            if "$ref" in link:
-                _, link = resolve(link["$ref"])
+            is_selected = not should_skip(operation.path, operation.method, operation.definition)
+            if is_selected:
+                statistic.operations.selected += 1
+                # Store both identifiers
+                operation_id = operation.id
+                if operation_id is not None:
+                    selected_operations_by_id.add(operation_id)
+                selected_operations_by_path.add((operation.method, operation.path))
 
-            if "operationId" in link:
-                return link["operationId"] in selected_operations_by_id
-            else:
-                try:
-                    scope, _ = resolve(link["operationRef"])
-                    path, method = scope.rsplit("/", maxsplit=2)[-2:]
-                    path = path.replace("~1", "/").replace("~0", "~")
-                    return (method, path) in selected_operations_by_path
-                except Exception:
-                    return False
+            for response in operation.responses:
+                links = response.links
+                statistic.links.total += len(links)
+                if is_selected:
+                    for link in links:
+                        collected_links.append(link.definition)
 
         for link in collected_links:
-            if is_link_selected(link):
+            operation_id = link.get("operationId")
+            if operation_id is not None and operation_id in selected_operations_by_id:
                 statistic.links.selected += 1
+            else:
+                operation = self._spec.find_operation_by_ref(link["operationRef"])
+                if operation is not None and (operation.method, operation.path) in selected_operations_by_path:
+                    statistic.links.selected += 1
 
         return statistic
-
-    def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
-        try:
-            paths = self.raw_schema["paths"]
-        except KeyError:
-            return
-        resolve = self.resolver.resolve
-        should_skip = self._should_skip
-        for path, path_item in paths.items():
-            try:
-                if "$ref" in path_item:
-                    _, path_item = resolve(path_item["$ref"])
-                # Straightforward iteration is faster than converting to a set & calculating length.
-                for method, definition in path_item.items():
-                    if should_skip(path, method, definition):
-                        continue
-                    yield definition
-            except SCHEMA_PARSING_ERRORS:
-                # Ignore errors
-                continue
 
     def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
         while "$ref" in value:
             _, value = self.resolver.resolve(value["$ref"])
         return value
-
-    def _resolve_shared_parameters(self, path_item: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return self.resolver.resolve_all(path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-
-    def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
-        return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
-
-    def _collect_operation_parameters(
-        self, path_item: Mapping[str, Any], operation: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        shared_parameters = self._resolve_shared_parameters(path_item)
-        parameters = operation.get("parameters", ())
-        return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
@@ -294,36 +198,17 @@ class BaseOpenAPISchema(BaseSchema):
         operations and show errors for invalid ones.
         """
         __tracebackhide__ = True
-        try:
-            paths = self.raw_schema["paths"]
-        except KeyError as exc:
-            # This field is optional in Open API 3.1
-            if version.parse(self.specification.version) >= version.parse("3.1"):
-                return
-            # Missing `paths` is not recoverable
-            self._raise_invalid_schema(exc)
-
-        context = HookContext()
-        # Optimization: local variables are faster than attribute access
-        dispatch_hook = self.dispatch_hook
-        resolve_path_item = self._resolve_path_item
-        resolve_shared_parameters = self._resolve_shared_parameters
-        resolve_operation = self._resolve_operation
-        should_skip = self._should_skip
-        collect_parameters = self.collect_parameters
-        make_operation = self.make_operation
-        schema = OpenApi(self.raw_schema)
         base_url = self.get_base_url()
-        for operation in schema:
-            if isinstance(operation, Ok):
-                operation: APIOperation[OpenAPIParameter] = APIOperation(
-                    path=operation.ok().path,
-                    method=operation.ok().method,
-                    definition=None,
+        for result in self._spec:
+            if isinstance(result, Ok):
+                raw_operation = result.ok()
+                operation = APIOperation(
+                    path=raw_operation.path,
+                    method=raw_operation.method,
                     base_url=base_url,
                     app=self.app,
                     schema=self,
-                    inner=operation.ok(),
+                    inner=raw_operation,
                 )
                 # for parameter in parameters:
                 #     operation.add_parameter(parameter)
@@ -333,60 +218,7 @@ class BaseOpenAPISchema(BaseSchema):
                 # self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
                 yield Ok(operation)
             else:
-                yield operation
-        # for path, path_item in paths.items():
-        #     method = None
-        #     try:
-        #         dispatch_hook("before_process_path", context, path, path_item)
-        #         scope, path_item = resolve_path_item(path_item)
-        #         with in_scope(self.resolver, scope):
-        #             shared_parameters = resolve_shared_parameters(path_item)
-        #             for method, entry in path_item.items():
-        #                 if method not in HTTP_METHODS:
-        #                     continue
-        #                 try:
-        #                     resolved = resolve_operation(entry)
-        #                     if should_skip(path, method, resolved):
-        #                         continue
-        #                     parameters = resolved.get("parameters", ())
-        #                     parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-        #                     operation = make_operation(
-        #                         path,
-        #                         method,
-        #                         parameters,
-        #                         entry,
-        #                         resolved,
-        #                         scope,
-        #                     )
-        #                     yield Ok(operation)
-        #                 except SCHEMA_PARSING_ERRORS as exc:
-        #                     yield self._into_err(exc, path, method)
-        #     except SCHEMA_PARSING_ERRORS as exc:
-        #         yield self._into_err(exc, path, method)
-
-    def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
-        __tracebackhide__ = True
-        try:
-            self._raise_invalid_schema(error, path, method)
-        except InvalidSchema as exc:
-            return Err(exc)
-
-    def _raise_invalid_schema(
-        self,
-        error: Exception,
-        path: str | None = None,
-        method: str | None = None,
-    ) -> NoReturn:
-        __tracebackhide__ = True
-        if isinstance(error, RefResolutionError):
-            raise InvalidSchema.from_reference_resolution_error(error, path=path, method=method) from None
-        try:
-            self.validate()
-        except jsonschema.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_error(
-                exc, path=path, method=method, config=self.config.output
-            ) from None
-        raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method) from error
+                yield result
 
     def validate(self) -> None:
         with suppress(TypeError):
@@ -394,54 +226,6 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _validate(self) -> None:
         raise NotImplementedError
-
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        """Collect Open API parameters.
-
-        They should be used uniformly during the generation step; therefore, we need to convert them into
-        a spec-independent list of parameters.
-        """
-        raise NotImplementedError
-
-    def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        # The path item could be behind a reference
-        # In this case, we need to resolve it to get the proper scope for reference inside the item.
-        # It is mostly for validating responses.
-        if "$ref" in methods:
-            return self.resolver.resolve(methods["$ref"])
-        return self.resolver.resolution_scope, methods
-
-    def make_operation(
-        self,
-        path: str,
-        method: str,
-        parameters: list[OpenAPIParameter],
-        raw: dict[str, Any],
-        resolved: dict[str, Any],
-        scope: str,
-        inner,
-    ) -> APIOperation:
-        """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
-        __tracebackhide__ = True
-        base_url = self.get_base_url()
-        operation: APIOperation[OpenAPIParameter] = APIOperation(
-            path=path,
-            method=method,
-            definition=OperationDefinition(raw, resolved, scope),
-            base_url=base_url,
-            app=self.app,
-            schema=self,
-            inner=inner,
-        )
-        for parameter in parameters:
-            operation.add_parameter(parameter)
-        config = self.config.generation_for(operation=operation)
-        if config.with_security_parameters:
-            self.security.process_definitions(self.raw_schema, operation, self.resolver)
-        self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
-        return operation
 
     @property
     def resolver(self) -> InliningResolver:
@@ -456,81 +240,6 @@ class BaseOpenAPISchema(BaseSchema):
     def get_security_requirements(self, operation: APIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
         return self.security.get_security_requirements(self.raw_schema, operation)
-
-    def get_operation_by_id(self, operation_id: str) -> APIOperation:
-        """Get an `APIOperation` instance by its `operationId`."""
-        cache = self._operation_cache
-        cached = cache.get_operation_by_id(operation_id)
-        if cached is not None:
-            return cached
-        # Operation has not been accessed yet, need to populate the cache
-        if not cache.has_ids_to_definitions:
-            self._populate_operation_id_cache(cache)
-        try:
-            entry = cache.get_definition_by_id(operation_id)
-        except KeyError as exc:
-            matches = get_close_matches(operation_id, cache.known_operation_ids)
-            self._on_missing_operation(operation_id, exc, matches)
-        # It could've been already accessed in a different place
-        traversal_key = (entry.scope, entry.path, entry.method)
-        instance = cache.get_operation_by_traversal_key(traversal_key)
-        if instance is not None:
-            return instance
-        resolved = self._resolve_operation(entry.operation)
-        parameters = self._collect_operation_parameters(entry.path_item, resolved)
-        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, resolved, entry.scope)
-        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=operation_id)
-        return initialized
-
-    def _populate_operation_id_cache(self, cache: OperationCache) -> None:
-        """Collect all operation IDs from the schema."""
-        resolve = self.resolver.resolve
-        default_scope = self.resolver.resolution_scope
-        for path, path_item in self.raw_schema.get("paths", {}).items():
-            # If the path is behind a reference we have to keep the scope
-            # The scope is used to resolve nested components later on
-            if "$ref" in path_item:
-                scope, path_item = resolve(path_item["$ref"])
-            else:
-                scope = default_scope
-            for key, entry in path_item.items():
-                if key not in HTTP_METHODS:
-                    continue
-                if "operationId" in entry:
-                    cache.insert_definition_by_id(
-                        entry["operationId"],
-                        path=path,
-                        method=key,
-                        scope=scope,
-                        path_item=path_item,
-                        operation=entry,
-                    )
-
-    def get_operation_by_reference(self, reference: str) -> APIOperation:
-        """Get local or external `APIOperation` instance by reference.
-
-        Reference example: #/paths/~1users~1{user_id}/patch
-        """
-        cache = self._operation_cache
-        cached = cache.get_operation_by_reference(reference)
-        if cached is not None:
-            return cached
-        scope, operation = self.resolver.resolve(reference)
-        path, method = scope.rsplit("/", maxsplit=2)[-2:]
-        path = path.replace("~1", "/").replace("~0", "~")
-        # Check the traversal cache as it could've been populated in other places
-        traversal_key = (self.resolver.resolution_scope, path, method)
-        cached = cache.get_operation_by_traversal_key(traversal_key)
-        if cached is not None:
-            return cached
-        with in_scope(self.resolver, scope):
-            resolved = self._resolve_operation(operation)
-        parent_ref, _ = reference.rsplit("/", maxsplit=1)
-        _, path_item = self.resolver.resolve(parent_ref)
-        parameters = self._collect_operation_parameters(path_item, resolved)
-        initialized = self.make_operation(path, method, parameters, operation, resolved, scope)
-        cache.insert_operation(initialized, traversal_key=traversal_key, reference=reference)
-        return initialized
 
     def get_case_strategy(
         self,
@@ -794,62 +503,6 @@ def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[
         yield
 
 
-@dataclass
-class MethodMap(Mapping):
-    """Container for accessing API operations.
-
-    Provides a more specific error message if API operation is not found.
-    """
-
-    _parent: APIOperationMap
-    # Reference resolution scope
-    _scope: str
-    # Methods are stored for this path
-    _path: str
-    # Storage for definitions
-    _path_item: CaseInsensitiveDict
-
-    __slots__ = ("_parent", "_scope", "_path", "_path_item")
-
-    def __len__(self) -> int:
-        return len(self._path_item)
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._path_item)
-
-    def _init_operation(self, method: str) -> APIOperation:
-        method = method.lower()
-        operation = self._path_item[method]
-        schema = cast(BaseOpenAPISchema, self._parent._schema)
-        cache = schema._operation_cache
-        path = self._path
-        scope = self._scope
-        traversal_key = (scope, path, method)
-        cached = cache.get_operation_by_traversal_key(traversal_key)
-        if cached is not None:
-            return cached
-        schema.resolver.push_scope(scope)
-        try:
-            resolved = schema._resolve_operation(operation)
-        finally:
-            schema.resolver.pop_scope()
-        parameters = schema._collect_operation_parameters(self._path_item, resolved)
-        inner = OpenApi(self._parent._schema.raw_schema)[path][method]
-        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope, inner)
-        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=resolved.get("operationId"))
-        return initialized
-
-    def __getitem__(self, item: str) -> APIOperation:
-        try:
-            return self._init_operation(item)
-        except LookupError as exc:
-            available_methods = ", ".join(key.upper() for key in self if key in HTTP_METHODS)
-            message = f"Method `{item.upper()}` not found."
-            if available_methods:
-                message += f" Available methods: {available_methods}"
-            raise LookupError(message) from exc
-
-
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 
@@ -873,46 +526,6 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
-
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
-        # differently.
-        collected: list[OpenAPIParameter] = []
-        # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
-        # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
-        # Also, not every API has operations with payload (they might have only GET operations without payloads).
-        # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
-        # we have operations with a payload.
-        media_types = self._get_consumes_for_operation(definition)
-        # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
-        body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
-        # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
-        # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
-        # the default because it is broader since it allows us to upload files.
-        form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
-
-        form_parameters = []
-        for parameter in parameters:
-            if parameter["in"] == "formData":
-                # We need to gather form parameters first before creating a composite parameter for them
-                form_parameters.append(parameter)
-            elif parameter["in"] == "body":
-                for media_type in body_media_types:
-                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type))
-            else:
-                if parameter["in"] in ("header", "cookie"):
-                    check_header(parameter)
-                collected.append(OpenAPI20Parameter(definition=parameter))
-
-        if form_parameters:
-            for media_type in form_data_media_types:
-                collected.append(
-                    # Individual `formData` parameters are joined into a single "composite" one.
-                    OpenAPI20CompositeBody.from_parameters(*form_parameters, media_type=media_type)
-                )
-        return collected
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -1034,25 +647,6 @@ class OpenApi30(SwaggerV20):
             url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
             return urlsplit(url).path
         return "/"
-
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
-        collected: list[OpenAPIParameter] = []
-
-        for parameter in parameters:
-            if parameter["in"] in ("header", "cookie"):
-                check_header(parameter)
-            collected.append(OpenAPI30Parameter(definition=parameter))
-        if "requestBody" in definition:
-            required = definition["requestBody"].get("required", False)
-            description = definition["requestBody"].get("description")
-            for media_type, content in definition["requestBody"]["content"].items():
-                collected.append(
-                    OpenAPI30Body(content, description=description, media_type=media_type, required=required)
-                )
-        return collected
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
