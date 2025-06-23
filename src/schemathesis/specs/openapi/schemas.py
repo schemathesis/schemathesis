@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field
 from hashlib import sha1
@@ -21,7 +20,7 @@ from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
-from schemathesis.core import HTTP_METHODS, NOT_SET, NotSet, Specification, media_types
+from schemathesis.core import NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -32,8 +31,7 @@ from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
-from schemathesis.specs.openapi._access import OpenApi
-from schemathesis.specs.openapi.stateful import links
+from schemathesis.specs.openapi._access import ApiOperation, OpenApi
 
 from ...generation import GenerationMode
 from ...hooks import HookDispatcher
@@ -97,40 +95,15 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def __repr__(self) -> str:
-        info = self.raw_schema["info"]
-        return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
+        return f"<{self.__class__.__name__} for {self._spec.title} {self._spec.version}>"
 
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         return self._spec.find_operation_by_label(label)
 
-    def _should_skip(
-        self,
-        path: str,
-        method: str,
-        definition: dict[str, Any],
-        _ctx_cache: SimpleNamespace = SimpleNamespace(
-            operation=APIOperation(
-                method="",
-                path="",
-                label="",
-                schema=None,  # type: ignore
-                inner=None,
-            )
-        ),
-    ) -> bool:
-        if method not in HTTP_METHODS:
-            return True
+    def _should_skip(self, operation: ApiOperation) -> bool:
         if self.filter_set.is_empty():
             return False
-        # Attribute assignment is way faster than creating a new namespace every time
-        operation = _ctx_cache.operation
-        operation.method = method
-        operation.path = path
-        operation.label = f"{method.upper()} {path}"
-        operation.definition.raw = definition
-        operation.definition.resolved = definition
-        operation.schema = self
-        return not self.filter_set.match(_ctx_cache)
+        return not self.filter_set.match(SimpleNamespace(operation=operation))
 
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
@@ -149,7 +122,7 @@ class BaseOpenAPISchema(BaseSchema):
                 continue
             operation = result.ok()
 
-            is_selected = not should_skip(operation.path, operation.method, operation.definition)
+            is_selected = not should_skip(operation)
             if is_selected:
                 statistic.operations.selected += 1
                 # Store both identifiers
@@ -158,28 +131,24 @@ class BaseOpenAPISchema(BaseSchema):
                     selected_operations_by_id.add(operation_id)
                 selected_operations_by_path.add((operation.method, operation.path))
 
-            for response in operation.responses:
+            for response in operation.responses.values():
                 links = response.links
                 statistic.links.total += len(links)
                 if is_selected:
-                    for link in links:
+                    for link in links.values():
                         collected_links.append(link.definition)
 
         for link in collected_links:
             operation_id = link.get("operationId")
-            if operation_id is not None and operation_id in selected_operations_by_id:
-                statistic.links.selected += 1
+            if operation_id is not None:
+                if operation_id in selected_operations_by_id:
+                    statistic.links.selected += 1
             else:
                 operation = self._spec.find_operation_by_ref(link["operationRef"])
                 if operation is not None and (operation.method, operation.path) in selected_operations_by_path:
                     statistic.links.selected += 1
 
         return statistic
-
-    def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
-        while "$ref" in value:
-            _, value = self.resolver.resolve(value["$ref"])
-        return value
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
@@ -210,8 +179,6 @@ class BaseOpenAPISchema(BaseSchema):
                     schema=self,
                     inner=raw_operation,
                 )
-                # for parameter in parameters:
-                #     operation.add_parameter(parameter)
                 # config = self.config.generation_for(operation=operation)
                 # if config.with_security_parameters:
                 #     self.security.process_definitions(self.raw_schema, operation, self.resolver)
@@ -274,11 +241,6 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def _get_response_definitions(self, operation: APIOperation, response: Response):
-        status_code = str(response.status_code)
-        responses = operation.responses
-        return responses.get(status_code) or responses.get("default")
-
     def get_headers(self, operation: APIOperation, response: Response) -> dict[str, Any] | None:
         resolved = operation.inner.get_response_definition(response.status_code)
         if not resolved:
@@ -287,20 +249,6 @@ class BaseOpenAPISchema(BaseSchema):
 
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
-
-    def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
-        result: dict[str, dict[str, Any]] = defaultdict(dict)
-        for status_code, link in links.get_all_links(operation):
-            if isinstance(link, Ok):
-                name = link.ok().name
-            else:
-                name = link.err().name
-            result[status_code][name] = link
-
-        return result
-
-    def get_tags(self, operation: APIOperation) -> list[str] | None:
-        return operation.definition.raw.get("tags")
 
     @property
     def validator_cls(self) -> type[jsonschema.Validator]:
@@ -323,7 +271,7 @@ class BaseOpenAPISchema(BaseSchema):
         content_types = response.headers.get("content-type")
         failures: list[Failure] = []
         if content_types is None:
-            all_media_types = operation.inner.get_content_types(response.status_code)
+            all_media_types = operation.inner.output_content_types_for(response.status_code)
             formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             failures.append(MissingContentType(operation=operation.label, message=message, media_types=all_media_types))
@@ -503,10 +451,6 @@ def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[
         yield
 
 
-OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
-OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
-
-
 class SwaggerV20(BaseOpenAPISchema):
     nullable_name = "x-nullable"
     example_field = "x-example"
@@ -518,8 +462,7 @@ class SwaggerV20(BaseOpenAPISchema):
 
     @property
     def specification(self) -> Specification:
-        version = self.raw_schema.get("swagger", "2.0")
-        return Specification.openapi(version=version)
+        return Specification.openapi(version="2.0")
 
     def _validate(self) -> None:
         SWAGGER_20_VALIDATOR.validate(self.raw_schema)
@@ -540,8 +483,7 @@ class SwaggerV20(BaseOpenAPISchema):
         files, data = [], {}
         # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
         # explicitly, then use it., but if "multipart/form-data" is specified, then use it
-        content_types = self.get_request_payload_content_types(operation)
-        is_multipart = "multipart/form-data" in content_types
+        is_multipart = "multipart/form-data" in operation.input_content_types
 
         known_fields: dict[str, dict] = {}
 
@@ -569,9 +511,6 @@ class SwaggerV20(BaseOpenAPISchema):
                 add_file(name, value)
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
-
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        return self._get_consumes_for_operation(operation.definition.raw)
 
     def make_case(
         self,
@@ -601,13 +540,6 @@ class SwaggerV20(BaseOpenAPISchema):
             media_type=media_type,
             meta=meta,
         )
-
-    def _get_consumes_for_operation(self, definition: dict[str, Any]) -> list[str]:
-        global_consumes = self.raw_schema.get("consumes", [])
-        consumes = definition.get("consumes", [])
-        if not consumes:
-            consumes = global_consumes
-        return consumes
 
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         for parameter in definition.get("parameters", []):
@@ -654,10 +586,6 @@ class OpenApi30(SwaggerV20):
 
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return serialization.serialize_openapi3_parameters(definitions)
-
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        request_body = self._resolve_until_no_references(operation.definition.raw["requestBody"])
-        return list(request_body["content"])
 
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation
