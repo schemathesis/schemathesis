@@ -564,13 +564,8 @@ class APIOperation:
     method: str
     schema: BaseSchema
     inner: ApiOperation
-    label: str = None  # type: ignore
     app: Any = None
     base_url: str | None = None
-
-    def __post_init__(self) -> None:
-        if self.label is None:
-            self.label = f"{self.method.upper()} {self.path}"  # type: ignore
 
     def __deepcopy__(self, memo: dict) -> APIOperation:
         return self
@@ -586,6 +581,14 @@ class APIOperation:
     @property
     def full_path(self) -> str:
         return self.schema.get_full_path(self.path)
+
+    @property
+    def label(self) -> str:
+        return self.inner.label
+
+    @property
+    def is_deprecated(self) -> bool:
+        return self.inner.is_deprecated
 
     @property
     def tags(self) -> list[str] | None:
@@ -721,11 +724,6 @@ class APIOperation:
             media_type=media_type,
             meta=_meta,
         )
-
-    @property
-    def operation_reference(self) -> str:
-        path = self.path.replace("~", "~0").replace("/", "~1")
-        return f"#/paths/{path}/{self.method}"
 
     def validate_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool | None:
         """Validate a response against the API schema.

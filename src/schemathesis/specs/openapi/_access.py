@@ -221,6 +221,10 @@ class ApiOperation:
         return f"{self.method.upper()} {self.path}"
 
     @property
+    def is_deprecated(self) -> bool:
+        return self.definition.get("deprecated", False)
+
+    @property
     def input_content_types(self) -> list[str]:
         return self._accessor.extract_input_content_types(self)
 
