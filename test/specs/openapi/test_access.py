@@ -1411,3 +1411,22 @@ def test_response_links_references():
 
     assert response.links["ExternalRef"].definition["operationRef"] == "#/paths/~1users~1{id}/get"
     assert len(response.links) == 1
+
+
+def test_is_deprecated():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {"deprecated": True, "responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"201": {"description": "Created"}}},  # No operationId
+            },
+        },
+    }
+
+    OPENAPI_30_VALIDATOR.validate(raw_schema)
+    schema = OpenApi(raw_schema)
+
+    assert schema.find_operation_by_label("GET /users").is_deprecated
+    assert not schema.find_operation_by_label("POST /users").is_deprecated
