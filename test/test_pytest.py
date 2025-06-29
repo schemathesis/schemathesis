@@ -869,6 +869,22 @@ def test(case):
     result.assert_outcomes(passed=2)
 
 
+@pytest.mark.operations("csv_payload")
+def test_error_reporting(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+
+@schema.include(path_regex="csv").parametrize()
+def test(case):
+    pass
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert "while generating" not in result.stdout.str()
+
+
 def test_config_using_headers(testdir):
     testdir.make_test(
         """
