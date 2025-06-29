@@ -244,19 +244,25 @@ class Case:
 
         response = Response.from_any(response)
 
+        config = self.operation.schema.config.checks_config_for(
+            operation=self.operation, phase=self.meta.phase.name.value if self.meta is not None else None
+        )
+        if not checks:
+            # Checks are not specified explicitly, derive from the config
+            checks = []
+            for check in CHECKS.get_all():
+                name = check.__name__
+                if config.get_by_name(name=name).enabled:
+                    checks.append(check)
         checks = [
-            check
-            for check in list(checks or CHECKS.get_all()) + list(additional_checks or [])
-            if check not in set(excluded_checks or [])
+            check for check in list(checks) + list(additional_checks or []) if check not in set(excluded_checks or [])
         ]
 
         ctx = CheckContext(
             override=self._override,
             auth=None,
             headers=CaseInsensitiveDict(headers) if headers else None,
-            config=self.operation.schema.config.checks_config_for(
-                operation=self.operation, phase=self.meta.phase.name.value if self.meta is not None else None
-            ),
+            config=config,
             transport_kwargs=transport_kwargs,
             recorder=None,
         )

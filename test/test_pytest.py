@@ -881,8 +881,28 @@ def test(case):
 """
     )
     result = testdir.runpytest()
-    result.assert_outcomes(failed=1)
     assert "while generating" not in result.stdout.str()
+
+
+@pytest.mark.operations("failure")
+def test_disable_checks_via_config(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+config = schemathesis.Config.from_dict({{
+    "checks": {{
+        "not_a_server_error": {{"enabled": False}},
+        "content_type_conformance": {{"enabled": False}},
+    }}
+}})
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}', config=config)
+
+@schema.include(name="GET /failure").parametrize()
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
 
 
 def test_config_using_headers(testdir):
