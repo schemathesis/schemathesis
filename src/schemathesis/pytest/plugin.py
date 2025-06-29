@@ -20,6 +20,7 @@ from schemathesis.core.errors import (
     InvalidHeadersExample,
     InvalidRegexPattern,
     InvalidSchema,
+    SchemathesisError,
     SerializationNotPossible,
     format_exception,
 )
@@ -263,20 +264,27 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
 
 @pytest.hookimpl(tryfirst=True)  # type: ignore[misc]
 def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pytest.TestReport) -> None:
-    if call.excinfo and call.excinfo.type is FailureGroup:
-        tb_entries = list(call.excinfo.traceback)
-        total_frames = len(tb_entries)
+    if call.excinfo:
+        if issubclass(call.excinfo.type, SchemathesisError) and hasattr(call.excinfo.value, "__notes__"):
+            # Hypothesis adds quite a lot of additional debug information which is not that helpful in Schemathesis
+            call.excinfo.value.__notes__.clear()
+            report.longrepr = "".join(format_exception(call.excinfo.value))
+        if call.excinfo.type is FailureGroup:
+            tb_entries = list(call.excinfo.traceback)
+            total_frames = len(tb_entries)
 
-        # Keep internal Schemathesis frames + one extra one from the caller
-        skip_frames = 0
-        for i in range(total_frames - 1, -1, -1):
-            entry = tb_entries[i]
+            # Keep internal Schemathesis frames + one extra one from the caller
+            skip_frames = 0
+            for i in range(total_frames - 1, -1, -1):
+                entry = tb_entries[i]
 
-            if not str(entry.path).endswith("schemathesis/generation/case.py"):
-                skip_frames = i
-                break
+                if not str(entry.path).endswith("schemathesis/generation/case.py"):
+                    skip_frames = i
+                    break
 
-        report.longrepr = "".join(format_exception(call.excinfo.value, with_traceback=True, skip_frames=skip_frames))
+            report.longrepr = "".join(
+                format_exception(call.excinfo.value, with_traceback=True, skip_frames=skip_frames)
+            )
 
 
 @hookimpl(wrapper=True)

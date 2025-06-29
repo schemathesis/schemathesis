@@ -120,7 +120,7 @@ def openapi_cases(
                     for media_type in all_media_types
                 ):
                     # None of media types defined for this operation are not supported
-                    raise SerializationNotPossible.from_media_types(*all_media_types)
+                    raise SerializationNotPossible.from_media_types(*all_media_types) from None
                 # Other media types are possible - avoid choosing this media type in the future
                 event_text = f"Can't serialize data to `{parameter.media_type}`."
                 note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
