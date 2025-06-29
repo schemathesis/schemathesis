@@ -85,6 +85,12 @@ class RequestsTransport(BaseTransport["requests.Session"]):
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         import requests
 
+        config = case.operation.schema.config
+
+        timeout = config.request_timeout_for(operation=case.operation)
+        verify = config.tls_verify_for(operation=case.operation)
+        cert = config.request_cert_for(operation=case.operation)
+
         if session is not None and session.headers:
             # These headers are explicitly provided via config or CLI args.
             # They have lower priority than ones provided via `kwargs`
@@ -94,6 +100,14 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             kwargs["headers"] = headers
 
         data = self.serialize_case(case, **kwargs)
+
+        if verify is not None:
+            data.setdefault("verify", verify)
+        if timeout is not None:
+            data.setdefault("timeout", timeout)
+        if cert is not None:
+            data.setdefault("cert", cert)
+
         kwargs.pop("base_url", None)
         data.update({key: value for key, value in kwargs.items() if key not in data})
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
@@ -119,7 +133,6 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         verify = data.get("verify", True)
 
         try:
-            config = case.operation.schema.config
             rate_limit = config.rate_limit_for(operation=case.operation)
             with ratelimit(rate_limit, config.base_url):
                 response = session.request(**data)  # type: ignore

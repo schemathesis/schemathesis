@@ -905,6 +905,42 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
+def test_transport_kwargs_from_config(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+config = schemathesis.Config.from_dict({{
+    "tls-verify": False,
+    "headers": {{ "X-Foo": "Bar", "X-Spam": "Unknown" }},
+    "request-timeout": 3,
+    "request-cert": "foo",
+    "phases": {{
+        "coverage": {{
+            "enabled": False,
+        }}
+    }}
+}})
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}', config=config)
+
+def noop(*args, **kwargs):
+    pass
+
+@schema.include(name="GET /success").parametrize()
+@settings(suppress_health_check=list(HealthCheck))
+def test(case, mocker):
+    spy = mocker.patch("requests.Session.request")
+    case.call_and_validate(checks=[noop], headers={{"X-Spam": "Explicit" }})
+    kwargs = spy.call_args[1]
+    assert kwargs["verify"] is False
+    assert kwargs["timeout"] == 3
+    assert kwargs["cert"] == "foo"
+    assert kwargs["headers"]["X-Foo"] == "Bar"
+    assert kwargs["headers"]["X-Spam"] == "Explicit"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_config_using_headers(testdir):
     testdir.make_test(
         """
