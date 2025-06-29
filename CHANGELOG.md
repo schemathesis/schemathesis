@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.2...HEAD) - TBD
 
+### :wrench: Changed
+
+- **Pytest**: Cleaner error reporting for Schema-related errors (like unknown media type).
+
 ## [4.0.2](https://github.com/schemathesis/schemathesis/compare/v4.0.1...v4.0.2) - 2025-06-15
 
 ### :bug: Fixed
