@@ -5,10 +5,15 @@ from unittest.mock import patch
 
 import pytest
 import requests
+from jsonschema.exceptions import SchemaError
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from schemathesis.cli.commands.run.context import ExecutionContext
+from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
+from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.config import HealthCheck
+from schemathesis.config._report import ReportFormat
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -39,8 +44,8 @@ CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
 
 RESPONSE = Response(
     status_code=200,
-    headers={},
-    content=b"",
+    headers={"Content-Type": ["application/json"]},
+    content=b"{}",
     request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
     elapsed=0.1,
     verify=False,
@@ -365,11 +370,11 @@ def combined_check(ctx, response, case):
             continue
         try:
             check(ctx, response, case)
-        except Failure:
+        except (Failure, SchemaError):
             pass
 
 
-def test_default(corpus, filename):
+def test_default(corpus, filename, tmp_path):
     schema = _load_schema(corpus, filename)
     try:
         schema.as_state_machine()()
@@ -381,10 +386,23 @@ def test_default(corpus, filename):
     schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])
 
-    for event in from_schema(schema).execute():
-        if isinstance(event, events.Interrupted):
-            pytest.exit("Keyboard Interrupt")
-        assert_event(filename, event)
+    handlers = [
+        JunitXMLHandler(path=tmp_path / "junit.xml"),
+        CassetteWriter(format=ReportFormat.VCR, path=tmp_path / "vcr.yaml", config=schema.config),
+        CassetteWriter(format=ReportFormat.HAR, path=tmp_path / "har.json", config=schema.config),
+    ]
+    ctx = ExecutionContext(schema.config)
+
+    try:
+        for event in from_schema(schema).execute():
+            if isinstance(event, events.Interrupted):
+                pytest.exit("Keyboard Interrupt")
+            assert_event(filename, event)
+            for handler in handlers:
+                handler.handle_event(ctx, event)
+    finally:
+        for handler in handlers:
+            handler.shutdown(ctx)
 
 
 def test_coverage_phase(corpus, filename):
