@@ -1646,7 +1646,41 @@ def test_query_parameters_dont_exceed_max_length(ctx):
     )
 
 
-def test_path_parameters_always_present(ctx):
+def foo_id(value):
+    return {
+        "path_parameters": {
+            "foo_id": value,
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ["schema", "expected"],
+    [
+        (
+            {
+                "type": "integer",
+            },
+            [
+                foo_id({}),
+                foo_id("null,null"),
+                foo_id("null"),
+                foo_id("false"),
+            ],
+        ),
+        (
+            {"type": "string", "format": "date-time"},
+            [
+                foo_id("0"),
+                foo_id({}),
+                foo_id("null,null"),
+                foo_id("null"),
+                foo_id("false"),
+            ],
+        ),
+    ],
+)
+def test_path_parameters_always_present(ctx, schema, expected):
     schema = ctx.openapi.build_schema(
         {
             "/foo/{foo_id}": {
@@ -1656,9 +1690,7 @@ def test_path_parameters_always_present(ctx):
                             "name": "foo_id",
                             "in": "path",
                             "required": True,
-                            "schema": {
-                                "type": "integer",
-                            },
+                            "schema": schema,
                         },
                     ],
                     "responses": {"default": {"description": "OK"}},
@@ -1669,28 +1701,7 @@ def test_path_parameters_always_present(ctx):
     assert_coverage(
         schema,
         [GenerationMode.NEGATIVE],
-        [
-            {
-                "path_parameters": {
-                    "foo_id": {},
-                },
-            },
-            {
-                "path_parameters": {
-                    "foo_id": "null,null",
-                },
-            },
-            {
-                "path_parameters": {
-                    "foo_id": "null",
-                },
-            },
-            {
-                "path_parameters": {
-                    "foo_id": "false",
-                },
-            },
-        ],
+        expected,
         ("/foo/{foo_id}", "post"),
     )
 
