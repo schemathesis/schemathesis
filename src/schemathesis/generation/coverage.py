@@ -1060,7 +1060,7 @@ def _negative_type(
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
     for strategy in strategies.values():
         value = ctx.generate_from(strategy)
-        if seen.insert(value):
+        if seen.insert(value) and ctx.is_valid_for_location(value):
             yield NegativeValue(value, description="Incorrect type", location=ctx.current_path)
 
 
