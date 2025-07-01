@@ -568,7 +568,7 @@ These settings can only be applied at the project level.
 
 The following settings control how Schemathesis makes network requests to the API under test.
 
-#### `header`
+#### `headers`
 
 !!! note ""
 
