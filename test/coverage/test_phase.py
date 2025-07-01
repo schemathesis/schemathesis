@@ -1646,6 +1646,55 @@ def test_query_parameters_dont_exceed_max_length(ctx):
     )
 
 
+def test_path_parameters_always_present(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo/{foo_id}": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "foo_id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {
+                                "type": "integer",
+                            },
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.NEGATIVE],
+        [
+            {
+                "path_parameters": {
+                    "foo_id": {},
+                },
+            },
+            {
+                "path_parameters": {
+                    "foo_id": "null,null",
+                },
+            },
+            {
+                "path_parameters": {
+                    "foo_id": "null",
+                },
+            },
+            {
+                "path_parameters": {
+                    "foo_id": "false",
+                },
+            },
+        ],
+        ("/foo/{foo_id}", "post"),
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
