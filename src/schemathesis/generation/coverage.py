@@ -109,19 +109,22 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
 class CoverageContext:
     generation_modes: list[GenerationMode]
     location: str
+    is_required: bool
     path: list[str | int]
 
-    __slots__ = ("location", "generation_modes", "path")
+    __slots__ = ("location", "generation_modes", "is_required", "path")
 
     def __init__(
         self,
         *,
         location: str,
         generation_modes: list[GenerationMode] | None = None,
+        is_required: bool,
         path: list[str | int] | None = None,
     ) -> None:
         self.location = location
         self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
+        self.is_required = is_required
         self.path = path or []
 
     @contextmanager
@@ -140,6 +143,7 @@ class CoverageContext:
         return CoverageContext(
             location=self.location,
             generation_modes=[GenerationMode.POSITIVE],
+            is_required=self.is_required,
             path=self.path,
         )
 
@@ -147,6 +151,7 @@ class CoverageContext:
         return CoverageContext(
             location=self.location,
             generation_modes=[GenerationMode.NEGATIVE],
+            is_required=self.is_required,
             path=self.path,
         )
 
@@ -155,6 +160,16 @@ class CoverageContext:
             return not value or (is_latin_1_encodable(value) and not has_invalid_characters("", value))
         elif self.location == "path":
             return not is_invalid_path_parameter(value)
+        return True
+
+    def leads_to_negative_test_case(self, value: Any) -> bool:
+        if self.location == "query":
+            # Some values will not be serialized into the query string
+            if isinstance(value, list) and not self.is_required:
+                # Optional parameters should be present
+                return any(item not in [{}, []] for item in value)
+            if isinstance(value, dict) and not self.is_required:
+                return bool(value)
         return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
@@ -955,11 +970,13 @@ def _negative_items(ctx: CoverageContext, schema: dict[str, Any] | bool) -> Gene
     """Arrays not matching the schema."""
     nctx = ctx.with_negative()
     for value in cover_schema_iter(nctx, schema):
-        yield NegativeValue(
-            [value.value],
-            description=f"Array with invalid items: {value.description}",
-            location=nctx.current_path,
-        )
+        items = [value.value]
+        if ctx.leads_to_negative_test_case(items):
+            yield NegativeValue(
+                items,
+                description=f"Array with invalid items: {value.description}",
+                location=nctx.current_path,
+            )
 
 
 def _not_matching_pattern(value: str, pattern: re.Pattern) -> bool:

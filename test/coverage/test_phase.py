@@ -704,9 +704,6 @@ def test_mixed_type_keyword(ctx):
                 "query": {"key": [ANY]},
             },
             {
-                "query": {"key": [{}]},
-            },
-            {
                 "query": {"key": [["null", "null"]]},
             },
             {
@@ -1706,7 +1703,60 @@ def test_path_parameters_always_present(ctx, schema, expected):
     )
 
 
-def test_negative_query_parameter(ctx):
+@pytest.mark.parametrize(
+    ["schema", "required", "expected"],
+    [
+        [
+            {
+                "type": "string",
+                "enum": ["foo", "bar", "spam"],
+                "example": "spam",
+            },
+            False,
+            [
+                "http://127.0.0.1/foo?q=0&q=0",
+                ANY,
+                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=null&q=null",
+                "http://127.0.0.1/foo?q=null",
+                "http://127.0.0.1/foo?q=false",
+            ],
+        ],
+        [
+            {"type": "array", "items": {"type": "string"}},
+            False,
+            [
+                "http://127.0.0.1/foo?q=0&q=0",
+                "http://127.0.0.1/foo?q=null&q=null",
+                "http://127.0.0.1/foo?q=null",
+                "http://127.0.0.1/foo?q=false",
+                "http://127.0.0.1/foo?q=0",
+                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=null",
+                "http://127.0.0.1/foo?q=false",
+            ],
+        ],
+        [
+            {"type": "array", "items": {"type": "string"}},
+            True,
+            [
+                "http://127.0.0.1/foo",
+                "http://127.0.0.1/foo?q=0&q=0",
+                "http://127.0.0.1/foo",
+                "http://127.0.0.1/foo?q=null&q=null",
+                "http://127.0.0.1/foo?q=null",
+                "http://127.0.0.1/foo?q=false",
+                "http://127.0.0.1/foo?q=0",
+                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=null",
+                "http://127.0.0.1/foo?q=false",
+            ],
+        ],
+    ],
+)
+def test_negative_query_parameter(ctx, schema, expected, required):
     schema = ctx.openapi.build_schema(
         {
             "/foo": {
@@ -1715,11 +1765,8 @@ def test_negative_query_parameter(ctx):
                         {
                             "name": "q",
                             "in": "query",
-                            "schema": {
-                                "type": "string",
-                                "enum": ["foo", "bar", "spam"],
-                                "example": "spam",
-                            },
+                            "required": required,
+                            "schema": schema,
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},
@@ -1740,6 +1787,10 @@ def test_negative_query_parameter(ctx):
             return
         kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
         request = Request(**kwargs).prepare()
+        if not required:
+            # We generate negative data - optional parameters should appear in the URL, but should be incorrect
+            # Having it absent makes the case positive
+            assert "?q=" in request.url
         urls.append(request.url)
 
     config = ProjectConfig()
@@ -1757,14 +1808,7 @@ def test_negative_query_parameter(ctx):
 
     test_func()
 
-    assert urls == [
-        "http://127.0.0.1/foo?q=0&q=0",
-        ANY,
-        "http://127.0.0.1/foo?q=",
-        "http://127.0.0.1/foo?q=null&q=null",
-        "http://127.0.0.1/foo?q=null",
-        "http://127.0.0.1/foo?q=false",
-    ]
+    assert urls == expected
 
 
 def test_negative_data_rejection(ctx, cli, openapi3_base_url, snapshot_cli):
