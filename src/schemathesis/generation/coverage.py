@@ -1027,6 +1027,9 @@ def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generat
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format.setdefault("type", "string")
+    if ctx.location == "path":
+        # Empty path parameters are invalid
+        without_format["minLength"] = 1
     strategy = from_schema(without_format)
     if format in jsonschema.Draft202012Validator.FORMAT_CHECKER.checkers:
         if format == "hostname":
