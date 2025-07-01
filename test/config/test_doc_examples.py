@@ -4,17 +4,24 @@ from pathlib import Path
 import pytest
 import yaml
 
+from schemathesis.checks import CHECKS
 from schemathesis.config import SchemathesisConfig
+from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import HookError
+from schemathesis.core.transforms import resolve_pointer
 
 ROOT_DIR = Path(__file__).parent.parent.parent
 DOCS_DIR = ROOT_DIR / "docs"
 README_FILE = ROOT_DIR / "README.md"
 
 
-def extract_examples(path: str, format: str = "toml") -> list:
+def read_doc(path: str) -> str:
     with open(DOCS_DIR / path, encoding="utf-8") as fd:
-        markdown = fd.read()
+        return fd.read()
+
+
+def extract_examples(path: str, format: str = "toml") -> list:
+    markdown = read_doc(path)
     pattern = re.compile(rf"```{format}(.*?)```", re.DOTALL)
     return pattern.findall(markdown)
 
@@ -74,3 +81,48 @@ def test_yaml_snippets_are_valid(filename: str, snippet: str):
         yaml.safe_load(snippet)
     except yaml.YAMLError as exc:
         pytest.fail(f"Invalid YAML in {filename}:\n{exc}")
+
+
+def _resolve(current):
+    if "$ref" in current:
+        return resolve_pointer(CONFIG_SCHEMA, current["$ref"][1:])
+    return current
+
+
+def _search_rest(current, variant, title, segment):
+    data = _resolve(current["properties"][variant])
+    rest = title.split(segment, 1)[1].strip(".")
+    for rest_segment in rest.split("."):
+        data = data["properties"][rest_segment]
+
+
+def test_titles_are_valid():
+    markdown = read_doc("reference/configuration.md")
+    for title in re.findall(r"^####\s+`?([^`\n]+)`?", markdown, re.MULTILINE):
+        current = CONFIG_SCHEMA
+        for segment in title.split("."):
+            current = _resolve(current)
+            if segment.startswith("<"):
+                # Like `<format>`
+                name = segment.strip("<>")
+                if name == "format":
+                    variants = ["junit", "har", "vcr"]
+                elif name == "phase":
+                    variants = ["examples", "fuzzing", "coverage", "stateful"]
+                elif name == "check":
+                    if "expected-statuses" in title:
+                        variants = [
+                            name
+                            for name in CHECKS.get_all_names()
+                            if current["properties"][name]["$ref"] == "#/$defs/CheckConfig"
+                        ]
+                    else:
+                        variants = CHECKS.get_all_names()
+                else:
+                    raise ValueError(f"Unknown segment: {name}")
+
+                for variant in variants:
+                    _search_rest(current, variant, title, segment)
+                break
+            else:
+                current = current["properties"][segment]
