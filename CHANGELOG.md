@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Empty path parameter in the negative tests. [#2912](https://github.com/schemathesis/schemathesis/issues/2912)
+- Generating negative test cases where query parameters do not appear in the resulting URL making them positive. [#2900](https://github.com/schemathesis/schemathesis/issues/2900)
 
 ## [4.0.3](https://github.com/schemathesis/schemathesis/compare/v4.0.2...v4.0.3) - 2025-06-30
 

@@ -474,7 +474,10 @@ def _iter_coverage_cases(
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
-            coverage.CoverageContext(location=location, generation_modes=generation_modes), schema
+            coverage.CoverageContext(
+                location=location, generation_modes=generation_modes, is_required=parameter.is_required
+            ),
+            schema,
         )
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
@@ -492,7 +495,10 @@ def _iter_coverage_cases(
             if examples:
                 schema.setdefault("examples", []).extend(examples)
             gen = coverage.cover_schema_iter(
-                coverage.CoverageContext(location="body", generation_modes=generation_modes), schema
+                coverage.CoverageContext(
+                    location="body", generation_modes=generation_modes, is_required=body.is_required
+                ),
+                schema,
             )
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet):
@@ -712,11 +718,13 @@ def _iter_coverage_cases(
             }
 
         def _yield_negative(
-            subschema: dict[str, Any], _location: str, _container_name: str
+            subschema: dict[str, Any], _location: str, _container_name: str, is_required: bool
         ) -> Generator[Case, None, None]:
             iterator = iter(
                 coverage.cover_schema_iter(
-                    coverage.CoverageContext(location=_location, generation_modes=[GenerationMode.NEGATIVE]),
+                    coverage.CoverageContext(
+                        location=_location, generation_modes=[GenerationMode.NEGATIVE], is_required=is_required
+                    ),
                     subschema,
                 )
             )
@@ -751,7 +759,7 @@ def _iter_coverage_cases(
                 )
             if GenerationMode.NEGATIVE in generation_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
-                for case in _yield_negative(subschema, location, container_name):
+                for case in _yield_negative(subschema, location, container_name, is_required=bool(required)):
                     kwargs = _case_to_kwargs(case)
                     if not seen_negative.insert(kwargs):
                         continue
@@ -778,7 +786,7 @@ def _iter_coverage_cases(
                 )
                 if GenerationMode.NEGATIVE in generation_modes:
                     subschema = _combination_schema(combo, required, parameter_set)
-                    for case in _yield_negative(subschema, location, container_name):
+                    for case in _yield_negative(subschema, location, container_name, is_required=bool(required)):
                         assert case.meta is not None
                         assert isinstance(case.meta.phase.data, CoveragePhaseData)
                         # Already generated in one of the blocks above
