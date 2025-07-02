@@ -327,9 +327,9 @@ def cached_test_func(f: Callable) -> Callable:
         except (KeyboardInterrupt, Failure):
             raise
         except Exception as exc:
-            if isinstance(exc, (requests.ConnectionError, ChunkedEncodingError)) and is_unrecoverable_network_error(
-                exc
-            ):
+            if isinstance(
+                exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
+            ) and is_unrecoverable_network_error(exc):
                 # Server likely has crashed and does not accept any connections at all
                 # Don't report these error - only the original crash should be reported
                 if exc.request is not None:

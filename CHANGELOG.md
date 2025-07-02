@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.3...HEAD) - TBD
 
+### :wrench: Changed
+
+- Show cURL commands on network timeouts.
+
 ### :bug: Fixed
 
 - Empty path parameter in the negative tests. [#2912](https://github.com/schemathesis/schemathesis/issues/2912)
