@@ -26,6 +26,10 @@ Network Error
 
 Read timed out after 0.08 seconds
 
+Reproduce with:
+
+    curl -X GET http://127.0.0.1/api/slow
+
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================

@@ -421,6 +421,7 @@ def clear_hypothesis_notes(exc: Exception) -> None:
 def is_unrecoverable_network_error(exc: Exception) -> bool:
     from http.client import RemoteDisconnected
 
+    import requests
     from urllib3.exceptions import ProtocolError
 
     def has_connection_reset(inner: BaseException) -> bool:
@@ -433,6 +434,8 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
         return False
 
+    if isinstance(exc, requests.Timeout):
+        return True
     if isinstance(exc.__context__, ProtocolError):
         if len(exc.__context__.args) == 2 and isinstance(exc.__context__.args[1], RemoteDisconnected):
             return True
@@ -442,14 +445,16 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
     return has_connection_reset(exc)
 
 
-@dataclass()
+@dataclass
 class UnrecoverableNetworkError:
-    error: requests.ConnectionError | ChunkedEncodingError
+    error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout
     code_sample: str
 
     __slots__ = ("error", "code_sample")
 
-    def __init__(self, error: requests.ConnectionError | ChunkedEncodingError, code_sample: str) -> None:
+    def __init__(
+        self, error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, code_sample: str
+    ) -> None:
         self.error = error
         self.code_sample = code_sample
 
