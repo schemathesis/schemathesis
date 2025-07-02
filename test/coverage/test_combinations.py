@@ -65,17 +65,17 @@ def assert_not_conform(values: list, schema: dict):
 
 @pytest.fixture
 def ctx():
-    return CoverageContext(location="query", is_required=True)
+    return CoverageContext(location="body", is_required=True)
 
 
 @pytest.fixture
 def pctx():
-    return CoverageContext(location="query", generation_modes=[GenerationMode.POSITIVE], is_required=True)
+    return CoverageContext(location="body", generation_modes=[GenerationMode.POSITIVE], is_required=True)
 
 
 @pytest.fixture
 def nctx():
-    return CoverageContext(location="query", generation_modes=[GenerationMode.NEGATIVE], is_required=True)
+    return CoverageContext(location="body", generation_modes=[GenerationMode.NEGATIVE], is_required=True)
 
 
 @pytest.mark.parametrize(
