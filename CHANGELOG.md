@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Do not generate negative test cases during the coverage phase if the original schema accepts any value.
+- False positive test cases on path, query, header, and cookie parameters of type "string". [#2900](https://github.com/schemathesis/schemathesis/issues/2900), [#2913](https://github.com/schemathesis/schemathesis/issues/2913)
 
 ### :wrench: Changed
 

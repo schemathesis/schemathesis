@@ -179,14 +179,14 @@ class CoverageContext:
 
     def can_be_negated(self, schema: dict[str, Any]) -> bool:
         # Path, query, header, and cookie parameters will be stringified anyway
-        # If there are no constraints, then anything will match the original schema after serialization
+        # If there are no constraints or only `type: string`, then anything will match the original schema after serialization
         if self.location in ("query", "path", "header", "cookie"):
             cleaned = {
                 k: v
                 for k, v in schema.items()
                 if not k.startswith("x-") and k not in ["description", "example", "examples"]
             }
-            return cleaned != {}
+            return cleaned not in [{}, {"type": "string"}]
         return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
