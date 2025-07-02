@@ -139,6 +139,34 @@ MIXED_CASES = [
 ]
 
 
+def build_schema(ctx, parameters=None, request_body=None, responses=None, version="3.0.2", path="/foo", method="post"):
+    if responses is None:
+        responses = {"default": {"description": "OK"}}
+
+    schema = {
+        path: {
+            method: {
+                "responses": responses,
+            }
+        }
+    }
+    if parameters is not None:
+        schema[path][method]["parameters"] = parameters
+
+    if request_body is not None:
+        schema[path][method]["requestBody"] = request_body
+
+    return ctx.openapi.build_schema(schema, version=version)
+
+
+def assert_positive_coverage(schema, expected, path=None):
+    return assert_coverage(schema, [GenerationMode.POSITIVE], expected, path)
+
+
+def assert_negative_coverage(schema, expected, path=None):
+    return assert_coverage(schema, [GenerationMode.NEGATIVE], expected, path)
+
+
 @pytest.mark.parametrize(
     ("methods", "expected"),
     [
@@ -157,107 +185,85 @@ MIXED_CASES = [
     ],
 )
 def test_phase(ctx, methods, expected):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "q1",
-                            "schema": {"type": "integer", "minimum": 5},
-                            "required": True,
-                        },
-                        {
-                            "in": "query",
-                            "name": "q2",
-                            "schema": {"type": "string", "minLength": 3},
-                            "required": True,
-                        },
-                        {
-                            "in": "header",
-                            "name": "h1",
-                            "schema": {"type": "integer", "maximum": 5},
-                            "required": True,
-                        },
-                        {
-                            "in": "header",
-                            "name": "h2",
-                            "schema": {"type": "string", "maxLength": 3},
-                            "required": True,
-                        },
-                    ],
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"j-prop": {"type": "integer"}},
-                                    "required": ["j-prop"],
-                                },
-                            },
-                            "application/xml": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {"x-prop": {"type": "string"}},
-                                    "required": ["x-prop"],
-                                },
-                            },
-                        },
-                    },
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "schema": {"type": "integer", "minimum": 5},
+                "required": True,
             },
-        }
+            {
+                "in": "query",
+                "name": "q2",
+                "schema": {"type": "string", "minLength": 3},
+                "required": True,
+            },
+            {
+                "in": "header",
+                "name": "h1",
+                "schema": {"type": "integer", "maximum": 5},
+                "required": True,
+            },
+            {
+                "in": "header",
+                "name": "h2",
+                "schema": {"type": "string", "maxLength": 3},
+                "required": True,
+            },
+        ],
+        {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"j-prop": {"type": "integer"}},
+                        "required": ["j-prop"],
+                    },
+                },
+                "application/xml": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"x-prop": {"type": "string"}},
+                        "required": ["x-prop"],
+                    },
+                },
+            },
+        },
     )
     assert_coverage(schema, methods, expected)
 
 
 def test_phase_no_body(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "q1",
-                            "schema": {"type": "integer", "minimum": 5},
-                            "required": True,
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "schema": {"type": "integer", "minimum": 5},
+                "required": True,
             },
-        }
+        ],
     )
-    assert_coverage(schema, [GenerationMode.POSITIVE], [{"query": {"q1": "6"}}, {"query": {"q1": "5"}}])
+    assert_positive_coverage(schema, [{"query": {"q1": "6"}}, {"query": {"q1": "5"}}])
 
 
 def test_with_example(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "q1",
-                            "schema": {"type": "string", "example": "secret"},
-                            "required": True,
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "schema": {"type": "string", "example": "secret"},
+                "required": True,
             },
-        }
+        ],
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        [{"query": {"q1": "secret"}}],
-    )
+    assert_positive_coverage(schema, [{"query": {"q1": "secret"}}])
 
 
 EXPECTED_EXAMPLES = [
@@ -268,63 +274,46 @@ EXPECTED_EXAMPLES = [
 
 
 def test_with_examples_openapi_3(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "q1",
-                            "schema": {"type": "string"},
-                            "required": True,
-                            "examples": {
-                                "first": {"value": "A1"},
-                                "second": {"value": "B2"},
-                            },
-                        },
-                        {
-                            "in": "query",
-                            "name": "q2",
-                            "schema": {"type": "integer"},
-                            "required": True,
-                            "examples": {
-                                "first": {"value": 10},
-                                "second": {"value": 20},
-                            },
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "schema": {"type": "string"},
+                "required": True,
+                "examples": {
+                    "first": {"value": "A1"},
+                    "second": {"value": "B2"},
+                },
             },
-        }
+            {
+                "in": "query",
+                "name": "q2",
+                "schema": {"type": "integer"},
+                "required": True,
+                "examples": {
+                    "first": {"value": 10},
+                    "second": {"value": 20},
+                },
+            },
+        ],
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        EXPECTED_EXAMPLES,
-    )
+    assert_positive_coverage(schema, EXPECTED_EXAMPLES)
 
 
 def test_with_optional_parameters(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
-                        {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": False, "example": 10},
-                        {"in": "query", "name": "q3", "schema": {"type": "integer"}, "required": False, "example": 15},
-                        {"in": "query", "name": "q4", "schema": {"type": "integer"}, "required": False, "example": 20},
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
-            },
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
+            {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": False, "example": 10},
+            {"in": "query", "name": "q3", "schema": {"type": "integer"}, "required": False, "example": 15},
+            {"in": "query", "name": "q4", "schema": {"type": "integer"}, "required": False, "example": 20},
+        ],
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         [
             {
                 "query": {
@@ -383,22 +372,15 @@ def test_with_optional_parameters(ctx):
 
 
 def test_with_example_openapi_3(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
-                        {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": True, "example": 10},
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
-            },
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
+            {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": True, "example": 10},
+        ],
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         [
             {
                 "query": {
@@ -435,9 +417,8 @@ def test_with_response_example_openapi_3(ctx):
         },
         components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         [
             {
                 "path_parameters": {
@@ -454,11 +435,9 @@ def test_with_response_example_openapi_3(ctx):
     )
 
 
-def test_with_examples_openapi_3_1():
-    schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+def test_with_examples_openapi_3_1(ctx):
+    schema = ctx.openapi.build_schema(
+        {
             "/foo": {
                 "post": {
                     "parameters": [
@@ -479,65 +458,55 @@ def test_with_examples_openapi_3_1():
                 }
             }
         },
-    }
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        EXPECTED_EXAMPLES,
+        version="3.1.0",
     )
+    assert_positive_coverage(schema, EXPECTED_EXAMPLES)
 
 
 def test_with_examples_openapi_3_request_body(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "age": {"type": "integer"},
-                                        "tags": {"type": "array", "items": {"type": "string"}},
-                                        "address": {
-                                            "type": "object",
-                                            "properties": {"street": {"type": "string"}, "city": {"type": "string"}},
-                                        },
-                                    },
-                                    "required": ["name", "age"],
-                                },
-                                "examples": {
-                                    "example1": {
-                                        "value": {
-                                            "name": "John Doe",
-                                            "age": 30,
-                                            "tags": ["developer", "python"],
-                                            "address": {"street": "123 Main St", "city": "Anytown"},
-                                        }
-                                    },
-                                    "example2": {
-                                        "value": {
-                                            "name": "Jane Smith",
-                                            "age": 25,
-                                            "tags": ["designer", "ui/ux"],
-                                            "address": {"street": "456 Elm St", "city": "Somewhere"},
-                                        }
-                                    },
-                                },
+    schema = build_schema(
+        ctx,
+        request_body={
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "age": {"type": "integer"},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                            "address": {
+                                "type": "object",
+                                "properties": {"street": {"type": "string"}, "city": {"type": "string"}},
+                            },
+                        },
+                        "required": ["name", "age"],
+                    },
+                    "examples": {
+                        "example1": {
+                            "value": {
+                                "name": "John Doe",
+                                "age": 30,
+                                "tags": ["developer", "python"],
+                                "address": {"street": "123 Main St", "city": "Anytown"},
                             }
                         },
-                        "required": True,
+                        "example2": {
+                            "value": {
+                                "name": "Jane Smith",
+                                "age": 25,
+                                "tags": ["designer", "ui/ux"],
+                                "address": {"street": "456 Elm St", "city": "Somewhere"},
+                            }
+                        },
                     },
-                    "responses": {"default": {"description": "OK"}},
                 }
             },
-        }
+            "required": True,
+        },
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         [
             {
                 "body": {
@@ -629,73 +598,56 @@ def test_with_examples_openapi_3_request_body(ctx):
 
 
 def test_with_examples_openapi_2(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "q1",
-                            "type": "string",
-                            "required": True,
-                            "x-examples": {
-                                "first": {"value": "A1"},
-                                "second": {"value": "B2"},
-                            },
-                        },
-                        {
-                            "in": "query",
-                            "name": "q2",
-                            "type": "integer",
-                            "required": True,
-                            "x-examples": {
-                                "first": {"value": 10},
-                                "second": {"value": 20},
-                            },
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "type": "string",
+                "required": True,
+                "x-examples": {
+                    "first": {"value": "A1"},
+                    "second": {"value": "B2"},
+                },
             },
-        },
+            {
+                "in": "query",
+                "name": "q2",
+                "type": "integer",
+                "required": True,
+                "x-examples": {
+                    "first": {"value": 10},
+                    "second": {"value": 20},
+                },
+            },
+        ],
         version="2.0",
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        EXPECTED_EXAMPLES,
-    )
+    assert_positive_coverage(schema, EXPECTED_EXAMPLES)
 
 
 def test_mixed_type_keyword(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "key",
-                            "in": "query",
-                            "required": False,
-                            "schema": {
-                                "type": "array",
-                                "items": {
-                                    "type": "string",
-                                    "enum": ["a", "b"],
-                                    "additionalProperties": False,
-                                },
-                            },
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "key",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["a", "b"],
+                        "additionalProperties": False,
+                    },
+                },
             },
-        }
+        ],
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "query": {"key": ["0", "0"]},
@@ -732,37 +684,30 @@ def test_mixed_type_keyword(ctx):
 
 
 def test_negative_patterns(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "name": {
-                                            "type": "string",
-                                            "minLength": 3,
-                                            "maxLength": 10,
-                                            "pattern": "^[a-zA-Z0-9-_]$",
-                                        },
-                                    },
-                                    "required": ["name"],
-                                },
-                            }
+    schema = build_schema(
+        ctx,
+        request_body={
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "minLength": 3,
+                                "maxLength": 10,
+                                "pattern": "^[a-zA-Z0-9-_]$",
+                            },
                         },
-                        "required": True,
+                        "required": ["name"],
                     },
-                    "responses": {"default": {"description": "OK"}},
                 }
             },
-        }
+            "required": True,
+        },
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "body": {},
@@ -825,23 +770,17 @@ def test_negative_patterns(ctx):
 
 
 def test_array_in_header_path_query(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo/{bar}": {
-                "post": {
-                    "parameters": [
-                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
-                        {"name": "bar", "in": "path", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+            {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
+            {"name": "bar", "in": "path", "required": True, "schema": {"type": "string"}},
+        ],
+        path="/foo/{bar}",
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -922,22 +861,15 @@ def test_array_in_header_path_query(ctx):
 
 
 def test_required_header(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "X-API-Key-2", "in": "header", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+            {"name": "X-API-Key-2", "in": "header", "required": True, "schema": {"type": "string"}},
+        ],
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -974,22 +906,15 @@ def test_required_header(ctx):
 
 
 def test_required_and_optional_headers(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
-                        {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+            {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string"}},
+        ],
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
@@ -1041,73 +966,47 @@ def test_required_and_optional_headers(ctx):
 
 
 def test_path_parameter_string_non_empty(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "name",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "name",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string"},
             }
-        }
+        ],
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        [{"path_parameters": {"name": "0"}}],
-    )
+    assert_positive_coverage(schema, [{"path_parameters": {"name": "0"}}])
 
 
 @pytest.mark.parametrize("extra", [{}, {"pattern": "[0-9]{1}", "minLength": 1}])
 def test_path_parameter_invalid_example(ctx, extra):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "name",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", **extra},
-                            "example": "/",
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "name",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string", **extra},
+                "example": "/",
             }
-        }
+        ],
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        [{"path_parameters": {"name": "0"}}],
-    )
+    assert_positive_coverage(schema, [{"path_parameters": {"name": "0"}}])
 
 
 def test_path_parameter(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo/{id}": {
-                "post": {
-                    "parameters": [
-                        {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+        ],
+        path="/foo/{id}",
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "path_parameters": {
@@ -1135,26 +1034,19 @@ def test_path_parameter(ctx):
 
 
 def test_incorrect_headers_with_loose_schema(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "authorization",
-                            "in": "header",
-                            "required": False,
-                            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "authorization",
+                "in": "header",
+                "required": False,
+                "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"},
             }
-        }
+        ],
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         (
             [
                 {"headers": {"authorization": ANY}},
@@ -1170,83 +1062,56 @@ def test_incorrect_headers_with_loose_schema(ctx):
 
 
 def test_incorrect_headers(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "X-API-Key-1",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string"},
-                            "example": "тест",
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "X-API-Key-1",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "string"},
+                "example": "тест",
+            },
+        ],
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        [{"headers": {"X-API-Key-1": ""}}],
-    )
+    assert_positive_coverage(schema, [{"headers": {"X-API-Key-1": ""}}])
 
 
 def test_use_default(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "Key",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "string", "default": "DEFAULT-VALUE"},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "Key",
+                "in": "query",
+                "required": True,
+                "schema": {"type": "string", "default": "DEFAULT-VALUE"},
+            },
+        ],
     )
-    assert_coverage(
-        schema,
-        [GenerationMode.POSITIVE],
-        [{"query": {"Key": "DEFAULT-VALUE"}}],
-    )
+    assert_positive_coverage(schema, [{"query": {"Key": "DEFAULT-VALUE"}}])
 
 
 def test_optional_parameter_without_type(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "query",
-                            "required": True,
-                            "schema": {"title": "Query", "type": "string"},
-                        },
-                        {
-                            "in": "query",
-                            "name": "locking_period",
-                            "required": False,
-                            "schema": {"default": 24, "title": "Locking Period"},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "query",
+                "required": True,
+                "schema": {"title": "Query", "type": "string"},
+            },
+            {
+                "in": "query",
+                "name": "locking_period",
+                "required": False,
+                "schema": {"default": 24, "title": "Locking Period"},
+            },
+        ],
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {
                 "query": {
@@ -1296,26 +1161,19 @@ def test_optional_parameter_without_type(ctx):
 
 
 def test_incorrect_headers_with_enum(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "X-API-Key-1",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"enum": ["foo"]},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "X-API-Key-1",
+                "in": "header",
+                "required": True,
+                "schema": {"enum": ["foo"]},
+            },
+        ],
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         (
             [
                 {},
@@ -1344,30 +1202,23 @@ def test_incorrect_headers_with_enum(ctx):
 
 
 def test_generate_empty_headers_too(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "X-API-Key-1",
-                            "in": "header",
-                            "required": True,
-                            "schema": {
-                                "maxLength": 40,
-                                "pattern": "^[\\w\\W]+$",
-                                "type": "string",
-                            },
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "X-API-Key-1",
+                "in": "header",
+                "required": True,
+                "schema": {
+                    "maxLength": 40,
+                    "pattern": "^[\\w\\W]+$",
+                    "type": "string",
+                },
+            },
+        ],
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         [
             {},
             {"headers": {"X-API-Key-1": "{}"}},
@@ -1380,171 +1231,111 @@ def test_generate_empty_headers_too(ctx):
     )
 
 
-def test_more_than_max_items(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {"type": "boolean"},
-                                    "maxItems": 3,
-                                },
-                            }
-                        },
-                    },
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    assert_coverage(
-        schema,
-        [GenerationMode.NEGATIVE],
-        [
-            {"body": [False, False, False, False]},
-            {"body": [{}]},
-            {"body": [[None, None]]},
-            {"body": [""]},
-            {"body": [None]},
-            {"body": [0]},
-            {"body": {}},
-            {"body": ""},
-            {},
-            {"body": False},
-            {"body": 0},
-        ],
-    )
-
-
-def test_less_than_min_items(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {"type": "boolean"},
-                                    "minItems": 3,
-                                },
-                            }
-                        },
-                    },
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    assert_coverage(
-        schema,
-        [GenerationMode.NEGATIVE],
-        [
-            {"body": [False, False]},
-            {"body": [{}]},
-            {"body": [[None, None]]},
-            {"body": [""]},
-            {"body": [None]},
-            {"body": [0]},
-            {"body": {}},
-            {"body": ""},
-            {},
-            {"body": False},
-            {"body": 0},
-        ],
-    )
-
-
+@pytest.mark.parametrize(
+    ["schema", "expected"],
+    [
+        (
+            {
+                "type": "array",
+                "items": {"type": "boolean"},
+                "maxItems": 3,
+            },
+            [
+                {"body": [False, False, False, False]},
+                {"body": [{}]},
+                {"body": [[None, None]]},
+                {"body": [""]},
+                {"body": [None]},
+                {"body": [0]},
+                {"body": {}},
+                {"body": ""},
+                {},
+                {"body": False},
+                {"body": 0},
+            ],
+        ),
+        (
+            {
+                "type": "array",
+                "items": {"type": "boolean"},
+                "minItems": 3,
+            },
+            [
+                {"body": [False, False]},
+                {"body": [{}]},
+                {"body": [[None, None]]},
+                {"body": [""]},
+                {"body": [None]},
+                {"body": [0]},
+                {"body": {}},
+                {"body": ""},
+                {},
+                {"body": False},
+                {"body": 0},
+            ],
+        ),
+        (
+            {
+                "type": "array",
+                "items": {
+                    "pattern": "[\\p{L}]+",
+                },
+                "maxItems": 50,
+            },
+            [
+                {
+                    "body": [],
+                },
+                {
+                    "body": {},
+                },
+                {
+                    "body": "",
+                },
+                {},
+                {
+                    "body": False,
+                },
+                {
+                    "body": 0,
+                },
+            ],
+        ),
+    ],
+)
 @pytest.mark.filterwarnings("ignore::UserWarning")
-def test_min_items_with_unsupported_pattern(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "pattern": "[\\p{L}]+",
-                                    },
-                                    "maxItems": 50,
-                                },
-                            }
-                        },
-                    },
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
-        }
-    )
-    assert_coverage(
-        schema,
-        [GenerationMode.NEGATIVE],
-        [
-            {
-                "body": [],
-            },
-            {
-                "body": {},
-            },
-            {
-                "body": "",
-            },
-            {},
-            {
-                "body": False,
-            },
-            {
-                "body": 0,
-            },
-        ],
-    )
+def test_array_constraints(ctx, schema, expected):
+    schema = build_schema(ctx, request_body={"required": True, "content": {"application/json": {"schema": schema}}})
+    assert_negative_coverage(schema, expected)
 
 
 def test_query_parameters_with_nested_enum(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "q1",
-                            "schema": {
-                                "items": {
-                                    "enum": [
-                                        "A",
-                                        "B",
-                                        "C",
-                                        "D",
-                                        "E",
-                                        "F",
-                                    ],
-                                    "type": "string",
-                                },
-                                "type": "array",
-                            },
-                            "required": True,
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "q1",
+                "schema": {
+                    "items": {
+                        "enum": [
+                            "A",
+                            "B",
+                            "C",
+                            "D",
+                            "E",
+                            "F",
+                        ],
+                        "type": "string",
+                    },
+                    "type": "array",
+                },
+                "required": True,
             },
-        }
+        ],
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         [
             {
                 "query": {
@@ -1598,31 +1389,24 @@ def test_query_parameters_with_nested_enum(ctx):
 
 
 def test_query_parameters_dont_exceed_max_length(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "foo",
-                            "in": "query",
-                            "required": False,
-                            "schema": {
-                                "type": "string",
-                                "pattern": "^bar\\.spam\\.[^,]+(?:,bar\\.spam\\.[^,]+)*$",
-                                "minLength": 1,
-                                "maxLength": 60,
-                            },
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "foo",
+                "in": "query",
+                "required": False,
+                "schema": {
+                    "type": "string",
+                    "pattern": "^bar\\.spam\\.[^,]+(?:,bar\\.spam\\.[^,]+)*$",
+                    "minLength": 1,
+                    "maxLength": 60,
+                },
             },
-        }
+        ],
     )
-    assert_coverage(
+    assert_positive_coverage(
         schema,
-        [GenerationMode.POSITIVE],
         [
             {
                 "query": {
@@ -1678,26 +1462,20 @@ def foo_id(value):
     ],
 )
 def test_path_parameters_always_present(ctx, schema, expected):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo/{foo_id}": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "foo_id",
-                            "in": "path",
-                            "required": True,
-                            "schema": schema,
-                        },
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "foo_id",
+                "in": "path",
+                "required": True,
+                "schema": schema,
             },
-        }
+        ],
+        path="/foo/{foo_id}",
     )
-    assert_coverage(
+    assert_negative_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
         expected,
         ("/foo/{foo_id}", "post"),
     )
@@ -1757,22 +1535,16 @@ def test_path_parameters_always_present(ctx, schema, expected):
     ],
 )
 def test_negative_query_parameter(ctx, schema, expected, required):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "required": required,
-                            "schema": schema,
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "q",
+                "in": "query",
+                "required": required,
+                "schema": schema,
             }
-        }
+        ],
     )
 
     schema = schemathesis.openapi.from_dict(schema)
@@ -1812,22 +1584,20 @@ def test_negative_query_parameter(ctx, schema, expected, required):
 
 
 def test_negative_data_rejection(ctx, cli, openapi3_base_url, snapshot_cli):
-    raw_schema = {
-        "/success": {
-            "get": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "page_num",
-                        "required": False,
-                        "schema": {"type": "integer", "minimum": 1, "maximum": 999, "default": 1},
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}},
-            },
-        }
-    }
-    schema_path = ctx.openapi.write_schema(raw_schema)
+    raw_schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "query",
+                "name": "page_num",
+                "required": False,
+                "schema": {"type": "integer", "minimum": 1, "maximum": 999, "default": 1},
+            }
+        ],
+        path="/success",
+        method="get",
+    )
+    schema_path = ctx.openapi.write_schema(raw_schema["paths"])
     assert (
         cli.main(
             "run",
@@ -1935,29 +1705,23 @@ def failed(ctx, response, case):
 
 
 def test_urlencoded_payloads_are_valid(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/x-www-form-urlencoded": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "key": {"type": "number", "example": 1},
-                                    },
-                                    "required": ["key"],
-                                },
-                                "example": {"key": 1},
-                            }
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/x-www-form-urlencoded": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "key": {"type": "number", "example": 1},
                         },
+                        "required": ["key"],
                     },
-                    "responses": {"default": {"description": "OK"}},
+                    "example": {"key": 1},
                 }
-            }
-        }
+            },
+        },
     )
     schema = schemathesis.openapi.from_dict(schema)
 
@@ -1984,19 +1748,13 @@ def test_urlencoded_payloads_are_valid(ctx):
 
 
 def test_no_missing_header_duplication(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "parameters": [
-                        {"name": "X-Key-1", "in": "header", "required": False, "schema": {"type": "string"}},
-                        {"name": "X-Key-2", "in": "header", "required": False, "schema": {"type": "string"}},
-                        {"name": "X-Key-3", "in": "header", "required": True, "schema": {"type": "string"}},
-                    ],
-                    "responses": {"default": {"description": "OK"}},
-                }
-            }
-        }
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "X-Key-1", "in": "header", "required": False, "schema": {"type": "string"}},
+            {"name": "X-Key-2", "in": "header", "required": False, "schema": {"type": "string"}},
+            {"name": "X-Key-3", "in": "header", "required": True, "schema": {"type": "string"}},
+        ],
     )
     schema = schemathesis.openapi.from_dict(schema)
 
