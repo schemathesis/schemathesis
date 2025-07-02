@@ -240,7 +240,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     ):
         raise AcceptedNegativeData(
             operation=case.operation.label,
-            message=f"Allowed statuses: {', '.join(config.expected_statuses)}",
+            message=f"Invalid data should have been rejected\nExpected: {', '.join(config.expected_statuses)}",
             status_code=response.status_code,
             expected_statuses=config.expected_statuses,
         )
@@ -264,7 +264,7 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
     if case.meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
         raise RejectedPositiveData(
             operation=case.operation.label,
-            message=f"Allowed statuses: {', '.join(config.expected_statuses)}",
+            message=f"Valid data should have been accepted\nExpected: {', '.join(config.expected_statuses)}",
             status_code=response.status_code,
             allowed_statuses=config.expected_statuses,
         )
