@@ -330,7 +330,7 @@ class AcceptedNegativeData(Failure):
         message: str,
         status_code: int,
         expected_statuses: list[str],
-        title: str = "Accepted negative data",
+        title: str = "API accepted schema-violating request",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -358,7 +358,7 @@ class RejectedPositiveData(Failure):
         message: str,
         status_code: int,
         allowed_statuses: list[str],
-        title: str = "Rejected positive data",
+        title: str = "API rejected schema-compliant request",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation

@@ -24,9 +24,10 @@ Schemathesis dev
 __________________________________ GET /test ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Accepted negative data
+- API accepted schema-violating request
 
-    Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 422, 428, 5xx
 
 [406] Not Acceptable:
 
@@ -62,9 +63,10 @@ Reproduce with:
             "incorrect": "positive"
         }
 
-- Accepted negative data
+- API accepted schema-violating request
 
-    Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 422, 428, 5xx
 
 [200] OK:
 
@@ -89,7 +91,7 @@ Test Phases:
 
 Failures:
   ❌ Response violates schema: 1
-  ❌ Accepted negative data: 2
+  ❌ API accepted schema-violating request: 2
 
 Test cases:
   N generated, N found N unique failures

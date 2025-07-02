@@ -305,7 +305,7 @@ def test_positive_data_acceptance(
     if should_raise:
         with pytest.raises(Failure) as exc_info:
             positive_data_acceptance(ctx, response, case)
-        assert "Rejected positive data" in exc_info.value.title
+        assert "API rejected schema-compliant request" in exc_info.value.title
     else:
         assert positive_data_acceptance(ctx, response, case) is None
 
