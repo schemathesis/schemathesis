@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.8...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive test cases on path, query, header, and cookie parameters of type "string". [#2900](https://github.com/schemathesis/schemathesis/issues/2900), [#2913](https://github.com/schemathesis/schemathesis/issues/2913)
+
 ### :wrench: Changed
 
 - Do not display API probing result in the test phases summary.
@@ -45,7 +49,7 @@
 
 ### :bug: Fixed
 
-- Ignoring some string formats during positive test case generation in the coverage phase. [#2930](https://github.com/schemathesis/schemathesis/issues/2930) 
+- Ignoring some string formats during positive test case generation in the coverage phase. [#2930](https://github.com/schemathesis/schemathesis/issues/2930)
 
 ## [4.0.4](https://github.com/schemathesis/schemathesis/compare/v4.0.3...v4.0.4) - 2025-07-02
 
