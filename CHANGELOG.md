@@ -6,6 +6,10 @@
 
 - Improve error messages for `negative_data_rejection` and `positive_data_acceptance` checks.
 
+### :bug: Fixed
+
+- False positive test cases on path, query, header, and cookie parameters of type "string". [#2900](https://github.com/schemathesis/schemathesis/issues/2900), [#2913](https://github.com/schemathesis/schemathesis/issues/2913) 
+
 ## [4.0.4](https://github.com/schemathesis/schemathesis/compare/v4.0.3...v4.0.4) - 2025-07-02
 
 ### :wrench: Changed
