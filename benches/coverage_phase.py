@@ -5,8 +5,8 @@ import pytest
 from schemathesis.generation.coverage import CoverageContext, cover_schema_iter
 
 CONTEXTS = [
-    CoverageContext(location="body", is_required=True).with_positive(),
-    CoverageContext(location="body", is_required=True).with_negative(),
+    CoverageContext(location="body", is_required=True, custom_formats={}).with_positive(),
+    CoverageContext(location="body", is_required=True, custom_formats={}).with_negative(),
 ]
 CONTEXT_NAMES = [",".join([m.value for m in ctx.generation_modes]) for ctx in CONTEXTS]
 

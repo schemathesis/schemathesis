@@ -423,10 +423,8 @@ def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _build_custom_formats(
-    custom_formats: dict[str, st.SearchStrategy] | None, generation_config: GenerationConfig
-) -> dict[str, st.SearchStrategy]:
-    custom_formats = {**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
+def _build_custom_formats(generation_config: GenerationConfig) -> dict[str, st.SearchStrategy]:
+    custom_formats = {**get_default_format_strategies(), **STRING_FORMATS}
     if generation_config.exclude_header_characters is not None:
         custom_formats[HEADER_FORMAT] = header_values(exclude_characters=generation_config.exclude_header_characters)
     elif not generation_config.allow_x00:
@@ -441,7 +439,6 @@ def make_positive_strategy(
     media_type: str | None,
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema.protocols.Validator],
-    custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     if is_header_location(location):
@@ -451,7 +448,7 @@ def make_positive_strategy(
         for sub_schema in schema.get("properties", {}).values():
             if list(sub_schema) == ["type"] and sub_schema["type"] == "string":
                 sub_schema.setdefault("format", HEADER_FORMAT)
-    custom_formats = _build_custom_formats(custom_formats, generation_config)
+    custom_formats = _build_custom_formats(generation_config)
     return from_schema(
         schema,
         custom_formats=custom_formats,
@@ -472,9 +469,8 @@ def make_negative_strategy(
     media_type: str | None,
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema.protocols.Validator],
-    custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
-    custom_formats = _build_custom_formats(custom_formats, generation_config)
+    custom_formats = _build_custom_formats(generation_config)
     return negative_schema(
         schema,
         operation_name=operation_name,

@@ -12,6 +12,7 @@ from schemathesis.generation.coverage import (
     _positive_string,
     cover_schema_iter,
 )
+from schemathesis.specs.openapi.formats import get_default_format_strategies
 
 PATTERN = "^\\d+$"
 
@@ -65,17 +66,27 @@ def assert_not_conform(values: list, schema: dict):
 
 @pytest.fixture
 def ctx():
-    return CoverageContext(location="query", is_required=True)
+    return CoverageContext(location="query", is_required=True, custom_formats=get_default_format_strategies())
 
 
 @pytest.fixture
 def pctx():
-    return CoverageContext(location="query", generation_modes=[GenerationMode.POSITIVE], is_required=True)
+    return CoverageContext(
+        location="query",
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats=get_default_format_strategies(),
+    )
 
 
 @pytest.fixture
 def nctx():
-    return CoverageContext(location="query", generation_modes=[GenerationMode.NEGATIVE], is_required=True)
+    return CoverageContext(
+        location="query",
+        generation_modes=[GenerationMode.NEGATIVE],
+        is_required=True,
+        custom_formats=get_default_format_strategies(),
+    )
 
 
 @pytest.mark.parametrize(

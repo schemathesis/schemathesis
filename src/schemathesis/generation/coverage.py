@@ -111,8 +111,9 @@ class CoverageContext:
     location: str
     is_required: bool
     path: list[str | int]
+    custom_formats: dict[str, st.SearchStrategy]
 
-    __slots__ = ("location", "generation_modes", "is_required", "path")
+    __slots__ = ("location", "generation_modes", "is_required", "path", "custom_formats")
 
     def __init__(
         self,
@@ -121,11 +122,13 @@ class CoverageContext:
         generation_modes: list[GenerationMode] | None = None,
         is_required: bool,
         path: list[str | int] | None = None,
+        custom_formats: dict[str, st.SearchStrategy],
     ) -> None:
         self.location = location
         self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
         self.is_required = is_required
         self.path = path or []
+        self.custom_formats = custom_formats
 
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:
@@ -145,6 +148,7 @@ class CoverageContext:
             generation_modes=[GenerationMode.POSITIVE],
             is_required=self.is_required,
             path=self.path,
+            custom_formats=self.custom_formats,
         )
 
     def with_negative(self) -> CoverageContext:
@@ -153,6 +157,7 @@ class CoverageContext:
             generation_modes=[GenerationMode.NEGATIVE],
             is_required=self.is_required,
             path=self.path,
+            custom_formats=self.custom_formats,
         )
 
     def is_valid_for_location(self, value: Any) -> bool:
@@ -234,7 +239,10 @@ class CoverageContext:
                 return cached_draw(
                     st.lists(
                         st.fixed_dictionaries(
-                            {key: from_schema(sub_schema) for key, sub_schema in items["properties"].items()}
+                            {
+                                key: from_schema(sub_schema, custom_formats=self.custom_formats)
+                                for key, sub_schema in items["properties"].items()
+                            }
                         ),
                         min_size=min_items,
                     )
@@ -245,7 +253,7 @@ class CoverageContext:
             if isinstance(schema, dict) and "allOf" not in schema:
                 return self.generate_from_schema(schema)
 
-        return self.generate_from(from_schema(schema))
+        return self.generate_from(from_schema(schema, custom_formats=self.custom_formats))
 
 
 T = TypeVar("T")
