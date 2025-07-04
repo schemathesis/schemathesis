@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import ANY
 
 import pytest
@@ -1307,6 +1308,39 @@ def test_generate_empty_headers_too(ctx):
 def test_array_constraints(ctx, schema, expected):
     schema = build_schema(ctx, request_body={"required": True, "content": {"application/json": {"schema": schema}}})
     assert_negative_coverage(schema, expected)
+
+
+def test_string_with_format(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "in": "path",
+                "name": "foo_id",
+                "schema": {"type": "string", "format": "uuid"},
+                "required": True,
+            },
+        ],
+        path="/foo/{foo_id}",
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+
+    def test(case):
+        uuid.UUID(case.path_parameters["foo_id"], version=4)
+
+    config = ProjectConfig()
+    config.generation.update(modes=[GenerationMode.POSITIVE])
+    test_func = create_test(
+        operation=schema["/foo/{foo_id}"]["post"],
+        test_func=test,
+        config=HypothesisTestConfig(
+            modes=[HypothesisTestMode.COVERAGE],
+            project=config,
+        ),
+    )
+
+    test_func()
 
 
 def test_query_parameters_with_nested_enum(ctx):
