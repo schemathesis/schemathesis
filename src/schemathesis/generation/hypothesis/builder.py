@@ -18,7 +18,7 @@ from requests.models import CaseInsensitiveDict
 
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
-from schemathesis.config import ProjectConfig
+from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
@@ -183,6 +183,7 @@ def create_test(
             config.as_strategy_kwargs,
             generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
             unexpected_methods=phases_config.coverage.unexpected_methods,
+            generation_config=generation,
         )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
@@ -295,7 +296,8 @@ def add_coverage(
     auth_storage: AuthStorage | None,
     as_strategy_kwargs: dict[str, Any],
     generate_duplicate_query_parameters: bool,
-    unexpected_methods: set[str] | None = None,
+    unexpected_methods: set[str],
+    generation_config: GenerationConfig,
 ) -> Callable:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
@@ -309,7 +311,11 @@ def add_coverage(
         if container in as_strategy_kwargs
     }
     for case in _iter_coverage_cases(
-        operation, generation_modes, generate_duplicate_query_parameters, unexpected_methods
+        operation=operation,
+        generation_modes=generation_modes,
+        generate_duplicate_query_parameters=generate_duplicate_query_parameters,
+        unexpected_methods=unexpected_methods,
+        generation_config=generation_config,
     ):
         if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
             continue
@@ -446,11 +452,14 @@ def _stringify_value(val: Any, container_name: str) -> Any:
 
 
 def _iter_coverage_cases(
+    *,
     operation: APIOperation,
     generation_modes: list[GenerationMode],
     generate_duplicate_query_parameters: bool,
-    unexpected_methods: set[str] | None = None,
+    unexpected_methods: set[str],
+    generation_config: GenerationConfig,
 ) -> Generator[Case, None, None]:
+    from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
     from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
     from schemathesis.specs.openapi.serialization import get_serializers_for_operation
@@ -463,6 +472,7 @@ def _iter_coverage_cases(
     responses = find_in_responses(operation)
     # NOTE: The HEAD method is excluded
     unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
+    custom_formats = _build_custom_formats(generation_config)
 
     seen_negative = coverage.HashSet()
     seen_positive = coverage.HashSet()
@@ -475,7 +485,10 @@ def _iter_coverage_cases(
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
             coverage.CoverageContext(
-                location=location, generation_modes=generation_modes, is_required=parameter.is_required
+                location=location,
+                generation_modes=generation_modes,
+                is_required=parameter.is_required,
+                custom_formats=custom_formats,
             ),
             schema,
         )
@@ -496,7 +509,10 @@ def _iter_coverage_cases(
                 schema.setdefault("examples", []).extend(examples)
             gen = coverage.cover_schema_iter(
                 coverage.CoverageContext(
-                    location="body", generation_modes=generation_modes, is_required=body.is_required
+                    location="body",
+                    generation_modes=generation_modes,
+                    is_required=body.is_required,
+                    custom_formats=custom_formats,
                 ),
                 schema,
             )
@@ -723,7 +739,10 @@ def _iter_coverage_cases(
             iterator = iter(
                 coverage.cover_schema_iter(
                     coverage.CoverageContext(
-                        location=_location, generation_modes=[GenerationMode.NEGATIVE], is_required=is_required
+                        location=_location,
+                        generation_modes=[GenerationMode.NEGATIVE],
+                        is_required=is_required,
+                        custom_formats=custom_formats,
                     ),
                     subschema,
                 )
