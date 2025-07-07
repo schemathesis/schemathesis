@@ -41,7 +41,7 @@ class JunitXMLHandler(EventHandler):
                 TestSuite("schemathesis", test_cases=list(self.test_cases.values()), hostname=platform.node())
             ]
             with open(self.path, "w") as fd:
-                to_xml_report_file(file_descriptor=fd, test_suites=test_suites, prettyprint=True)
+                to_xml_report_file(file_descriptor=fd, test_suites=test_suites, prettyprint=True, encoding="utf-8")
 
     def get_or_create_test_case(self, label: str) -> TestCase:
         return self.test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
