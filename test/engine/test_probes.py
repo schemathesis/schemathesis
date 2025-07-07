@@ -63,7 +63,7 @@ def test_detect_null_byte_error(ctx):
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
-            outcome=probes.ProbeOutcome.ERROR,
+            outcome=probes.ProbeOutcome.FAILURE,
             request=ANY,
             response=None,
             error=ANY,
