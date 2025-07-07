@@ -955,7 +955,6 @@ class OutputHandler(EventHandler):
                         ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
                         ProbeOutcome.FAILURE: ("✘", Style(color="red")),
                         ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
-                        ProbeOutcome.ERROR: ("⚠", Style(color="yellow")),
                     }[probe_run.outcome]
 
                     table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
