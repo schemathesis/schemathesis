@@ -86,8 +86,6 @@ class ProbeOutcome(str, enum.Enum):
     FAILURE = "failure"
     # Probe is not applicable
     SKIP = "skip"
-    # Error occurred during the probe
-    ERROR = "error"
 
 
 @dataclass
@@ -166,7 +164,8 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
         # which is not currently implemented
         return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
     except RequestException as exc:
+        # Consider any network errors as a failed probe
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        return ProbeRun(probe, ProbeOutcome.ERROR, req, None, exc)
+        return ProbeRun(probe, ProbeOutcome.FAILURE, req, None, exc)
     result_type = probe.analyze_response(response)
     return ProbeRun(probe, result_type, request, response)
