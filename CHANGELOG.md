@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.6...HEAD) - TBD
 
+### :rocket: Added
+
+- Support for `application/yaml` media type.
+
 ### :wrench: Changed
 
 - Validate schema of YAML response.

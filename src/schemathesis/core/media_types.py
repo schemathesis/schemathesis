@@ -55,7 +55,7 @@ def is_json(value: str) -> bool:
 
 def is_yaml(value: str) -> bool:
     """Detect whether the content type is YAML-compatible."""
-    return value in ("text/yaml", "text/x-yaml", "application/x-yaml", "text/vnd.yaml")
+    return value in ("text/yaml", "text/x-yaml", "application/x-yaml", "text/vnd.yaml", "application/yaml")
 
 
 def is_plain_text(value: str) -> bool:
