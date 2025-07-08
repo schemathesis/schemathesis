@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.6...HEAD) - TBD
 
+### :wrench: Changed
+
+- Validate schema of YAML response.
+
 ## [4.0.6](https://github.com/schemathesis/schemathesis/compare/v4.0.5...v4.0.6) - 2025-07-07
 
 ### :bug: Fixed
@@ -11,7 +15,6 @@
 ### :wrench: Changed
 
 - Consider connection error as a failed API probe. [#2935](https://github.com/schemathesis/schemathesis/issues/2935)
-- Validate schema of YAML response.
 
 ## [4.0.5](https://github.com/schemathesis/schemathesis/compare/v4.0.4...v4.0.5) - 2025-07-04
 
