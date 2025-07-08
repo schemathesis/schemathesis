@@ -10,7 +10,8 @@
 
 ### :wrench: Changed
 
-- Consider connection error as a failed API probe. [#2935](https://github.com/schemathesis/schemathesis/issues/2935)  
+- Consider connection error as a failed API probe. [#2935](https://github.com/schemathesis/schemathesis/issues/2935)
+- Validate schema of YAML response.
 
 ## [4.0.5](https://github.com/schemathesis/schemathesis/compare/v4.0.4...v4.0.5) - 2025-07-04
 

@@ -24,11 +24,11 @@ Schemathesis dev
 __________________________________ GET /data ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- JSON deserialization error
+- Content deserialization error
 
-    Response must be valid JSON with 'Content-Type: application/json' header:
+    Failed to deserialize response content:
 
-      Expecting value: line 1 column 1 (char 0)
+      Malformed media type: ``
 
 [200] OK:
 
@@ -53,7 +53,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ JSON deserialization error: 1
+  ❌ Content deserialization error: 1
 
 Test cases:
   N generated, N found N unique failures
