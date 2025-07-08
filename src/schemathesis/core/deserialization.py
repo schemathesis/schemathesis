@@ -4,6 +4,9 @@ import re
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
+from schemathesis.core import media_types
+from schemathesis.core.transport import Response
+
 if TYPE_CHECKING:
     import yaml
 
@@ -63,3 +66,14 @@ def deserialize_yaml(stream: str | bytes | TextIO | BinaryIO) -> Any:
     import yaml
 
     return yaml.load(stream, get_yaml_loader())
+
+
+def deserialize_response(response: Response, content_type: str) -> Any:
+    if media_types.is_yaml(content_type):
+        encoding = response.encoding or "utf-8"
+        return deserialize_yaml(response.content.decode(encoding))
+    if media_types.is_json(content_type):
+        return response.json()
+    raise NotImplementedError(
+        f"Unsupported Content-Type: {content_type!r}. Supported types are: application/yaml, application/json."
+    )
