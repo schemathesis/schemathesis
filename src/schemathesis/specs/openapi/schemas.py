@@ -29,7 +29,7 @@ from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
-from schemathesis.core import NOT_SET, NotSet, Specification, media_types
+from schemathesis.core import NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -617,17 +617,30 @@ class BaseOpenAPISchema(BaseSchema):
             formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             failures.append(MissingContentType(operation=operation.label, message=message, media_types=all_media_types))
-            content_type = None
+            # Default content type
+            content_type = "application/json"
         else:
             content_type = content_types[0]
-        if content_type and not media_types.is_json(content_type):
-            _maybe_raise_one_or_more(failures)
-            return None
         try:
-            data = response.json()
+            data = deserialization.deserialize_response(response, content_type)
         except JSONDecodeError as exc:
             failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
             _maybe_raise_one_or_more(failures)
+            return None
+        except NotImplementedError:
+            # If the content type is not supported, we cannot validate it
+            _maybe_raise_one_or_more(failures)
+            return None
+        except Exception as exc:
+            failures.append(
+                Failure(
+                    operation=operation.label,
+                    title="Content deserialization error",
+                    message=f"Failed to deserialize response content:\n\n  {exc}",
+                )
+            )
+            _maybe_raise_one_or_more(failures)
+            return None
         with self._validating_response(scopes) as resolver:
             try:
                 jsonschema.validate(
