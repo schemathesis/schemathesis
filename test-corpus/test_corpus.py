@@ -412,7 +412,13 @@ def test_coverage_phase(corpus, filename):
     modes = list(GenerationMode)
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
-            for _ in _iter_coverage_cases(operation.ok(), modes, generate_duplicate_query_parameters=False):
+            for _ in _iter_coverage_cases(
+                operation=operation.ok(),
+                generation_modes=modes,
+                generate_duplicate_query_parameters=False,
+                unexpected_methods=set(),
+                generation_config=schema.config.generation,
+            ):
                 pass
 
 
