@@ -32,6 +32,22 @@ jobs:
           fi
         shell: bash
 
+
+      - name: Generate stable tag
+        id: stable-tag
+        run: |
+          if [ "${{ env.is_prerelease }}" == "false" ]; then
+            if [ "${{ matrix.tag-suffix }}" == "" ]; then
+              echo "stable_tag=type=raw,value=stable" >> $GITHUB_OUTPUT
+            elif [ "${{ matrix.tag-suffix }}" == "-bookworm" ]; then
+              echo "stable_tag=type=raw,value=stable-bookworm" >> $GITHUB_OUTPUT
+            else
+              echo "stable_tag=" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "stable_tag=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -44,7 +60,13 @@ jobs:
           tags: |
             type=semver,pattern={{raw}}${{ matrix.tag-suffix }}
             type=semver,pattern={{version}}${{ matrix.tag-suffix }}
-            ${{ env.is_prerelease == 'false' && 'type=raw,value=stable${{ matrix.tag-suffix }}' || '' }}
+            ${{ steps.stable-tag.outputs.stable_tag }}
+
+      - name: Build metadata
+        run: |
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+          echo "Is prerelease: ${{ env.is_prerelease }}"
+          echo "Tag suffix: '${{ matrix.tag-suffix }}'"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
