@@ -10,8 +10,6 @@
 | **before\_init\_operation** | `(context, operation: APIOperation) -> None`  | Adjust an `APIOperation` before building strategies (e.g., restrict enum choices, set defaults). |
 | **before\_add\_examples**   | `(context, examples: list[Case]) -> None`     | Append explicit `Case` instances before the `examples` phase.                              |
 
-## Data-Generation Hooks
-
 ## Request-Lifecycle Hooks
 
 Mutate or inspect the test case and HTTP request flow.

@@ -5,10 +5,10 @@
 Schemathesis generates three types of data:
 
 - **Schema examples** from your API documentation
-- **Valid test data** that follows schema constraints  
+- **Valid test data** that follows schema constraints
 - **Invalid test data** that deliberately breaks constraints
 
-The data covers all JSON Schema types for OpenAPI and valid queries for GraphQL. 
+The data covers all JSON Schema types for OpenAPI and valid queries for GraphQL.
 
 Note, that some generated data may be rejected by your API if the validation rules are not expressed in your schema.
 
@@ -16,22 +16,27 @@ Note, that some generated data may be rejected by your API if the validation rul
 
 Schemathesis identifies problems in three main categories:
 
-**API Contract Violations**
+**Schema Compliance Issues**
 
-- Responses not matching documented schemas
+- Response bodies not matching schemas
 - Undocumented status codes
-- Missing or incorrect content types
+- Missing required headers
+- Wrong content types
 
 **Implementation Flaws**
 
-- Server errors (5xx responses)
-- Data validation issues (accepting invalid data or rejecting valid data)
+- Server crashes (5xx responses)
+- Accepting invalid data
+- Rejecting valid data
+- Allowing missing required headers
 - Authentication bypasses
 
 **Stateful Behavior Issues**
 
-- Resources accessible after deletion
-- Resources unavailable after creation
+- Deleted resources still accessible
+- Created resources not available
+
+See more details in the [Checks reference](reference/checks.md).
 
 ## How should I run Schemathesis?
 
