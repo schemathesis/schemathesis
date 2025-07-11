@@ -223,6 +223,7 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     if len(candidates) == 1:
         new_type = candidates.pop()
         schema["type"] = new_type
+        _ensure_query_serializes_to_non_empty(context, schema)
         prevent_unsatisfiable_schema(schema, new_type)
         return MutationResult.SUCCESS
     # Choose one type that will be present in the final candidates list
@@ -235,8 +236,16 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     ]
     new_type = draw(st.sampled_from(remaining_candidates))
     schema["type"] = new_type
+    _ensure_query_serializes_to_non_empty(context, schema)
     prevent_unsatisfiable_schema(schema, new_type)
     return MutationResult.SUCCESS
+
+
+def _ensure_query_serializes_to_non_empty(context: MutationContext, schema: Schema) -> None:
+    if context.is_query_location and schema.get("type") == "array":
+        # Query parameters with empty arrays or arrays of `None` or empty arrays / objects will not appear in the final URL
+        schema["minItems"] = schema.get("minItems") or 1
+        schema.setdefault("items", {}).update({"not": {"enum": [None, [], {}]}})
 
 
 def _get_type_candidates(context: MutationContext, schema: Schema) -> set[str]:

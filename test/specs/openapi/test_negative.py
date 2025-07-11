@@ -333,6 +333,40 @@ def test_optional_query_param_negation(ctx):
     test()
 
 
+@pytest.mark.hypothesis_nested
+def test_negating_multiple_query_params(ctx):
+    # When all query parameters are optional
+    schema = ctx.openapi.build_schema(
+        {
+            "/bug": {
+                "get": {
+                    "parameters": [
+                        {"name": "key1", "in": "query", "required": False, "schema": {"type": "integer"}},
+                        {"name": "key2", "in": "query", "required": False, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+
+    @given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        request = requests.PreparedRequest()
+        request.prepare(**case.as_transport_kwargs(base_url="http://127.0.0.1"))
+        # Then negated parameter should always be serialized
+        query = urlparse(request.url).query
+        if "key1" in case.query:
+            assert "key1" in query, case.query
+        if "key2" in case.query:
+            assert "key2" in query, case.query
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("schema", "new_type"),
     [

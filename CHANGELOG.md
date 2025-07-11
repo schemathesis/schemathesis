@@ -6,7 +6,8 @@
 
 - Use `utf-8` encoding when generating JUnit reports.
 - Properly display Schemathesis version in CLI.
-- Test case metadata containing incorrect info about generated components causing false positive failures in `negative_data_rejection` and `positive_data_acceptance` checks. [#2900](https://github.com/schemathesis/schemathesis/issues/2900) 
+- Test case metadata containing incorrect info about generated components causing false positive failures in `negative_data_rejection` and `positive_data_acceptance` checks. [#2900](https://github.com/schemathesis/schemathesis/issues/2900)
+- Negative test cases with invalid query parameters mistakenly becoming positive test cases.
 
 ## [4.0.7](https://github.com/schemathesis/schemathesis/compare/v4.0.6...v4.0.7) - 2025-07-08
 
