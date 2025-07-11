@@ -14,7 +14,7 @@ from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core import NOT_SET, NotSet, media_types
+from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.transforms import deepclone
@@ -57,10 +57,10 @@ def openapi_cases(
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.POSITIVE,
-    path_parameters: NotSet | dict[str, Any] = NOT_SET,
-    headers: NotSet | dict[str, Any] = NOT_SET,
-    cookies: NotSet | dict[str, Any] = NOT_SET,
-    query: NotSet | dict[str, Any] = NOT_SET,
+    path_parameters: dict[str, Any] | None = None,
+    headers: dict[str, Any] | None = None,
+    cookies: dict[str, Any] | None = None,
+    query: dict[str, Any] | None = None,
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
@@ -220,7 +220,7 @@ def _get_body_strategy(
 
 
 def get_parameters_value(
-    value: NotSet | dict[str, Any],
+    value: dict[str, Any] | None,
     location: str,
     draw: Callable,
     operation: APIOperation,
@@ -234,7 +234,7 @@ def get_parameters_value(
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
     generate those parts.
     """
-    if isinstance(value, NotSet) or not value:
+    if value is None:
         strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config)
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         return draw(strategy)
@@ -274,7 +274,7 @@ def any_negated_values(values: list[ValueContainer]) -> bool:
 
 def generate_parameter(
     location: str,
-    explicit: NotSet | dict[str, Any],
+    explicit: dict[str, Any] | None,
     operation: APIOperation,
     draw: Callable,
     ctx: HookContext,
