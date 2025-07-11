@@ -14,6 +14,7 @@ from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.meta import ComponentKind
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
@@ -251,6 +252,25 @@ def test_call_and_validate(openapi3_schema_url, kwargs):
     @settings(max_examples=1, deadline=None)
     def test(case):
         case.call_and_validate(**kwargs)
+
+    test()
+
+
+@pytest.mark.operations("custom_format")
+def test_metadata_has_only_relevant_components(openapi3_schema_url):
+    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
+
+    operation = api_schema["/custom_format"]["GET"]
+
+    @given(
+        case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE)
+        | operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
+    )
+    @settings(max_examples=10, deadline=None)
+    def test(case):
+        # Metadata should only contain components relevant to the API operation
+        assert len(case.meta.components) == 1
+        assert ComponentKind.QUERY in case.meta.components
 
     test()
 
