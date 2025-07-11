@@ -8,73 +8,222 @@ These checks validate that API responses conform to your API schema.
 
 ### `not_a_server_error`
 
-**Detects server-side errors and implementation issues**
+Catches server-side errors and implementation issues
 
-**Triggers on:** 5xx HTTP status codes or GraphQL `errors` field
+**Examples** 
+
+- `500 Internal Server Error`
+- `502 Bad Gateway` 
+- GraphQL response with `"errors": [{...}]`
+
+---
 
 ### `status_code_conformance`
-**Verifies response status codes match schema documentation**
 
-**Triggers on:** Status codes not documented in schema
+Verifies response status codes match schema documentation
+
+**Examples**
+
+- Schema documents `200, 404` but API returns `403`
+- Schema documents `201` but API returns `200`
+
+---
 
 ### `content_type_conformance`
-**Validates `Content-Type` header matches schema**
 
-**Triggers on:** Content types not matching schema-documented media types  
+Validates `Content-Type` header matches schema
+
+**Examples**
+
+- Schema specifies `application/json` but API returns `text/html`
+- Schema specifies `application/xml` but API returns `application/json`
+
+---
 
 ### `response_headers_conformance`
-**Ensures required response headers are present and valid**
 
-**Triggers on:** Missing or invalid required headers
+Ensures required response headers are present and valid
+
+**Example**
+
+Schema specifies response must include `X-RateLimit-Remaining` header:
+
+```http
+GET /api/data
+
+Response: 200 OK
+Content-Type: application/json
+# Missing required X-RateLimit-Remaining header ❌
+
+{"data": [...]}
+```
+
+---
 
 ### `response_schema_conformance`
-**Validates response body against JSON Schema**
 
-**Triggers on:** Response body not matching schema structure
+Validates response body against JSON Schema
+
+**Example**
+
+Schema defines user object as:
+
+```yaml
+type: object
+required: [id, name, email]
+properties:
+  id: {type: integer}
+  name: {type: string}
+  email: {type: string, format: email}
+```
+
+But API returns:
+
+```http
+GET /users/789
+
+Response: 200 OK
+{
+  "id": "789",          ❌ Should be integer, not string
+  "name": "Eve"         ❌ Missing required 'email' field
+}
+```
 
 ## Input Handling Validation
 
 These checks verify how your API processes different types of request data.
 
 ### `negative_data_rejection`
-**Verifies API rejects invalid request data with appropriate errors**
 
-**Triggers on:** API accepting schema-violating requests
+Verifies API rejects invalid data with appropriate error responses
 
-### `positive_data_acceptance`
-**Ensures API accepts valid request data**
+**Example**
 
-**Triggers on:** API rejecting schema-compliant requests  
+Schema specifies `age` must be an integer:
 
-### `missing_required_header`
-**Checks APIs return 4xx for missing required headers**
+```http
+POST /users
+Content-Type: application/json
 
-**Triggers on:** API not rejecting requests missing required headers
+{"name": "Charlie", "age": "twenty-five"}
 
-### `unsupported_method`
-**Verifies APIs return 405 for undocumented HTTP methods**
-
-**Triggers on:** Non-405 responses for undocumented methods on valid paths
+Response: 200 OK  ❌ Should return 400 Bad Request
+{"id": 456, "name": "Charlie", "age": null}
+```
 
 ---
+
+### `positive_data_acceptance`
+
+Verifies API accepts valid request data
+
+**Example**
+
+Request perfectly matches schema:
+
+```http
+POST /users
+Content-Type: application/json
+
+{"name": "Diana", "age": 25, "email": "diana@example.com"}
+
+Response: 400 Bad Request  ❌ Should accept valid data
+{"error": "Invalid request"}
+```
+
+---
+
+### `missing_required_header`
+
+Verifies APIs return 4xx for missing required headers
+
+**Example**
+
+Schema requires `X-API-Key` header, but:
+
+```http
+GET /protected-resource
+# Missing required X-API-Key header
+
+Response: 200 OK  ❌ Should return 400 Bad Request or 401 Unauthorized
+```
+
+---
+
+### `unsupported_method`
+
+Verifies APIs return 405 for undocumented HTTP methods
+
+**Example**
+
+Schema only documents `GET /users/{id}` and `PUT /users/{id}`, but:
+
+```http
+PATCH /users/123
+Content-Type: application/json
+
+{"name": "Bob"}
+
+Response: 200 OK  ❌ Should return 405 Method Not Allowed
+```
 
 ## Stateful Behavior
 
 These checks test API behavior across sequences of operations.
 
 ### `use_after_free`
-**Detects when deleted resources remain accessible**
 
-**Triggers on:** Accessing deleted resources doesn't return 404
+Detects when deleted resources remain accessible
+
+**Example**
+
+```http
+DELETE /users/123
+
+Response: 204 No Content
+```
+
+Then:
+
+```http
+GET /users/123
+
+Response: 200 OK  ❌ Should return 404 Not Found
+```
+
+---
 
 ### `ensure_resource_availability`
-**Verifies created resources are immediately accessible**
 
-**Triggers on:** Newly created resources can't be retrieved/modified
+Verifies created resources are immediately accessible
+
+**Example**
+
+```http
+POST /users
+Content-Type: application/json
+
+{"name": "Alice", "email": "alice@example.com"}
+
+Response: 201 Created
+Location: /users/123
+```
+
+Then immediately:
+
+```http
+GET /users/123
+
+Response: 404 Not Found  ❌ Should return the created user
+```
 
 ## Security
 
-### `ignored_auth` <small>*authentication*</small>
-**Tests whether authentication requirements are enforced**
+### `ignored_auth`
 
-**Triggers on:** Protected endpoints accepting requests without proper auth
+Verifies authentication is properly enforced
+
+**Example**
+
+- Endpoint requires authentication but accepts requests without auth headers
+- Returns `200 OK` instead of `401 Unauthorized`
