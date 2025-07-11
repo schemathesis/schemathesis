@@ -32,8 +32,10 @@ from werkzeug.test import TestResponse
 import schemathesis.cli
 from schemathesis import auths, hooks
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
+from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.transport import Response
+from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.specs.openapi import media_types
 
 from .apps import _graphql as graphql
@@ -58,6 +60,8 @@ logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
 settings.register_profile("CI", max_examples=2000)
+
+output.SCHEMATHESIS_VERSION = "dev"
 
 
 @pytest.fixture(autouse=True)
@@ -357,6 +361,9 @@ class CliSnapshotConfig:
             data,
             flags=re.MULTILINE,
         )
+        version_line = "Schemathesis dev"
+        data = data.replace(f"Schemathesis v{SCHEMATHESIS_VERSION}", version_line)
+        data = re.sub("━+", "━" * len(version_line), data)
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
