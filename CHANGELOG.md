@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.7...HEAD) - TBD
 
+### :bug: Fixed
+
+- Use `utf-8` encoding when generating JUnit reports
+
 ## [4.0.7](https://github.com/schemathesis/schemathesis/compare/v4.0.6...v4.0.7) - 2025-07-08
 
 ### :rocket: Added
