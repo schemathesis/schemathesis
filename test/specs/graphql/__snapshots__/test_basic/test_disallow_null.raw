@@ -43,7 +43,6 @@ API Operations:
   Tested: 1
 
 Test Phases:
-  ✅ API probing
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ❌ Fuzzing
