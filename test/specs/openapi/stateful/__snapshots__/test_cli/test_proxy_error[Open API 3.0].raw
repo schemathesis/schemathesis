@@ -12,7 +12,9 @@ Schemathesis dev
      Operations:       4 selected / 4 total
 
 
- 🚫  API probing failed: Connection failed
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
 
  🚫  Stateful (in 0.00s)
 
