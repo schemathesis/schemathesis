@@ -5,6 +5,7 @@
 ### :wrench: Changed
 
 - Do not display API probing result in the test phases summary.
+- Do not display API probing errors in CLI output. Treat errors as a missing capability.
 
 ## [4.0.8](https://github.com/schemathesis/schemathesis/compare/v4.0.7...v4.0.8) - 2025-07-12
 

@@ -20,10 +20,9 @@ from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
-from schemathesis.core.result import Err, Ok
+from schemathesis.core.result import Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
-from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
@@ -960,22 +959,13 @@ class OutputHandler(EventHandler):
                     table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
 
                 message = Padding(table, BLOCK_PADDING)
-            elif event.status == Status.SKIP:
+            else:
+                assert event.status == Status.SKIP
+                assert isinstance(event.payload, Ok)
                 message = Padding(
                     Text.assemble(
                         ("⏭   ", ""),
                         ("API probing skipped", Style(color="yellow")),
-                    ),
-                    BLOCK_PADDING,
-                )
-            else:
-                assert event.status == Status.ERROR
-                assert isinstance(event.payload, Err)
-                error = EngineErrorInfo(event.payload.err())
-                message = Padding(
-                    Text.assemble(
-                        ("🚫  ", ""),
-                        (f"API probing failed: {error.message}", Style(color="red")),
                     ),
                     BLOCK_PADDING,
                 )
