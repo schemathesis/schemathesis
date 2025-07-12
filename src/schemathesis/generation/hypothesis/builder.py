@@ -624,7 +624,9 @@ def _iter_coverage_cases(
                 ),
             )
         # Generate duplicate query parameters
-        if generate_duplicate_query_parameters and operation.query:
+        # NOTE: if the query schema has no constraints, then we may have no negative test cases at all
+        # as they all will match the original schema and therefore will be considered as positive ones
+        if generate_duplicate_query_parameters and operation.query and "query" in template:
             container = template["query"]
             for parameter in operation.query:
                 instant = Instant()
@@ -656,24 +658,26 @@ def _iter_coverage_cases(
                 name = parameter.name
                 location = parameter.location
                 container_name = LOCATION_TO_CONTAINER[location]
-                container = template[container_name]
-                data = template.with_container(
-                    container_name=container_name,
-                    value={k: v for k, v in container.items() if k != name},
-                    generation_mode=GenerationMode.NEGATIVE,
-                )
-                yield operation.Case(
-                    **data.kwargs,
-                    _meta=CaseMetadata(
-                        generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                        components=data.components,
-                        phase=PhaseInfo.coverage(
-                            description=f"Missing `{name}` at {location}",
-                            parameter=name,
-                            parameter_location=location,
+                # NOTE: if the schema is overly permissive we may not have any negative test cases
+                if container_name in template:
+                    container = template[container_name]
+                    data = template.with_container(
+                        container_name=container_name,
+                        value={k: v for k, v in container.items() if k != name},
+                        generation_mode=GenerationMode.NEGATIVE,
+                    )
+                    yield operation.Case(
+                        **data.kwargs,
+                        _meta=CaseMetadata(
+                            generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
+                            components=data.components,
+                            phase=PhaseInfo.coverage(
+                                description=f"Missing `{name}` at {location}",
+                                parameter=name,
+                                parameter_location=location,
+                            ),
                         ),
-                    ),
-                )
+                    )
     # Generate combinations for each location
     for location, parameter_set in [
         ("query", operation.query),

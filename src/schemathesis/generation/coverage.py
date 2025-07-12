@@ -177,6 +177,18 @@ class CoverageContext:
                 return bool(value)
         return True
 
+    def can_be_negated(self, schema: dict[str, Any]) -> bool:
+        # Path, query, header, and cookie parameters will be stringified anyway
+        # If there are no constraints, then anything will match the original schema after serialization
+        if self.location in ("query", "path", "header", "cookie"):
+            cleaned = {
+                k: v
+                for k, v in schema.items()
+                if not k.startswith("x-") and k not in ["description", "example", "examples"]
+            }
+            return cleaned != {}
+        return True
+
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
         return cached_draw(strategy)
 
@@ -389,6 +401,8 @@ def cover_schema_iter(
             yield from _cover_positive_for_type(ctx, schema, ty)
     if GenerationMode.NEGATIVE in ctx.generation_modes:
         template = None
+        if not ctx.can_be_negated(schema):
+            return
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.at(key):
                 if key == "enum":

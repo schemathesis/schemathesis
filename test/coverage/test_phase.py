@@ -1515,6 +1515,43 @@ def test_path_parameters_always_present(ctx, schema, expected):
     )
 
 
+def test_path_parameters_without_constraints_negative(ctx):
+    # When there are no constraints, then we can't generate negative values as everything will match the previous schema
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "foo_id",
+                "in": "path",
+                "required": True,
+                "schema": {},
+            },
+        ],
+        path="/foo/{foo_id}",
+    )
+    assert_negative_coverage(
+        schema,
+        [],
+        ("/foo/{foo_id}", "post"),
+    )
+
+
+def test_query_without_constraints_negative(ctx):
+    # When there are no constraints, then we can't generate negative values as everything will match the previous schema
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "q",
+                "in": "query",
+                "required": True,
+                "schema": {},
+            },
+        ],
+    )
+    assert_negative_coverage(schema, [])
+
+
 @pytest.mark.parametrize(
     ["schema", "required", "expected"],
     [
