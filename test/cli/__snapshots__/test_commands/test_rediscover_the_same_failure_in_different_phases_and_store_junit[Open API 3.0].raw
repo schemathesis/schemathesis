@@ -58,7 +58,6 @@ API Operations:
   Tested: 3
 
 Test Phases:
-  ✅ API probing
   ❌ Examples
   ❌ Coverage
   ❌ Fuzzing

@@ -39,7 +39,6 @@ API Operations:
   Skipped: 3
 
 Test Phases:
-  🚫 API probing
   ⏭  Examples (disabled)
   ⏭  Coverage (disabled)
   ⏭  Fuzzing (disabled)

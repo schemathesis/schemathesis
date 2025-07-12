@@ -39,7 +39,6 @@ API Operations:
   Errored: 1
 
 Test Phases:
-  ✅ API probing
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   🚫 Fuzzing

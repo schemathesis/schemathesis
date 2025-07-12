@@ -33,7 +33,6 @@ API Operations:
     - No examples in schema
 
 Test Phases:
-  ✅ API probing
   ⏭  Examples
   ⚡ Coverage
   ⏭  Fuzzing
