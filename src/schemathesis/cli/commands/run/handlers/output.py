@@ -1337,6 +1337,9 @@ class OutputHandler(EventHandler):
         click.echo(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
+            if phase == PhaseName.PROBING:
+                # It is not a test phase
+                continue
             status, skip_reason = self.phases[phase]
 
             if status == Status.SKIP:
