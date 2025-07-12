@@ -13,7 +13,7 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events
 from schemathesis.transport.prepare import get_default_headers
@@ -41,16 +41,11 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     payload: Result[ProbePayload, Exception] | None = None
     for result in probes:
         if isinstance(result.probe, NullByteInHeader) and result.is_failure:
-            from ...specs.openapi import formats
-            from ...specs.openapi.formats import HEADER_FORMAT, header_values
+            from schemathesis.specs.openapi import formats
+            from schemathesis.specs.openapi.formats import HEADER_FORMAT, header_values
 
             formats.register(HEADER_FORMAT, header_values(exclude_characters="\n\r\x00"))
-        if result.error is not None:
-            status = Status.ERROR
-            payload = Err(result.error)
-        else:
-            status = Status.SUCCESS
-            payload = Ok(ProbePayload(probes=probes))
+        payload = Ok(ProbePayload(probes=probes))
     yield events.PhaseFinished(phase=phase, status=status, payload=payload)
 
 
