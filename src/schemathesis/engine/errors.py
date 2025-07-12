@@ -426,7 +426,15 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
     def has_connection_reset(inner: BaseException) -> bool:
         exc_str = str(inner)
-        if any(pattern in exc_str for pattern in ["Connection reset by peer", "[Errno 104]", "ECONNRESET"]):
+        if any(
+            pattern in exc_str
+            for pattern in [
+                "Connection reset by peer",
+                "[Errno 104]",
+                "ECONNRESET",
+                "An established connection was aborted",
+            ]
+        ):
             return True
 
         if inner.__context__ is not None:
@@ -434,7 +442,7 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
         return False
 
-    if isinstance(exc, requests.Timeout):
+    if isinstance(exc, (requests.Timeout, requests.exceptions.ChunkedEncodingError)):
         return True
     if isinstance(exc.__context__, ProtocolError):
         if len(exc.__context__.args) == 2 and isinstance(exc.__context__.args[1], RemoteDisconnected):
