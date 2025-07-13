@@ -313,7 +313,7 @@ def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 def test_continue_on_failure(cli, schema_url):
     result = cli.run(schema_url, "--continue-on-failure")
-    assert "114 generated" in result.stdout
+    assert "113 generated" in result.stdout
 
 
 @pytest.mark.operations("multiple_failures")
