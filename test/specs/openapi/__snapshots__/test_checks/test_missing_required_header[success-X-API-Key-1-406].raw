@@ -34,7 +34,7 @@ _________________________________ GET /success _________________________________
 
 Reproduce with:
 
-    curl -X GET -H 'X-API-Key-2: [Filtered]' http://127.0.0.1/api/success
+    curl -X GET http://127.0.0.1/api/success
 
 =================================== SUMMARY ====================================
 

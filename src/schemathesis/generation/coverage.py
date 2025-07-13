@@ -8,8 +8,9 @@ from functools import lru_cache, partial
 from itertools import combinations
 from json.encoder import _make_iterencode, c_make_encoder, encode_basestring_ascii  # type: ignore
 from typing import Any, Callable, Generator, Iterator, TypeVar, cast
+from urllib.parse import quote_plus
 
-import jsonschema
+import jsonschema.protocols
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
@@ -19,7 +20,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
+from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
@@ -34,7 +35,7 @@ def _replace_zero_with_nonzero(x: float) -> float:
 
 
 def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
-    return st.lists(strategy, max_size=3) | st.dictionaries(st.text(), strategy, max_size=3)
+    return st.lists(strategy, max_size=2) | st.dictionaries(st.text(), strategy, max_size=2)
 
 
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
@@ -42,10 +43,12 @@ NEGATIVE_MODE_MAX_ITEMS = 15
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
-    st.none() | st.booleans() | NUMERIC_STRATEGY | st.text(), json_recursive_strategy
+    st.none() | st.booleans() | NUMERIC_STRATEGY | st.text(max_size=16),
+    json_recursive_strategy,
+    max_leaves=2,
 )
-ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY, min_size=2)
-OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(), JSON_STRATEGY)
+ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY, min_size=2, max_size=3)
+OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(max_size=16), JSON_STRATEGY, max_size=2)
 
 
 STRATEGIES_FOR_TYPE = {
@@ -112,8 +115,9 @@ class CoverageContext:
     is_required: bool
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
+    validator_cls: type[jsonschema.protocols.Validator]
 
-    __slots__ = ("location", "generation_modes", "is_required", "path", "custom_formats")
+    __slots__ = ("location", "generation_modes", "is_required", "path", "custom_formats", "validator_cls")
 
     def __init__(
         self,
@@ -123,12 +127,14 @@ class CoverageContext:
         is_required: bool,
         path: list[str | int] | None = None,
         custom_formats: dict[str, st.SearchStrategy],
+        validator_cls: type[jsonschema.protocols.Validator],
     ) -> None:
         self.location = location
         self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
         self.is_required = is_required
         self.path = path or []
         self.custom_formats = custom_formats
+        self.validator_cls = validator_cls
 
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:
@@ -149,6 +155,7 @@ class CoverageContext:
             is_required=self.is_required,
             path=self.path,
             custom_formats=self.custom_formats,
+            validator_cls=self.validator_cls,
         )
 
     def with_negative(self) -> CoverageContext:
@@ -158,6 +165,7 @@ class CoverageContext:
             is_required=self.is_required,
             path=self.path,
             custom_formats=self.custom_formats,
+            validator_cls=self.validator_cls,
         )
 
     def is_valid_for_location(self, value: Any) -> bool:
@@ -173,20 +181,21 @@ class CoverageContext:
             if isinstance(value, list) and not self.is_required:
                 # Optional parameters should be present
                 return any(item not in [{}, []] for item in value)
-            if isinstance(value, dict) and not self.is_required:
-                return bool(value)
         return True
+
+    def will_be_serialized_to_string(self) -> bool:
+        return self.location in ("query", "path", "header", "cookie")
 
     def can_be_negated(self, schema: dict[str, Any]) -> bool:
         # Path, query, header, and cookie parameters will be stringified anyway
         # If there are no constraints, then anything will match the original schema after serialization
-        if self.location in ("query", "path", "header", "cookie"):
+        if self.will_be_serialized_to_string():
             cleaned = {
                 k: v
                 for k, v in schema.items()
                 if not k.startswith("x-") and k not in ["description", "example", "examples"]
             }
-            return cleaned != {}
+            return cleaned not in [{}, {"type": "string"}]
         return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
@@ -411,7 +420,7 @@ def cover_schema_iter(
                     for value_ in _negative_enum(ctx, [value], seen):
                         yield value_
                 elif key == "type":
-                    yield from _negative_type(ctx, value, seen)
+                    yield from _negative_type(ctx, value, seen, schema)
                 elif key == "properties":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_properties(ctx, template, value)
@@ -1038,7 +1047,7 @@ def _negative_multiple_of(
 
 
 def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
-    unique = ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1})
+    unique = jsonify(ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1}))
     yield NegativeValue(unique + unique, description="Non-unique items", location=ctx.current_path)
 
 
@@ -1086,22 +1095,120 @@ def _is_non_integer_float(x: float) -> bool:
     return x != int(x)
 
 
+def is_valid_header_value(value: Any) -> bool:
+    value = str(value)
+    if not is_latin_1_encodable(value):
+        return False
+    if has_invalid_characters("A", value):
+        return False
+    return True
+
+
+def jsonify(value: Any) -> Any:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    elif value is None:
+        return "null"
+
+    stack: list = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            for key, sub_item in item.items():
+                if isinstance(sub_item, bool):
+                    item[key] = "true" if sub_item else "false"
+                elif sub_item is None:
+                    item[key] = "null"
+                elif isinstance(sub_item, dict):
+                    stack.append(sub_item)
+                elif isinstance(sub_item, list):
+                    stack.extend(item)
+        elif isinstance(item, list):
+            for idx, sub_item in enumerate(item):
+                if isinstance(sub_item, bool):
+                    item[idx] = "true" if sub_item else "false"
+                elif sub_item is None:
+                    item[idx] = "null"
+                else:
+                    stack.extend(item)
+    return value
+
+
+def quote_path_parameter(value: Any) -> str:
+    if isinstance(value, str):
+        if value == ".":
+            return "%2E"
+        elif value == "..":
+            return "%2E%2E"
+        else:
+            return quote_plus(value)
+    if isinstance(value, list):
+        return ",".join(map(str, value))
+    return str(value)
+
+
 def _negative_type(
-    ctx: CoverageContext,
-    ty: str | list[str],
-    seen: HashSet,
+    ctx: CoverageContext, ty: str | list[str], seen: HashSet, schema: dict[str, Any]
 ) -> Generator[GeneratedValue, None, None]:
     if isinstance(ty, str):
         types = [ty]
     else:
         types = ty
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
+
+    filter_func = {
+        "path": lambda x: not is_invalid_path_parameter(x),
+        "header": is_valid_header_value,
+        "cookie": is_valid_header_value,
+        "query": lambda x: not contains_unicode_surrogate_pair(x),
+    }.get(ctx.location)
+
     if "number" in types:
         del strategies["integer"]
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
     if ctx.location == "query":
         strategies.pop("object", None)
+    if filter_func is not None:
+        for ty, strategy in strategies.items():
+            strategies[ty] = strategy.filter(filter_func)
+
+    pattern = schema.get("pattern")
+    if pattern is not None:
+        try:
+            re.compile(pattern)
+        except re.error:
+            schema = schema.copy()
+            del schema["pattern"]
+            return
+
+    validator = ctx.validator_cls(
+        schema,
+        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+    )
+    is_valid = validator.is_valid
+    try:
+        is_valid(None)
+        apply_validation = True
+    except Exception:
+        # Schema is not correct and we can't validate the generated instances.
+        # In such a scenario it is better to generate at least something with some chances to have a false
+        # positive failure
+        apply_validation = False
+
+    def _does_not_match_the_original_schema(value: Any) -> bool:
+        return not is_valid(str(value))
+
+    if ctx.location == "path":
+        for ty, strategy in strategies.items():
+            strategies[ty] = strategy.map(jsonify).map(quote_path_parameter)
+    elif ctx.location == "query":
+        for ty, strategy in strategies.items():
+            strategies[ty] = strategy.map(jsonify)
+
+    if apply_validation and ctx.will_be_serialized_to_string():
+        for ty, strategy in strategies.items():
+            strategies[ty] = strategy.filter(_does_not_match_the_original_schema)
     for strategy in strategies.values():
         value = ctx.generate_from(strategy)
         if seen.insert(value) and ctx.is_valid_for_location(value):
