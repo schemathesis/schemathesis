@@ -119,9 +119,9 @@ class AnyNumber:
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
-        ({"type": "null"}, [0, False, "", [None, None], {}]),
-        ({"type": "boolean"}, [0, None, "", [None, None], {}]),
-        ({"type": ["boolean", "null"]}, [0, "", [None, None], {}]),
+        ({"type": "null"}, [0, False, "", [None, None]]),
+        ({"type": "boolean"}, [0, None, "", [None, None]]),
+        ({"type": ["boolean", "null"]}, [0, "", [None, None]]),
         ({"enum": [1, 2]}, ["AAA"]),
         ({"enum": [1, 2, {}]}, ["AAA"]),
         ({"const": 42}, ["AAA"]),
@@ -178,16 +178,16 @@ def test_positive_string(ctx, schema, lengths):
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
-        ({"type": "string"}, [0, False, None, [None, None], {}]),
-        ({"type": "string", "minLength": 5}, [0, False, None, [None, None], {}, "0000"]),
-        ({"type": "string", "maxLength": 10}, [0, False, None, [None, None], {}, "00000000000"]),
+        ({"type": "string"}, [0, False, None, [None, None]]),
+        ({"type": "string", "minLength": 5}, [0, False, None, [None, None], "0000"]),
+        ({"type": "string", "maxLength": 10}, [0, False, None, [None, None], "00000000000"]),
         (
             {"type": "string", "minLength": 5, "maxLength": 10},
-            [0, False, None, [None, None], {}, "0000", "00000000000"],
+            [0, False, None, [None, None], "0000", "00000000000"],
         ),
-        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, False, None, [None, None], {}, AnyString(), ""]),
-        ({"type": "string", "pattern": "^[0-9]"}, [0, False, None, [None, None], {}, AnyString()]),
-        ({"type": "string", "format": "date-time"}, [0, False, None, [None, None], {}, ""]),
+        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, False, None, [None, None], AnyString(), ""]),
+        ({"type": "string", "pattern": "^[0-9]"}, [0, False, None, [None, None], AnyString()]),
+        ({"type": "string", "format": "date-time"}, [0, False, None, [None, None], ""]),
     ],
 )
 def test_negative_string(nctx, schema, expected):
@@ -205,7 +205,7 @@ def test_negative_string_with_pattern(nctx):
         "pattern": r"^[\da-z]+$",
     }
     covered = cover_schema(nctx, schema)
-    assert covered == [0, False, None, [None, None], {}, "0000", "000000000", AnyString()]
+    assert covered == [0, False, None, [None, None], "0000", "000000000", AnyString()]
     assert_unique(covered)
     assert_not_conform(covered, schema)
 
@@ -816,10 +816,6 @@ def test_positive_other(pctx, schema, expected):
                     "foo": [None, None],
                 },
                 {
-                    "bar": "",
-                    "foo": {},
-                },
-                {
                     "bar": 0,
                     "foo": "",
                 },
@@ -834,10 +830,6 @@ def test_positive_other(pctx, schema, expected):
                 {
                     "bar": [None, None],
                     "foo": "",
-                },
-                {
-                    "foo": "",
-                    "bar": {},
                 },
                 {
                     "bar": "",
@@ -872,10 +864,6 @@ def test_positive_other(pctx, schema, expected):
                     "foo": [None, None],
                 },
                 {
-                    "bar": "",
-                    "foo": {},
-                },
-                {
                     "bar": 0,
                     "foo": "",
                 },
@@ -889,10 +877,6 @@ def test_positive_other(pctx, schema, expected):
                 },
                 {
                     "bar": [None, None],
-                    "foo": "",
-                },
-                {
-                    "bar": {},
                     "foo": "",
                 },
             ],
@@ -916,9 +900,6 @@ def test_positive_other(pctx, schema, expected):
                 },
                 {
                     "foo": [None, None],
-                },
-                {
-                    "foo": {},
                 },
                 {
                     "foo": "",
@@ -1030,7 +1011,7 @@ def test_negative_pattern_with_incompatible_length(nctx):
                     {"minimum": 5},
                 ],
             },
-            [4, AnyNumber(), False, None, "", [None, None], {}],
+            [4, AnyNumber(), False, None, "", [None, None]],
         ),
         (
             {
@@ -1039,7 +1020,7 @@ def test_negative_pattern_with_incompatible_length(nctx):
                     {"type": "string"},
                 ],
             },
-            [4, 0, False, None, [None, None], {}],
+            [4, 0, False, None, [None, None]],
         ),
         (
             {
@@ -1095,7 +1076,7 @@ def test_negative_combinators(nctx, schema, expected):
 @pytest.mark.filterwarnings("ignore::UserWarning")
 def test_unsupported_patterns(nctx, pattern):
     covered = cover_schema(nctx, {"type": "string", "pattern": pattern})
-    assert covered == [0, False, None, [None, None], {}]
+    assert covered == [0, False, None, [None, None]]
     assert not cover_schema(nctx, {"patternProperties": {pattern: {"type": "string"}}})
 
 
@@ -1199,9 +1180,6 @@ def test_negative_value_locations(nctx, schema, expected):
                         None,
                     ],
                 },
-                {
-                    "name": {},
-                },
                 {},
                 0,
                 False,
@@ -1261,7 +1239,6 @@ def test_large_string_with_complex_pattern(nctx):
             None,
             None,
         ],
-        {},
     ]
 
 

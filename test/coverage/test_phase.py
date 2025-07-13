@@ -30,12 +30,10 @@ NEGATIVE_CASES = [
     {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": {}}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": ["null", "null"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "null"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "false"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": {}, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ["null", "null"], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
@@ -83,14 +81,12 @@ MIXED_CASES = [
     {"query": {"q1": "5", "q2": ["000", "000"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["5", "5"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": {}}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": ["null", "null"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "null"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "false"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "4", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": {}, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["null", "null"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "null", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -669,9 +665,6 @@ def test_mixed_type_keyword(ctx):
                 "query": {"key": ["0"]},
             },
             {
-                "query": {"key": {}},
-            },
-            {
                 "query": {"key": ""},
             },
             {
@@ -795,11 +788,6 @@ def test_array_in_header_path_query(ctx):
                 "headers": {"X-API-Key-1": "0"},
                 "path_parameters": {"bar": "0"},
                 "query": {"key": ["0", "0"]},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": {}},
             },
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -1132,11 +1120,6 @@ def test_optional_parameter_without_type(ctx):
                         "0",
                         "0",
                     ],
-                },
-            },
-            {
-                "query": {
-                    "query": {},
                 },
             },
             {
@@ -1564,8 +1547,7 @@ def test_query_without_constraints_negative(ctx):
             False,
             [
                 "http://127.0.0.1/foo?q=0&q=0",
-                ANY,
-                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=AAA",
                 "http://127.0.0.1/foo?q=null&q=null",
                 "http://127.0.0.1/foo?q=null",
                 "http://127.0.0.1/foo?q=false",
@@ -1581,7 +1563,6 @@ def test_query_without_constraints_negative(ctx):
                 "http://127.0.0.1/foo?q=false",
                 "http://127.0.0.1/foo?q=0",
                 "http://127.0.0.1/foo?q=",
-                "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null",
                 "http://127.0.0.1/foo?q=false",
             ],
@@ -1592,12 +1573,10 @@ def test_query_without_constraints_negative(ctx):
             [
                 "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=0&q=0",
-                "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=null&q=null",
                 "http://127.0.0.1/foo?q=null",
                 "http://127.0.0.1/foo?q=false",
                 "http://127.0.0.1/foo?q=0",
-                "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null",
                 "http://127.0.0.1/foo?q=false",
@@ -1869,10 +1848,10 @@ def assert_coverage(schema, modes, expected, path=None):
         if meta.phase.data.description.startswith("Unspecified"):
             return
         assert_requests_call(case)
+        mode = meta.generation.mode
         if len(modes) == 1:
-            assert meta.generation.mode == modes[0]
+            assert mode == modes[0]
         else:
-            mode = meta.generation.mode
             if mode == GenerationMode.POSITIVE:
                 # If the main mode is positive, then all components should have the positive mode
                 for component, info in case.meta.components.items():
@@ -1882,11 +1861,7 @@ def assert_coverage(schema, modes, expected, path=None):
                 assert any(info.mode == mode for info in case.meta.components.values())
 
         if meta.phase.data.description == "Maximum length string":
-            location = meta.phase.data.parameter_location
-            name = meta.phase.data.parameter
-            container = getattr(case, location)
-            value = container[name]
-            parameter = getattr(operation, location).get(name)
+            value, parameter = get_value_and_parameter(case)
             assert len(value) == parameter.definition["schema"]["maxLength"]
 
         output = {}
@@ -1917,3 +1892,11 @@ def assert_coverage(schema, modes, expected, path=None):
         assert cases in expected
     else:
         assert cases == expected
+
+
+def get_value_and_parameter(case):
+    location = LOCATION_TO_CONTAINER[case.meta.phase.data.parameter_location]
+    name = case.meta.phase.data.parameter
+    container = getattr(case, location)
+    parameter = getattr(case.operation, location).get(name)
+    return container.get(name), parameter
