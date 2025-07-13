@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.9...HEAD) - TBD
 
+### :bug: Fixed
+
+- Negative test cases with invalid query parameters mistakenly becoming positive test cases.
+
 ## [4.0.9](https://github.com/schemathesis/schemathesis/compare/v4.0.8...v4.0.9) - 2025-07-13
 
 ### :bug: Fixed

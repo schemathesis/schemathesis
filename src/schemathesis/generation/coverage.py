@@ -1100,6 +1100,8 @@ def _negative_type(
         del strategies["integer"]
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
+    if ctx.location == "query":
+        strategies.pop("object", None)
     for strategy in strategies.values():
         value = ctx.generate_from(strategy)
         if seen.insert(value) and ctx.is_valid_for_location(value):
