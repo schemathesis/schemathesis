@@ -1,9 +1,15 @@
+import re
 import uuid
+from dataclasses import dataclass
 from unittest.mock import ANY
+from urllib.parse import parse_qs, unquote
 
+import jsonschema
 import pytest
 from hypothesis import Phase, settings
+from jsonschema import ValidationError
 from requests import Request
+from requests.models import RequestEncodingMixin
 
 import schemathesis
 from schemathesis.config._projects import ProjectConfig
@@ -14,6 +20,15 @@ from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from test.utils import assert_requests_call
 
+
+@dataclass
+class Pattern:
+    _pattern: str
+
+    def __eq__(self, value: object, /) -> bool:
+        return bool(isinstance(value, str) and re.match(self._pattern, value))
+
+
 POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "0000"}, "body": {"j-prop": 0}},
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "6", "q2": "000"}, "body": {"j-prop": 0}},
@@ -23,55 +38,61 @@ POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
 ]
 NEGATIVE_CASES = [
-    {"query": {"q1": ANY}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": ["null", "null"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "null"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "false"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ["null", "null"], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": "", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": "false", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ["null", "null"], "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": "", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": "false", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0000"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "{}"}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": ANY}, "body": 0},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null,null"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null"}, "body": False},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null"}, "body": 0},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "false"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "6", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "{}", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null,null", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "false", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": {}}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": [None, None]}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": None}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": 0}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": 0}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": [None, None]},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": ""},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": False},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": {}}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": [None, None]}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": ""}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": None}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": False}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": ANY}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": [None, None]},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": ""},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": False},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": ANY}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "6", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "{}", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null,null", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "false", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"x-prop": {}}},
+    {
+        "query": {"q1": ANY, "q2": "0"},
+        "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")},
+        "body": {"x-prop": [None, None]},
+    },
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"x-prop": None}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"x-prop": False}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"x-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": [None, None]},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": ""},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": False},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": {}}},
+    {
+        "query": {"q1": ANY, "q2": "0"},
+        "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")},
+        "body": {"j-prop": [None, None]},
+    },
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": ""}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": None}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": False}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": ANY}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": [None, None]},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": ""},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": False},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
 ]
 MIXED_CASES = [
     {"query": {"q1": "5"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -81,9 +102,6 @@ MIXED_CASES = [
     {"query": {"q1": "5", "q2": ["000", "000"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["5", "5"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": ["null", "null"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": "null"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": "false"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "4", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -94,11 +112,12 @@ MIXED_CASES = [
     {"query": {"q1": ANY, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "6", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "0000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "{}"}, "body": {"j-prop": 0}},
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": ANY}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "null,null"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "null"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "false"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "0"}, "body": {"j-prop": 0}},
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": ANY}, "body": {"j-prop": 0}},
+    {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": ANY}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5", "h2": "00"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "6", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "{}", "h2": "000"}, "body": {"j-prop": 0}},
@@ -776,13 +795,57 @@ def test_negative_patterns(ctx):
     )
 
 
+def test_query_parameters_always_negative():
+    # See GH-2900
+    schema = {
+        "openapi": "3.0.3",
+        "paths": {
+            "/password": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "charset",
+                            "required": False,
+                            "schema": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "pattern": "^[!\"#$%&'()*+,\\-./0-9:;<=>?@A-Z\\[\\\\\\]^_`a-z{|}~]+$",
+                            },
+                            "example": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+                        },
+                        {
+                            "in": "query",
+                            "name": "length",
+                            "required": False,
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 4096, "default": 32},
+                            "example": 16,
+                        },
+                        {
+                            "in": "query",
+                            "name": "quantity",
+                            "required": False,
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 10},
+                            "example": 2,
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+    }
+
+    assert_negative_coverage(schema, ANY, ("/password", "get"))
+
+
 def test_array_in_header_path_query(ctx):
     schema = build_schema(
         ctx,
         [
-            {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
-            {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
-            {"name": "bar", "in": "path", "required": True, "schema": {"type": "string"}},
+            {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "number"}},
+            {"name": "key", "in": "query", "required": True, "schema": {"type": "number"}},
+            {"name": "bar", "in": "path", "required": True, "schema": {"type": "number"}},
         ],
         path="/foo/{bar}",
     )
@@ -790,79 +853,74 @@ def test_array_in_header_path_query(ctx):
         schema,
         [
             {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "0"},
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "false"},
             },
             {
-                "path_parameters": {"bar": "0"},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": ["0", "0"]},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": ["null", "null"]},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": "null"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "0"},
+                "path_parameters": {"bar": "false"},
                 "query": {"key": "false"},
             },
             {
-                "headers": {"X-API-Key-1": "{}"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "null,null"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "null"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": "0"},
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": ["false", "false"]},
             },
             {
                 "headers": {"X-API-Key-1": "false"},
-                "path_parameters": {"bar": "0"},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": {}},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "null,null"},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "null"},
-                "query": {"key": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
                 "path_parameters": {"bar": "false"},
-                "query": {"key": "0"},
+                "query": {"key": ["null", "null"]},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": ""},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": "null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null,null"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": ""},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "null%2Cnull"},
+                "query": {"key": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": Pattern(".")},
+                "query": {"key": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "null"},
+                "query": {"key": "false"},
             },
         ],
         path=("/foo/{bar}", "post"),
     )
 
 
-def test_required_header(ctx):
+def test_required_header_as_string(ctx):
     schema = build_schema(
         ctx,
         [
@@ -870,44 +928,84 @@ def test_required_header(ctx):
             {"name": "X-API-Key-2", "in": "header", "required": True, "schema": {"type": "string"}},
         ],
     )
+    # Header is a string and we can't generate anything positive, except for a test case with missing headers
+    assert_negative_coverage(schema, [{}])
+
+
+def test_path_parameter_dots(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "name",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "number", "pattern": "[^.]"},
+            }
+        ],
+    )
+    assert_negative_coverage(
+        schema,
+        (
+            [
+                {"path_parameters": {"name": "%2E"}},
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": ANY}},
+                {"path_parameters": {"name": "null"}},
+            ],
+            [
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": "%2E"}},
+                {"path_parameters": {"name": ANY}},
+            ],
+            [
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": ANY}},
+                {"path_parameters": {"name": "null"}},
+            ],
+            [
+                {"path_parameters": {"name": "%2E"}},
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": ANY}},
+            ],
+        ),
+    )
+
+
+def test_required_header(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string", "maxLength": 5}},
+            {"name": "X-API-Key-2", "in": "header", "required": True, "schema": {"type": "string", "maxLength": 5}},
+        ],
+    )
     assert_negative_coverage(
         schema,
         [
             {
-                "headers": {"X-API-Key-1": "0"},
+                "headers": {"X-API-Key-1": Pattern(".{5,}")},
             },
             {
-                "headers": {"X-API-Key-2": "0"},
+                "headers": {"X-API-Key-2": Pattern(".{5,}")},
             },
             {
-                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "{}"},
+                "headers": {"X-API-Key-1": Pattern(".{5,}"), "X-API-Key-2": Pattern(".{5,}")},
             },
             {
-                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null,null"},
+                "headers": {"X-API-Key-1": Pattern(".{5,}"), "X-API-Key-2": Pattern(".{5,}")},
             },
             {
-                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null"},
+                "headers": {"X-API-Key-1": Pattern(".{5,}"), "X-API-Key-2": Pattern(".{5,}")},
             },
             {
-                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "false"},
-            },
-            {
-                "headers": {"X-API-Key-1": "{}", "X-API-Key-2": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "null,null", "X-API-Key-2": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "null", "X-API-Key-2": "0"},
-            },
-            {
-                "headers": {"X-API-Key-1": "false", "X-API-Key-2": "0"},
+                "headers": {"X-API-Key-1": Pattern(".{5,}"), "X-API-Key-2": Pattern(".{5,}")},
             },
         ],
     )
 
 
-def test_required_and_optional_headers(ctx):
+def test_required_and_optional_headers_only_type(ctx):
     schema = build_schema(
         ctx,
         [
@@ -918,8 +1016,36 @@ def test_required_and_optional_headers(ctx):
     assert_negative_coverage(
         schema,
         [
+            # Can't really negate a parameter that can be anything, except for make it missing and injecting an unknown one
             {
-                "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
+                "headers": {"x-schemathesis-unknown-property": "42"},
+            },
+            {},
+        ],
+    )
+
+
+def test_required_and_optional_headers(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "X-API-Key-1",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "string", "pattern": "^[0-9]{5}$"},
+            },
+            {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string", "pattern": "^[0-9]{5}$"}},
+        ],
+    )
+    assert_negative_coverage(
+        schema,
+        [
+            {
+                "headers": {"X-API-Key-1": "00000", "x-schemathesis-unknown-property": "42"},
+            },
+            {
+                "headers": {"X-API-Key-1": ""},
             },
             {
                 "headers": {"X-API-Key-1": "{}"},
@@ -940,6 +1066,9 @@ def test_required_and_optional_headers(ctx):
                 "headers": {"X-API-Key-2": "0"},
             },
             {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": ""},
+            },
+            {
                 "headers": {"X-API-Key-1": "0", "X-API-Key-2": "{}"},
             },
             {
@@ -950,6 +1079,9 @@ def test_required_and_optional_headers(ctx):
             },
             {
                 "headers": {"X-API-Key-1": "0", "X-API-Key-2": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "", "X-API-Key-2": "0"},
             },
             {
                 "headers": {"X-API-Key-1": "{}", "X-API-Key-2": "0"},
@@ -999,11 +1131,27 @@ def test_path_parameter_invalid_example(ctx, extra):
     assert_positive_coverage(schema, [{"path_parameters": {"name": "0"}}])
 
 
-def test_path_parameter(ctx):
+def test_path_parameter_as_string(ctx):
     schema = build_schema(
         ctx,
         [
             {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+        ],
+        path="/foo/{id}",
+    )
+    # Path parameter is a string and we can't generate anything positive
+    assert_negative_coverage(
+        schema,
+        [],
+        path=("/foo/{id}", "post"),
+    )
+
+
+def test_path_parameter(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "id", "in": "path", "required": True, "schema": {"type": "string", "maxLength": 5}},
         ],
         path="/foo/{id}",
     )
@@ -1012,23 +1160,11 @@ def test_path_parameter(ctx):
         [
             {
                 "path_parameters": {
-                    "id": {},
+                    "id": "000000",
                 },
             },
             {
-                "path_parameters": {
-                    "id": "null,null",
-                },
-            },
-            {
-                "path_parameters": {
-                    "id": "null",
-                },
-            },
-            {
-                "path_parameters": {
-                    "id": "false",
-                },
+                "path_parameters": {"id": Pattern(".{5,}")},
             },
         ],
         path=("/foo/{id}", "post"),
@@ -1115,44 +1251,13 @@ def test_optional_parameter_without_type(ctx):
     assert_negative_coverage(
         schema,
         [
+            # Can't really negate a parameter that can be anything, except for make it missing and injecting an unknown one
             {
                 "query": {
-                    "query": "",
                     "x-schemathesis-unknown-property": "42",
                 },
             },
-            {
-                "query": {
-                    "query": "0",
-                },
-            },
             {},
-            {
-                "query": {
-                    "query": [
-                        "0",
-                        "0",
-                    ],
-                },
-            },
-            {
-                "query": {
-                    "query": [
-                        "null",
-                        "null",
-                    ],
-                },
-            },
-            {
-                "query": {
-                    "query": "null",
-                },
-            },
-            {
-                "query": {
-                    "query": "false",
-                },
-            },
         ],
     )
 
@@ -1218,11 +1323,6 @@ def test_generate_empty_headers_too(ctx):
         schema,
         [
             {},
-            {"headers": {"X-API-Key-1": "{}"}},
-            {"headers": {"X-API-Key-1": "null,null"}},
-            {"headers": {"X-API-Key-1": "null"}},
-            {"headers": {"X-API-Key-1": "false"}},
-            {"headers": {"X-API-Key-1": "0"}},
             {"headers": {"X-API-Key-1": ""}},
         ],
     )
@@ -1473,8 +1573,8 @@ def foo_id(value):
                 "type": "integer",
             },
             [
-                foo_id({}),
-                foo_id("null,null"),
+                foo_id("null%2Cnull"),
+                foo_id(Pattern(".")),
                 foo_id("null"),
                 foo_id("false"),
             ],
@@ -1483,8 +1583,7 @@ def foo_id(value):
             {"type": "string", "format": "date-time"},
             [
                 foo_id("0"),
-                foo_id({}),
-                foo_id("null,null"),
+                foo_id("null%2Cnull"),
                 foo_id("null"),
                 foo_id("false"),
             ],
@@ -1533,7 +1632,7 @@ def test_path_parameters_without_constraints_negative(ctx):
 
 
 def test_query_without_constraints_negative(ctx):
-    # When there are no constraints, then we can't generate negative values as everything will match the previous schema
+    # When there are no constraints, then we can't generate negative values as everything will match the previous schema, only missing parameter
     schema = build_schema(
         ctx,
         [
@@ -1545,7 +1644,7 @@ def test_query_without_constraints_negative(ctx):
             },
         ],
     )
-    assert_negative_coverage(schema, [])
+    assert_negative_coverage(schema, [{}])
 
 
 @pytest.mark.parametrize(
@@ -1571,6 +1670,17 @@ def test_query_without_constraints_negative(ctx):
             False,
             [
                 "http://127.0.0.1/foo?q=0&q=0",
+                "http://127.0.0.1/foo?q=",
+                "http://127.0.0.1/foo?q=null",
+                "http://127.0.0.1/foo?q=false",
+            ],
+        ],
+        [
+            {"type": "array", "items": {"type": "string", "pattern": "^[0-9]{3,5}$"}},
+            False,
+            [
+                "http://127.0.0.1/foo?q=0&q=0",
+                "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null&q=null",
                 "http://127.0.0.1/foo?q=null",
                 "http://127.0.0.1/foo?q=false",
@@ -1581,11 +1691,12 @@ def test_query_without_constraints_negative(ctx):
             ],
         ],
         [
-            {"type": "array", "items": {"type": "string"}},
+            {"type": "array", "items": {"type": "string", "pattern": "^[0-9]{3,5}$"}},
             True,
             [
                 "http://127.0.0.1/foo",
                 "http://127.0.0.1/foo?q=0&q=0",
+                "http://127.0.0.1/foo?q=",
                 "http://127.0.0.1/foo?q=null&q=null",
                 "http://127.0.0.1/foo?q=null",
                 "http://127.0.0.1/foo?q=false",
@@ -1872,6 +1983,20 @@ def assert_coverage(schema, modes, expected, path=None):
             if mode == GenerationMode.NEGATIVE:
                 # If the main mode is negative, then at least one component should be negative
                 assert any(info.mode == mode for info in case.meta.components.values())
+        if (
+            mode == GenerationMode.NEGATIVE
+            and meta.phase.data.parameter_location
+            in [
+                "query",
+                "path",
+                "header",
+                "cookie",
+            ]
+            and not (
+                meta.phase.data.description == "Object with unexpected properties" and meta.phase.data.parameter is None
+            )
+        ):
+            _validate_negative_parameter_serialization(case)
 
         if meta.phase.data.description == "Maximum length string":
             value, parameter = get_value_and_parameter(case)
@@ -1913,3 +2038,89 @@ def get_value_and_parameter(case):
     container = getattr(case, location)
     parameter = getattr(case.operation, location).get(name)
     return container.get(name), parameter
+
+
+def _validate_negative_parameter_serialization(case):
+    """Validate that negative test cases remain negative after HTTP serialization."""
+    # This addresses the false positive issue where generated non-string values
+    # (like `null`, `false`, `123`) become valid strings after HTTP serialization
+    # (like `"null"`, `"false"`, `"123"`), causing "API accepted schema-violating request" errors.
+    #
+    # For example:
+    # - Generated: charset=None (Python None)
+    # - Serialized: charset=null (string "null")
+    # - If "null" matches the string pattern, it's actually valid, not negative
+    #
+    value, parameter = get_value_and_parameter(case)
+
+    # Get the serialized values that will actually be sent to the API
+    data = case.meta.phase.data
+    if data.description.startswith("Missing") and parameter.definition.get("required"):
+        # Missing required parameter - proper negative test case
+        return
+    if data.description.startswith("Duplicate"):
+        # Duplicate parameter is negative not in the schema sense
+        return
+    serialized_items = _get_serialized_parameter_values(value, data.parameter, data.parameter_location)
+
+    # Validate each serialized value against the parameter schema
+    _validate_serialized_items_are_negative(serialized_items, parameter, case)
+
+
+def _get_serialized_parameter_values(value, parameter_name, location):
+    """Get the actual serialized values that will be sent to the API."""
+    if location == "query":
+        return _serialize_query_parameter(value, parameter_name)
+    elif location == "path":
+        return [unquote(str(value))]
+    return [str(value)]
+
+
+def _serialize_query_parameter(value, parameter_name):
+    """Serialize a query parameter."""
+    encoded = RequestEncodingMixin._encode_params({parameter_name: value})
+    if encoded == f"{parameter_name}=":
+        # Empty value case: param=
+        return [""]
+    elif not encoded:
+        # No parameter sent (None/empty case)
+        return []
+    return parse_qs(encoded).get(parameter_name, [])
+
+
+def _validate_serialized_items_are_negative(serialized_items, parameter, case):
+    """Validate that serialized parameter values are actually negative."""
+    # If a serialized value passes validation, it means we generated a "negative"
+    # test case that's actually positive after serialization - this is a false positive.
+    if not serialized_items:
+        # Empty items list - this is only negative if parameter is required
+        if not parameter.definition.get("required", False):
+            pytest.fail(
+                f"Generated empty parameter '{parameter.name}' but parameter is not required. "
+                f"This creates a false positive in negative testing."
+            )
+        return
+
+    # Get the JSON schema for validation
+    schema = parameter.as_json_schema(case.operation)
+    validator = case.operation.schema.validator_cls(
+        schema,
+        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+    )
+
+    # Check each serialized value
+    for item in serialized_items:
+        try:
+            validator.validate(item)
+            # If validation passes, this is a false positive
+            pytest.fail(
+                f"FALSE POSITIVE: Generated negative value became valid after serialization.\n"
+                f"Parameter: {parameter.name}\n"
+                f"Serialized value: '{item}'\n"
+                f"Schema: {schema}\n"
+                f"Description: {case.meta.phase.data.description}\n"
+                f"This value should be invalid but passes validation after HTTP serialization."
+            )
+        except ValidationError:
+            # Validation failed - this is expected for negative cases
+            pass

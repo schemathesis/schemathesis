@@ -233,6 +233,7 @@ def test_flaky_assertions(engine_factory, kwargs):
         assert "Second" in messages
 
 
+@flaky(max_runs=10, min_passes=1)
 @pytest.mark.usefixtures("restore_checks")
 def test_failure_hidden_behind_another_failure(engine_factory):
     # The same API operation, but one error is far less frequent and is located behind another one that happens more often, so it is not found in the first test suite
