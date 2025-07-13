@@ -1,6 +1,6 @@
 # Understanding Data Generation
 
-This guide explains how Schemathesis generates test data for your API, from raw schemas to complete HTTP requests. Understanding this process helps you write better extensions, troubleshoot unexpected behavior, and optimize your testing strategy.
+This document explains how Schemathesis generates test data for your API, from raw schemas to complete HTTP requests. Understanding this process helps you write better extensions, troubleshoot unexpected behavior, and optimize your testing process.
 
 ## The Generation Hierarchy
 
@@ -21,21 +21,22 @@ Schemathesis                 → Complete API testing workflow
 2. **hypothesis-jsonschema** and **hypothesis-graphql** translate your API schemas into Hypothesis strategies
 3. **Schemathesis** orchestrates the entire process: parsing schemas, generating all request components, sending requests, and validating responses
 
-This layered approach means Schemathesis inherits Hypothesis's powerful features (like automatic shrinking) while adding API-specific intelligence.
+This layered approach means Schemathesis inherits Hypothesis's features (like automatic shrinking) while adding API-specific behavior.
 
 ## Testing Phases
 
-Schemathesis generates test cases through multiple independent phases, each targeting different aspects of API testing.
+Schemathesis generates test cases through multiple phases, each targeting different aspects of API testing.
 
 ### Examples Phase
 
-Uses `example` and `examples` from your schema, filling missing parameters with generated data.
+Uses `example` and `examples` from your schema, filling missing parts with generated data.
 
 **Example:**
 ```yaml
 # Schema
 parameters:
   - name: limit
+    in: query
     schema:
       type: integer
       examples: [10, 50, 100]
@@ -45,18 +46,18 @@ parameters:
 
 ### Coverage Phase
 
-Generates boundary values, enum combinations, and constraint violations systematically.
+Aims to exhaustively cover boundary values for every constraint defined in the schema.
 
 **Example:**
 ```yaml
 # Schema: {"type": "string", "minLength": 2, "maxLength": 10}
 
-# Produces: strings of length 2, 3, 9, 10 (boundaries)
+# Produces: strings of length 1, 2, 3, 9, 10, 11
 ```
 
 ### Fuzzing Phase
 
-Generates random, diverse data within schema constraints using Hypothesis strategies.
+Generates random data based on the schema constraints.
 
 **Example:**
 ```yaml
@@ -99,7 +100,8 @@ Generates data that **should be rejected** by your API — deliberately invalid 
 # Negative examples: 42, [], "", "ab"
 ```
 
-**How it works:** Schemathesis mutates your schema to produce invalid data.
+!!! tip "How it works"
+    Schemathesis mutates your schema to produce invalid data.
 
 ```bash
 # Enable negative testing
@@ -108,7 +110,7 @@ schemathesis run --mode=negative https://api.example.com/openapi.json
 
 ## Serialization Process
 
-The final step transforms generated Python objects into actual HTTP requests based on your API's media types.
+The final step transforms generated objects into actual HTTP requests based on your API's media types.
 
 **Media type support:**
 
@@ -138,10 +140,12 @@ When Schemathesis finds a failing test case, it automatically **shrinks** it to 
 **After shrinking**
 
 ```python
-{"name": "a", "age": 42}  # Only essential data
+{"name": "a", "age": 42}  # Only data that triggers a failure
 ```
 
-Shrinking is enabled by default. Disable with `--no-shrink` for faster runs.
+
+!!! important
+    Shrinking is enabled by default. Disable with `--no-shrink` for faster test runs.
 
 ## How Many Test Cases Does Schemathesis Generate?
 
