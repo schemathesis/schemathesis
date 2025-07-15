@@ -6,6 +6,10 @@
 
 - Negative test cases with invalid query parameters mistakenly becoming positive test cases.
 
+### :wrench: Changed
+
+- Display cURL code samples on more network errors. [#2940](https://github.com/schemathesis/schemathesis/issues/2940) 
+
 ## [4.0.9](https://github.com/schemathesis/schemathesis/compare/v4.0.8...v4.0.9) - 2025-07-13
 
 ### :bug: Fixed
