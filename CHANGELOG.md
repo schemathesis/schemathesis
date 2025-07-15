@@ -4,7 +4,7 @@
 
 ### :bug: Fixed
 
-- Negative test cases with invalid query parameters mistakenly becoming positive test cases.
+- Negative test cases with invalid parameters mistakenly becoming positive test cases.
 
 ### :wrench: Changed
 
