@@ -429,6 +429,7 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
         if any(
             pattern in exc_str
             for pattern in [
+                "Connection aborted",
                 "Connection reset by peer",
                 "[Errno 104]",
                 "ECONNRESET",
