@@ -532,7 +532,8 @@ def test_shared_examples_openapi_2(ctx):
     assert find(strategies[0], lambda case: case.body == "value")
 
 
-def test_examples_ref_openapi_2(ctx):
+@pytest.mark.parametrize("examples", [{"example1": {"value": "value"}}, ["value"]])
+def test_examples_ref_openapi_2(ctx, examples):
     schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -549,7 +550,7 @@ def test_examples_ref_openapi_2(ctx):
                     "in": "body",
                     "required": True,
                     "schema": {},
-                    "x-examples": {"example1": {"value": "value"}},
+                    "x-examples": examples,
                 }
             }
         },
@@ -1462,6 +1463,14 @@ def content(schema, **kwargs):
         ),
         (
             content({"$ref": "#/components/schemas/Item"}, **{"x-examples": {"Example1": {"value": {"id": "123456"}}}}),
+            {
+                "Item": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+        (
+            content({"$ref": "#/components/schemas/Item"}, **{"x-examples": [{"id": "123456"}]}),
             {
                 "Item": [
                     {"id": "123456"},
