@@ -107,6 +107,8 @@
 
 This release only includes documentation & URLs updates.
 
+Check the [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
+
 ## [4.0.0-beta.1](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.12...v4.0.0-beta.1) - 2025-06-07
 
 ### :rocket: Added
