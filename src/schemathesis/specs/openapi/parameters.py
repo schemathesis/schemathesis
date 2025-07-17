@@ -60,9 +60,11 @@ class OpenAPIParameter(Parameter):
         # JSON Schema allows `examples` as an array
         examples = []
         if self.examples_field in self.definition:
-            examples.extend(
-                [example["value"] for example in self.definition[self.examples_field].values() if "value" in example]
-            )
+            container = self.definition[self.examples_field]
+            if isinstance(container, dict):
+                examples.extend([example["value"] for example in container.values() if "value" in example])
+            elif isinstance(container, list):
+                examples.extend(container)
         if self.example_field in self.definition:
             examples.append(self.definition[self.example_field])
         schema = self.from_open_api_to_json_schema(operation, self.definition)

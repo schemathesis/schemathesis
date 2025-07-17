@@ -206,20 +206,23 @@ def _find_request_body_examples_definition(
 
 
 def extract_inner_examples(
-    examples: dict[str, Any], unresolved_definition: dict[str, Any]
+    examples: dict[str, Any] | list, unresolved_definition: dict[str, Any]
 ) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
-    for name, example in examples.items():
-        if "$ref" in unresolved_definition[name] and "value" not in example and "externalValue" not in example:
-            # The example here is a resolved example and should be yielded as is
-            yield example
-        if isinstance(example, dict):
-            if "value" in example:
-                yield example["value"]
-            elif "externalValue" in example:
-                with suppress(requests.RequestException):
-                    # Report a warning if not available?
-                    yield load_external_example(example["externalValue"])
+    if isinstance(examples, dict):
+        for name, example in examples.items():
+            if "$ref" in unresolved_definition[name] and "value" not in example and "externalValue" not in example:
+                # The example here is a resolved example and should be yielded as is
+                yield example
+            if isinstance(example, dict):
+                if "value" in example:
+                    yield example["value"]
+                elif "externalValue" in example:
+                    with suppress(requests.RequestException):
+                        # Report a warning if not available?
+                        yield load_external_example(example["externalValue"])
+    elif isinstance(examples, list):
+        yield from examples
 
 
 @lru_cache
@@ -381,9 +384,12 @@ def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]
                 ("x-examples", "x-example"),
             ):
                 examples = definition.get(examples_field, {})
-                for example in examples.values():
-                    if "value" in example:
-                        output.setdefault(name, []).append(example["value"])
+                if isinstance(examples, dict):
+                    for example in examples.values():
+                        if "value" in example:
+                            output.setdefault(name, []).append(example["value"])
+                elif isinstance(examples, list):
+                    output.setdefault(name, []).extend(examples)
                 if example_field in definition:
                     output.setdefault(name, []).append(definition[example_field])
     return output
