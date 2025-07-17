@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Negative test cases with invalid query parameters mistakenly becoming positive test cases.
+- Support `x-examples` as a list for Open API 2.0.
 
 ### :wrench: Changed
 

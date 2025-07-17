@@ -594,7 +594,26 @@ def test_with_examples_openapi_3_request_body(ctx):
     )
 
 
-def test_with_examples_openapi_2(ctx):
+@pytest.mark.parametrize(
+    ["first", "second"],
+    [
+        (
+            {
+                "first": {"value": "A1"},
+                "second": {"value": "B2"},
+            },
+            {
+                "first": {"value": 10},
+                "second": {"value": 20},
+            },
+        ),
+        (
+            ["A1", "B2"],
+            [10, 20],
+        ),
+    ],
+)
+def test_with_examples_openapi_2(ctx, first, second):
     schema = build_schema(
         ctx,
         [
@@ -603,20 +622,14 @@ def test_with_examples_openapi_2(ctx):
                 "name": "q1",
                 "type": "string",
                 "required": True,
-                "x-examples": {
-                    "first": {"value": "A1"},
-                    "second": {"value": "B2"},
-                },
+                "x-examples": first,
             },
             {
                 "in": "query",
                 "name": "q2",
                 "type": "integer",
                 "required": True,
-                "x-examples": {
-                    "first": {"value": 10},
-                    "second": {"value": 20},
-                },
+                "x-examples": second,
             },
         ],
         version="2.0",
