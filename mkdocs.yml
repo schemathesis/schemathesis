@@ -40,6 +40,7 @@ nav:
       - Checks: reference/checks.md
       - reference/warnings.md
 
+  - Migration from v3: migration.md
   - FAQ: faq.md
   - External Resources: resources.md
 
