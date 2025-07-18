@@ -306,6 +306,7 @@ STRING_FORMAT_SCHEMA = {
         (b'{"success": true}', {"responses": {"200": {"description": "text"}}}),
         (b'{"random": "text"}', {"responses": {"200": {"description": "text"}}}),
         (b'{"success": true}', {"responses": {"200": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
+        (b'{"success": true}', {"responses": {"2XX": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"success": true}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (
             b'{"value": "2017-07-21"}',
@@ -350,6 +351,38 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
             {
                 "responses": {
                     "200": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            b'{"success": true}',
+            {
+                "responses": {
+                    "2XX": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            b'{"success": true}',
+            {
+                "responses": {
+                    # Specific status code should be used instead of a more general one
+                    "200": {
+                        "description": "text",
+                        "content": {"application/json": {"schema": SUCCESS_SCHEMA}},
+                    },
+                    "2XX": {
+                        "description": "text",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "string"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    },
                 }
             },
         ),
@@ -507,6 +540,7 @@ Value:
     ("content", "definition"),
     [
         (b'{"random": "text"}', {"responses": {"200": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
+        (b'{"random": "text"}', {"responses": {"2XX": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"random": "text"}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"value": "text"}', {"responses": {"default": {"description": "text", "schema": STRING_FORMAT_SCHEMA}}}),
     ],
@@ -528,6 +562,15 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
             {
                 "responses": {
                     "200": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            "application/json",
+            b'{"random": "text"}',
+            {
+                "responses": {
+                    "2XX": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
                 }
             },
         ),
