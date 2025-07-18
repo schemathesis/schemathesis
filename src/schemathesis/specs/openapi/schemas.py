@@ -41,6 +41,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi.stateful import links
+from schemathesis.specs.openapi.utils import expand_status_code
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -556,12 +557,10 @@ class BaseOpenAPISchema(BaseSchema):
         except KeyError as exc:
             path = operation.path
             self._raise_invalid_schema(exc, path, operation.method)
-        status_code = str(response.status_code)
-        if status_code in responses:
-            return self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
-        if "default" in responses:
-            return self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
-        return None
+        definition = _get_response_definition_by_status(response.status_code, responses)
+        if definition is None:
+            return None
+        return self.resolver.resolve_in_scope(definition, operation.definition.scope)
 
     def get_headers(
         self, operation: APIOperation, response: Response
@@ -598,12 +597,8 @@ class BaseOpenAPISchema(BaseSchema):
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         __tracebackhide__ = True
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
-        status_code = str(response.status_code)
-        if status_code in responses:
-            definition = responses[status_code]
-        elif "default" in responses:
-            definition = responses["default"]
-        else:
+        definition = _get_response_definition_by_status(response.status_code, responses)
+        if definition is None:
             # No response defined for the received response status code
             return None
         scopes, schema = self.get_response_schema(definition, operation.definition.scope)
@@ -758,6 +753,24 @@ class BaseOpenAPISchema(BaseSchema):
             # Rewrite the reference with the new location
             schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"
         return schema
+
+
+def _get_response_definition_by_status(status_code: int, responses: dict[str, Any]) -> dict[str, Any] | None:
+    # Cast to string, as integers are often there due to YAML deserialization
+    responses = {str(status): definition for status, definition in responses.items()}
+    if str(status_code) in responses:
+        return responses[str(status_code)]
+    # More specific should go first
+    keys = sorted(responses, key=lambda k: k.count("X"))
+    for key in keys:
+        if key == "default":
+            continue
+        status_codes = expand_status_code(key)
+        if status_code in status_codes:
+            return responses[key]
+    if "default" in responses:
+        return responses["default"]
+    return None
 
 
 def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
