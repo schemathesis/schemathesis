@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.10...HEAD) - TBD
 
+### :bug: Fixed
+
+- Check for wildcard response keys when searching for response definitions. [#2960](https://github.com/schemathesis/schemathesis/discussions/2960)
+
 ## [4.0.10](https://github.com/schemathesis/schemathesis/compare/v4.0.9...v4.0.10) - 2025-07-17
 
 ### :bug: Fixed
