@@ -97,6 +97,10 @@ Easy integration:
 
 </div>
 
+
+!!! important
+    **Upgrading from older versions?** Check our [Migration Guide](migration.md) for key changes.
+
 ## Need help?
 
 * **[Resources](resources.md)** — Community articles, videos, and tutorials
