@@ -115,7 +115,7 @@ def worker_task(
 ) -> None:
     from hypothesis.errors import HypothesisWarning, InvalidArgument
 
-    from schemathesis.generation.hypothesis.builder import create_test
+    from schemathesis.generation.hypothesis.builder import create_coverage_test, create_examples_test, create_test
 
     from ._executor import run_test, test_func
 
@@ -169,18 +169,25 @@ def worker_task(
                     ):
                         continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation)
+
+                    config = HypothesisTestConfig(
+                        modes=[mode],
+                        settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.name),
+                        seed=ctx.config.seed,
+                        project=ctx.config,
+                        as_strategy_kwargs=as_strategy_kwargs,
+                    )
                     try:
-                        test_function = create_test(
-                            operation=operation,
-                            test_func=test_func,
-                            config=HypothesisTestConfig(
-                                modes=[mode],
-                                settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.name),
-                                seed=ctx.config.seed,
-                                project=ctx.config,
-                                as_strategy_kwargs=as_strategy_kwargs,
-                            ),
-                        )
+                        if phase == PhaseName.EXAMPLES:
+                            test_function = create_examples_test(
+                                operation=operation, test_func=test_func, config=config
+                            )
+                        elif phase == PhaseName.COVERAGE:
+                            test_function = create_coverage_test(
+                                operation=operation, test_func=test_func, config=config
+                            )
+                        elif phase == PhaseName.FUZZING:
+                            test_function = create_test(operation=operation, test_func=test_func, config=config)
                     except (InvalidSchema, InvalidArgument) as exc:
                         on_error(exc, method=operation.method, path=operation.path)
                         continue
