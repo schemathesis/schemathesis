@@ -227,6 +227,65 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
+def create_examples_test(
+    *,
+    test_func: Callable,
+    operation: APIOperation,
+    config: HypothesisTestConfig,
+) -> Callable:
+    hook_dispatcher = HookDispatcherMark.get(test_func)
+    auth_storage = AuthStorageMark.get(test_func)
+    strategy_kwargs = {
+        "hooks": hook_dispatcher,
+        "auth_storage": auth_storage,
+        **config.as_strategy_kwargs,
+    }
+    phases_config = config.project.phases_for(operation=operation)
+
+    @wraps(test_func)
+    def test_wrapper(*args: Any, **kwargs: Any) -> Any:
+        __tracebackhide__ = True
+        for case in generate_example_cases(
+            test=test_func,
+            operation=operation,
+            fill_missing=phases_config.examples.fill_missing,
+            hook_dispatcher=hook_dispatcher,
+            **strategy_kwargs,
+        ):
+            test_func(*args, case=case, **kwargs)
+        return None
+
+    return test_wrapper
+
+
+def create_coverage_test(
+    *,
+    test_func: Callable,
+    operation: APIOperation,
+    config: HypothesisTestConfig,
+) -> Callable:
+    auth_storage = AuthStorageMark.get(test_func)
+    generation = config.project.generation_for(operation=operation)
+    phases_config = config.project.phases_for(operation=operation)
+
+    @wraps(test_func)
+    def test_wrapper(*args: Any, **kwargs: Any) -> Any:
+        __tracebackhide__ = True
+        for case in generate_coverage_cases(
+            operation=operation,
+            generation_modes=generation.modes,
+            auth_storage=auth_storage,
+            as_strategy_kwargs=config.as_strategy_kwargs,
+            generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=phases_config.coverage.unexpected_methods,
+            generation_config=generation,
+        ):
+            test_func(*args, case=case, **kwargs)
+        return None
+
+    return test_wrapper
+
+
 def add_examples(
     test: Callable,
     operation: APIOperation,
@@ -234,6 +293,22 @@ def add_examples(
     hook_dispatcher: HookDispatcher | None = None,
     **kwargs: Any,
 ) -> Callable:
+    for example in generate_example_cases(
+        test=test, operation=operation, fill_missing=fill_missing, hook_dispatcher=hook_dispatcher, **kwargs
+    ):
+        test = hypothesis.example(case=example)(test)
+
+    return test
+
+
+def generate_example_cases(
+    *,
+    test: Callable,
+    operation: APIOperation,
+    fill_missing: bool,
+    hook_dispatcher: HookDispatcher | None = None,
+    **kwargs: Any,
+) -> Generator[Case]:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
@@ -273,9 +348,7 @@ def add_examples(
                 InvalidHeadersExampleMark.set(original_test, invalid_headers)
                 continue
         adjust_urlencoded_payload(example)
-        test = hypothesis.example(case=example)(test)
-
-    return test
+        yield example
 
 
 def adjust_urlencoded_payload(case: Case) -> None:
@@ -298,6 +371,29 @@ def add_coverage(
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
 ) -> Callable:
+    for case in generate_coverage_cases(
+        operation=operation,
+        generation_modes=generation_modes,
+        auth_storage=auth_storage,
+        as_strategy_kwargs=as_strategy_kwargs,
+        generate_duplicate_query_parameters=generate_duplicate_query_parameters,
+        unexpected_methods=unexpected_methods,
+        generation_config=generation_config,
+    ):
+        test = hypothesis.example(case=case)(test)
+    return test
+
+
+def generate_coverage_cases(
+    *,
+    operation: APIOperation,
+    generation_modes: list[GenerationMode],
+    auth_storage: AuthStorage | None,
+    as_strategy_kwargs: dict[str, Any],
+    generate_duplicate_query_parameters: bool,
+    unexpected_methods: set[str],
+    generation_config: GenerationConfig,
+) -> Generator[Case]:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
     auth_context = auths.AuthContext(
@@ -309,7 +405,6 @@ def add_coverage(
         for container in LOCATION_TO_CONTAINER.values()
         if container in as_strategy_kwargs
     }
-
     with warnings.catch_warnings():
         warnings.filterwarnings(
             "ignore", message=".*but this is not valid syntax for a Python regular expression.*", category=UserWarning
@@ -331,9 +426,7 @@ def add_coverage(
                     setattr(case, container_name, value)
                 else:
                     container.update(value)
-
-            test = hypothesis.example(case=case)(test)
-    return test
+            yield case
 
 
 class Instant:
