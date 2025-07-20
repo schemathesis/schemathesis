@@ -207,15 +207,24 @@ class Case:
             transport_ = transport.get(kwargs["app"])
         else:
             transport_ = self.operation.schema.transport
-        response = transport_.send(
-            self,
-            session=session,
-            base_url=base_url,
-            headers=headers,
-            params=params,
-            cookies=cookies,
-            **kwargs,
-        )
+        try:
+            response = transport_.send(
+                self,
+                session=session,
+                base_url=base_url,
+                headers=headers,
+                params=params,
+                cookies=cookies,
+                **kwargs,
+            )
+        except Exception as exc:
+            # May happen in ASGI / WSGI apps
+            if not hasattr(exc, "__notes__"):
+                exc.__notes__ = []  # type: ignore[attr-defined]
+            verify = kwargs.get("verify", True)
+            curl = self.as_curl_command(headers=headers, verify=verify)
+            exc.__notes__.append(f"\nReproduce with: \n\n    {curl}")  # type: ignore[attr-defined]
+            raise
         dispatch("after_call", hook_context, self, response)
         return response
 
