@@ -113,10 +113,13 @@ def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: Sa
     kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url, headers=headers)
     if config.enabled:
         kwargs["url"] = sanitize_url(kwargs["url"], config=config)
+        kwargs["headers"] = dict(kwargs["headers"])
         sanitize_value(kwargs["headers"], config=config)
         if kwargs["cookies"]:
+            kwargs["cookies"] = dict(kwargs["cookies"])
             sanitize_value(kwargs["cookies"], config=config)
         if kwargs["params"]:
+            kwargs["params"] = dict(kwargs["params"])
             sanitize_value(kwargs["params"], config=config)
 
     return requests.Request(**kwargs).prepare()
