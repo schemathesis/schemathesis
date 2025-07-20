@@ -9,6 +9,37 @@ from pydantic import BaseModel
 import schemathesis
 
 
+def test_code_sample(testdir):
+    testdir.makepyfile(
+        """
+from fastapi import FastAPI, Depends, HTTPException, Security
+
+app = FastAPI()
+
+@app.get("/fail")
+async def fail():
+    1 / 0
+
+from hypothesis import settings
+import schemathesis
+from schemathesis import GenerationMode
+from schemathesis.specs.openapi.checks import ignored_auth
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=3)
+def test_api(case):
+    case.call_and_validate()
+""",
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(failed=1)
+    assert "ZeroDivisionError: division by zero" in result.stdout.str()
+    assert "Reproduce with" in result.stdout.str()
+    assert "curl -X GET http://localhost/fail" in result.stdout.str()
+
+
 @pytest.mark.hypothesis_nested
 def test_cookies(fastapi_app):
     @fastapi_app.get("/cookies")

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.11...HEAD) - TBD
 
+### :wrench: Changed
+
+- Display cURL code sample for application-level exceptions when using the ASGI / WSGI integration.
+
 ## [4.0.11](https://github.com/schemathesis/schemathesis/compare/v4.0.10...v4.0.11) - 2025-07-18
 
 ### :bug: Fixed
