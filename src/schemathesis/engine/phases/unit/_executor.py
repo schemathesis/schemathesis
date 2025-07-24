@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from warnings import WarningMessage, catch_warnings
 
 import requests
+from hypothesis.control import currently_in_test_context
 from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
@@ -115,7 +116,8 @@ def run_test(
     )
 
     try:
-        setup_hypothesis_database_key(test_function, operation)
+        if hasattr(test_function, "hypothesis"):
+            setup_hypothesis_database_key(test_function, operation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
             test_function(
                 ctx=ctx,
@@ -370,7 +372,9 @@ def test_func(
             recorder.record_request(case_id=case.id, request=error.request)
         raise
     recorder.record_response(case_id=case.id, response=response)
-    metrics.maximize(generation.maximize, case=case, response=response)
+    if currently_in_test_context():
+        metrics.maximize(generation.maximize, case=case, response=response)
+
     validate_response(
         case=case,
         ctx=check_ctx,
