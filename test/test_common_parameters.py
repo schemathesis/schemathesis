@@ -132,7 +132,9 @@ def test_common_parameters_with_references_stateful(ctx):
     assert len(state_machine.bundles) == 1
     assert "POST /bar -> 200" in state_machine.bundles
     # 1 operation that creates data for other operations + 2 links
-    assert len(state_machine.rules()) == 3
+    assert hasattr(state_machine, "POST_bar__200__FooPOST__POST_foo")
+    assert hasattr(state_machine, "POST_bar__200__FooPut__PUT_foo")
+    assert hasattr(state_machine, "RANDOM__POST_bar")
 
 
 def test_common_parameters_multiple_tests(testdir):
