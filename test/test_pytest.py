@@ -905,6 +905,35 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
+@pytest.mark.parametrize(
+    ["filter", "expected"],
+    (
+        ("", {"failed": 1}),
+        # Adds two additional operations
+        (".include(name_regex='GET /(success|text)')", {"failed": 2, "passed": 1}),
+        # Also excludes the one defined in the config file
+        (".include(name_regex='GET /(success|text)').exclude(name='POST /write_only')", {"failed": 1, "passed": 1}),
+    ),
+)
+@pytest.mark.operations("__all__")
+def test_filter_combination(testdir, openapi3_schema_url, filter, expected):
+    testdir.make_test(f"""
+config = schemathesis.Config.from_dict({{
+    "operations": [{{
+        "exclude-name": "POST /write_only",
+        "enabled": False,
+    }}]
+}})
+schema = schemathesis.openapi.from_url("{openapi3_schema_url}", config=config)
+
+@schema{filter}.parametrize()
+def test_api(case):
+    case.call_and_validate()
+    """)
+    result = testdir.runpytest()
+    result.assert_outcomes(**expected)
+
+
 def test_transport_kwargs_from_config(testdir, openapi3_schema_url):
     testdir.make_test(
         f"""

@@ -243,6 +243,7 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
         config = SchemathesisConfig.discover()
     project_config = config.projects.get(schema)
     instance = GraphQLSchema(schema, config=project_config)
+    instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
     dispatch("after_load_schema", hook_context, instance)
     return instance
 

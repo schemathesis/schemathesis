@@ -159,9 +159,15 @@ class OperationsConfig(DiffBase):
         if exclude_deprecated:
             exclude_set.include(is_deprecated)
 
+        return self.filter_set_with(include=include_set, exclude=exclude_set)
+
+    def filter_set_with(self, include: FilterSet, exclude: FilterSet | None = None) -> FilterSet:
+        if not self.operations and exclude is None:
+            return include
         operations = list(self.operations)
 
         final = FilterSet()
+        exclude = exclude or FilterSet()
 
         def priority_filter(ctx: HasAPIOperation) -> bool:
             """Filter operations according to CLI and config priority."""
@@ -169,12 +175,12 @@ class OperationsConfig(DiffBase):
                 if op_config._filter_set.match(ctx) and not op_config.enabled:
                     return False
 
-            if not include_set.is_empty():
-                if exclude_set.is_empty():
-                    return include_set.match(ctx)
-                return include_set.match(ctx) and not exclude_set.match(ctx)
-            elif not exclude_set.is_empty():
-                return not exclude_set.match(ctx)
+            if not include.is_empty():
+                if exclude.is_empty():
+                    return include.match(ctx)
+                return include.match(ctx) and not exclude.match(ctx)
+            elif not exclude.is_empty():
+                return not exclude.match(ctx)
 
             return True
 

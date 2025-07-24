@@ -228,6 +228,7 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
             LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
             "Unable to determine the Open API version as it's not specified in the document.",
         )
+    instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
     dispatch("after_load_schema", hook_context, instance)
     return instance
 
