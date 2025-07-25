@@ -36,6 +36,15 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             config = SchemathesisConfig.from_path(config_file)
         else:
             config = SchemathesisConfig.discover()
+    except FileNotFoundError:
+        display_header(SCHEMATHESIS_VERSION)
+        click.secho(
+            f"❌  Failed to load configuration file from {config_file}",
+            fg="red",
+            bold=True,
+        )
+        click.echo("\nThe configuration file does not exist")
+        ctx.exit(1)
     except (TOMLDecodeError, ConfigError) as exc:
         display_header(SCHEMATHESIS_VERSION)
         click.secho(
