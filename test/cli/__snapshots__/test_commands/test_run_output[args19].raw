@@ -13,8 +13,7 @@ Usage: schemathesis run [OPTIONS] LOCATION
 Options:
   -u, --url URL                  API base URL (required for file-based schemas)
   -w, --workers                  Number of concurrent workers for testing. Auto-
-                                 adjusts if 'auto' is specified  [default:
-                                 1][auto, 1-64]
+                                 adjusts if 'auto' is specified[auto, 1-64]
   --phases                       A comma-separated list of test phases to run
                                  [possible values: examples, coverage, fuzzing,
                                  stateful]
@@ -77,7 +76,7 @@ Network requests options:
                                  authentication
   --proxy URL                    Set the proxy for all network requests
   --tls-verify TEXT              Path to CA bundle for TLS verification, or
-                                 'false' to disable  [default: true]
+                                 'false' to disable
   --rate-limit TEXT              Specify a rate limit for test requests in
                                  '<limit>/<duration>' format. Example - `100/m`
                                  for 100 requests per minute
@@ -103,9 +102,8 @@ Output options:
   --report-preserve-bytes       Retain exact byte sequence of payloads in
                                 cassettes, encoded as base64
   --output-sanitize BOOLEAN     Enable or disable automatic output sanitization
-                                to obscure sensitive data  [default: true]
+                                to obscure sensitive data
   --output-truncate BOOLEAN     Truncate schemas and responses in error messages
-                                [default: true]
 
 Data generation options:
   -m, --mode                      Test data generation mode  [default: all]
@@ -120,17 +118,16 @@ Data generation options:
   --generation-deterministic      Enables deterministic mode, which eliminates
                                   random variation between tests
   --generation-allow-x00 BOOLEAN  Whether to allow the generation of 'NULL'
-                                  bytes within strings  [default: true]
+                                  bytes within strings
   --generation-codec TEXT         The codec used for generating strings
   --generation-maximize METRIC    Guide input generation to values more likely
                                   to expose bugs via targeted property-based
                                   testing [possible values: response_time]
   --generation-with-security-parameters BOOLEAN
                                   Whether to generate security parameters
-                                  [default: true]
   --generation-graphql-allow-null BOOLEAN
                                   Whether to use `null` values for optional
-                                  arguments in GraphQL queries  [default: true]
+                                  arguments in GraphQL queries
   --generation-database TEXT      Storage for examples discovered by
                                   Schemathesis. Use 'none' to disable,
                                   ':memory:' for temporary storage, or specify a

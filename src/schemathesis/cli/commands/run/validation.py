@@ -73,7 +73,11 @@ def validate_base_url(ctx: click.core.Context, param: click.core.Parameter, raw_
     return raw_value
 
 
-def validate_generation_codec(ctx: click.core.Context, param: click.core.Parameter, raw_value: str) -> str:
+def validate_generation_codec(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
+) -> str | None:
+    if raw_value is None:
+        return raw_value
     try:
         codecs.getencoder(raw_value)
     except LookupError as exc:
@@ -214,7 +218,11 @@ def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter
     return [GenerationMode(value)]
 
 
-def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str | bool:
+def convert_boolean_string(
+    ctx: click.core.Context, param: click.core.Parameter, value: str | None
+) -> str | bool | None:
+    if value is None:
+        return value
     return string_to_boolean(value)
 
 
@@ -226,7 +234,9 @@ def reraise_format_error(raw_value: str) -> Generator[None, None, None]:
         raise click.BadParameter(f"Expected KEY:VALUE format, received {raw_value}.") from exc
 
 
-def convert_workers(ctx: click.core.Context, param: click.core.Parameter, value: str) -> int:
+def convert_workers(ctx: click.core.Context, param: click.core.Parameter, value: str | None) -> int | None:
+    if value is None:
+        return value
     if value == "auto":
         return get_workers_count()
     return int(value)
