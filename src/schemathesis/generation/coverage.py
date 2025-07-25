@@ -233,6 +233,9 @@ class CoverageContext:
             return cached_draw(st.integers(min_value=schema.get("minimum"), max_value=schema.get("maximum")))
         if "enum" in schema:
             return cached_draw(st.sampled_from(schema["enum"]))
+        if keys == ["multipleOf", "type"] and schema["type"] in ("integer", "number"):
+            step = schema["multipleOf"]
+            return cached_draw(st.integers().map(step.__mul__))
         if "pattern" in schema:
             pattern = schema["pattern"]
             try:
