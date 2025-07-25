@@ -183,6 +183,37 @@ def assert_negative_coverage(schema, expected, path=None):
     return assert_coverage(schema, [GenerationMode.NEGATIVE], expected, path)
 
 
+ALL_MODES = list(GenerationMode)
+
+
+def run_test(operation, test, modes=ALL_MODES, generate_duplicate_query_parameters=None, unexpected_methods=None):
+    config = ProjectConfig()
+    config.generation.update(modes=modes)
+    if generate_duplicate_query_parameters is not None:
+        config.phases.coverage.generate_duplicate_query_parameters = generate_duplicate_query_parameters
+    if unexpected_methods is not None:
+        config.phases.coverage.unexpected_methods = unexpected_methods
+    test_func = create_test(
+        operation=operation,
+        test_func=test,
+        config=HypothesisTestConfig(
+            modes=[HypothesisTestMode.COVERAGE],
+            project=config,
+            settings=settings(phases=[Phase.explicit]),
+        ),
+    )
+
+    test_func()
+
+
+def run_positive_test(operation, test, **kwargs):
+    return run_test(operation, test, [GenerationMode.POSITIVE], **kwargs)
+
+
+def run_negative_test(operation, test, **kwargs):
+    return run_test(operation, test, [GenerationMode.NEGATIVE], **kwargs)
+
+
 @pytest.mark.parametrize(
     ("methods", "expected"),
     [
@@ -964,6 +995,12 @@ def test_path_parameter_dots(ctx):
                 {"path_parameters": {"name": "null"}},
             ],
             [
+                {"path_parameters": {"name": "%2E%2E"}},
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": ANY}},
+                {"path_parameters": {"name": "null"}},
+            ],
+            [
                 {"path_parameters": {"name": "%2E"}},
                 {"path_parameters": {"name": "null%2Cnull"}},
                 {"path_parameters": {"name": ANY}},
@@ -1425,18 +1462,7 @@ def test_string_with_format(ctx):
     def test(case):
         uuid.UUID(case.path_parameters["foo_id"], version=4)
 
-    config = ProjectConfig()
-    config.generation.update(modes=[GenerationMode.POSITIVE])
-    test_func = create_test(
-        operation=schema["/foo/{foo_id}"]["post"],
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-        ),
-    )
-
-    test_func()
+    run_positive_test(schema["/foo/{foo_id}"]["post"], test)
 
 
 def test_query_parameters_with_nested_enum(ctx):
@@ -1572,12 +1598,19 @@ def foo_id(value):
             {
                 "type": "integer",
             },
-            [
-                foo_id("null%2Cnull"),
-                foo_id(Pattern(".")),
-                foo_id("null"),
-                foo_id("false"),
-            ],
+            (
+                [
+                    foo_id("null%2Cnull"),
+                    foo_id(Pattern(".")),
+                    foo_id("null"),
+                    foo_id("false"),
+                ],
+                [
+                    foo_id("null%2Cnull"),
+                    foo_id(Pattern(".")),
+                    foo_id("false"),
+                ],
+            ),
         ),
         (
             {"type": "string", "format": "date-time"},
@@ -1739,20 +1772,7 @@ def test_negative_query_parameter(ctx, schema, expected, required):
             assert "?q=" in request.url
         urls.append(request.url)
 
-    config = ProjectConfig()
-    config.generation.update(modes=[GenerationMode.NEGATIVE])
-    config.phases.coverage.generate_duplicate_query_parameters = True
-    test_func = create_test(
-        operation=operation,
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-            settings=settings(phases=[Phase.explicit]),
-        ),
-    )
-
-    test_func()
+    run_negative_test(operation, test, generate_duplicate_query_parameters=True)
 
     assert urls == expected
 
@@ -1815,38 +1835,13 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
         methods.add(case.method)
         assert f"-X {case.method}" in case.as_curl_command()
 
-    config = ProjectConfig()
-    config.generation.update(modes=[GenerationMode.NEGATIVE])
-    test_func = create_test(
-        operation=operation,
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-            settings=settings(phases=[Phase.explicit]),
-        ),
-    )
-
-    test_func()
+    run_negative_test(operation, test)
 
     assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
 
     methods = set()
 
-    config = ProjectConfig()
-    config.generation.update(modes=[GenerationMode.NEGATIVE])
-    config.phases.coverage.unexpected_methods = {"DELETE", "PUT"}
-    test_func = create_test(
-        operation=operation,
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-            settings=settings(phases=[Phase.explicit]),
-        ),
-    )
-
-    test_func()
+    run_negative_test(operation, test, unexpected_methods={"DELETE", "PUT"})
 
     assert methods == {"DELETE", "PUT"}
 
@@ -1878,6 +1873,45 @@ def failed(ctx, response, case):
         )
 
 
+@pytest.mark.openapi_version("3.0")
+def test_nested_parameters(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "range",
+                            "in": "query",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "null"},
+                                },
+                            },
+                        }
+                    ]
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+
+    ranges = set()
+    operation = schema["/test"]["get"]
+
+    def test(case):
+        if case.meta.phase.name != TestPhase.COVERAGE:
+            return
+        if not case.meta.phase.data.description.startswith("Unspecified"):
+            return
+        ranges.add(case.query["range"])
+
+    run_negative_test(operation, test)
+
+    assert ranges == {"0"}
+
+
 def test_urlencoded_payloads_are_valid(ctx):
     schema = build_schema(
         ctx,
@@ -1906,19 +1940,7 @@ def test_urlencoded_payloads_are_valid(ctx):
             return
         assert_requests_call(case)
 
-    config = ProjectConfig()
-    config.generation.update(modes=list(GenerationMode))
-    test_func = create_test(
-        operation=operation,
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-            settings=settings(phases=[Phase.explicit]),
-        ),
-    )
-
-    test_func()
+    run_test(operation, test)
 
 
 def test_no_missing_header_duplication(ctx):
@@ -1940,19 +1962,7 @@ def test_no_missing_header_duplication(ctx):
             return
         descriptions.append(case.meta.phase.data.description)
 
-    config = ProjectConfig()
-    config.generation.update(modes=list(GenerationMode))
-    test_func = create_test(
-        operation=operation,
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-            settings=settings(phases=[Phase.explicit]),
-        ),
-    )
-
-    test_func()
+    run_test(operation, test)
 
     assert "Missing required property: X-Key-3" not in descriptions
     assert "Missing `X-Key-3` at header" in descriptions
@@ -2011,20 +2021,7 @@ def assert_coverage(schema, modes, expected, path=None):
                 output[container] = value
         cases.append(output)
 
-    config = ProjectConfig()
-    config.generation.update(modes=modes)
-    config.phases.coverage.generate_duplicate_query_parameters = True
-    test_func = create_test(
-        operation=operation,
-        test_func=test,
-        config=HypothesisTestConfig(
-            modes=[HypothesisTestMode.COVERAGE],
-            project=config,
-            settings=settings(phases=[Phase.explicit]),
-        ),
-    )
-
-    test_func()
+    run_test(operation, test, modes=modes, generate_duplicate_query_parameters=True)
 
     if isinstance(expected, tuple):
         assert cases in expected

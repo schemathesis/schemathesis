@@ -195,7 +195,7 @@ class BaseOpenAPISchema(BaseSchema):
                 self.resolver.push_scope(scope)
                 try:
                     for method, definition in path_item.items():
-                        if method not in HTTP_METHODS:
+                        if method not in HTTP_METHODS or not definition:
                             continue
                         statistic.operations.total += 1
                         is_selected = not should_skip(path, method, definition)

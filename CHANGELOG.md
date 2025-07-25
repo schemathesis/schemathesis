@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.14...HEAD) - TBD
 
+### :bug: Fixed
+
+- Incorrect serialization of parameters with nested structures during the coverage phase. [#2966](https://github.com/schemathesis/schemathesis/issues/2966)
+
 ## [4.0.14](https://github.com/schemathesis/schemathesis/compare/v4.0.13...v4.0.14) - 2025-07-25
 
 ### :bug: Fixed
