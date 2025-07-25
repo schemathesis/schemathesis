@@ -94,7 +94,7 @@ class ReportsConfig(DiffBase):
         vcr_path: str | None = None,
         har_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
-        preserve_bytes: bool = False,
+        preserve_bytes: bool | None = None,
     ) -> None:
         formats = formats or []
         if junit_path is not None or ReportFormat.JUNIT in formats:
