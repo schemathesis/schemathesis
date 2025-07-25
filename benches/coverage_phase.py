@@ -4,6 +4,9 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from schemathesis.generation.coverage import CoverageContext, cover_schema_iter
+from schemathesis.generation.hypothesis import setup
+
+setup()
 
 CONTEXTS = [
     CoverageContext(
