@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Negative test cases with invalid parameters mistakenly becoming positive test cases. [#2900](https://github.com/schemathesis/schemathesis/issues/2900), [#2913](https://github.com/schemathesis/schemathesis/issues/2913)
+- **CLI**: Gracefully handle non-existing config file for the `--config-file` CLI option.
 
 ## [4.0.13](https://github.com/schemathesis/schemathesis/compare/v4.0.12...v4.0.13) - 2025-07-24
 
