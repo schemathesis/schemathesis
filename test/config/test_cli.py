@@ -81,3 +81,7 @@ def test_incorrect_config(cli, snapshot_cli, tmp_path, config_content):
     if result.exception and not isinstance(result.exception, SystemExit):
         raise result.exception
     assert result == snapshot_cli
+
+
+def test_non_existing_file(cli, snapshot_cli):
+    assert cli.main("--config-file=unknown-file.toml", "run", "http://127.0.0.1") == snapshot_cli
