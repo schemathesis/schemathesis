@@ -660,6 +660,32 @@ def test(case):
     assert expected in result.stdout.str()
 
 
+@pytest.mark.parametrize("enabled", [True, False])
+@pytest.mark.operations("basic")
+def test_output_sanitization_via_config_file(testdir, openapi3_schema_url, enabled):
+    testdir.make_test(
+        f"""
+config = schemathesis.Config.from_dict({{
+    "headers": {{"Authorization": "secret"}},
+    "output": {{
+        "sanitization": {{"enabled": {enabled}}}
+    }}
+}})
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}', config=config)
+
+@schema.include(name="GET /basic").parametrize()
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    if enabled:
+        assert "Authorization: [Filtered]" in result.stdout.str()
+    else:
+        assert "Authorization: secret" in result.stdout.str()
+
+
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""

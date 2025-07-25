@@ -1273,6 +1273,44 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
     assert expected in result.stdout
 
 
+@pytest.mark.parametrize("override", [True, False])
+@pytest.mark.parametrize("enabled", [True, False])
+@pytest.mark.operations("failure")
+def test_output_sanitization_via_config(cli, openapi2_schema_url, hypothesis_max_examples, enabled, override):
+    auth = "secret-auth"
+    args = ()
+    if override:
+        # Should differ from the config file
+        if enabled:
+            args = ("--output-sanitize=false",)
+        else:
+            args = ("--output-sanitize=true",)
+    result = cli.run(
+        openapi2_schema_url,
+        f"--max-examples={hypothesis_max_examples or 5}",
+        "--seed=1",
+        f"-H Authorization: {auth}",
+        *args,
+        config={"output": {"sanitization": {"enabled": enabled}}},
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    if override:
+        if enabled:
+            # Config enables sanitization, CLI disables it
+            expected = f"curl -X GET -H 'Authorization: {auth}'"
+        else:
+            # Config disables sanitization, CLI enables it
+            expected = "curl -X GET -H 'Authorization: [Filtered]'"
+    else:
+        if enabled:
+            # Config enables sanitization
+            expected = "curl -X GET -H 'Authorization: [Filtered]'"
+        else:
+            # Config disables sanitization
+            expected = f"curl -X GET -H 'Authorization: {auth}'"
+    assert expected in result.stdout, result.stdout
+
+
 @pytest.mark.operations("success")
 @flaky(max_runs=5, min_passes=1)
 def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, openapi3_base_url, snapshot_cli):

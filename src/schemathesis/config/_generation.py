@@ -105,34 +105,34 @@ class GenerationConfig(DiffBase):
         *,
         modes: list[GenerationMode] | None = None,
         max_examples: int | None = None,
-        no_shrink: bool = False,
+        no_shrink: bool | None = None,
         deterministic: bool | None = None,
-        allow_x00: bool = True,
+        allow_x00: bool | None = None,
         codec: str | None = None,
         maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool | None = None,
-        graphql_allow_null: bool = True,
+        graphql_allow_null: bool | None = None,
         database: str | None = None,
-        unique_inputs: bool = False,
+        unique_inputs: bool | None = None,
         exclude_header_characters: str | None = None,
     ) -> None:
         if modes is not None:
             self.modes = modes
         if max_examples is not None:
             self.max_examples = max_examples
-        self.no_shrink = no_shrink
+        self.no_shrink = no_shrink or False
         self.deterministic = deterministic or False
-        self.allow_x00 = allow_x00
+        self.allow_x00 = allow_x00 if allow_x00 is not None else True
         if codec is not None:
             self.codec = codec
         if maximize is not None:
             self.maximize = maximize
         if with_security_parameters is not None:
             self.with_security_parameters = with_security_parameters
-        self.graphql_allow_null = graphql_allow_null
+        self.graphql_allow_null = graphql_allow_null if graphql_allow_null is not None else True
         if database is not None:
             self.database = database
-        self.unique_inputs = unique_inputs
+        self.unique_inputs = unique_inputs or False
         if exclude_header_characters is not None:
             self.exclude_header_characters = exclude_header_characters
 
