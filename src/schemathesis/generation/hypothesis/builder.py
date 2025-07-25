@@ -22,6 +22,7 @@ from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode, coverage
@@ -397,7 +398,7 @@ class Template:
         return output
 
     def unmodified(self) -> TemplateValue:
-        kwargs = self._template.copy()
+        kwargs = deepclone(self._template)
         kwargs = self._serialize(kwargs)
         return TemplateValue(kwargs=kwargs, components=self._components.copy())
 
