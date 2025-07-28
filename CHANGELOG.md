@@ -32,6 +32,10 @@
 
 - Display cURL code sample for application-level exceptions when using the ASGI / WSGI integration.
 
+### :wrench: Changed
+
+- Generate coverage & example test cases lazily. This should reduce the memory consumption for large schemas. [#2954](https://github.com/schemathesis/schemathesis/discussions/2954) 
+
 ## [4.0.11](https://github.com/schemathesis/schemathesis/compare/v4.0.10...v4.0.11) - 2025-07-18
 
 ### :bug: Fixed
