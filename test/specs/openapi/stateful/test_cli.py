@@ -252,3 +252,36 @@ def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
         )
         == snapshot_cli
     )
+
+
+def test_unique_inputs(ctx, cli, snapshot_cli, openapi3_base_url):
+    # See GH-2977
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "post": {
+                    "responses": {
+                        "200": {
+                            "links": {"getItem": {"operationId": "GetById"}},
+                        }
+                    }
+                }
+            },
+            "/item/{id}": {
+                "get": {
+                    "operationId": "GetById",
+                    "responses": {"200": {"descrionn": "Ok"}},
+                },
+            },
+        }
+    )
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={openapi3_base_url}",
+            "--phases=stateful",
+            "--generation-unique-inputs",
+            "--max-examples=10",
+        )
+        == snapshot_cli
+    )

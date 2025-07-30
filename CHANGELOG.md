@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.15...HEAD) - TBD
 
+### :bug: Fixed
+
+- Internal error if the stateful phase is used with `--generation-unique-inputs`. [#2977](https://github.com/schemathesis/schemathesis/issues/2977) 
+
 ## [4.0.15](https://github.com/schemathesis/schemathesis/compare/v4.0.14...v4.0.15) - 2025-07-26
 
 ### :bug: Fixed

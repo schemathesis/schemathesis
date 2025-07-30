@@ -185,9 +185,11 @@ class APIStateMachine(RuleBasedStateMachine):
         if target is not None:
             super()._add_result_to_targets((target,), result)
 
-    def _add_results_to_targets(self, targets: tuple[str, ...], results: list[StepOutput]) -> None:
+    def _add_results_to_targets(self, targets: tuple[str, ...], results: list[StepOutput | None]) -> None:
         # Hypothesis >6.131.15
         for result in results:
+            if result is None:
+                continue
             target = self._get_target_for_result(result)
             if target is not None:
                 super()._add_results_to_targets((target,), [result])
