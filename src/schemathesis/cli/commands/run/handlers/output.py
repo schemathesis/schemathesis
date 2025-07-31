@@ -1230,10 +1230,10 @@ class OutputHandler(EventHandler):
         click.echo()
         if self.warnings.missing_auth:
             self._display_warning_block(
-                title="Missing authentication",
+                title="Authentication failed",
                 operations=self.warnings.missing_auth,
                 operation_suffix=" returned authentication errors",
-                tips=["💡 Use --auth or -H to provide authentication credentials"],
+                tips=["💡 Ensure valid authentication credentials are set via --auth or -H"],
             )
 
         if self.warnings.missing_test_data:

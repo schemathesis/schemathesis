@@ -1,7 +1,0 @@
-Exit code: 2
----
-Stdout:
-Usage: schemathesis run [OPTIONS] SCHEMA
-Try 'schemathesis run -h' for help.
-
-Error: Invalid value: The `--header` and `--set-header` options were both used to set the 'Authorization' header, which is not permitted.
