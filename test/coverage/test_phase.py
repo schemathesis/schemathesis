@@ -1873,6 +1873,28 @@ def failed(ctx, response, case):
         )
 
 
+def test_missing_authorization(ctx, cli, snapshot_cli, openapi3_base_url):
+    # The reproduction code should not contain auth if it is explicitly specified
+    schema_path = ctx.openapi.write_schema(
+        {"/failure": {"get": {"security": [{"ApiKeyAuth": None}]}}},
+        version="2.0",
+        securityDefinitions={"ApiKeyAuth": {"type": "apiKey", "name": "Authorization", "in": "header"}},
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "-c",
+            "not_a_server_error",
+            f"--url={openapi3_base_url}",
+            "--header=Authorization: Bearer SECRET",
+            "--phases=coverage",
+            "--mode=negative",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.openapi_version("3.0")
 def test_nested_parameters(ctx):
     schema = ctx.openapi.build_schema(
