@@ -8,6 +8,10 @@
 - Do not show auth headers for cases when the test case was sent specifically without auth.
 - Do not show unnecessary auth warning if the only test that happened was for missing auth.
 
+### :wrench: Changed
+
+- Improve wording for authentication-related warning.
+
 ## [4.0.15](https://github.com/schemathesis/schemathesis/compare/v4.0.14...v4.0.15) - 2025-07-26
 
 ### :bug: Fixed
