@@ -672,6 +672,7 @@ config = schemathesis.Config.from_dict({{
     }}
 }})
 schema = schemathesis.openapi.from_url('{openapi3_schema_url}', config=config)
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @schema.include(name="GET /basic").parametrize()
 def test(case):
