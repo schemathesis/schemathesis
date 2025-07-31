@@ -80,6 +80,10 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         if cookies is not None:
             merge_at(data, "cookies", cookies)
 
+        excluded_headers = get_exclude_headers(case)
+        for name in excluded_headers:
+            data["headers"].pop(name, None)
+
         return data
 
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
@@ -112,9 +116,6 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         data.update({key: value for key, value in kwargs.items() if key not in data})
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
 
-        excluded_headers = get_exclude_headers(case)
-        for name in excluded_headers:
-            data["headers"].pop(name, None)
         current_session_headers: MutableMapping[str, Any] = {}
         current_session_auth = None
 
@@ -124,9 +125,11 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             close_session = True
         else:
             current_session_headers = session.headers
-            if isinstance(session.auth, tuple) and "Authorization" in excluded_headers:
-                current_session_auth = session.auth
-                session.auth = None
+            if isinstance(session.auth, tuple):
+                excluded_headers = get_exclude_headers(case)
+                if "Authorization" in excluded_headers:
+                    current_session_auth = session.auth
+                    session.auth = None
             close_session = False
         session.headers = {}
 
