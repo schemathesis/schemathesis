@@ -1,0 +1,68 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 2.0
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+=================================== FAILURES ===================================
+__________________________________ GET /basic __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"detail": "Unauthorized"}`
+
+Reproduce with:
+
+    curl -X GET http://127.0.0.1/api/basic
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Test cases:
+  N generated, N found N unique failures, N skipped
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

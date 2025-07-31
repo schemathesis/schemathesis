@@ -6,6 +6,7 @@
 
 - Internal error if the stateful phase is used with `--generation-unique-inputs`. [#2977](https://github.com/schemathesis/schemathesis/issues/2977) 
 - Do not show auth headers for cases when the test case was sent specifically without auth.
+- Do not show unnecessary auth warning if the only test that happened was for missing auth.
 
 ## [4.0.15](https://github.com/schemathesis/schemathesis/compare/v4.0.14...v4.0.15) - 2025-07-26
 

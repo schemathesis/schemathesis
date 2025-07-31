@@ -26,6 +26,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
+from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
 
@@ -1053,10 +1054,19 @@ class OutputHandler(EventHandler):
 
         warnings = self.config.warnings_for(operation=operation)
 
+        def has_only_missing_auth_case() -> bool:
+            case = list(event.recorder.cases.values())[0].value
+            return bool(
+                case.meta
+                and isinstance(case.meta.phase.data, CoveragePhaseData)
+                and case.meta.phase.data.description == "Missing `Authorization` at header"
+            )
+
         if SchemathesisWarning.MISSING_AUTH in warnings:
-            for status_code in (401, 403):
-                if statistic.ratio_for(status_code) >= AUTH_ERRORS_THRESHOLD:
-                    self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
+            if not (len(event.recorder.cases) == 1 and has_only_missing_auth_case()):
+                for status_code in (401, 403):
+                    if statistic.ratio_for(status_code) >= AUTH_ERRORS_THRESHOLD:
+                        self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
 
         # Warn if all positive test cases got 4xx in return and no failure was found
         def all_positive_are_rejected(recorder: ScenarioRecorder) -> bool:
