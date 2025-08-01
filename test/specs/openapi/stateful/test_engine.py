@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import hypothesis
 import hypothesis.errors
 import pytest
+from flask import Flask, jsonify, request
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -11,7 +12,11 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
 from schemathesis.generation import GenerationMode
-from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
+from schemathesis.specs.openapi.checks import (
+    ignored_auth,
+    response_schema_conformance,
+    use_after_free,
+)
 from test.utils import flaky
 
 
@@ -561,6 +566,110 @@ def test_negative_tests(engine_factory):
     event = result.events[-1]
     if event.status != Status.FAILURE:
         pytest.fail(str(result.events))
+
+
+def test_negative_changing_to_positive(app_runner):
+    # See GH-2983
+    schema = {
+        "openapi": "3.1.0",
+        "paths": {
+            "/Customers/{id}": {
+                "put": {
+                    "operationId": "UpdateCustomer",
+                    "parameters": [
+                        {"name": "id", "in": "path", "schema": {"type": "integer"}},
+                    ],
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomerUpdate"}}}
+                    },
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            },
+            "/Customers": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/CustomerCreate"},
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "links": {
+                                "Customer": {"$ref": "#/components/links/updateCustomer"},
+                            }
+                        }
+                    },
+                }
+            },
+        },
+        "components": {
+            "links": {
+                "updateCustomer": {
+                    "operationId": "UpdateCustomer",
+                    "parameters": {"id": "$response.body"},
+                    "requestBody": {"name": "firstname"},
+                }
+            },
+            "schemas": {
+                "CustomerUpdate": {"required": ["name"]},
+                "CustomerCreate": {"type": "object", "properties": {"name": {"type": "string"}}},
+            },
+        },
+    }
+
+    app = Flask(__name__)
+
+    CUSTOMERS = {}
+    NEXT_ID = 1
+
+    @app.route("/Customers/<int:id>", methods=["PUT"])
+    def update_customer(id):
+        if id not in CUSTOMERS:
+            return "", 404
+        data = request.get_json(force=True, silent=True)
+        if not data:
+            return jsonify({"error": ["Invalid JSON"]}), 400
+        CUSTOMERS[id].update(data)
+        return "", 204
+
+    @app.route("/Customers", methods=["POST"])
+    def create_customer():
+        nonlocal NEXT_ID
+        data = request.get_json(force=True, silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": ["Invalid JSON"]}), 400
+
+        name = data.get("name")
+        if not (isinstance(name, str) and 1 <= len(name) <= 3):
+            return jsonify({"error": ["Invalid name. Must be 1 to 3 characters."]}), 400
+
+        customer_id = NEXT_ID
+        NEXT_ID += 1
+        data["id"] = customer_id
+        CUSTOMERS[customer_id] = data
+        return jsonify(customer_id), 201
+
+    app_port = app_runner.run_flask_app(app)
+
+    config = schemathesis.Config.from_dict(
+        {
+            "checks": {
+                "enabled": False,
+                "negative_data_rejection": {"enabled": True},
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema, config=config)
+    schema.config.update(base_url=f"http://127.0.0.1:{app_port}/")
+    schema.config.generation.update(database="none")
+    engine = stateful.execute(
+        engine=EngineContext(schema=schema, stop_event=threading.Event()),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
+    )
+    result = collect_result(engine)
+    assert result.events[-1].status == Status.SUCCESS
 
 
 def test_unique_inputs(engine_factory):
