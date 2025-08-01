@@ -48,10 +48,10 @@ def assert_conform(values: list, schema: dict):
 
 
 def assert_not_conform(values: list, schema: dict):
+    if schema.get("format") == "unknown":
+        # Can't validate the format
+        return
     for entry in values:
-        if schema.get("format") == "unknown":
-            # Can't validate the format
-            continue
         try:
             jsonschema.validate(
                 entry,
@@ -59,7 +59,7 @@ def assert_not_conform(values: list, schema: dict):
                 cls=jsonschema.Draft7Validator,
                 format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
             )
-            raise ValueError(f"Value {entry} conforms to {schema}")
+            raise AssertionError(f"Value {entry} conforms to {schema}")
         except (jsonschema.ValidationError, ValueError):
             pass
 
@@ -1048,7 +1048,7 @@ def test_positive_pattern(pctx):
     covered = cover_schema(pctx, schema)
     assert covered == ["0000-0000", "00-0000", "00-00000", "0000-000000000000000", "000-000000000000000"]
     assert_unique(covered)
-    assert_not_conform(covered, schema)
+    assert_conform(covered, schema)
 
 
 def test_negative_pattern_with_incompatible_length(nctx):
@@ -1099,7 +1099,11 @@ def test_negative_pattern_with_incompatible_length(nctx):
                     {"type": "string", "maxLength": 5},
                 ],
             },
-            [4, AnyNumber(), AnyNumber(), "000000"],
+            (
+                [4, AnyNumber(), AnyNumber()],
+                [4, AnyNumber()],
+                [4],
+            ),
         ),
         (
             {
@@ -1116,7 +1120,7 @@ def test_negative_pattern_with_incompatible_length(nctx):
                     },
                 ]
             },
-            [ANY, "00000000000", AnyNumber(), AnyNumber()],
+            ["00000000000", AnyNumber(), AnyNumber()],
         ),
         (
             {
@@ -1137,7 +1141,63 @@ def test_negative_combinators(nctx, schema, expected):
             assert_not_conform(covered, schema)
             break
     else:
-        pytest.fail("Expected value didn't match")
+        pytest.fail(f"Expected value didn't match\nGot: {covered!r}\nExpected: {expected!r}")
+
+
+@pytest.mark.parametrize(
+    ["schema", "expected"],
+    [
+        (
+            {
+                "anyOf": [
+                    {"type": "number"},
+                    {"type": "null"},
+                ]
+            },
+            [
+                False,
+                "",
+                [
+                    None,
+                    None,
+                ],
+                {},
+            ],
+        ),
+        (
+            {
+                "oneOf": [
+                    {"type": "number"},
+                    {"type": "integer"},
+                    {"type": "null"},
+                ]
+            },
+            [
+                False,
+                "",
+                [
+                    None,
+                    None,
+                ],
+                {},
+                # Matching both, "number" and "integer", hence invalid
+                0,
+            ],
+        ),
+    ],
+)
+def test_negative_one_of(schema, expected):
+    # See GH-2975
+    nctx = CoverageContext(
+        location="body",
+        generation_modes=[GenerationMode.NEGATIVE],
+        is_required=True,
+        custom_formats=get_default_format_strategies(),
+        validator_cls=jsonschema.validators.Draft202012Validator,
+    )
+    covered = cover_schema(nctx, schema)
+    assert_not_conform(covered, schema)
+    assert covered == expected
 
 
 @pytest.mark.parametrize(
