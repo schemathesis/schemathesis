@@ -597,12 +597,49 @@ def cover_schema_iter(
                         with _ignore_unfixable():
                             canonical = canonicalish(schema)
                             yield from cover_schema_iter(nctx, canonical, seen)
-                elif key == "anyOf" or key == "oneOf":
+                elif key == "anyOf":
                     nctx = ctx.with_negative()
-                    # NOTE: Other sub-schemas are not filtered out
+                    validators = [jsonschema.validators.validator_for(sub_schema)(sub_schema) for sub_schema in value]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
-                            yield from cover_schema_iter(nctx, sub_schema, seen)
+                            for value in cover_schema_iter(nctx, sub_schema, seen):
+                                # Negative value for this schema could be a positive value for another one
+                                if is_valid_for_others(value.value, idx, validators):
+                                    continue
+                                yield value
+                elif key == "oneOf":
+                    nctx = ctx.with_negative()
+                    validators = [jsonschema.validators.validator_for(sub_schema)(sub_schema) for sub_schema in value]
+                    for idx, sub_schema in enumerate(value):
+                        with nctx.at(idx):
+                            for value in cover_schema_iter(nctx, sub_schema, seen):
+                                if is_invalid_for_oneOf(value.value, idx, validators):
+                                    yield value
+
+
+def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema.Validator]) -> bool:
+    for vidx, validator in enumerate(validators):
+        if idx == vidx:
+            # This one is being negated
+            continue
+        if validator.is_valid(value):
+            return True
+    return False
+
+
+def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema.Validator]) -> bool:
+    valid_count = 0
+    for vidx, validator in enumerate(validators):
+        if idx == vidx:
+            # This one is being negated
+            continue
+        if validator.is_valid(value):
+            valid_count += 1
+            # Should circuit - no need to validate more, it is already invalid
+            if valid_count > 1:
+                return True
+    # No matching at all - we successfully generated invalid value
+    return valid_count == 0
 
 
 def _get_properties(schema: dict | bool) -> dict | bool:
