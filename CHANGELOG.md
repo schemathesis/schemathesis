@@ -1,10 +1,12 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.16...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.17...HEAD) - TBD
+
+## [4.0.17](https://github.com/schemathesis/schemathesis/compare/v4.0.16...v4.0.17) - 2025-08-02
 
 ### :bug: Fixed
 
-- Generating negative test cases incorrectly marked as invalid if `anyOf` is present. [#2975](https://github.com/schemathesis/schemathesis/issues/2975)
+- Generating negative test cases incorrectly marked as invalid if `anyOf` or `oneOf` are present. [#2975](https://github.com/schemathesis/schemathesis/issues/2975)
 - Set correct data generation mode for stateful test cases if after adding stateful data, a negative test case becomes positive. [#2983](https://github.com/schemathesis/schemathesis/issues/2983) 
 
 ## [4.0.16](https://github.com/schemathesis/schemathesis/compare/v4.0.15...v4.0.16) - 2025-07-31
