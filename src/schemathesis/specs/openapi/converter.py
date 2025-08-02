@@ -32,6 +32,21 @@ def to_json_schema(
         schema["format"] = "binary"
     if update_quantifiers:
         update_pattern_in_schema(schema)
+    # Sometimes `required` is incorrectly has a boolean value
+    properties = schema.get("properties")
+    if properties:
+        for name, subschema in properties.items():
+            if not isinstance(subschema, dict):
+                continue
+            is_required = subschema.get("required")
+            if is_required is True:
+                schema.setdefault("required", []).append(name)
+                del subschema["required"]
+            elif is_required is False:
+                if "required" in schema and name in schema["required"]:
+                    schema["required"].remove(name)
+                del subschema["required"]
+
     if schema_type == "object":
         if is_response_schema:
             # Write-only properties should not occur in responses
