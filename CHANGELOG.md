@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.17...HEAD) - TBD
 
+### :bug: Fixed
+
+- Correctly merge quantifiers into regular expressions with anchors and a single literal.
+
 ## [4.0.17](https://github.com/schemathesis/schemathesis/compare/v4.0.16...v4.0.17) - 2025-08-02
 
 ### :bug: Fixed

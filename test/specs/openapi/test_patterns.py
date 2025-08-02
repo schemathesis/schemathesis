@@ -79,6 +79,10 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("b$", None, None, "b$"),
         ("b$", 0, None, "b$"),
         ("}?", 0, None, "}?"),
+        # Literal length is outside of the quantifiers range
+        ("^0$", 2, 2, "^0$"),
+        ("^0$", 2, None, "^0$"),
+        ("^0$", 0, 0, "^0$"),
         # More complex patterns
         # Fixed parts with single quantifier
         ("^abc[0-9]*$", None, 5, "^abc([0-9]){0,2}$"),
@@ -164,7 +168,7 @@ def test_update_quantifier_random(data):
     assert is_valid_regex(modified_pattern)
 
     # Generate a string matching the modified pattern
-    generated = data.draw(st.from_regex(modified_pattern, fullmatch=True))
+    generated = data.draw(st.from_regex(modified_pattern, fullmatch=True, alphabet=st.characters(codec=None)))
 
     # Assert that the generated string meets the length constraints
     if min_length is not None:
