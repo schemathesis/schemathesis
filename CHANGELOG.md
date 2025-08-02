@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Correctly merge quantifiers into regular expressions with anchors and a single literal.
+- Internal error if a parameter schema contains `required` with a boolean value instead of an array.
 
 ### :wrench: Changed
 

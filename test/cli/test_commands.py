@@ -557,6 +557,50 @@ async def test_multiple_files_schema(ctx, openapi_2_app, cli, hypothesis_max_exa
     assert isinstance(payload["photoUrls"], list)
 
 
+@pytest.mark.parametrize("required", [True, False])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"required": []},
+        {"required": ["region"]},
+    ],
+    ids=["no-required", "not-in-required", "in-required"],
+)
+def test_required_as_boolean(ctx, cli, snapshot_cli, openapi3_base_url, required, kwargs):
+    # Happens in the wild, even though it is incorrect
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/success": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "region": {
+                                            "required": required,
+                                            "type": "string",
+                                        },
+                                    },
+                                    "type": "object",
+                                    **kwargs,
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "-c not_a_server_error", "--max-examples=5")
+        == snapshot_cli
+    )
+
+
 def test_no_useless_traceback(ctx, cli, snapshot_cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {
