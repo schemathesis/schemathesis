@@ -81,6 +81,11 @@ def _handle_parsed_pattern(parsed: list, pattern: str, min_length: int | None, m
             inner_pattern = "."
         else:
             inner_pattern = pattern[leading_anchor_length:-trailing_anchor_length]
+        # Single literal has the length of 1, but quantifiers could be != 1, which means we can't merge them
+        if op == LITERAL and (
+            (min_length is not None and min_length > 1) or (max_length is not None and max_length < 1)
+        ):
+            return pattern
         return leading_anchor + _update_quantifier(op, value, inner_pattern, min_length, max_length) + trailing_anchor
     elif (
         len(parsed) > 3
