@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
@@ -311,25 +312,30 @@ def add_coverage(
         for container in LOCATION_TO_CONTAINER.values()
         if container in as_strategy_kwargs
     }
-    for case in _iter_coverage_cases(
-        operation=operation,
-        generation_modes=generation_modes,
-        generate_duplicate_query_parameters=generate_duplicate_query_parameters,
-        unexpected_methods=unexpected_methods,
-        generation_config=generation_config,
-    ):
-        if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
-            continue
-        adjust_urlencoded_payload(case)
-        auths.set_on_case(case, auth_context, auth_storage)
-        for container_name, value in overrides.items():
-            container = getattr(case, container_name)
-            if container is None:
-                setattr(case, container_name, value)
-            else:
-                container.update(value)
 
-        test = hypothesis.example(case=case)(test)
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message=".*but this is not valid syntax for a Python regular expression.*", category=UserWarning
+        )
+        for case in _iter_coverage_cases(
+            operation=operation,
+            generation_modes=generation_modes,
+            generate_duplicate_query_parameters=generate_duplicate_query_parameters,
+            unexpected_methods=unexpected_methods,
+            generation_config=generation_config,
+        ):
+            if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
+                continue
+            adjust_urlencoded_payload(case)
+            auths.set_on_case(case, auth_context, auth_storage)
+            for container_name, value in overrides.items():
+                container = getattr(case, container_name)
+                if container is None:
+                    setattr(case, container_name, value)
+                else:
+                    container.update(value)
+
+            test = hypothesis.example(case=case)(test)
     return test
 
 

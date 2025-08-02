@@ -6,6 +6,10 @@
 
 - Correctly merge quantifiers into regular expressions with anchors and a single literal.
 
+### :wrench: Changed
+
+- Do not show excessive warnings about unsupported regex in CLI during the coverage phase.
+
 ## [4.0.17](https://github.com/schemathesis/schemathesis/compare/v4.0.16...v4.0.17) - 2025-08-02
 
 ### :bug: Fixed
