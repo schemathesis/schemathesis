@@ -1,0 +1,71 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ 🚫  Coverage (in 0.00s)
+
+     🚫 1 error
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+_________________________________ GET /success _________________________________
+Schema Error
+
+Invalid `properties` definition
+
+Location:
+    properties
+
+Problematic definition:
+"ABC"
+
+Error details:
+    'ABC' is not of type 'object'
+
+Ensure that the definition complies with the OpenAPI specification
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples
+  🚫 Coverage
+  🚫 Fuzzing
+  ⏭  Stateful (not applicable)
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  N generated, N skipped
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

@@ -52,7 +52,7 @@ class InvalidSchema(SchemathesisError):
 
     @classmethod
     def from_jsonschema_error(
-        cls, error: ValidationError, path: str | None, method: str | None, config: OutputConfig
+        cls, error: ValidationError | JsonSchemaError, path: str | None, method: str | None, config: OutputConfig
     ) -> InvalidSchema:
         if error.absolute_path:
             part = error.absolute_path[-1]

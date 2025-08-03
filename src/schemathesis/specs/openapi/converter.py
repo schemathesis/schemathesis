@@ -34,7 +34,7 @@ def to_json_schema(
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value
     properties = schema.get("properties")
-    if properties:
+    if isinstance(properties, dict):
         for name, subschema in properties.items():
             if not isinstance(subschema, dict):
                 continue
