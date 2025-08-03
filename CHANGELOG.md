@@ -2,6 +2,14 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.18...HEAD) - TBD
 
+### :bug: Fixed
+
+- `AttributeError` during response conformance checks if the response schema contains an error in `properties` definition.
+
+### :wrench: Changed
+
+- Report schema errors in response definitions.
+
 ## [4.0.18](https://github.com/schemathesis/schemathesis/compare/v4.0.17...v4.0.18) - 2025-08-02
 
 ### :bug: Fixed

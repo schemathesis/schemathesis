@@ -601,6 +601,34 @@ def test_required_as_boolean(ctx, cli, snapshot_cli, openapi3_base_url, required
     )
 
 
+def test_invalid_response_definition(ctx, cli, snapshot_cli, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/success": {
+                "get": {
+                    "responses": {
+                        "default": {
+                            "description": "text",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        # Seen in real-life schema
+                                        "properties": "ABC",
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "-c response_schema_conformance", "--max-examples=1")
+        == snapshot_cli
+    )
+
+
 def test_no_useless_traceback(ctx, cli, snapshot_cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {

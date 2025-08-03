@@ -646,6 +646,10 @@ class BaseOpenAPISchema(BaseSchema):
                     # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
                     format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
                 )
+            except jsonschema.SchemaError as exc:
+                raise InvalidSchema.from_jsonschema_error(
+                    exc, path=operation.path, method=operation.method, config=self.config.output
+                ) from exc
             except jsonschema.ValidationError as exc:
                 failures.append(
                     JsonSchemaError.from_exception(

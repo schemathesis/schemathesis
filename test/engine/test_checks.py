@@ -453,6 +453,30 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
     assert case.operation.is_valid_response(response)
 
 
+def test_response_schema_conformance_invalid_properties(openapi_30, response_factory):
+    response = Response.from_requests(response_factory.requests(content=b'{"success": true}'), True)
+    case = make_case(
+        openapi_30,
+        {
+            "responses": {
+                "default": {
+                    "description": "text",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                # Seen in real-life schema
+                                "properties": "ABC",
+                            }
+                        }
+                    },
+                }
+            }
+        },
+    )
+    with pytest.raises(InvalidSchema):
+        assert response_schema_conformance(CTX, response, case) is None
+
+
 @pytest.mark.parametrize(
     "extra",
     [
