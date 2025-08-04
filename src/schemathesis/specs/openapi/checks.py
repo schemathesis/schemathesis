@@ -513,6 +513,8 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                     _remove_auth_from_container(container, security_parameters, location=location)
                     kwargs[container_name] = container
             kwargs.pop("session", None)
+            if case.operation.app is not None:
+                kwargs.setdefault("app", case.operation.app)
             ctx._record_case(parent_id=case.id, case=no_auth_case)
             no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
             ctx._record_response(case_id=no_auth_case.id, response=no_auth_response)
