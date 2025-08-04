@@ -785,7 +785,7 @@ def test_iter_parameters():
     assert set(param_names) == {"q", "id", "version", "auth", "session"}
 
     # Verify body and formData are excluded
-    all_params = list(operation._iter_parameters())
+    all_params = list(operation.iter_parameters())
     all_locations = [p.location for p in all_params]
     assert "body" in all_locations
     assert "formData" in all_locations

@@ -12,7 +12,7 @@ from referencing._core import Resolver
 from referencing.exceptions import Unresolvable
 from referencing.typing import Retrieve
 
-from schemathesis.core import HTTP_METHODS
+from schemathesis.core import HTTP_METHODS, NOT_SET
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import deepclone
@@ -86,7 +86,7 @@ class V2:
         input_content_types = self.extract_input_content_types(operation)
         body_media_types: list[str] = input_content_types or [OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE]
         form_parameters = []
-        for param in operation._iter_parameters():
+        for param in operation.iter_parameters():
             if param.location == "body":
                 for media_type in body_media_types:
                     yield Body(media_type=media_type, definition=param.definition, resolver=param.resolver)
@@ -238,7 +238,7 @@ class ApiOperation:
     def tags(self) -> list[str] | None:
         return cast(Optional[list[str]], self.definition.get("tags"))
 
-    def _iter_parameters(self) -> Iterator[OperationParameter]:
+    def iter_parameters(self) -> Iterator[OperationParameter]:
         """Iterate over all `parameters` containers applicable to this API operation."""
         seen = set()
 
@@ -257,24 +257,24 @@ class ApiOperation:
     @property
     def parameters(self) -> ParameterContainer:
         return ParameterContainer(
-            param for param in self._iter_parameters() if param.location in ("query", "path", "header", "cookie")
+            param for param in self.iter_parameters() if param.location in ("query", "path", "header", "cookie")
         )
 
     @property
     def query(self) -> ParameterContainer:
-        return ParameterContainer(param for param in self._iter_parameters() if param.location == "query")
+        return ParameterContainer(param for param in self.iter_parameters() if param.location == "query")
 
     @property
     def path_parameters(self) -> ParameterContainer:
-        return ParameterContainer(param for param in self._iter_parameters() if param.location == "path")
+        return ParameterContainer(param for param in self.iter_parameters() if param.location == "path")
 
     @property
     def headers(self) -> ParameterContainer:
-        return ParameterContainer(param for param in self._iter_parameters() if param.location == "header")
+        return ParameterContainer(param for param in self.iter_parameters() if param.location == "header")
 
     @property
     def cookies(self) -> ParameterContainer:
-        return ParameterContainer(param for param in self._iter_parameters() if param.location == "cookie")
+        return ParameterContainer(param for param in self.iter_parameters() if param.location == "cookie")
 
     @property
     def body(self) -> Iterator[Body]:
@@ -282,13 +282,15 @@ class ApiOperation:
 
     @property
     def responses(self) -> dict[str, Response]:
-        responses = {}
+        return dict(self.iter_responses())
+
+    def iter_responses(self) -> Iterator[tuple[str, Response]]:
         for key, response in self.definition.get("responses", {}).items():
             response, resolver = _maybe_resolve(response, self.resolver)
-            responses[str(key)] = Response(
-                status_code=str(key), definition=response, resolver=resolver, _accessor=self._accessor
+            yield (
+                str(key),
+                Response(status_code=str(key), definition=response, resolver=resolver, _accessor=self._accessor),
             )
-        return responses
 
     def get_response_definition(self, status_code: int) -> Response | None:
         responses = self.responses
@@ -355,22 +357,50 @@ class Response:
 
     @property
     def links(self) -> dict[str, Link]:
+        return dict(self.iter_links())
+
+    def iter_links(self) -> Iterator[tuple[str, Link]]:
         links = self.definition.get(self._accessor.links_field)
         if links is None:
-            return {}
-        output = {}
+            return
         for name, definition in links.items():
             definition, _ = _maybe_resolve(definition, self.resolver)
-            output[name] = Link(name=name, definition=definition)
-        return output
+            yield name, Link(name=name, definition=definition)
+
+
+SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 
 
 @dataclass
 class Link:
     name: str
-    definition: Any
+    definition: dict[str, Any]
 
     __slots__ = ("name", "definition")
+
+    @property
+    def lookup_key(self) -> str:
+        return self.definition.get("operationId") or self.definition["operationRef"]
+
+    def resolve_in(self, schema: OpenApi):
+        lookup = self.definition.get("operationId")
+        if lookup is not None:
+            return schema.find_operation_by_id(lookup)
+        lookup = self.definition["operationRef"]
+        return schema.find_operation_by_ref(lookup)
+
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return self.definition.get("parameters", {})
+
+    @property
+    def body(self) -> Any:
+        return self.definition.get("requestBody", NOT_SET)
+
+    @property
+    def merge_body(self) -> bool:
+        extension = self.definition.get(SCHEMATHESIS_LINK_EXTENSION)
+        return extension.get("merge_body", True) if extension else True
 
 
 @dataclass

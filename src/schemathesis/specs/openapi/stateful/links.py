@@ -11,9 +11,7 @@ from schemathesis.generation.stateful.state_machine import ExtractedParam, StepO
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
-from schemathesis.specs.openapi.references import RECURSION_DEPTH_LIMIT
 
-SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
 
 
@@ -43,7 +41,7 @@ class OpenApiLink:
 
     __slots__ = ("name", "status_code", "source", "target", "parameters", "body", "merge_body", "_cached_extract")
 
-    def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: APIOperation):
+    def __init__(self, name: str, status_code: str, link, source: APIOperation):
         from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
         self.name = name
@@ -52,25 +50,16 @@ class OpenApiLink:
         assert isinstance(source.schema, BaseOpenAPISchema)
         errors = []
 
-        get_operation: Callable[[str], APIOperation]
-        if "operationId" in definition:
-            operation_reference = definition["operationId"]
-            get_operation = source.schema.get_operation_by_id
-        else:
-            operation_reference = definition["operationRef"]
-            get_operation = source.schema.get_operation_by_reference
-
         try:
-            self.target = get_operation(operation_reference)
+            self.target = link.resolve_in(source.schema._spec)
             target = self.target.label
         except OperationNotFound:
-            target = operation_reference
-            errors.append(TransitionValidationError(f"Operation '{operation_reference}' not found"))
+            target = link.lookup
+            errors.append(TransitionValidationError(f"Operation '{link.lookup}' not found"))
 
-        extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
-        self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors)
-        self.body = definition.get("requestBody", NOT_SET)
-        self.merge_body = extension.get("merge_body", True) if extension else True
+        self.parameters = self._normalize_parameters(link.parameters, errors)
+        self.body = link.body
+        self.merge_body = link.merge_body
 
         if errors:
             raise InvalidTransition(
@@ -200,11 +189,9 @@ class StepOutputWrapper:
 def get_all_links(
     operation: APIOperation,
 ) -> Generator[tuple[str, Result[OpenApiLink, InvalidTransition]], None, None]:
-    for status_code, definition in operation.definition.raw["responses"].items():
-        definition = operation.schema.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)  # type: ignore[attr-defined]
-        for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
+    for status_code, response in operation.inner.iter_responses():
+        for name, link in response.iter_links():
             try:
-                link = OpenApiLink(name, status_code, link_definition, operation)
-                yield status_code, Ok(link)
+                yield status_code, Ok(OpenApiLink(name, status_code, link, operation))
             except InvalidTransition as exc:
                 yield status_code, Err(exc)
