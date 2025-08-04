@@ -28,7 +28,7 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
+from schemathesis.generation.hypothesis import examples, setup, strategies
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import (
@@ -123,9 +123,6 @@ def create_test(
     default = hypothesis.settings.default
     settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
     assert settings is not None
-
-    if settings.deadline == default.deadline:
-        settings = hypothesis.settings(settings, deadline=DEFAULT_DEADLINE)
 
     if settings.verbosity == default.verbosity:
         settings = hypothesis.settings(settings, verbosity=Verbosity.quiet)

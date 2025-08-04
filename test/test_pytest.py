@@ -3,7 +3,6 @@ import platform
 import pytest
 
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.modes import GenerationMode
 
 
@@ -154,15 +153,15 @@ def test_b(case, a):
 
 def test_default_hypothesis_deadline(testdir):
     testdir.make_test(
-        f"""
+        """
 @schema.parametrize()
 def test_a(case):
-    assert settings().deadline.total_seconds() == {DEFAULT_DEADLINE} / 1000
+    assert settings().deadline is None
 
 @schema.parametrize()
 @settings(max_examples=5)
 def test_b(case):
-    assert settings().deadline.total_seconds() == {DEFAULT_DEADLINE} / 1000
+    assert settings().deadline is None
 
 @schema.parametrize()
 @settings(max_examples=5, deadline=100)
@@ -175,7 +174,7 @@ def test_d():
     )
     # When there is a test with Pytest
     result = testdir.runpytest()
-    # Then it should use the global Schemathesis deadline for Hypothesis (DEFAULT_DEADLINE value)
+    # Then it should use the global Schemathesis deadline for Hypothesis (None)
     result.assert_outcomes(passed=4)
 
 
