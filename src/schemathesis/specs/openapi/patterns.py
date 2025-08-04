@@ -155,6 +155,8 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
     current_position = leading_anchor_length
     distribution_idx = 0
 
+    # __import__("pdb").set_trace()
+
     for op, value in pattern_parts:
         if op == LITERAL:
             # Check if the literal comes from a bracketed expression,
@@ -174,8 +176,18 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
                 continue
             if pattern[current_position] == "\\":
                 # Escaped value
-                current_position += 2
                 result += "\\"
+                # Could be an octal value
+                if (
+                    current_position + 2 < len(pattern)
+                    and pattern[current_position + 1] == "0"
+                    and pattern[current_position + 2] in ("0", "1", "2", "3", "4", "5", "6", "7")
+                ):
+                    result += pattern[current_position + 1]
+                    result += pattern[current_position + 2]
+                    current_position += 3
+                    continue
+                current_position += 2
             else:
                 current_position += 1
             result += chr(value)

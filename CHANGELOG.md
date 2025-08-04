@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Internal error in the `ignored_auth` check in ASGI/WSGI integration.
+- Handle octal escapes during updating quantifiers in regular expressions.
 
 ## [4.0.19](https://github.com/schemathesis/schemathesis/compare/v4.0.18...v4.0.19) - 2025-08-03
 

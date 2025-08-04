@@ -130,6 +130,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^[\W\w]{2,}$", 1, 3, r"^(.){2,3}$"),
         (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix([|]){2}(?:,prefix[|]+){499}$"),
         (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.([^,]){1}(?:,bar\.spam\.[^,]+){0}$"),
+        (r"^\008+()?$", None, 2, r"^\00(8){1}(){0}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
