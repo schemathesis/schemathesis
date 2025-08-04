@@ -155,8 +155,6 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
     current_position = leading_anchor_length
     distribution_idx = 0
 
-    # __import__("pdb").set_trace()
-
     for op, value in pattern_parts:
         if op == LITERAL:
             # Check if the literal comes from a bracketed expression,
@@ -361,13 +359,58 @@ def _handle_repeat_quantifier(
 ) -> str:
     """Handle repeat quantifiers (e.g., '+', '*', '?')."""
     min_repeat, max_repeat, _ = value
-    min_length, max_length = _build_size(min_repeat, max_repeat, min_length, max_length)
-    if min_length > max_length:
-        return pattern
+
+    # First, analyze the inner pattern
     inner = _strip_quantifier(pattern)
     if inner.startswith("(") and inner.endswith(")"):
         inner = inner[1:-1]
-    return f"({inner})" + _build_quantifier(min_length, max_length)
+
+    # Determine the length of the inner pattern
+    inner_length = 1  # default assumption for non-literal patterns
+    try:
+        parsed = sre_parse.parse(inner)
+        if all(item[0] == LITERAL for item in parsed):
+            inner_length = len(parsed)
+            if max_length and max_length > 0 and inner_length > max_length:
+                return pattern
+    except re.error:
+        pass
+
+    if inner_length == 0:
+        # Empty pattern contributes 0 chars regardless of repetitions
+        # For length constraints, only 0 repetitions make sense
+        if min_length is not None and min_length > 0:
+            return pattern  # Can't satisfy positive length with empty pattern
+        return f"({inner})" + _build_quantifier(0, 0)
+
+    # Convert external length constraints to repetition constraints
+    external_min_repeat = None
+    external_max_repeat = None
+
+    if min_length is not None:
+        # Need at least ceil(min_length / inner_length) repetitions
+        external_min_repeat = (min_length + inner_length - 1) // inner_length
+
+    if max_length is not None:
+        # Can have at most floor(max_length / inner_length) repetitions
+        external_max_repeat = max_length // inner_length
+
+    # Merge original repetition constraints with external constraints
+    final_min_repeat = min_repeat
+    if external_min_repeat is not None:
+        final_min_repeat = max(min_repeat, external_min_repeat)
+
+    final_max_repeat = max_repeat
+    if external_max_repeat is not None:
+        if max_repeat == MAXREPEAT:
+            final_max_repeat = external_max_repeat
+        else:
+            final_max_repeat = min(max_repeat, external_max_repeat)
+
+    if final_min_repeat > final_max_repeat:
+        return pattern
+
+    return f"({inner})" + _build_quantifier(final_min_repeat, final_max_repeat)
 
 
 def _handle_literal_or_in_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
