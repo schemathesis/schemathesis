@@ -36,6 +36,12 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
 ## Articles
 
+- [Introduction to Schemathesis: A Tool for Automatic Test Data Generation for Web APIs](https://gihyo.jp/article/2025/07/monthly-python-2507) (in Japanese) by **@ryu22e**
+
+    - **Description**: A great introduction to Schemathesis 4 that covers both CLI usage and pytest integration with many practical examples.
+
+    - **Date**: Jul 2025
+
 - [Create a Cracker of an Open API Contract with VS Code, Spectral, Prism and Schemathesis](https://blog.hungovercoders.com/datagriff/2023/12/22/create-a-cracker-of-an-open-api-contract-with-vs-code-spectral-prism-and-schemathesis.html) by **@dataGriff**
 
     - **Description**: Detailed walkthrough of contract-first API design and testing workflow.
