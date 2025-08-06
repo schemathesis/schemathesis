@@ -1671,3 +1671,48 @@ def test_find_matching_in_responses_yields_all():
 
 def test_find_matching_in_responses_empty():
     assert list(find_matching_in_responses({}, "id")) == []
+
+
+def test_config_override_with_examples(ctx, cli, snapshot_cli, openapi3_base_url):
+    # See GH-3000
+    schema_file = ctx.openapi.write_schema(
+        {
+            "/{primary}/subs/{secondary}": {
+                "put": {
+                    "parameters": [
+                        {"name": "primary", "in": "path", "schema": {"type": "string"}, "required": True},
+                        {
+                            "name": "secondary",
+                            "in": "path",
+                            "schema": {"type": "string"},
+                            "example": "whatever",
+                            "required": True,
+                        },
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Schema"}}},
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Schema": {
+                    "type": "object",
+                    "properties": {"property": {"schema": {"type": "string"}, "example": "whatever"}},
+                }
+            }
+        },
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "--phases=examples",
+            f"--url={openapi3_base_url}",
+            config={"parameters": {"path.primary": "primary"}},
+        )
+        == snapshot_cli
+    )
