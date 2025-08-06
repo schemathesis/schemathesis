@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.21...HEAD) - TBD
 
+### :bug: Fixed
+
+- [#3000](https://github.com/schemathesis/schemathesis/issues/3000)
+
 ## [4.0.21](https://github.com/schemathesis/schemathesis/compare/v4.0.20...v4.0.21) - 2025-08-04
 
 ### :wrench: Changed

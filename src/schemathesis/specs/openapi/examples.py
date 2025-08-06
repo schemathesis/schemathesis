@@ -51,6 +51,20 @@ class BodyExample:
 Example = Union[ParameterExample, BodyExample]
 
 
+def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    mergeable_keys = {"path_parameters", "headers", "cookies", "query"}
+
+    for key, value in right.items():
+        if key in mergeable_keys and key in left:
+            if isinstance(left[key], dict) and isinstance(value, dict):
+                # kwargs takes precedence
+                left[key] = {**left[key], **value}
+                continue
+        left[key] = value
+
+    return left
+
+
 def get_strategies_from_examples(
     operation: APIOperation[OpenAPIParameter], **kwargs: Any
 ) -> list[SearchStrategy[Case]]:
@@ -72,7 +86,7 @@ def get_strategies_from_examples(
     # Add examples from parameter's schemas
     examples.extend(extract_from_schemas(operation))
     return [
-        openapi_cases(operation=operation, **{**parameters, **kwargs, "phase": TestPhase.EXAMPLES}).map(
+        openapi_cases(operation=operation, phase=TestPhase.EXAMPLES, **merge_kwargs(parameters, kwargs)).map(
             serialize_components
         )
         for parameters in produce_combinations(examples)
