@@ -22,7 +22,7 @@ Replace random generated data with realistic values that work with your test env
 import schemathesis
 
 @schemathesis.hook  
-def map_query(context, query):
+def map_query(ctx, query):
     """Replace random user_id with a known test user"""
     if query and "user_id" in query:
         query["user_id"] = "test-user-123"
@@ -69,7 +69,7 @@ filter_* → map_* → flatmap_* → Final test case
 
 ```python
 @schemathesis.hook
-def filter_query(context, query):
+def filter_query(ctx, query):
     return query and query.get("user_id") != "admin"
 ```
 
@@ -79,7 +79,7 @@ def filter_query(context, query):
 
 ```python
 @schemathesis.hook
-def map_path_parameters(context, path_parameters):
+def map_path_parameters(ctx, path_parameters):
     if path_parameters and "product_id" in path_parameters:
         path_parameters["product_id"] = "product_1"
     return path_parameters
@@ -93,7 +93,7 @@ def map_path_parameters(context, path_parameters):
 from hypothesis import strategies as st
 
 @schemathesis.hook
-def flatmap_body(context, body):
+def flatmap_body(ctx, body):
     if body and "email" in body and "organization" in body:
         org = body["organization"]
         domain = f"{org.lower()}.com"
@@ -161,7 +161,7 @@ Define your hooks:
 import schemathesis
 
 @schemathesis.hook
-def map_headers(context, headers):
+def map_headers(ctx, headers):
     if headers is None:
         headers = {}
     headers["X-Test-Mode"] = "true"
@@ -198,14 +198,14 @@ Apply hooks only to certain API endpoints:
 ```python
 # Only apply to user endpoints, skip POST requests
 @schemathesis.hook.apply_to(path_regex=r"/users/").skip_for(method="POST")
-def map_headers(context, headers):
+def map_headers(ctx, headers):
     headers = headers or {}
     headers["X-User-Context"] = "test-user"
     return headers
 
 # Only apply to a specific operation
 @schemathesis.hook.apply_to(name="GET /orders/{order_id}")
-def map_path_parameters(context, path_parameters):
+def map_path_parameters(ctx, path_parameters):
     path_parameters = path_parameters or {}
     path_parameters["order_id"] = "order_12345"  # Known test order
     return path_parameters
@@ -217,7 +217,7 @@ For complex scenarios, modify the entire request:
 
 ```python
 @schemathesis.hook
-def before_call(context, case, **kwargs):
+def before_call(ctx, case, **kwargs):
     """Modify the request just before it's sent"""
     # Add correlation ID for tracing
     case.headers["X-Correlation-ID"] = f"test-{uuid.uuid4()}"
@@ -231,7 +231,7 @@ def before_call(context, case, **kwargs):
 
 ```python
 @schemathesis.hook
-def before_init_operation(context, operation):
+def before_init_operation(ctx, operation):
     """Remove optional properties to focus tests on required fields only"""
     for parameter in operation.iter_parameters():
         schema = parameter.definition.get("schema", {})
@@ -271,7 +271,7 @@ GraphQL hooks work with `graphql.DocumentNode` objects instead of JSON data. The
 
 ```python
 @schemathesis.hook
-def map_body(context, body):
+def map_body(ctx, body):
     """Change field names in the GraphQL query"""
     node = body.definitions[0].selection_set.selections[0]
     
@@ -287,7 +287,7 @@ Use `map_query` to provide variables:
 
 ```python
 @schemathesis.hook
-def map_query(context, query):
+def map_query(ctx, query):
     """Add query parameters to GraphQL requests"""
     return {"q": "42"}
 ```
@@ -298,7 +298,7 @@ Note that `query` is always `None` for GraphQL requests since Schemathesis doesn
 
 ```python
 @schemathesis.hook
-def filter_body(context, body):
+def filter_body(ctx, body):
     """Skip queries with specific field names"""
     node = body.definitions[0].selection_set.selections[0]
     return node.name.value != "excludeThisField"
@@ -310,7 +310,7 @@ def filter_body(context, body):
 from hypothesis import strategies as st
 
 @schemathesis.hook
-def flatmap_body(context, body):
+def flatmap_body(ctx, body):
     """Generate dependent fields based on query content"""
     node = body.definitions[0].selection_set.selections[0]
     if node.name.value == "someField":

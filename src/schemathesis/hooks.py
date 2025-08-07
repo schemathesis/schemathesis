@@ -395,7 +395,7 @@ def hook(hook: str | Callable) -> Callable:
                 return query and "user_id" in query
 
             @schemathesis.hook
-            def before_call(ctx, case):
+            def before_call(ctx, case, **kwargs):
                 \"\"\"Modify headers before sending each request\"\"\"
                 if case.headers is None:
                     case.headers = {}
