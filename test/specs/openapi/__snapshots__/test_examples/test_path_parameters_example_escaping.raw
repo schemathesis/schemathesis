@@ -1,0 +1,60 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ❌  Examples (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+___________________________ GET /networks/{network} ____________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 404
+    Documented: 202
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    curl -X GET http://127.0.0.1/api/networks/fd00%3A%3A%2F64
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ❌ Examples
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

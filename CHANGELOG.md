@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Parameter overrides replacing all explicit examples instead of merging with them. [#3000](https://github.com/schemathesis/schemathesis/issues/3000)
+- Escape examples for path parameters. [#3003](https://github.com/schemathesis/schemathesis/issues/3003)
 
 ## [4.0.21](https://github.com/schemathesis/schemathesis/compare/v4.0.20...v4.0.21) - 2025-08-04
 

@@ -1716,3 +1716,38 @@ def test_config_override_with_examples(ctx, cli, snapshot_cli, openapi3_base_url
         )
         == snapshot_cli
     )
+
+
+def test_path_parameters_example_escaping(ctx, cli, snapshot_cli, openapi3_base_url):
+    # See GH-3003
+    schema_file = ctx.openapi.write_schema(
+        {
+            "/networks/{network}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "network",
+                            "in": "path",
+                            "required": True,
+                            "schema": {
+                                "type": "string",
+                                "format": "ipv6-network",
+                                "example": "fd00::/64",
+                            },
+                        },
+                    ],
+                    # Set `202` to trigger a failure
+                    "responses": {"202": {"description": "Ok"}},
+                }
+            }
+        }
+    )
+
+    result = cli.main(
+        "run",
+        str(schema_file),
+        "--phases=examples",
+        f"--url={openapi3_base_url}",
+    )
+
+    assert result == snapshot_cli
