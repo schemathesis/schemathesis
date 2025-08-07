@@ -243,3 +243,112 @@ def test_not_a_server_error(cli, snapshot_cli, openapi3_schema_url):
         )
         == snapshot_cli
     )
+
+
+def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_runner, cli, snapshot_cli):
+    app = Flask(__name__)
+
+    organizations = {}
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def openapi():
+        return {
+            "openapi": "3.1.0",
+            "info": {"title": "Test API", "version": "0.1.0"},
+            "paths": {
+                "/organizations/": {
+                    "post": {
+                        "operationId": "organizations:create",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"name": {"type": "string"}},
+                                        "required": ["name"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {
+                            "201": {
+                                "description": "Created",
+                                "headers": {"Location": {"schema": {"type": "string"}}},
+                                "links": {
+                                    "create_project": {
+                                        "operationId": "organizations:projects:create",
+                                        "parameters": {
+                                            "organization_id": "$response.body#/id",
+                                        },
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
+                "/organizations/{organization_id}/projects/": {
+                    "post": {
+                        "operationId": "organizations:projects:create",
+                        "parameters": [
+                            {"name": "organization_id", "in": "path", "required": True, "schema": {"type": "integer"}}
+                        ],
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"name": {"type": "string"}},
+                                        "required": ["name"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {
+                            "201": {"description": "Created"},
+                            "422": {"description": "Unprocessable Content"},
+                        },
+                    }
+                },
+            },
+        }
+
+    @app.route("/organizations/", methods=["POST"])
+    def create_organization():
+        nonlocal next_id
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({"error": "Must be object"}), 422
+        if "name" not in data:
+            return jsonify({"error": "Name is missing"}), 422
+
+        organizations[next_id] = data
+        response = jsonify({"id": next_id, "name": data["name"]})
+        next_id += 1
+        return response, 201
+
+    @app.route("/organizations/<int:organization_id>/projects/", methods=["POST"])
+    def create_sub(organization_id):
+        if organization_id not in organizations:
+            return jsonify({"error": "Not found"}), 404
+
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({"error": "Must be object"}), 422
+
+        return jsonify({"id": 1}), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "-c ensure_resource_availability",
+            "--max-examples=50",
+            "--phases=stateful",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
