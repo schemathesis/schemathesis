@@ -34,7 +34,7 @@ Hooks that execute during test case execution.
 
 | Hook | Signature | Execution Stage | Purpose |
 |------|-----------|-----------------|---------|
-| **before_call** | `(ctx, case: Case) -> None` | Before HTTP request | Modify test case (headers, body, etc.) |
+| **before_call** | `(ctx, case: Case, **kwargs) -> None` | Before HTTP request | Modify test case (headers, body, etc.) |
 | **process_call_kwargs** | `(ctx, case: Case, kwargs: dict) -> dict` | Before `case.call()` | Modify request library arguments (timeout, verify, etc.) |
 | **after_call** | `(ctx, case: Case, response: Response) -> None` | After HTTP response | Inspect/modify response before checks |
 

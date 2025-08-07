@@ -49,7 +49,7 @@ class APIWorkflow(schema.as_state_machine()):
 
     def before_call(self, case):
         """Modify every request in the sequence."""
-        
+
     def after_call(self, response, case):
         """Process every response."""
 
