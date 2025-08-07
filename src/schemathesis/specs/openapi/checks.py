@@ -408,8 +408,11 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
 
-    # First, check if this is a 4XX response
-    if not (400 <= response.status_code < 500):
+    # Only check for 404 (Not Found) responses - other 4XX are not resource availability issues
+    # 422 / 400: Validation errors (bad request data)
+    # 401 / 403: Auth issues (expired tokens, permissions)
+    # 409: Conflict errors
+    if response.status_code != 404:
         return None
 
     parent = ctx._find_parent(case_id=case.id)

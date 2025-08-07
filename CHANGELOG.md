@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.22...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positives in `ensure_resource_availability` check by limiting it to 404 responses only.
+
 ## [4.0.22](https://github.com/schemathesis/schemathesis/compare/v4.0.21...v4.0.22) - 2025-08-07
 
 ### :bug: Fixed
