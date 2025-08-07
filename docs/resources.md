@@ -98,6 +98,12 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
 ## Videos
 
+- [Fuzzing REST APIs for Security Testing](https://youtu.be/ZdshB1qcgvw) by **Alina Kostetska** at **RoboCon 2024**
+
+    - **Description**: Security-focused presentation demonstrating how to use Schemathesis / Robot Framework integration for fuzzing REST APIs to discover vulnerabilities.
+
+    - **Date**: 04 Nov 2024
+
 - [API Fuzzing: What it is and why you should use it](https://youtu.be/wX3GMJY9B6A) by **José Haro Peralta**
 
     - **Description**: Technical overview and demonstration of Schemathesis capabilities.
