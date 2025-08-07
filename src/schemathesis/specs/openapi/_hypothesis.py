@@ -301,6 +301,8 @@ def generate_parameter(
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
+        if value is not None and location == "path":
+            value = quote_all(value)
         used_generator = None
     return ValueContainer(value=value, location=location, generator=used_generator)
 
