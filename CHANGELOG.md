@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.23...HEAD) - TBD
 
+### :bug: Fixed
+
+- Internal error on incorrect value for `--tls-verify` when the schema URL is accessed via HTTPs. [#3007](https://github.com/schemathesis/schemathesis/issues/3007)
+
 ## [4.0.23](https://github.com/schemathesis/schemathesis/compare/v4.0.22...v4.0.23) - 2025-08-07
 
 ### :bug: Fixed

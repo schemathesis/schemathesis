@@ -67,6 +67,9 @@ def make_request(func: Callable[..., requests.Response], url: str, **kwargs: Any
         return raise_for_status(response)
     except requests.RequestException as exc:
         handle_request_error(exc)
+    except OSError as exc:
+        # Possible with certificate errors
+        raise LoaderError(message=str(exc), kind=LoaderErrorKind.INVALID_CERTIFICATE, url=url, extras=[]) from None
 
 
 WAIT_FOR_SCHEMA_INTERVAL = 0.05

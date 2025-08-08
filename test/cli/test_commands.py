@@ -1303,6 +1303,12 @@ def test_rate_limit(cli, schema_url):
     assert cli.run(schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("failure")
+def test_invalid_tls_verify(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url.replace("http", "https"), "--tls-verify=falst") == snapshot_cli
+
+
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
 def test_invalid_schema_with_disabled_validation(
     ctx, cli, openapi_3_schema_with_invalid_security, version, snapshot_cli, openapi3_base_url
