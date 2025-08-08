@@ -330,6 +330,7 @@ class LoaderErrorKind(str, enum.Enum):
     CONNECTION_SSL = "connection_ssl"
     CONNECTION_OTHER = "connection_other"
     NETWORK_OTHER = "network_other"
+    INVALID_CERTIFICATE = "invalid_certificate"
 
     # HTTP error codes
     HTTP_SERVER_ERROR = "http_server_error"
