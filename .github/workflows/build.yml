@@ -66,6 +66,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5.4.3
         with:
+          files: coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # On windows redirecting output to a file could lead to an error due to the default IO encoding being CP-1252
