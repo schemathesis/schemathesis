@@ -140,6 +140,13 @@ def _format_anyof_error(error: ValidationError) -> str:
             f"Error in {section} section:\n  At least one filter is required when defining [[operations]].\n\n"
             "Please specify at least one include or exclude filter property (e.g., include-path, exclude-tag, etc.)."
         )
+    elif list(error.schema_path) == ["properties", "workers", "anyOf"]:
+        return (
+            f"Invalid value for 'workers': {repr(error.instance)}\n\n"
+            f"Expected either:\n"
+            f"  - A positive integer (e.g., workers = 4)\n"
+            f'  - The string "auto" for automatic detection (workers = "auto")'
+        )
     return error.message
 
 
