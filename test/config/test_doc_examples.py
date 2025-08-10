@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import schemathesis.config._projects
 from schemathesis.checks import CHECKS
 from schemathesis.config import SchemathesisConfig
 from schemathesis.config._validator import CONFIG_SCHEMA
@@ -52,6 +53,7 @@ def test_configs(monkeypatch, config, snapshot_config):
     monkeypatch.setenv("SESSION_ID", "secret-session-id!")
     monkeypatch.setenv("USER_ID", "42")
     monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setattr(schemathesis.config._projects, "get_workers_count", lambda: 4)
     try:
         config = SchemathesisConfig.from_str(config)
         assert config == snapshot_config

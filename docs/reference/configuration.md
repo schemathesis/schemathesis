@@ -369,6 +369,10 @@ These settings can only be applied at the project level.
     workers = 4       # Use exactly 4 workers
     ```
 
+    ```toml
+    workers = "auto"  # Allocate workers based on the number of available CPU cores
+    ```
+
 #### `wait-for-schema`
 
 !!! note ""

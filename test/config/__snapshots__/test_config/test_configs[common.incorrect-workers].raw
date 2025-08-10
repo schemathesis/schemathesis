@@ -1,0 +1,5 @@
+Invalid value for 'workers': 'foo'
+
+Expected either:
+  - A positive integer (e.g., workers = 4)
+  - The string "auto" for automatic detection (workers = "auto")

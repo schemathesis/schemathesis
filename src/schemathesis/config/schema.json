@@ -94,7 +94,14 @@
       "type": "string"
     },
     "workers": {
-      "type": "integer"
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "const": "auto"
+        }
+      ]
     },
     "wait-for-schema": {
       "type": "number",
@@ -491,7 +498,14 @@
           "type": "string"
         },
         "workers": {
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "const": "auto"
+            }
+          ]
         },
         "wait-for-schema": {
           "type": "number",
