@@ -1,0 +1,48 @@
+name: Memory Benchmark
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  memory-benchmark:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.2.1
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - uses: astral-sh/setup-uv@v6
+
+      - run: uv pip install '.' 'memray==1.18.0' --system
+
+      - run: python benches/memory/measure.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: memory-benchmark-results
+          path: memory-benchmark-results/
+          retention-days: 30
+
+      - uses: peter-evans/find-comment@v2
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: Memory Benchmark Results
+
+      - uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: memory-benchmark-results/report.md
+          edit-mode: replace
