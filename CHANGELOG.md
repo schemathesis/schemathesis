@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.24...HEAD) - TBD
 
+### :scroll: Documentation
+
+- Add a search bar. [#3013](https://github.com/schemathesis/schemathesis/issues/3013)
+
 ## [4.0.24](https://github.com/schemathesis/schemathesis/compare/v4.0.23...v4.0.24) - 2025-08-09
 
 ### :bug: Fixed

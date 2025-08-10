@@ -113,5 +113,6 @@ plugins:
         paths: [src]
         options:
           show_source: false
+- search
 
 copyright: Copyright &copy; 2020-2025 Dmitry Dygalo & Schemathesis.io
