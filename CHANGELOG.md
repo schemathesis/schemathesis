@@ -2,6 +2,14 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.24...HEAD) - TBD
 
+### :bug: Fixed
+
+- `workers = "auto"` being incorrectly rejected in configuration files. [#3015](https://github.com/schemathesis/schemathesis/issues/3015)
+
+### :wrench: Changed
+
+- Improve error message for invalid `workers` values.
+
 ### :scroll: Documentation
 
 - Add a search bar. [#3013](https://github.com/schemathesis/schemathesis/issues/3013)
