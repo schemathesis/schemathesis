@@ -7,6 +7,7 @@ def setup() -> None:
     from hypothesis.internal.entropy import deterministic_PRNG
     from hypothesis.internal.reflection import is_first_param_referenced_in_function
     from hypothesis.strategies._internal import collections, core
+    from hypothesis.vendor import pretty
     from hypothesis_jsonschema import _from_schema, _resolve
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
@@ -26,6 +27,14 @@ def setup() -> None:
         return is_first_param_referenced_in_function(f)
 
     core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function  # type: ignore
+
+    class RepresentationPrinter(pretty.RepresentationPrinter):
+        def pretty(self, obj: object) -> None:
+            # This one takes way too much - in the coverage phase it may give >2 orders of magnitude improvement
+            # depending on the schema size (~300 seconds -> 4.5 seconds in one of the benchmarks)
+            return None
+
+    root_core.RepresentationPrinter = RepresentationPrinter  # type: ignore
     _resolve.deepcopy = deepclone  # type: ignore
     _from_schema.deepcopy = deepclone  # type: ignore
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore
