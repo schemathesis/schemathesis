@@ -1,0 +1,20 @@
+{
+  "scenarios": [
+    {
+      "name": "large_payload_fuzzing",
+      "schema": "large_payload.yaml",
+      "args": [
+        "--phases=fuzzing",
+        "--continue-on-failure"
+      ]
+    },
+    {
+      "name": "large_payload_coverage",
+      "schema": "large_payload.yaml",
+      "args": [
+        "--phases=coverage",
+        "--continue-on-failure"
+      ]
+    }
+  ]
+}
