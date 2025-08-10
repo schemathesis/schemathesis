@@ -6,6 +6,16 @@
 
 - Add a search bar. [#3013](https://github.com/schemathesis/schemathesis/issues/3013)
 
+### :racing_car: Performance
+
+- Dramatically improved performance and memory usage. For the coverage phase expect order of magnitude improvements that scale with schema complexity.
+
+Examples:
+  - PetStore API: **12s → 1.5s** (8x faster)
+  - Complex endpoint schema with nested objects and 40+ fields: **330s → 4.5s** (73x faster)
+
+These improvements come from removing unnecessary memory allocations in unnecessary pretty-printing operations in Hypothesis.
+
 ## [4.0.24](https://github.com/schemathesis/schemathesis/compare/v4.0.23...v4.0.24) - 2025-08-09
 
 ### :bug: Fixed
