@@ -14,7 +14,7 @@ def run_memray(schema_path: str, args: list[str]) -> dict[str, Any]:
         cmd = (
             ["memray", "run", "--force", "-o", memray_output, "-m", "schemathesis.cli", "run"]
             + args
-            + ["-u http://127.0.0.1:8000", schema_path]
+            + ["-u http://127.0.0.1:8000", "--seed=1", schema_path]
         )
 
         subprocess.run(
