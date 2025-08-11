@@ -227,65 +227,6 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def create_examples_test(
-    *,
-    test_func: Callable,
-    operation: APIOperation,
-    config: HypothesisTestConfig,
-) -> Callable:
-    hook_dispatcher = HookDispatcherMark.get(test_func)
-    auth_storage = AuthStorageMark.get(test_func)
-    strategy_kwargs = {
-        "hooks": hook_dispatcher,
-        "auth_storage": auth_storage,
-        **config.as_strategy_kwargs,
-    }
-    phases_config = config.project.phases_for(operation=operation)
-
-    @wraps(test_func)
-    def test_wrapper(*args: Any, **kwargs: Any) -> Any:
-        __tracebackhide__ = True
-        for case in generate_example_cases(
-            test=test_func,
-            operation=operation,
-            fill_missing=phases_config.examples.fill_missing,
-            hook_dispatcher=hook_dispatcher,
-            **strategy_kwargs,
-        ):
-            test_func(*args, case=case, **kwargs)
-        return None
-
-    return test_wrapper
-
-
-def create_coverage_test(
-    *,
-    test_func: Callable,
-    operation: APIOperation,
-    config: HypothesisTestConfig,
-) -> Callable:
-    auth_storage = AuthStorageMark.get(test_func)
-    generation = config.project.generation_for(operation=operation)
-    phases_config = config.project.phases_for(operation=operation)
-
-    @wraps(test_func)
-    def test_wrapper(*args: Any, **kwargs: Any) -> Any:
-        __tracebackhide__ = True
-        for case in generate_coverage_cases(
-            operation=operation,
-            generation_modes=generation.modes,
-            auth_storage=auth_storage,
-            as_strategy_kwargs=config.as_strategy_kwargs,
-            generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
-            unexpected_methods=phases_config.coverage.unexpected_methods,
-            generation_config=generation,
-        ):
-            test_func(*args, case=case, **kwargs)
-        return None
-
-    return test_wrapper
-
-
 def add_examples(
     test: Callable,
     operation: APIOperation,
