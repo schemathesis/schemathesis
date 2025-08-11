@@ -1,0 +1,372 @@
+openapi: 3.0.3
+info:
+  title: Stateful User Management API
+  version: 1.0.0
+  description: Simple API with OpenAPI links for stateful testing
+
+paths:
+  /users:
+    post:
+      operationId: createUser
+      summary: Create a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                email:
+                  type: string
+                  format: email
+                age:
+                  type: integer
+                  minimum: 18
+                  maximum: 120
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            GetUser:
+              operationId: getUser
+              parameters:
+                userId: '$response.body#/id'
+              description: Get created user by ID
+            UpdateUser:
+              operationId: updateUser
+              parameters:
+                userId: '$response.body#/id'
+              description: Update created user
+            DeleteUser:
+              operationId: deleteUser
+              parameters:
+                userId: '$response.body#/id'
+              description: Delete created user
+
+    get:
+      operationId: listUsers
+      summary: List all users
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  total:
+                    type: integer
+          links:
+            GetFirstUser:
+              operationId: getUser
+              parameters:
+                userId: '$response.body#/users/0/id'
+              description: Get first user from list
+
+  /users/{userId}:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      operationId: getUser
+      summary: Get user by ID
+      responses:
+        '200':
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            UpdateThisUser:
+              operationId: updateUser
+              parameters:
+                userId: '$response.body#/id'
+              description: Update this user
+            DeleteThisUser:
+              operationId: deleteUser
+              parameters:
+                userId: '$response.body#/id'
+              description: Delete this user
+            GetUserPosts:
+              operationId: getUserPosts
+              parameters:
+                userId: '$response.body#/id'
+              description: Get posts by this user
+        '404':
+          description: User not found
+
+    put:
+      operationId: updateUser
+      summary: Update user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                email:
+                  type: string
+                  format: email
+                age:
+                  type: integer
+                  minimum: 18
+                  maximum: 120
+                status:
+                  type: string
+                  enum: ['active', 'inactive', 'suspended']
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          links:
+            VerifyUpdate:
+              operationId: getUser
+              parameters:
+                userId: '$response.body#/id'
+              description: Verify the update by getting user
+        '404':
+          description: User not found
+
+    delete:
+      operationId: deleteUser
+      summary: Delete user
+      responses:
+        '204':
+          description: User deleted successfully
+        '404':
+          description: User not found
+
+  /users/{userId}/posts:
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      operationId: getUserPosts
+      summary: Get posts by user
+      responses:
+        '200':
+          description: User posts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+          links:
+            GetFirstPost:
+              operationId: getPost
+              parameters:
+                postId: '$response.body#/posts/0/id'
+              description: Get first post details
+
+    post:
+      operationId: createPost
+      summary: Create a post for user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - content
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          links:
+            GetCreatedPost:
+              operationId: getPost
+              parameters:
+                postId: '$response.body#/id'
+              description: Get the created post
+            UpdateCreatedPost:
+              operationId: updatePost
+              parameters:
+                postId: '$response.body#/id'
+              description: Update the created post
+            DeleteCreatedPost:
+              operationId: deletePost
+              parameters:
+                postId: '$response.body#/id'
+              description: Delete the created post
+
+  /posts/{postId}:
+    parameters:
+      - name: postId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      operationId: getPost
+      summary: Get post by ID
+      responses:
+        '200':
+          description: Post found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+          links:
+            GetPostAuthor:
+              operationId: getUser
+              parameters:
+                userId: '$response.body#/authorId'
+              description: Get the post author
+
+    put:
+      operationId: updatePost
+      summary: Update post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+      responses:
+        '200':
+          description: Post updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+    delete:
+      operationId: deletePost
+      summary: Delete post
+      responses:
+        '204':
+          description: Post deleted
+        '404':
+          description: Post not found
+
+components:
+  schemas:
+    User:
+      type: object
+      required:
+        - id
+        - username
+        - email
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        age:
+          type: integer
+        status:
+          type: string
+          enum: ['active', 'inactive', 'suspended']
+          default: 'active'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Post:
+      type: object
+      required:
+        - id
+        - title
+        - content
+        - authorId
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        content:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

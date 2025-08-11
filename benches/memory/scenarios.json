@@ -15,6 +15,14 @@
         "--phases=coverage",
         "--continue-on-failure"
       ]
+    },
+    {
+      "name": "stateful_users",
+      "schema": "stateful_users.yaml",
+      "args": [
+        "--phases=stateful",
+        "--continue-on-failure"
+      ]
     }
   ]
 }
