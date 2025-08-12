@@ -704,6 +704,9 @@ class APIOperation(Generic[P]):
             **kwargs: Extra arguments to the underlying strategy function.
 
         """
+        if self.schema.config.headers:
+            headers = kwargs.setdefault("headers", {})
+            headers.update(self.schema.config.headers)
         strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:

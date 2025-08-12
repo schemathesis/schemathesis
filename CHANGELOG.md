@@ -5,16 +5,14 @@
 ### :rocket: Added
 
 - Support the `const`, `additionalItems`, `dependencies`, `if`, `then`, `else`, `patternProperties`, `propertyNames`, `contains`, keywords in top-level parameter schemas.
+- **Coverage phase**: Generate values for empty schemas.
+- **Coverage phase**: Generate values for `not` keyword and `false` JSON Schemas.
 
 ### :bug: Fixed
 
 - **Coverage phase**: Error 'Path parameter is not defined' if the parameter schema is empty.
 - Properly assign the "stateful" phase value in metadata of test cases generated during the stateful phase.
-
-### :wrench: Changed
-
-- **Coverage phase**: Generate values for empty schemas.
-- **Coverage phase**: Generate values for `not` keyword and `false` JSON Schemas.
+- False positive `API accepted schema-violating request` caused by passing security-related header via CLI during the stateful phase.
 
 ## [4.0.25](https://github.com/schemathesis/schemathesis/compare/v4.0.24...v4.0.25) - 2025-08-10
   
