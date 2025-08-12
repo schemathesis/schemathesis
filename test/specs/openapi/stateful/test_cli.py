@@ -84,6 +84,25 @@ def test_with_cassette(tmp_path, cli, schema_url):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
+def test_with_cassette_stateful_only(tmp_path, cli, schema_url):
+    cassette_path = tmp_path / "output.yaml"
+    cli.run(
+        schema_url,
+        "--max-examples=5",
+        "--max-failures=1",
+        "--phases=stateful",
+        "-c not_a_server_error",
+        f"--report-vcr-path={cassette_path}",
+    )
+    assert cassette_path.exists()
+    with cassette_path.open(encoding="utf-8") as fd:
+        cassette = yaml.safe_load(fd)
+    for interaction in cassette["http_interactions"]:
+        assert interaction["phase"]["name"] == "stateful"
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 def test_junit(tmp_path, cli, schema_url):
     junit_path = tmp_path / "junit.xml"
     result = cli.run(

@@ -70,7 +70,7 @@ def test_get_examples(location, swagger_20):
     assert strategies[0].example() == operation.Case(
         media_type=media_type,
         _meta=CaseMetadata(
-            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.generate()
+            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.fuzzing()
         ),
         **{container: expected},
     )
