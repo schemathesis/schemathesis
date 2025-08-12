@@ -5,7 +5,6 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
-from weakref import WeakKeyDictionary
 
 import jsonschema.protocols
 from hypothesis import event, note, reject
@@ -190,9 +189,6 @@ def openapi_cases(
     return instance
 
 
-_BODY_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
-
-
 def _get_body_strategy(
     parameter: OpenAPIBody,
     strategy_factory: StrategyFactory,
@@ -203,10 +199,6 @@ def _get_body_strategy(
 
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
-    # The cache key relies on object ids, which means that the parameter should not be mutated
-    # Note, the parent schema is not included as each parameter belong only to one schema
-    if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:
-        return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
     schema = parameter.as_json_schema(operation)
     schema = operation.schema.prepare_schema(schema)
     assert isinstance(operation.schema, BaseOpenAPISchema)
@@ -215,7 +207,6 @@ def _get_body_strategy(
     )
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
-    _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[strategy_factory] = strategy
     return strategy
 
 
@@ -246,9 +237,6 @@ def get_parameters_value(
         copied.update(new)
         return copied
     return value
-
-
-_PARAMETER_STRATEGIES_CACHE: WeakKeyDictionary = WeakKeyDictionary()
 
 
 @dataclass
@@ -352,10 +340,6 @@ def get_parameters_strategy(
 
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
-        # The cache key relies on object ids, which means that the parameter should not be mutated
-        nested_cache_key = (strategy_factory, location, tuple(sorted(exclude)))
-        if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
-            return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
         schema = get_schema_for_location(operation, location, parameters)
         if location == "header" and exclude:
             # Remove excluded headers case-insensitively
@@ -399,7 +383,6 @@ def get_parameters_strategy(
                 strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
             elif location == "query":
                 strategy = strategy.map(jsonify_python_specific_types)
-        _PARAMETER_STRATEGIES_CACHE.setdefault(operation, {})[nested_cache_key] = strategy
         return strategy
     # No parameters defined for this location
     return st.none()

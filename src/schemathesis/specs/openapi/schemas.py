@@ -47,7 +47,6 @@ from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import serialization
-from ._cache import OperationCache
 from ._hypothesis import openapi_cases
 from .converter import to_json_schema, to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
@@ -96,7 +95,6 @@ class BaseOpenAPISchema(BaseSchema):
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
-    _operation_cache: OperationCache = field(default_factory=OperationCache)
     _inline_reference_cache: dict[str, Any] = field(default_factory=dict)
     # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
     # excessive resolving
@@ -115,17 +113,12 @@ class BaseOpenAPISchema(BaseSchema):
         return iter(self.raw_schema.get("paths", {}))
 
     def _get_operation_map(self, path: str) -> APIOperationMap:
-        cache = self._operation_cache
-        map = cache.get_map(path)
-        if map is not None:
-            return map
         path_item = self.raw_schema.get("paths", {})[path]
         with in_scope(self.resolver, self.location or ""):
             scope, path_item = self._resolve_path_item(path_item)
         self.dispatch_hook("before_process_path", HookContext(), path, path_item)
         map = APIOperationMap(self, {})
         map._data = MethodMap(map, scope, path, CaseInsensitiveDict(path_item))
-        cache.insert_map(path, map)
         return map
 
     def find_operation_by_label(self, label: str) -> APIOperation | None:
@@ -136,7 +129,7 @@ class BaseOpenAPISchema(BaseSchema):
         matches = get_close_matches(item, list(self))
         self._on_missing_operation(item, exc, matches)
 
-    def _on_missing_operation(self, item: str, exc: KeyError, matches: list[str]) -> NoReturn:
+    def _on_missing_operation(self, item: str, exc: KeyError | None, matches: list[str]) -> NoReturn:
         message = f"`{item}` not found"
         if matches:
             message += f". Did you mean `{matches[0]}`?"
@@ -443,31 +436,6 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_operation_by_id(self, operation_id: str) -> APIOperation:
         """Get an `APIOperation` instance by its `operationId`."""
-        cache = self._operation_cache
-        cached = cache.get_operation_by_id(operation_id)
-        if cached is not None:
-            return cached
-        # Operation has not been accessed yet, need to populate the cache
-        if not cache.has_ids_to_definitions:
-            self._populate_operation_id_cache(cache)
-        try:
-            entry = cache.get_definition_by_id(operation_id)
-        except KeyError as exc:
-            matches = get_close_matches(operation_id, cache.known_operation_ids)
-            self._on_missing_operation(operation_id, exc, matches)
-        # It could've been already accessed in a different place
-        traversal_key = (entry.scope, entry.path, entry.method)
-        instance = cache.get_operation_by_traversal_key(traversal_key)
-        if instance is not None:
-            return instance
-        resolved = self._resolve_operation(entry.operation)
-        parameters = self._collect_operation_parameters(entry.path_item, resolved)
-        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, resolved, entry.scope)
-        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=operation_id)
-        return initialized
-
-    def _populate_operation_id_cache(self, cache: OperationCache) -> None:
-        """Collect all operation IDs from the schema."""
         resolve = self.resolver.resolve
         default_scope = self.resolver.resolution_scope
         for path, path_item in self.raw_schema.get("paths", {}).items():
@@ -477,44 +445,29 @@ class BaseOpenAPISchema(BaseSchema):
                 scope, path_item = resolve(path_item["$ref"])
             else:
                 scope = default_scope
-            for key, entry in path_item.items():
-                if key not in HTTP_METHODS:
+            for method, operation in path_item.items():
+                if method not in HTTP_METHODS:
                     continue
-                if "operationId" in entry:
-                    cache.insert_definition_by_id(
-                        entry["operationId"],
-                        path=path,
-                        method=key,
-                        scope=scope,
-                        path_item=path_item,
-                        operation=entry,
-                    )
+                if "operationId" in operation and operation["operationId"] == operation_id:
+                    resolved = self._resolve_operation(operation)
+                    parameters = self._collect_operation_parameters(path_item, resolved)
+                    return self.make_operation(path, method, parameters, operation, resolved, scope)
+        self._on_missing_operation(operation_id, None, [])
 
     def get_operation_by_reference(self, reference: str) -> APIOperation:
         """Get local or external `APIOperation` instance by reference.
 
         Reference example: #/paths/~1users~1{user_id}/patch
         """
-        cache = self._operation_cache
-        cached = cache.get_operation_by_reference(reference)
-        if cached is not None:
-            return cached
         scope, operation = self.resolver.resolve(reference)
         path, method = scope.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
-        # Check the traversal cache as it could've been populated in other places
-        traversal_key = (self.resolver.resolution_scope, path, method)
-        cached = cache.get_operation_by_traversal_key(traversal_key)
-        if cached is not None:
-            return cached
         with in_scope(self.resolver, scope):
             resolved = self._resolve_operation(operation)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = self.resolver.resolve(parent_ref)
         parameters = self._collect_operation_parameters(path_item, resolved)
-        initialized = self.make_operation(path, method, parameters, operation, resolved, scope)
-        cache.insert_operation(initialized, traversal_key=traversal_key, reference=reference)
-        return initialized
+        return self.make_operation(path, method, parameters, operation, resolved, scope)
 
     def get_case_strategy(
         self,
@@ -851,22 +804,15 @@ class MethodMap(Mapping):
         method = method.lower()
         operation = self._path_item[method]
         schema = cast(BaseOpenAPISchema, self._parent._schema)
-        cache = schema._operation_cache
         path = self._path
         scope = self._scope
-        traversal_key = (scope, path, method)
-        cached = cache.get_operation_by_traversal_key(traversal_key)
-        if cached is not None:
-            return cached
         schema.resolver.push_scope(scope)
         try:
             resolved = schema._resolve_operation(operation)
         finally:
             schema.resolver.pop_scope()
         parameters = schema._collect_operation_parameters(self._path_item, resolved)
-        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope)
-        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=resolved.get("operationId"))
-        return initialized
+        return schema.make_operation(path, method, parameters, operation, resolved, scope)
 
     def __getitem__(self, item: str) -> APIOperation:
         try:
