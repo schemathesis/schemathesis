@@ -672,6 +672,67 @@ def test_negative_changing_to_positive(app_runner):
     assert result.events[-1].status == Status.SUCCESS
 
 
+def test_explicit_auth_header_does_not_trigger_negative_data_rejection(app_runner):
+    schema = {
+        "openapi": "3.1.0",
+        "paths": {
+            "/organizations/": {
+                "post": {
+                    "responses": {"201": {"links": {"get": {"operationId": "organizations:get"}}}},
+                    "security": [{"HTTPBearer": []}],
+                },
+                "get": {"operationId": "organizations:get", "responses": {}},
+            }
+        },
+        "components": {"securitySchemes": {"HTTPBearer": {"type": "http"}}},
+    }
+
+    app = Flask(__name__)
+
+    def check_auth():
+        auth_header = request.headers.get("Authorization")
+        return auth_header and auth_header.startswith("Bearer ")
+
+    def auth_error():
+        return jsonify({"detail": "Not authenticated"}), 401
+
+    @app.route("/organizations/", methods=["GET"])
+    def organizations_list():
+        if not check_auth():
+            return auth_error()
+
+        return jsonify([])
+
+    @app.route("/organizations/", methods=["POST"])
+    def organizations_create():
+        if not check_auth():
+            return auth_error()
+        return jsonify({})
+
+    app_port = app_runner.run_flask_app(app)
+
+    config = schemathesis.Config.from_dict(
+        {
+            "base-url": f"http://127.0.0.1:{app_port}/",
+            "headers": {"Authorization": "Bearer secret"},
+            "checks": {
+                "enabled": False,
+                "negative_data_rejection": {"enabled": True},
+            },
+            "generation": {
+                "max-examples": 10,
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema, config=config)
+    engine = stateful.execute(
+        engine=EngineContext(schema=schema, stop_event=threading.Event()),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
+    )
+    result = collect_result(engine)
+    assert result.events[-1].status == Status.SUCCESS
+
+
 def test_unique_inputs(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
