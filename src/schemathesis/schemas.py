@@ -545,10 +545,6 @@ class Parameter:
         """Whether the parameter is required for a successful API call."""
         raise NotImplementedError
 
-    def serialize(self, operation: APIOperation) -> str:
-        """Get parameter's string representation."""
-        raise NotImplementedError
-
 
 P = TypeVar("P", bound=Parameter)
 

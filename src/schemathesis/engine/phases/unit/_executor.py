@@ -263,12 +263,7 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
 
     It increases the effectiveness of the Hypothesis database in the CLI.
     """
-    # Hypothesis's function digest depends on the test function signature. To reflect it for the web API case,
-    # we use all API operation parameters in the digest.
-    extra = operation.label.encode("utf8")
-    for parameter in operation.iter_parameters():
-        extra += parameter.serialize(operation).encode("utf8")
-    test.hypothesis.inner_test._hypothesis_internal_add_digest = extra  # type: ignore
+    test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore
 
 
 def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> str | None:
