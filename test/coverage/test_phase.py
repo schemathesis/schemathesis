@@ -963,7 +963,14 @@ def test_required_header_as_string(ctx):
     assert_negative_coverage(schema, [{}])
 
 
-def test_underspecified_path_parameters(ctx, cli, snapshot_cli, openapi3_base_url):
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {},
+        {"const": 42},
+    ],
+)
+def test_underspecified_path_parameters(ctx, cli, snapshot_cli, openapi3_base_url, schema):
     # There should be no "Path parameter 'organization_id' is not defined"
     schema_path = ctx.openapi.write_schema(
         {
@@ -974,7 +981,7 @@ def test_underspecified_path_parameters(ctx, cli, snapshot_cli, openapi3_base_ur
                             "name": "organization_id",
                             "in": "path",
                             "required": True,
-                            "schema": {},
+                            "schema": schema,
                         }
                     ],
                     "responses": {"200": {"description": "Successful Response"}},

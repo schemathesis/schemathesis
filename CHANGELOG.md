@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.25...HEAD) - TBD
 
+### :rocket: Added
+
+- Support the `const`, `additionalItems`, `dependencies`, `if`, `then`, `else`, `patternProperties`, `propertyNames`, `contains`, keywords in top-level parameter schemas.
+
 ### :bug: Fixed
 
 - **Coverage phase**: Error 'Path parameter is not defined' if the parameter schema is empty.
