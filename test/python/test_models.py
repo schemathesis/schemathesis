@@ -548,6 +548,11 @@ def test_checks_errors_deduplication(ctx, response_factory, factory_type):
     assert len(exc.value.exceptions) == 1
 
 
+def test_operation_hash(openapi_30):
+    # API Operations should be hashable
+    _ = {i.ok() for i in openapi_30.get_all_operations()}
+
+
 def _assert_override(spy, arg, original, overridden):
     # Then it should override generated value
     # And keep other values of the same kind intact
