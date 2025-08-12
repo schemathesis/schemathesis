@@ -321,7 +321,7 @@ class HashSet:
 
 
 def _cover_positive_for_type(
-    ctx: CoverageContext, schema: dict, ty: str | None
+    ctx: CoverageContext, schema: dict, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty)
@@ -369,6 +369,9 @@ def _cover_positive_for_type(
                 yield from _positive_object(ctx, schema, cast(dict, template))
         elif "properties" in schema or "required" in schema:
             yield from _positive_object(ctx, schema, cast(dict, template))
+        elif "not" in schema and isinstance(schema["not"], (dict, bool)):
+            nctx = ctx.with_negative()
+            yield from cover_schema_iter(nctx, schema["not"], seen)
 
 
 @contextmanager
@@ -397,9 +400,12 @@ def cover_schema_iter(
 ) -> Generator[GeneratedValue, None, None]:
     if seen is None:
         seen = HashSet()
-    if isinstance(schema, bool) or schema == {}:
+    if schema == {} or schema is True:
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
+    elif schema is False:
+        types = []
+        schema = {"not": {}}
     else:
         types = schema.get("type", [])
     push_examples_to_properties(schema)
@@ -615,6 +621,9 @@ def cover_schema_iter(
                             for value in cover_schema_iter(nctx, sub_schema, seen):
                                 if is_invalid_for_oneOf(value.value, idx, validators):
                                     yield value
+                elif key == "not" and isinstance(value, (dict, bool)):
+                    pctx = ctx.with_positive()
+                    yield from cover_schema_iter(pctx, value, seen)
 
 
 def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema.Validator]) -> bool:
