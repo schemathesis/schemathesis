@@ -12,6 +12,7 @@ class TestPhase(str, Enum):
     EXAMPLES = "examples"
     COVERAGE = "coverage"
     FUZZING = "fuzzing"
+    STATEFUL = "stateful"
 
 
 class ComponentKind(str, Enum):
@@ -34,15 +35,22 @@ class ComponentInfo:
 
 
 @dataclass
-class GeneratePhaseData:
+class FuzzingPhaseData:
     """Metadata specific to generate phase."""
 
     __slots__ = ()
 
 
 @dataclass
-class ExplicitPhaseData:
-    """Metadata specific to explicit phase."""
+class StatefulPhaseData:
+    """Metadata specific to stateful phase."""
+
+    __slots__ = ()
+
+
+@dataclass
+class ExamplesPhaseData:
+    """Metadata specific to examples phase."""
 
     __slots__ = ()
 
@@ -64,7 +72,7 @@ class PhaseInfo:
     """Phase-specific information."""
 
     name: TestPhase
-    data: CoveragePhaseData | ExplicitPhaseData | GeneratePhaseData
+    data: CoveragePhaseData | ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData
 
     __slots__ = ("name", "data")
 
@@ -84,8 +92,8 @@ class PhaseInfo:
         )
 
     @classmethod
-    def generate(cls) -> PhaseInfo:
-        return cls(name=TestPhase.FUZZING, data=GeneratePhaseData())
+    def fuzzing(cls) -> PhaseInfo:
+        return cls(name=TestPhase.FUZZING, data=FuzzingPhaseData())
 
 
 @dataclass

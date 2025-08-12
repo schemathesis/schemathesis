@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - **Coverage phase**: Error 'Path parameter is not defined' if the parameter schema is empty.
+- Properly assign the "stateful" phase value in metadata of test cases generated during the stateful phase.
 
 ### :wrench: Changed
 

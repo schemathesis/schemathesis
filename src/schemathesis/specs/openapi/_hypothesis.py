@@ -22,10 +22,11 @@ from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
     ComponentKind,
-    ExplicitPhaseData,
-    GeneratePhaseData,
+    ExamplesPhaseData,
+    FuzzingPhaseData,
     GenerationInfo,
     PhaseInfo,
+    StatefulPhaseData,
     TestPhase,
 )
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
@@ -63,7 +64,6 @@ def openapi_cases(
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
-    __is_stateful_phase: bool = False,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -80,8 +80,7 @@ def openapi_cases(
     start = time.monotonic()
     strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
-    phase_name = "stateful" if __is_stateful_phase else phase.value
-    generation_config = operation.schema.config.generation_for(operation=operation, phase=phase_name)
+    generation_config = operation.schema.config.generation_for(operation=operation, phase=phase.value)
 
     ctx = HookContext(operation=operation)
 
@@ -150,10 +149,11 @@ def openapi_cases(
             reject()
 
     _phase_data = {
-        TestPhase.EXAMPLES: ExplicitPhaseData(),
-        TestPhase.FUZZING: GeneratePhaseData(),
+        TestPhase.EXAMPLES: ExamplesPhaseData(),
+        TestPhase.FUZZING: FuzzingPhaseData(),
+        TestPhase.STATEFUL: StatefulPhaseData(),
     }[phase]
-    phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
+    phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
 
     instance = operation.Case(
         media_type=media_type,

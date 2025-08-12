@@ -40,7 +40,7 @@ def test_as_strategy(swagger_20):
     assert isinstance(strategy, st.SearchStrategy)
     assert strategy.example() == operation.Case(
         _meta=CaseMetadata(
-            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.generate()
+            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.fuzzing()
         ),
     )
 
