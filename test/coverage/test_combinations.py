@@ -48,7 +48,7 @@ def assert_conform(values: list, schema: dict):
 
 
 def assert_not_conform(values: list, schema: dict):
-    if schema.get("format") == "unknown":
+    if isinstance(schema, dict) and schema.get("format") == "unknown":
         # Can't validate the format
         return
     for entry in values:
@@ -101,11 +101,14 @@ def nctx():
     [
         (True, [None, True, False, "", 0, [None, None], {}]),
         ({}, [None, True, False, "", 0, [None, None], {}]),
+        (False, []),
         ({"type": "null"}, [None]),
         ({"type": "boolean"}, [True, False]),
         ({"type": ["boolean", "null"]}, [True, False, None]),
         ({"enum": [1, 2]}, [1, 2]),
         ({"const": 42}, [42]),
+        ({"not": {}}, []),
+        ({"not": {"type": "null"}}, [0, "false", "", ["null", "null"]]),
     ],
 )
 def test_positive_primitive_schemas(pctx, schema, expected):
@@ -128,6 +131,9 @@ class AnyNumber:
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
+        (False, [None, True, False, "", 0, [None, None], {}]),
+        (True, []),
+        ({}, []),
         ({"type": "null"}, [0, "false", "", ["null", "null"]]),
         ({"type": "boolean"}, [0, "null", "", ["null", "null"]]),
         ({"type": ["boolean", "null"]}, [0, "", ["null", "null"]]),
@@ -144,6 +150,8 @@ class AnyNumber:
         ({"exclusiveMinimum": 5}, [5]),
         ({"exclusiveMaximum": 5}, [5]),
         ({"required": ["a"]}, [{}]),
+        ({"not": {}}, [None, True, False, "", 0, [None, None], {}]),
+        ({"not": {"type": "null"}}, [None]),
     ],
 )
 def test_negative_primitive_schemas(nctx, schema, expected):
