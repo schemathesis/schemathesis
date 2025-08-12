@@ -99,6 +99,8 @@ def nctx():
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
+        (True, [None, True, False, "", 0, [None, None], {}]),
+        ({}, [None, True, False, "", 0, [None, None], {}]),
         ({"type": "null"}, [None]),
         ({"type": "boolean"}, [True, False]),
         ({"type": ["boolean", "null"]}, [True, False, None]),
@@ -275,6 +277,23 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 "required": ["foo"],
             },
             [
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+            ],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"foo": {}},
+                "required": ["foo"],
+            },
+            [
+                {"foo": ANY},
                 {"foo": ANY},
                 {"foo": ANY},
                 {"foo": ANY},

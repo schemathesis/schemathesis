@@ -397,7 +397,7 @@ def cover_schema_iter(
 ) -> Generator[GeneratedValue, None, None]:
     if seen is None:
         seen = HashSet()
-    if isinstance(schema, bool):
+    if isinstance(schema, bool) or schema == {}:
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
     else:
@@ -690,6 +690,7 @@ def _ensure_valid_headers_schema(schema: dict[str, Any]) -> dict[str, Any]:
 def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Boundary and near boundary values
+    schema = {"type": "string", **schema}
     min_length = schema.get("minLength")
     if min_length == 0:
         min_length = None
@@ -791,6 +792,7 @@ def closest_multiple_greater_than(y: int, x: int) -> int:
 def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     """Generate positive integer values."""
     # Boundary and near boundary values
+    schema = {"type": "number", **schema}
     minimum = schema.get("minimum")
     maximum = schema.get("maximum")
     exclusive_minimum = schema.get("exclusiveMinimum")

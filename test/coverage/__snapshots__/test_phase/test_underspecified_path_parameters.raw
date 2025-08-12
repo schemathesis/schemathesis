@@ -1,0 +1,59 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+____________________ GET /organizations/{organization_id}/ _____________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Unsupported method incorrect response
+
+    Wrong status for unsupported method TRACE (got 404, expected 405)
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with:
+
+    curl -X TRACE http://127.0.0.1/api/organizations/null/
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ❌ Coverage
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Unsupported method incorrect response: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

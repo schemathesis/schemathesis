@@ -963,6 +963,35 @@ def test_required_header_as_string(ctx):
     assert_negative_coverage(schema, [{}])
 
 
+def test_underspecified_path_parameters(ctx, cli, snapshot_cli, openapi3_base_url):
+    # There should be no "Path parameter 'organization_id' is not defined"
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/organizations/{organization_id}/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "organization_id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Successful Response"}},
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={openapi3_base_url}",
+            "--phases=coverage",
+        )
+        == snapshot_cli
+    )
+
+
 def test_path_parameter_dots(ctx):
     schema = build_schema(
         ctx,

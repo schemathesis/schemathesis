@@ -2,8 +2,16 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.25...HEAD) - TBD
 
-## [4.0.25](https://github.com/schemathesis/schemathesis/compare/v4.0.24...v4.0.25) - 2025-08-10
+### :bug: Fixed
 
+- **Coverage phase**: Error 'Path parameter is not defined' if the parameter schema is empty.
+
+### :wrench: Changed
+
+- **Coverage phase**: Generate values for empty schemas.
+
+## [4.0.25](https://github.com/schemathesis/schemathesis/compare/v4.0.24...v4.0.25) - 2025-08-10
+  
 ### :bug: Fixed
 
 - `workers = "auto"` being incorrectly rejected in configuration files. [#3015](https://github.com/schemathesis/schemathesis/issues/3015)
