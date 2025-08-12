@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import get_close_matches
 from enum import unique
 from types import SimpleNamespace
@@ -50,7 +50,6 @@ from schemathesis.schemas import (
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
-from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
@@ -86,8 +85,6 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
-    _operation_cache: OperationCache = field(default_factory=OperationCache)
-
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
@@ -101,10 +98,6 @@ class GraphQLSchema(BaseSchema):
                 yield operation_type.name
 
     def _get_operation_map(self, key: str) -> APIOperationMap:
-        cache = self._operation_cache
-        map = cache.get_map(key)
-        if map is not None:
-            return map
         schema = self.client_schema
         for root_type, operation_type in (
             (RootType.QUERY, schema.query_type),
@@ -113,7 +106,6 @@ class GraphQLSchema(BaseSchema):
             if operation_type and operation_type.name == key:
                 map = APIOperationMap(self, {})
                 map._data = FieldMap(map, root_type, operation_type)
-                cache.insert_map(key, map)
                 return map
         raise KeyError(key)
 
@@ -303,15 +295,9 @@ class FieldMap(Mapping):
 
     def _init_operation(self, field_name: str) -> APIOperation:
         schema = cast(GraphQLSchema, self._parent._schema)
-        cache = schema._operation_cache
-        operation = cache.get_operation(field_name)
-        if operation is not None:
-            return operation
         operation_type = self._operation_type
         field_ = operation_type.fields[field_name]
-        operation = schema._build_operation(self._root_type, operation_type, field_name, field_)
-        cache.insert_operation(field_name, operation)
-        return operation
+        return schema._build_operation(self._root_type, operation_type, field_name, field_)
 
     def __getitem__(self, item: str) -> APIOperation:
         try:
