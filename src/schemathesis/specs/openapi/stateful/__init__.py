@@ -15,7 +15,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
-from schemathesis.generation.meta import ComponentInfo, ComponentKind
+from schemathesis.generation.meta import ComponentInfo, ComponentKind, TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
@@ -179,10 +179,10 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 name = _normalize_name(f"RANDOM -> {target.label}")
                 config = schema.config.generation_for(operation=target, phase="stateful")
                 if len(config.modes) == 1:
-                    case_strategy = target.as_strategy(generation_mode=config.modes[0], __is_stateful_phase=True)
+                    case_strategy = target.as_strategy(generation_mode=config.modes[0], phase=TestPhase.STATEFUL)
                 else:
                     _strategies = {
-                        method: target.as_strategy(generation_mode=method, __is_stateful_phase=True)
+                        method: target.as_strategy(generation_mode=method, phase=TestPhase.STATEFUL)
                         for method in config.modes
                     }
 
@@ -269,7 +269,7 @@ def into_step_input(
             ):
                 kwargs["body"] = transition.request_body.value.ok()
             cases = strategies.combine(
-                [target.as_strategy(generation_mode=mode, __is_stateful_phase=True, **kwargs) for mode in modes]
+                [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **kwargs) for mode in modes]
             )
             case = draw(cases)
             if (

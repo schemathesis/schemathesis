@@ -34,8 +34,8 @@ from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
     ComponentKind,
-    ExplicitPhaseData,
-    GeneratePhaseData,
+    ExamplesPhaseData,
+    FuzzingPhaseData,
     GenerationInfo,
     PhaseInfo,
     TestPhase,
@@ -354,10 +354,10 @@ def graphql_cases(
     query_ = _generate_parameter("query", query, draw, operation, hook_context, hooks)
 
     _phase_data = {
-        TestPhase.EXAMPLES: ExplicitPhaseData(),
-        TestPhase.FUZZING: GeneratePhaseData(),
+        TestPhase.EXAMPLES: ExamplesPhaseData(),
+        TestPhase.FUZZING: FuzzingPhaseData(),
     }[phase]
-    phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
+    phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData], _phase_data)
     instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,

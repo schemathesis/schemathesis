@@ -102,7 +102,7 @@ def build_metadata(
             ]
             if value is not None
         },
-        phase=PhaseInfo.generate(),
+        phase=PhaseInfo.fuzzing(),
     )
 
 
