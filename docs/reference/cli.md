@@ -318,6 +318,19 @@ The following options control how Schemathesis makes network requests to the API
     $ st run openapi.yaml --rate-limit 5/s
     ```
 
+#### `--max-redirects INTEGER`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Range**: `>=0`  
+
+    Maximum number of redirects to follow for each network request during tests. Set to `0` to disable redirect following entirely.
+
+    ```console
+    $ st run openapi.yaml --max-redirects 5
+    ```
+
 #### `--request-timeout SECONDS`
 
 !!! note ""
