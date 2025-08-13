@@ -199,6 +199,7 @@ class OperationConfig(DiffBase):
     continue_on_failure: bool | None
     tls_verify: bool | str | None
     rate_limit: Limiter | None
+    max_redirects: int | None
     request_timeout: float | int | None
     request_cert: str | None
     request_cert_key: str | None
@@ -218,6 +219,7 @@ class OperationConfig(DiffBase):
         "tls_verify",
         "rate_limit",
         "_rate_limit",
+        "max_redirects",
         "request_timeout",
         "request_cert",
         "request_cert_key",
@@ -239,6 +241,7 @@ class OperationConfig(DiffBase):
         continue_on_failure: bool | None = None,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
+        max_redirects: int | None = None,
         request_timeout: float | int | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
@@ -260,6 +263,7 @@ class OperationConfig(DiffBase):
         else:
             self.rate_limit = rate_limit
         self._rate_limit = rate_limit
+        self.max_redirects = max_redirects
         self.request_timeout = request_timeout
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
@@ -308,6 +312,7 @@ class OperationConfig(DiffBase):
             continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
+            max_redirects=data.get("max-redirects"),
             request_timeout=data.get("request-timeout"),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),

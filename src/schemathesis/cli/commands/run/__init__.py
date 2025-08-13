@@ -218,6 +218,12 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     callback=validation.validate_rate_limit,
 )
 @grouped_option(
+    "--max-redirects",
+    help="Maximum number of redirects to follow for each request",
+    type=click.IntRange(min=0),
+    show_default=True,
+)
+@grouped_option(
     "--request-timeout",
     help="Timeout limit, in seconds, for each network request during tests",
     type=click.FloatRange(min=0.0, min_open=True),
@@ -448,6 +454,7 @@ def run(
     suppress_health_check: list[HealthCheck] | None,
     warnings: bool | list[SchemathesisWarning] | None,
     rate_limit: str | None = None,
+    max_redirects: int | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool | None = None,
     request_cert: str | None = None,
@@ -528,6 +535,7 @@ def run(
         workers=workers,
         continue_on_failure=continue_on_failure,
         rate_limit=rate_limit,
+        max_redirects=max_redirects,
         request_timeout=request_timeout,
         tls_verify=request_tls_verify,
         request_cert=request_cert,
