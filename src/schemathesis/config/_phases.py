@@ -173,11 +173,20 @@ class PhasesConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PhasesConfig:
+        # Use the outer "enabled" value as default for all phases.
+        default_enabled = data.get("enabled", None)
+
+        def merge(sub: dict[str, Any]) -> dict[str, Any]:
+            # Merge the default enabled flag with the sub-dict; the sub-dict takes precedence.
+            if default_enabled is not None:
+                return {"enabled": default_enabled, **sub}
+            return sub
+
         return cls(
-            examples=ExamplesPhaseConfig.from_dict(data.get("examples", {})),
-            coverage=CoveragePhaseConfig.from_dict(data.get("coverage", {})),
-            fuzzing=PhaseConfig.from_dict(data.get("fuzzing", {})),
-            stateful=StatefulPhaseConfig.from_dict(data.get("stateful", {})),
+            examples=ExamplesPhaseConfig.from_dict(merge(data.get("examples", {}))),
+            coverage=CoveragePhaseConfig.from_dict(merge(data.get("coverage", {}))),
+            fuzzing=PhaseConfig.from_dict(merge(data.get("fuzzing", {}))),
+            stateful=StatefulPhaseConfig.from_dict(merge(data.get("stateful", {}))),
         )
 
     def update(self, *, phases: list[str]) -> None:

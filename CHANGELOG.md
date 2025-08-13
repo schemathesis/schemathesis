@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - `--max-redirects` CLI & config file option. [#712](https://github.com/schemathesis/schemathesis/issues/712)
+- `enabled` config file option to disable all test phases. [#2951](https://github.com/schemathesis/schemathesis/issues/2951)
 
 ### :wrench: Changed
 

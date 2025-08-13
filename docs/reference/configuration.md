@@ -401,6 +401,23 @@ These settings can only be applied at the project level.
 
 ### Phases
 
+#### `phases.enabled`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Enables or disables all testing phases globally. When set to `false`, no phases will be executed during testing. This is commonly used to disable all phases first, then selectively enable specific ones.
+
+    Run only the coverage phase:
+
+    ```toml
+    [phases]
+    enabled = false
+    coverage.enabled = true
+    ```
+
 #### `phases.<phase>.enabled`
 
 !!! note "" 
@@ -504,6 +521,23 @@ These settings can only be applied at the project level.
     ```
 
 ### Checks
+
+#### `checks.enabled`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+    Enables or disables all checks globally. When set to `false`, no checks will be executed during testing. This is commonly used to disable all checks first, then selectively enable specific ones.
+
+    Disable all checks except response schema validation:
+
+    ```toml
+    [checks]
+    enabled = false
+    response_schema_conformance.enabled = true
+    ```
 
 #### `checks.<check>.enabled`
 

@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(examples=ExamplesPhaseConfig(enabled=False), fuzzing=PhaseConfig(enabled=False), stateful=StatefulPhaseConfig(enabled=False)))))
