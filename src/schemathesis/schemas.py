@@ -8,8 +8,10 @@ from typing import (
     Any,
     Callable,
     Generator,
+    Generic,
     Iterator,
     NoReturn,
+    TypeVar,
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
@@ -481,55 +483,6 @@ class Parameter:
     def is_required(self) -> bool:
         """Whether the parameter is required for a successful API call."""
         raise NotImplementedError
-
-
-P = TypeVar("P", bound=Parameter)
-
-
-@dataclass
-class ParameterSet(Generic[P]):
-    """A set of parameters for the same location."""
-
-    items: list[P]
-
-    __slots__ = ("items",)
-
-    def __init__(self, items: list[P] | None = None) -> None:
-        self.items = items or []
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    def add(self, parameter: P) -> None:
-        """Add a new parameter."""
-        self.items.append(parameter)
-
-    def get(self, name: str) -> P | None:
-        for parameter in self:
-            if parameter.name == name:
-                return parameter
-        return None
-
-    def contains(self, name: str) -> bool:
-        return self.get(name) is not None
-
-    def __contains__(self, item: str) -> bool:
-        return self.contains(item)
-
-    def __bool__(self) -> bool:
-        return bool(self.items)
-
-    def __iter__(self) -> Generator[P, None, None]:
-        yield from iter(self.items)
-
-    def __len__(self) -> int:
-        return len(self.items)
-
-    def __getitem__(self, item: int) -> P:
-        return self.items[item]
-
-
-class PayloadAlternatives(ParameterSet[P]):
-    """A set of alternative payloads."""
 
 
 D = TypeVar("D", bound=dict)
