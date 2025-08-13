@@ -4,7 +4,7 @@ import inspect
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum, unique
-from functools import partial
+from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 from schemathesis.core.marks import Mark
@@ -225,12 +225,18 @@ class HookDispatcher:
             strategy = strategy.flatmap(hook)
         return strategy
 
-    def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
+    def dispatch(
+        self, name: str, context: HookContext, *args: Any, _with_dual_style_kwargs: bool = False, **kwargs: Any
+    ) -> None:
         """Run all hooks for the given name."""
         for hook in self.get_all_by_name(name):
             if _should_skip_hook(hook, context):
                 continue
-            hook(context, *args, **kwargs)
+            # NOTE: It is a backward-compat shim to support calling `before_call` with `**kwargs` OR with `kwargs`.
+            if _with_dual_style_kwargs and not has_var_keyword(hook):
+                hook(context, *args, kwargs)
+            else:
+                hook(context, *args, **kwargs)
 
     def unregister(self, hook: Callable) -> None:
         """Unregister a specific hook."""
@@ -244,6 +250,12 @@ class HookDispatcher:
         Useful in tests.
         """
         self._hooks = defaultdict(list)
+
+
+@lru_cache(maxsize=16)
+def has_var_keyword(hook: Callable) -> bool:
+    """Check if hook function accepts **kwargs."""
+    return any(p.kind == inspect.Parameter.VAR_KEYWORD for p in inspect.signature(hook).parameters.values())
 
 
 def _should_skip_hook(hook: Callable, ctx: HookContext) -> bool:
@@ -349,7 +361,7 @@ def before_init_operation(context: HookContext, operation: APIOperation) -> None
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def before_call(context: HookContext, case: Case, **kwargs: Any) -> None:
+def before_call(context: HookContext, case: Case, kwargs: dict[str, Any]) -> None:
     """Called before every network call in CLI tests.
 
     Use cases:

@@ -217,7 +217,7 @@ For complex scenarios, modify the entire request:
 
 ```python
 @schemathesis.hook
-def before_call(ctx, case, **kwargs):
+def before_call(ctx, case, kwargs):
     """Modify the request just before it's sent"""
     # Add correlation ID for tracing
     case.headers["X-Correlation-ID"] = f"test-{uuid.uuid4()}"

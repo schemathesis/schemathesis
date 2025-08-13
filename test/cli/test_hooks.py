@@ -21,6 +21,20 @@ def before_call(context, case, **kwargs):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
+def test_before_call_no_kwargs_unpacking(ctx, cli, schema_url):
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_call(context, case, kwargs):
+    kwargs["allow_redirects"] = False
+        """
+    )
+    result = cli.main("run", schema_url, hooks=module)
+    assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
 def test_after_call(ctx, cli, schema_url, snapshot_cli):
     # When the `after_call` hook is registered
     # And it modifies the response and making it incorrect
