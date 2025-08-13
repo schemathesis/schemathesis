@@ -7,6 +7,10 @@
 - `--max-redirects` CLI & config file option. [#712](https://github.com/schemathesis/schemathesis/issues/712)
 - `enabled` config file option to disable all test phases. [#2951](https://github.com/schemathesis/schemathesis/issues/2951)
 
+### :bug: Fixed
+
+- Ignored `codec` for header generation.
+
 ### :wrench: Changed
 
 - `before_call` hooks now accept `kwargs` as a regular parameter instead of `**kwargs`. There is a backward compatibility shim for existing hooks with `**kwargs` signatures. The old calling convention will be removed in Schemathesis 5.0. [#3028](https://github.com/schemathesis/schemathesis/issues/3028)
