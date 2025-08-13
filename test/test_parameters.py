@@ -610,3 +610,31 @@ def test_missing_content_and_schema(ctx, location):
         "It should have either `schema` or `content` keywords defined",
     ):
         test()
+
+
+@pytest.mark.operations("headers")
+def test_ascii_codec_for_headers(openapi3_schema_url):
+    schema = schemathesis.openapi.from_url(openapi3_schema_url)
+    schema.config.generation.codec = "ascii"
+
+    @given(case=schema["/headers"]["GET"].as_strategy())
+    @settings(max_examples=50)
+    def test(case):
+        assert case.headers["X-Token"].isascii()
+
+    test()
+
+
+@pytest.mark.operations("headers")
+def test_exclude_chars_and_no_x00_for_headers(openapi3_schema_url):
+    schema = schemathesis.openapi.from_url(openapi3_schema_url)
+    schema.config.generation.exclude_header_characters = "abc"
+    schema.config.generation.allow_x00 = False
+
+    @given(case=schema["/headers"]["GET"].as_strategy())
+    @settings(max_examples=50)
+    def test(case):
+        assert "\x00" not in case.headers["X-Token"]
+        assert all(ch not in case.headers["X-Token"] for ch in schema.config.generation.exclude_header_characters)
+
+    test()

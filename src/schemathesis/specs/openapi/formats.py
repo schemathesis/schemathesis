@@ -65,11 +65,11 @@ def unregister_string_format(name: str) -> None:
         raise ValueError(f"Unknown Open API format: {name}") from exc
 
 
-def header_values(exclude_characters: str = "\n\r") -> st.SearchStrategy[str]:
+def header_values(codec: str | None = None, exclude_characters: str = "\n\r") -> st.SearchStrategy[str]:
     from hypothesis import strategies as st
 
     return st.text(
-        alphabet=st.characters(min_codepoint=0, max_codepoint=255, exclude_characters=exclude_characters)
+        alphabet=st.characters(min_codepoint=0, max_codepoint=255, codec=codec, exclude_characters=exclude_characters)
         # Header values with leading non-visible chars can't be sent with `requests`
     ).map(str.lstrip)
 
