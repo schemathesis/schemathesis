@@ -255,6 +255,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
         "examples": {
           "$ref": "#/$defs/ExamplesPhaseConfig"
         },
