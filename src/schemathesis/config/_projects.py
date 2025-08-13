@@ -54,6 +54,7 @@ class ProjectConfig(DiffBase):
     continue_on_failure: bool | None
     tls_verify: bool | str | None
     rate_limit: Limiter | None
+    max_redirects: int | None
     request_timeout: float | int | None
     request_cert: str | None
     request_cert_key: str | None
@@ -76,6 +77,7 @@ class ProjectConfig(DiffBase):
         "tls_verify",
         "rate_limit",
         "_rate_limit",
+        "max_redirects",
         "request_timeout",
         "request_cert",
         "request_cert_key",
@@ -100,6 +102,7 @@ class ProjectConfig(DiffBase):
         continue_on_failure: bool | None = None,
         tls_verify: bool | str = True,
         rate_limit: str | None = None,
+        max_redirects: int | None = None,
         request_timeout: float | int | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
@@ -133,6 +136,7 @@ class ProjectConfig(DiffBase):
         else:
             self.rate_limit = rate_limit
         self._rate_limit = rate_limit
+        self.max_redirects = max_redirects
         self.request_timeout = request_timeout
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
@@ -157,6 +161,7 @@ class ProjectConfig(DiffBase):
             continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify", True)),
             rate_limit=resolve(data.get("rate-limit")),
+            max_redirects=data.get("max-redirects"),
             request_timeout=data.get("request-timeout"),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
@@ -188,6 +193,7 @@ class ProjectConfig(DiffBase):
         workers: int | Literal["auto"] | None = None,
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
+        max_redirects: int | None = None,
         request_timeout: float | int | None = None,
         tls_verify: bool | str | None = None,
         request_cert: str | None = None,
@@ -220,6 +226,9 @@ class ProjectConfig(DiffBase):
 
         if rate_limit is not None:
             self.rate_limit = build_limiter(rate_limit)
+
+        if max_redirects is not None:
+            self.max_redirects = max_redirects
 
         if request_timeout is not None:
             self.request_timeout = request_timeout
@@ -263,6 +272,15 @@ class ProjectConfig(DiffBase):
             if config.headers is not None:
                 headers.update(config.headers)
         return headers
+
+    def max_redirects_for(self, *, operation: APIOperation | None = None) -> int | None:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.max_redirects is not None:
+                return config.max_redirects
+        if self.max_redirects is not None:
+            return self.max_redirects
+        return None
 
     def request_timeout_for(self, *, operation: APIOperation | None = None) -> float | int | None:
         if operation is not None:

@@ -91,6 +91,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         config = case.operation.schema.config
 
+        max_redirects = kwargs.pop("max_redirects", None) or config.max_redirects_for(operation=case.operation)
         timeout = config.request_timeout_for(operation=case.operation)
         verify = config.tls_verify_for(operation=case.operation)
         cert = config.request_cert_for(operation=case.operation)
@@ -131,6 +132,8 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                     current_session_auth = session.auth
                     session.auth = None
             close_session = False
+        if max_redirects is not None:
+            session.max_redirects = max_redirects
         session.headers = {}
 
         verify = data.get("verify", True)

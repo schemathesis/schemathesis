@@ -80,6 +80,8 @@ Network requests options:
   --rate-limit TEXT              Specify a rate limit for test requests in
                                  '<limit>/<duration>' format. Example - `100/m`
                                  for 100 requests per minute
+  --max-redirects INTEGER RANGE  Maximum number of redirects to follow for each
+                                 request  [x>=0]
   --request-timeout FLOAT RANGE  Timeout limit, in seconds, for each network
                                  request during tests  [x>0.0]
   --request-cert PATH            File path of unencrypted client certificate for

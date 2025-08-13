@@ -107,6 +107,7 @@ class EngineContext:
         kwargs: dict[str, Any] = {
             "session": self.get_session(operation=operation),
             "headers": config.headers_for(operation=operation),
+            "max_redirects": config.max_redirects_for(operation=operation),
             "timeout": config.request_timeout_for(operation=operation),
             "verify": config.tls_verify_for(operation=operation),
             "cert": config.request_cert_for(operation=operation),

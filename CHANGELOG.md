@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.26...HEAD) - TBD
 
+### :rocket: Added
+
+- `--max-redirects` CLI & config file option. [#712](https://github.com/schemathesis/schemathesis/issues/712)
+
 ## [4.0.26](https://github.com/schemathesis/schemathesis/compare/v4.0.25...v4.0.26) - 2025-08-12
 
 ### :rocket: Added

@@ -13,6 +13,7 @@ import trustme
 import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
+from flask import Flask, jsonify, redirect, url_for
 
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
@@ -1660,6 +1661,63 @@ def test_parameter_overrides(cli, schema_url, verify_overrides):
         config={"parameters": {"key": "foo", "id": "bar"}},
     )
     assert result.exit_code == ExitCode.OK, result.stdout
+
+
+@pytest.mark.parametrize(
+    ["args", "config"],
+    (
+        (
+            ("--max-redirects=5",),
+            {},
+        ),
+        (
+            (),
+            {"max-redirects": 5},
+        ),
+    ),
+)
+def test_max_redirects(cli, app_runner, snapshot_cli, args, config):
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Redirect Test", "version": "1.0.0"},
+        "paths": {
+            "/redirect": {
+                "get": {
+                    "responses": {
+                        "302": {"description": "Redirect"},
+                        "200": {
+                            "description": "Success",
+                        },
+                    },
+                }
+            }
+        },
+    }
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/redirect", methods=["GET"])
+    def redirect_endpoint():
+        # Infinite loop
+        return redirect(url_for("redirect_endpoint"), code=302)
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.main(
+            "run",
+            "--phases=fuzzing",
+            "--max-examples=1",
+            f"http://127.0.0.1:{port}/openapi.json",
+            *args,
+            config=config,
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.fixture

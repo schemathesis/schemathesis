@@ -662,6 +662,27 @@ The following settings control how Schemathesis makes network requests to the AP
     rate-limit = "1000/h"
     ```
 
+#### `max-redirects`
+
+!!! note ""
+
+    **Type:** `Integer`  
+    **Default:** `30`  
+
+    Maximum number of redirects to follow for each network request during tests.
+
+    Allow up to 5 redirects:
+
+    ```toml
+    max-redirects = 5
+    ```
+
+    Disable redirect following entirely:
+
+    ```toml
+    max-redirects = 0
+    ```
+
 #### `request-timeout`
 
 !!! note ""
