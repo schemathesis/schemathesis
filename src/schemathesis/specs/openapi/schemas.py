@@ -232,24 +232,19 @@ class BaseOpenAPISchema(BaseSchema):
 
         return statistic
 
-    def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
+    def _operation_iter(self) -> Iterator[tuple[str, str, dict[str, Any]]]:
         try:
             paths = self.raw_schema["paths"]
         except KeyError:
             return
         resolve = self.resolver.resolve
-        should_skip = self._should_skip
         for path, path_item in paths.items():
             try:
                 if "$ref" in path_item:
                     _, path_item = resolve(path_item["$ref"])
-                # Straightforward iteration is faster than converting to a set & calculating length.
                 for method, definition in path_item.items():
-                    if should_skip(path, method, definition):
-                        continue
-                    yield definition
+                    yield (method, path, definition)
             except SCHEMA_PARSING_ERRORS:
-                # Ignore errors
                 continue
 
     def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
