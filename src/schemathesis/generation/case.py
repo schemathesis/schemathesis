@@ -200,7 +200,7 @@ class Case:
 
         """
         hook_context = HookContext(operation=self.operation)
-        dispatch("before_call", hook_context, self, **kwargs)
+        dispatch("before_call", hook_context, self, _with_dual_style_kwargs=True, **kwargs)
         if self.operation.app is not None:
             kwargs.setdefault("app", self.operation.app)
         if "app" in kwargs:
