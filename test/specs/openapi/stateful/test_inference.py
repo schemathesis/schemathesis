@@ -58,10 +58,22 @@ def assert_links_work(response_factory, location, results, schema):
             ],
         ),
         # No path parameters
+        # Links without parameters don't make sense
         (
             {"/users": {"get": {"operationId": "getUsers"}}},
             "/users",
-            [{"operationId": "getUsers"}],
+            [],
+        ),
+        (
+            {
+                "/users": {
+                    "get": {"operationId": "listUsers"},
+                    "post": {"operationId": "createUser"},
+                    "delete": {"operationId": "deleteAllUsers"},
+                }
+            },
+            "/users",
+            [],
         ),
         # Multiple path parameters
         (

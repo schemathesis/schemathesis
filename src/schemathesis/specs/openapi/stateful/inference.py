@@ -117,6 +117,9 @@ class Router:
             # to support partial matches
             return None
         exact, parameters = match
+        if not parameters:
+            # Links without parameters don't make sense
+            return None
         matches = MatchList(exact=exact, inexact=[], parameters=parameters)
 
         # Find prefix matches, excluding the exact match
