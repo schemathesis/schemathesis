@@ -61,8 +61,8 @@ class MatchList:
 
 
 @dataclass
-class Router:
-    """Map URL paths to API Operation for OpenAPI link generation."""
+class LinkInferencer:
+    """Infer OpenAPI links from Location headers for stateful testing."""
 
     _adapter: MapAdapter
     # All endpoints for prefix matching
@@ -73,9 +73,8 @@ class Router:
     __slots__ = ("_adapter", "_endpoints", "_base_url", "_base_path")
 
     @classmethod
-    def from_schema(cls, schema: BaseOpenAPISchema) -> Router:
+    def from_schema(cls, schema: BaseOpenAPISchema) -> LinkInferencer:
         # NOTE: Use `matchit` for routing in the future
-        # TODO: Ensure parameter-less endpoints won't match just everything
         rules = []
         endpoints = []
         for method, path, definition in schema._operation_iter():
@@ -129,9 +128,9 @@ class Router:
         #  /users/{user_id}/posts , /users/{user_id}/posts/{post_id} (partial matches)
         #
         for candidate in self._endpoints:
-            if candidate.method != "get" or (
-                candidate.path.startswith(exact.path) and len(candidate.path) != len(exact.path)
-            ):
+            if candidate == exact:
+                continue
+            if candidate.path.startswith(exact.path):
                 matches.inexact.append(candidate)
 
         return matches

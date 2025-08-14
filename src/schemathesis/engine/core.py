@@ -7,6 +7,7 @@ from typing import Sequence
 from schemathesis.auths import unregister as unregister_auth
 from schemathesis.core import SpecificationFeature
 from schemathesis.engine import Status, events, phases
+from schemathesis.engine.repository import DataRepository
 from schemathesis.schemas import BaseSchema
 
 from .context import EngineContext
@@ -26,8 +27,9 @@ class Engine:
         if self.schema.config.auth.is_defined:
             unregister_auth()
 
-        ctx = EngineContext(schema=self.schema, stop_event=threading.Event())
         plan = self._create_execution_plan()
+        repository = DataRepository(list(plan.phases))
+        ctx = EngineContext(schema=self.schema, repository=repository, stop_event=threading.Event())
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
     def _create_execution_plan(self) -> ExecutionPlan:
@@ -122,6 +124,8 @@ class ExecutionPlan:
             for phase in self.phases:
                 if engine.has_reached_the_failure_limit:
                     phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
+                # Phase can be enabled if certain conditions are met
+                engine.update_phase(phase)
                 yield events.PhaseStarted(phase=phase)
                 if phase.should_execute(engine):
                     yield from phases.execute(engine, phase)

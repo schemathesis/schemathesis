@@ -1,9 +1,10 @@
 import pytest
+from flask import Flask, jsonify, request
 
 import schemathesis
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
-from schemathesis.specs.openapi.stateful.inference import Router
+from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 
 
 def assert_links_work(response_factory, location, results, schema):
@@ -12,9 +13,10 @@ def assert_links_work(response_factory, location, results, schema):
     output = StepOutput(response=response, case=None)
     for result in results:
         if "operationRef" in result:
-            assert schema.get_operation_by_reference(result["operationRef"]) is not None
+            operation = schema.get_operation_by_reference(result["operationRef"])
         else:
-            assert schema.get_operation_by_id(result["operationId"]) is not None
+            operation = schema.get_operation_by_id(result["operationId"])
+        assert operation is not None
         for expr in result.get("parameters", {}).values():
             expressions.evaluate(expr, output)
 
@@ -24,6 +26,11 @@ def assert_links_work(response_factory, location, results, schema):
     [
         (
             {
+                "/users": {
+                    "post": {
+                        "operationId": "createUser",
+                    }
+                },
                 "/users/{userId}": {
                     "get": {
                         "operationId": "getUserById",
@@ -273,9 +280,11 @@ def assert_links_work(response_factory, location, results, schema):
     ],
 )
 def test_build_location_link(paths, location, expected, response_factory):
-    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
-    router = Router.from_schema(schema)
-    results = router.build_links(location)
+    schema = schemathesis.openapi.from_dict(
+        {"openapi": "3.1.0", "info": {"title": "Test API", "version": "0.0.1"}, "paths": paths}
+    )
+    inferencer = LinkInferencer.from_schema(schema)
+    results = inferencer.build_links(location)
     assert results == expected
     if results:
         assert_links_work(response_factory, location, results, schema)
@@ -285,11 +294,11 @@ def test_build_location_link_empty_path():
     schema = schemathesis.openapi.from_dict(
         {"openapi": "3.1.0", "paths": {"/users/{userId}": {"get": {"operationId": "getUserById"}}}}
     )
-    router = Router.from_schema(schema)
+    inferencer = LinkInferencer.from_schema(schema)
 
-    assert router.build_links("") == []
-    assert router.build_links("   ") == []
-    assert router.build_links("not-a-path") == []
+    assert inferencer.build_links("") == []
+    assert inferencer.build_links("   ") == []
+    assert inferencer.build_links("not-a-path") == []
 
 
 @pytest.mark.parametrize(
@@ -422,8 +431,8 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
     schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
     schema.config.base_url = base_url
 
-    router = Router.from_schema(schema)
-    results = router.build_links(location)
+    inferencer = LinkInferencer.from_schema(schema)
+    results = inferencer.build_links(location)
     assert results == expected
 
     if results:
@@ -516,8 +525,8 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
 )
 def test_build_links_all_methods(paths, location, expected, response_factory):
     schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
-    router = Router.from_schema(schema)
-    results = router.build_links(location)
+    inferencer = LinkInferencer.from_schema(schema)
+    results = inferencer.build_links(location)
     assert results == expected
 
     if results:
@@ -527,7 +536,7 @@ def test_build_links_all_methods(paths, location, expected, response_factory):
 def test_build_links_no_paths_in_schema():
     # OpenAPI 3.1.0 allows schemas without paths
     schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "info": {"title": "Test", "version": "1.0"}})
-    assert Router.from_schema(schema).build_links("/users/123") == []
+    assert LinkInferencer.from_schema(schema).build_links("/users/123") == []
 
 
 def test_build_links_path_item_with_ref():
@@ -552,7 +561,7 @@ def test_build_links_path_item_with_ref():
 
     schema = schemathesis.openapi.from_dict(raw_schema)
 
-    assert Router.from_schema(schema).build_links("/users/123") == [
+    assert LinkInferencer.from_schema(schema).build_links("/users/123") == [
         {
             "operationId": "getUserById",
             "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
@@ -579,10 +588,10 @@ def test_build_links_path_item_broken_ref():
     }
 
     schema = schemathesis.openapi.from_dict(raw_schema)
-    router = Router.from_schema(schema)
+    inferencer = LinkInferencer.from_schema(schema)
 
     # Broken ref should not cause crashes, should just skip that path
-    assert router.build_links("/orders/456") == [
+    assert inferencer.build_links("/orders/456") == [
         {
             "operationId": "getOrder",
             "parameters": {"orderId": "$response.header.Location#regex:/orders/(.+)"},
@@ -590,7 +599,7 @@ def test_build_links_path_item_broken_ref():
     ]
 
     # The broken ref path should not match anything
-    assert router.build_links("/users/123") == []
+    assert inferencer.build_links("/users/123") == []
 
 
 def test_build_links_mixed_ref_and_inline_paths():
@@ -611,7 +620,7 @@ def test_build_links_mixed_ref_and_inline_paths():
 
     schema = schemathesis.openapi.from_dict(raw_schema)
 
-    assert Router.from_schema(schema).build_links("/users/123") == [
+    assert LinkInferencer.from_schema(schema).build_links("/users/123") == [
         {
             "operationId": "getUser",
             "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
@@ -640,10 +649,10 @@ def test_build_links_no_base_url_configured():
     )
     assert schema.config.base_url is None
 
-    router = Router.from_schema(schema)
+    inferencer = LinkInferencer.from_schema(schema)
 
     # Relative Location should work fine
-    assert router.build_links("/users/123") == [
+    assert inferencer.build_links("/users/123") == [
         {
             "operationId": "getUserById",
             "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
@@ -655,13 +664,13 @@ def test_build_links_no_base_url_configured():
     ]
 
     # Absolute Location should be ignored (can't validate without base_url)
-    assert router.build_links("http://api.example.com/users/123") == []
+    assert inferencer.build_links("http://api.example.com/users/123") == []
 
     # Different absolute URLs should also be ignored
-    assert router.build_links("https://localhost:8080/api/v1/users/123") == []
+    assert inferencer.build_links("https://localhost:8080/api/v1/users/123") == []
 
     # Another relative path should work
-    assert router.build_links("/users/456") == [
+    assert inferencer.build_links("/users/456") == [
         {
             "operationId": "getUserById",
             "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
@@ -671,3 +680,141 @@ def test_build_links_no_base_url_configured():
             "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
         },
     ]
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_link_inference_discovers_corruption_bug(ctx, cli, app_runner, snapshot_cli):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "create_user",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "User created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        },
+                        "default": {"description": "Error"},
+                    },
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "get_user",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {
+                            "description": "User found",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                        "required": ["id", "name"],
+                                    }
+                                }
+                            },
+                        },
+                        "default": {"description": "Error"},
+                    },
+                },
+                "put": {
+                    "operationId": "update_user",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"204": {"description": "User updated"}, "404": {"description": "User not found"}},
+                },
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    users = {}
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        nonlocal next_id
+        data = request.get_json()
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+        user_id = next_id
+        next_id += 1
+
+        users[user_id] = {"id": user_id, "name": data.get("name", "DefaultName"), "corrupted": False}
+
+        return jsonify({"id": user_id}), 201, {"Location": f"/users/{user_id}"}
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        if user_id not in users:
+            return "", 404
+
+        user = users[user_id]
+
+        # Bug: return invalid schema when corrupted
+        if user.get("corrupted"):
+            return jsonify(
+                {
+                    "id": 42,
+                    # Should be a string
+                    "name": None,
+                }
+            ), 200
+
+        return jsonify({"id": user_id, "name": user["name"]}), 200
+
+    @app.route("/users/<int:user_id>", methods=["PUT"])
+    def update_user(user_id):
+        if user_id not in users:
+            return "", 404
+
+        # Bug: PUT corrupts data, breaking subsequent GET calls
+        users[user_id]["corrupted"] = True
+
+        return "", 204
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c response_schema_conformance",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing,stateful",
+        )
+        == snapshot_cli
+    )
