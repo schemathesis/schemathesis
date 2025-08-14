@@ -6,7 +6,18 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
-from json.encoder import _make_iterencode, c_make_encoder, encode_basestring_ascii  # type: ignore
+try:
+    from json.encoder import _make_iterencode
+except ImportError:
+    _make_iterencode = None
+
+try:
+    from json.encoder import c_make_encoder
+except ImportError:
+    c_make_encoder = None
+
+from json.encoder import encode_basestring_ascii  # type: ignore
+
 from typing import Any, Callable, Generator, Iterator, TypeVar, cast
 from urllib.parse import quote_plus
 
@@ -285,10 +296,12 @@ T = TypeVar("T")
 
 if c_make_encoder is not None:
     _iterencode = c_make_encoder(None, None, encode_basestring_ascii, None, ":", ",", True, False, False)
-else:
+elif _make_iterencode:
     _iterencode = _make_iterencode(
         None, None, encode_basestring_ascii, None, float.__repr__, ":", ",", True, False, True
     )
+else:
+    _iterencode = lambda o, _: json.JSONEncoder(skipkeys=False, sort_keys=False, indent=None, item_separator=":", key_separator=",").iterencode(o)
 
 
 def _encode(o: Any) -> str:

@@ -14,6 +14,7 @@
 ### :wrench: Changed
 
 - `before_call` hooks now accept `kwargs` as a regular parameter instead of `**kwargs`. There is a backward compatibility shim for existing hooks with `**kwargs` signatures. The old calling convention will be removed in Schemathesis 5.0. [#3028](https://github.com/schemathesis/schemathesis/issues/3028)
+- Schemathesis now runs under pypy3
 
 ## [4.0.26](https://github.com/schemathesis/schemathesis/compare/v4.0.25...v4.0.26) - 2025-08-12
 
