@@ -416,3 +416,97 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
 
     if results:
         assert_links_work(response_factory, location, results, schema)
+
+
+@pytest.mark.parametrize(
+    ["paths", "location", "expected"],
+    [
+        # Same path with multiple methods - ALL should be included
+        (
+            {
+                "/users/{userId}": {
+                    "get": {"operationId": "getUserById"},
+                    "put": {"operationId": "updateUser"},
+                    "delete": {"operationId": "deleteUser"},
+                    "patch": {"operationId": "patchUser"},
+                }
+            },
+            "/users/123",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "updateUser",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "deleteUser",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "patchUser",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+            ],
+        ),
+        # Prefix matching should find ALL methods on matching paths
+        (
+            {
+                "/users/{userId}": {
+                    "get": {"operationId": "getUser"},
+                    "put": {"operationId": "updateUser"},
+                },
+                "/users/{userId}/posts": {
+                    "get": {"operationId": "getUserPosts"},
+                    "post": {"operationId": "createUserPost"},
+                },
+                "/users/{userId}/posts/{postId}": {
+                    "get": {"operationId": "getUserPost"},
+                    "put": {"operationId": "updateUserPost"},
+                    "delete": {"operationId": "deleteUserPost"},
+                },
+            },
+            "/users/123",
+            [
+                {
+                    "operationId": "getUser",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "updateUser",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "getUserPosts",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "createUserPost",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "getUserPost",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "updateUserPost",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+                {
+                    "operationId": "deleteUserPost",
+                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+                },
+            ],
+        ),
+    ],
+)
+def test_build_links_all_methods(paths, location, expected, response_factory):
+    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
+    router = Router.from_schema(schema)
+    results = router.build_links(location)
+    assert results == expected
+
+    if results:
+        assert_links_work(response_factory, location, results, schema)

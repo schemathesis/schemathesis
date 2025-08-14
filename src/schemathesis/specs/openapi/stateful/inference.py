@@ -27,9 +27,10 @@ if TYPE_CHECKING:
 @dataclass(unsafe_hash=True)
 class EndpointById:
     value: str
+    method: str
     path: str
 
-    __slots__ = ("value", "path")
+    __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
         return {"operationId": self.value}
@@ -38,9 +39,10 @@ class EndpointById:
 @dataclass(unsafe_hash=True)
 class EndpointByRef:
     value: str
+    method: str
     path: str
 
-    __slots__ = ("value", "path")
+    __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
         return {"operationRef": self.value}
@@ -73,26 +75,23 @@ class Router:
     @classmethod
     def from_schema(cls, schema: BaseOpenAPISchema) -> Router:
         # NOTE: Use `matchit` for routing in the future
-        # TODO: also match for non-GET endpoints
         # TODO: Ensure parameter-less endpoints won't match just everything
         rules = []
         endpoints = []
         for method, path, definition in schema._operation_iter():
-            if method != "get":
-                continue
             operation_id = definition.get("operationId")
             endpoint: EndpointById | EndpointByRef
             if operation_id:
-                endpoint = EndpointById(operation_id, path)
+                endpoint = EndpointById(operation_id, method=method, path=path)
             else:
                 encoded_path = path.replace("~", "~0").replace("/", "~1")
-                endpoint = EndpointByRef(f"#/paths/{encoded_path}/{method}", path)
+                endpoint = EndpointByRef(f"#/paths/{encoded_path}/{method}", method=method, path=path)
 
             endpoints.append(endpoint)
 
             # Replace `{parameter}` with `<parameter>` as angle brackets are used for parameters in werkzeug
             path = re.sub(r"\{([^}]+)\}", r"<\1>", path)
-            rules.append(Rule(path, endpoint=endpoint))
+            rules.append(Rule(path, endpoint=endpoint, methods=[method.upper()]))
 
         return cls(
             Map(rules).bind("", ""),
@@ -127,7 +126,9 @@ class Router:
         #  /users/{user_id}/posts , /users/{user_id}/posts/{post_id} (partial matches)
         #
         for candidate in self._endpoints:
-            if candidate.path.startswith(exact.path) and len(candidate.path) != len(exact.path):
+            if candidate.method != "get" or (
+                candidate.path.startswith(exact.path) and len(candidate.path) != len(exact.path)
+            ):
                 matches.inexact.append(candidate)
 
         return matches
