@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping, Union
+from urllib.parse import urlsplit
 
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, Rule
@@ -64,8 +65,10 @@ class Router:
     _adapter: MapAdapter
     # All endpoints for prefix matching
     _endpoints: list[Endpoint]
+    _base_url: str | None
+    _base_path: str
 
-    __slots__ = ("_adapter", "_endpoints")
+    __slots__ = ("_adapter", "_endpoints", "_base_url", "_base_path")
 
     @classmethod
     def from_schema(cls, schema: BaseOpenAPISchema) -> Router:
@@ -91,7 +94,12 @@ class Router:
             path = re.sub(r"\{([^}]+)\}", r"<\1>", path)
             rules.append(Rule(path, endpoint=endpoint))
 
-        return cls(Map(rules).bind("", ""), endpoints)
+        return cls(
+            Map(rules).bind("", ""),
+            endpoints,
+            schema.config.base_url,
+            schema.base_path,
+        )
 
     def match(self, path: str) -> tuple[Endpoint, Mapping[str, str]] | None:
         """Match path to endpoint and extract path parameters."""
@@ -126,7 +134,10 @@ class Router:
 
     def build_links(self, location: str) -> list[dict]:
         """Build all possible OpenAPI link definitions from Location header."""
-        matches = self.find_all_matches(location)
+        normalized_location = self._normalize_location(location)
+        if normalized_location is None:
+            return []
+        matches = self.find_all_matches(normalized_location)
         if matches is None:
             return []
         exact = self._build_link_from_match(matches.exact, matches.parameters)
@@ -162,3 +173,32 @@ class Router:
             link["parameters"] = parameters
 
         return link
+
+    def _normalize_location(self, location: str) -> str | None:
+        """Normalize location header, handling both relative and absolute URLs."""
+        location = location.strip()
+        if not location:
+            return None
+
+        # Check if it's an absolute URL
+        if location.startswith(("http://", "https://")):
+            if not self._base_url:
+                # Can't validate absolute URLs without base_url
+                return None
+
+            parsed = urlsplit(location)
+            base_parsed = urlsplit(self._base_url)
+
+            # Must match scheme, netloc, and start with the base path
+            if parsed.scheme != base_parsed.scheme or parsed.netloc != base_parsed.netloc:
+                return None
+
+            base_path = self._base_path.rstrip("/")
+            if not parsed.path.startswith(base_path):
+                return None
+
+            # Strip the base path to get relative path
+            relative_path = parsed.path[len(base_path) :]
+            return relative_path if relative_path.startswith("/") else "/" + relative_path
+        # Relative URL - use as is
+        return location

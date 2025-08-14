@@ -6,8 +6,21 @@ from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.stateful.inference import Router
 
 
+def assert_links_work(response_factory, location, results, schema):
+    # Verify links are valid and expressions work
+    response = response_factory.requests(headers={"Location": location})
+    output = StepOutput(response=response, case=None)
+    for result in results:
+        if "operationRef" in result:
+            assert schema.get_operation_by_reference(result["operationRef"]) is not None
+        else:
+            assert schema.get_operation_by_id(result["operationId"]) is not None
+        for expr in result.get("parameters", {}).values():
+            expressions.evaluate(expr, output)
+
+
 @pytest.mark.parametrize(
-    ["paths", "location", "link"],
+    ["paths", "location", "expected"],
     [
         (
             {
@@ -247,20 +260,13 @@ from schemathesis.specs.openapi.stateful.inference import Router
         ),
     ],
 )
-def test_build_location_link(paths, location, link, response_factory):
+def test_build_location_link(paths, location, expected, response_factory):
     schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
     router = Router.from_schema(schema)
     results = router.build_links(location)
-    assert results == link
-    response = response_factory.requests(headers={"Location": location})
-    output = StepOutput(response=response, case=None)
-    for result in results:
-        if "operationRef" in result:
-            assert schema.get_operation_by_reference(result["operationRef"]) is not None
-        else:
-            assert schema.get_operation_by_id(result["operationId"]) is not None
-        for expr in result.get("parameters", {}).values():
-            expressions.evaluate(expr, output)
+    assert results == expected
+    if results:
+        assert_links_work(response_factory, location, results, schema)
 
 
 def test_build_location_link_empty_path():
@@ -272,3 +278,141 @@ def test_build_location_link_empty_path():
     assert router.build_links("") == []
     assert router.build_links("   ") == []
     assert router.build_links("not-a-path") == []
+
+
+@pytest.mark.parametrize(
+    ["base_url", "paths", "location", "expected"],
+    [
+        # Relative Location with base_url - should work normally
+        (
+            "http://localhost:8080/api/v1",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/users/123",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                }
+            ],
+        ),
+        # Absolute Location matching base_url - should strip base and work
+        (
+            "http://localhost:8080/api/v1",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://localhost:8080/api/v1/users/123",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                }
+            ],
+        ),
+        # Base URL without subpath
+        (
+            "http://localhost:8080",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://localhost:8080/users/123",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                }
+            ],
+        ),
+        # Absolute Location with different host - should not match
+        (
+            "http://localhost:8080/api",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://different-host.com/api/users/123",
+            [],
+        ),
+        # Absolute Location with different base path - should not match
+        (
+            "http://localhost:8080/api/v1",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://localhost:8080/api/v2/users/123",
+            [],
+        ),
+        # Partial matches work with absolute URLs
+        (
+            "http://localhost:8080/api",
+            {
+                "/users/{userId}": {"get": {"operationId": "getUser"}},
+                "/users/{userId}/posts/{postId}": {"get": {"operationId": "getUserPost"}},
+            },
+            "http://localhost:8080/api/users/123",
+            [
+                {
+                    "operationId": "getUser",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                },
+                {
+                    "operationId": "getUserPost",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                },
+            ],
+        ),
+        # Base URL with trailing slash vs Location without
+        (
+            "http://localhost:8080/api/",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://localhost:8080/api/users/123",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                }
+            ],
+        ),
+        # Location with query parameters (should be ignored in matching)
+        (
+            "http://localhost:8080/api",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://localhost:8080/api/users/123?expand=profile",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                }
+            ],
+        ),
+        # Location with fragment (should be ignored in matching)
+        (
+            "http://localhost:8080/api",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "http://localhost:8080/api/users/123#profile",
+            [
+                {
+                    "operationId": "getUserById",
+                    "parameters": {
+                        "userId": "$response.header.Location#regex:/users/(.+)",
+                    },
+                }
+            ],
+        ),
+    ],
+)
+def test_build_links_with_base_url(base_url, paths, location, expected, response_factory):
+    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
+    schema.config.base_url = base_url
+
+    router = Router.from_schema(schema)
+    results = router.build_links(location)
+    assert results == expected
+
+    if results:
+        assert_links_work(response_factory, location, results, schema)
