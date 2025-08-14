@@ -77,6 +77,40 @@ paths:
 - Create user → Create user's orders → Get order details
 - Create parent → Create children → Get parent with children
 
+### Automatic Link Inference
+
+Writing OpenAPI links manually for every operation relationship can be time-consuming and error-prone. Schemathesis can automatically infer many of these connections by analyzing `Location` headers from API responses.
+
+When your API returns a `Location` header (typically after creating or updating resources), it reveals parameter values that can be used to test other operations on the same resource. Schemathesis extracts these parameters and generates links automatically.
+
+**How inference works:**
+
+1. **Exact matching**: Find the endpoint that exactly matches the Location path
+2. **Prefix matching**: Find related endpoints that can use the same extracted parameters  
+3. **Link generation**: Create links for all matching operations automatically
+
+**Example:**
+
+```
+POST /users → 201 Created, Location: /users/123
+
+Automatically inferred links:
+- GET /users/{userId}       -> Direct access to created resource
+- PUT /users/{userId}       -> Update the created resource
+- DELETE /users/{userId}    -> Delete the created resource
+- GET /users/{userId}/posts -> Access user's related resources
+```
+
+All operations automatically receive `userId: "123"` extracted from the Location header.
+
+- **Reduces manual work**: Automatically discovers many common API relationships
+- **Complements manual links**: Works alongside your existing link definitions (manual links take precedence)
+- **Uses real values**: Extracts actual IDs and parameters from your API responses
+- **Adapts automatically**: Discovers new relationships as your API schema evolves
+
+!!! important "Prerequisites"
+    This feature requires your API to return `Location` headers. Not all frameworks include these headers by default, but they're considered a REST best practice for resource creation operations.
+
 ## How Schemathesis Extends OpenAPI Links
 
 ### Regex Extraction from Headers and Query Parameters
