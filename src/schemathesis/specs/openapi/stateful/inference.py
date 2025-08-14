@@ -145,13 +145,12 @@ class Router:
         if matches is None:
             return []
         exact = self._build_link_from_match(matches.exact, matches.parameters)
-        parameters = exact.get("parameters")
+        parameters = exact["parameters"]
         links = [exact]
         for inexact in matches.inexact:
             link = inexact.to_link_base()
             # Parameter extraction is the same, only operations are different
-            if parameters is not None:
-                link["parameters"] = parameters
+            link["parameters"] = parameters
             links.append(link)
         return links
 
@@ -160,21 +159,20 @@ class Router:
     ) -> dict:
         link = endpoint.to_link_base()
 
-        # If there are path parameters, build regex expressions to extract them
-        if path_parameters:
-            parameters = {}
-            for name in path_parameters:
-                # Replace the target parameter with capture group and others with non-slash matcher
-                pattern = endpoint.path
-                for candidate in path_parameters:
-                    if candidate == name:
-                        pattern = pattern.replace(f"{{{candidate}}}", "(.+)")
-                    else:
-                        pattern = pattern.replace(f"{{{candidate}}}", "[^/]+")
+        # Build regex expressions to extract path parameters
+        parameters = {}
+        for name in path_parameters:
+            # Replace the target parameter with capture group and others with non-slash matcher
+            pattern = endpoint.path
+            for candidate in path_parameters:
+                if candidate == name:
+                    pattern = pattern.replace(f"{{{candidate}}}", "(.+)")
+                else:
+                    pattern = pattern.replace(f"{{{candidate}}}", "[^/]+")
 
-                parameters[name] = f"$response.header.Location#regex:{pattern}"
+            parameters[name] = f"$response.header.Location#regex:{pattern}"
 
-            link["parameters"] = parameters
+        link["parameters"] = parameters
 
         return link
 

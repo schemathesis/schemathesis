@@ -522,3 +522,152 @@ def test_build_links_all_methods(paths, location, expected, response_factory):
 
     if results:
         assert_links_work(response_factory, location, results, schema)
+
+
+def test_build_links_no_paths_in_schema():
+    # OpenAPI 3.1.0 allows schemas without paths
+    schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "info": {"title": "Test", "version": "1.0"}})
+    assert Router.from_schema(schema).build_links("/users/123") == []
+
+
+def test_build_links_path_item_with_ref():
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/users/{userId}": {
+                "$ref": "#/components/pathItems/UserPathItem",
+            }
+        },
+        "components": {
+            "pathItems": {
+                "UserPathItem": {
+                    "get": {"operationId": "getUserById"},
+                    "put": {"operationId": "updateUser"},
+                    "delete": {"operationId": "deleteUser"},
+                }
+            }
+        },
+    }
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    assert Router.from_schema(schema).build_links("/users/123") == [
+        {
+            "operationId": "getUserById",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "updateUser",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "deleteUser",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+    ]
+
+
+def test_build_links_path_item_broken_ref():
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/users/{userId}": {"$ref": "#/components/pathItems/NonExistentPathItem"},
+            "/orders/{orderId}": {"get": {"operationId": "getOrder"}},
+        },
+    }
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    router = Router.from_schema(schema)
+
+    # Broken ref should not cause crashes, should just skip that path
+    assert router.build_links("/orders/456") == [
+        {
+            "operationId": "getOrder",
+            "parameters": {"orderId": "$response.header.Location#regex:/orders/(.+)"},
+        }
+    ]
+
+    # The broken ref path should not match anything
+    assert router.build_links("/users/123") == []
+
+
+def test_build_links_mixed_ref_and_inline_paths():
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/users/{userId}": {"$ref": "#/components/pathItems/UserPathItem"},
+            "/users/{userId}/posts": {
+                "get": {"operationId": "getUserPosts"},
+                "post": {"operationId": "createUserPost"},
+            },
+        },
+        "components": {
+            "pathItems": {"UserPathItem": {"get": {"operationId": "getUser"}, "put": {"operationId": "updateUser"}}}
+        },
+    }
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    assert Router.from_schema(schema).build_links("/users/123") == [
+        {
+            "operationId": "getUser",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "updateUser",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "getUserPosts",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "createUserPost",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+    ]
+
+
+def test_build_links_no_base_url_configured():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.1.0",
+            "paths": {"/users/{userId}": {"get": {"operationId": "getUserById"}, "put": {"operationId": "updateUser"}}},
+        }
+    )
+    assert schema.config.base_url is None
+
+    router = Router.from_schema(schema)
+
+    # Relative Location should work fine
+    assert router.build_links("/users/123") == [
+        {
+            "operationId": "getUserById",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "updateUser",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+    ]
+
+    # Absolute Location should be ignored (can't validate without base_url)
+    assert router.build_links("http://api.example.com/users/123") == []
+
+    # Different absolute URLs should also be ignored
+    assert router.build_links("https://localhost:8080/api/v1/users/123") == []
+
+    # Another relative path should work
+    assert router.build_links("/users/456") == [
+        {
+            "operationId": "getUserById",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+        {
+            "operationId": "updateUser",
+            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
+        },
+    ]
