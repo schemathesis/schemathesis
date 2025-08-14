@@ -1,4 +1,14 @@
-"""Inferencing connections between API operations."""
+"""Inferencing connections between API operations.
+
+The current implementation extracts information from the `Location` header and
+generates OpenAPI links for exact and prefix matches.
+
+When a `Location` header points to `/users/123`, the inference:
+
+    1. Finds the exact match: `GET /users/{userId}`
+    2. Finds prefix matches: `GET /users/{userId}/posts`, `GET /users/{userId}/posts/{postId}`
+    3. Generates OpenAPI links with regex parameter extractors
+"""
 
 from __future__ import annotations
 
@@ -20,6 +30,9 @@ class EndpointById:
 
     __slots__ = ("value", "path")
 
+    def to_link_base(self) -> dict[str, Any]:
+        return {"operationId": self.value}
+
 
 @dataclass(unsafe_hash=True)
 class EndpointByRef:
@@ -28,8 +41,20 @@ class EndpointByRef:
 
     __slots__ = ("value", "path")
 
+    def to_link_base(self) -> dict[str, Any]:
+        return {"operationRef": self.value}
+
 
 Endpoint = Union[EndpointById, EndpointByRef]
+
+
+@dataclass
+class MatchList:
+    exact: Endpoint
+    inexact: list[Endpoint]
+    parameters: Mapping[str, Any]
+
+    __slots__ = ("exact", "inexact", "parameters")
 
 
 @dataclass
@@ -37,13 +62,18 @@ class Router:
     """Map URL paths to API Operation for OpenAPI link generation."""
 
     _adapter: MapAdapter
+    # All endpoints for prefix matching
+    _endpoints: list[Endpoint]
 
-    __slots__ = ("_adapter",)
+    __slots__ = ("_adapter", "_endpoints")
 
     @classmethod
     def from_schema(cls, schema: BaseOpenAPISchema) -> Router:
         # NOTE: Use `matchit` for routing in the future
+        # TODO: also match for non-GET endpoints
+        # TODO: Ensure parameter-less endpoints won't match just everything
         rules = []
+        endpoints = []
         for method, path, definition in schema._operation_iter():
             if method != "get":
                 continue
@@ -55,11 +85,13 @@ class Router:
                 encoded_path = path.replace("~", "~0").replace("/", "~1")
                 endpoint = EndpointByRef(f"#/paths/{encoded_path}/{method}", path)
 
+            endpoints.append(endpoint)
+
             # Replace `{parameter}` with `<parameter>` as angle brackets are used for parameters in werkzeug
             path = re.sub(r"\{([^}]+)\}", r"<\1>", path)
             rules.append(Rule(path, endpoint=endpoint))
 
-        return cls(Map(rules).bind("", ""))
+        return cls(Map(rules).bind("", ""), endpoints)
 
     def match(self, path: str) -> tuple[Endpoint, Mapping[str, str]] | None:
         """Match path to endpoint and extract path parameters."""
@@ -68,20 +100,50 @@ class Router:
         except (NotFound, MethodNotAllowed):
             return None
 
-    def build_link(self, location: str) -> dict | None:
-        """Build OpenAPI link definition from Location header."""
+    def find_all_matches(self, location: str) -> MatchList | None:
+        """Find all possible matches (both exact and partial) for the location."""
+        # Exact match first
         match = self.match(location)
         if not match:
+            # It may happen that there is no match, but it is unlikely as the API assumed to return a valid Location
+            # that points to existing endpoint. In such cases, if they appear in practice the logic here could be extended
+            # to support partial matches
             return None
+        exact, parameters = match
+        matches = MatchList(exact=exact, inexact=[], parameters=parameters)
 
-        endpoint, path_parameters = match
+        # Find prefix matches, excluding the exact match
+        # For example:
+        #
+        #  Location: /users/123 -> /users/{user_id} (exact match)
+        #  /users/{user_id}/posts , /users/{user_id}/posts/{post_id} (partial matches)
+        #
+        for candidate in self._endpoints:
+            if candidate.path.startswith(exact.path) and len(candidate.path) != len(exact.path):
+                matches.inexact.append(candidate)
 
-        link: dict[str, str | dict[str, Any]] = {}
+        return matches
 
-        if isinstance(endpoint, EndpointById):
-            link["operationId"] = endpoint.value
-        else:
-            link["operationRef"] = endpoint.value
+    def build_links(self, location: str) -> list[dict]:
+        """Build all possible OpenAPI link definitions from Location header."""
+        matches = self.find_all_matches(location)
+        if matches is None:
+            return []
+        exact = self._build_link_from_match(matches.exact, matches.parameters)
+        parameters = exact.get("parameters")
+        links = [exact]
+        for inexact in matches.inexact:
+            link = inexact.to_link_base()
+            # Parameter extraction is the same, only operations are different
+            if parameters is not None:
+                link["parameters"] = parameters
+            links.append(link)
+        return links
+
+    def _build_link_from_match(
+        self, endpoint: EndpointById | EndpointByRef, path_parameters: Mapping[str, Any]
+    ) -> dict:
+        link = endpoint.to_link_base()
 
         # If there are path parameters, build regex expressions to extract them
         if path_parameters:
