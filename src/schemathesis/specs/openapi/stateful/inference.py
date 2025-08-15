@@ -20,6 +20,8 @@ from urllib.parse import urlsplit
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, Rule
 
+from schemathesis.core.repository import LocationHeaderEntry
+
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
@@ -33,7 +35,7 @@ class EndpointById:
     __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
-        return {"operationId": self.value}
+        return {"operationId": self.value, "x-inferred": True}
 
 
 @dataclass(unsafe_hash=True)
@@ -45,10 +47,12 @@ class EndpointByRef:
     __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
-        return {"operationRef": self.value}
+        return {"operationRef": self.value, "x-inferred": True}
 
 
 Endpoint = Union[EndpointById, EndpointByRef]
+# Method, path, response code, sorted path parameter names
+SeenLinkKey = tuple[str, str, int, tuple[str, ...]]
 
 
 @dataclass
@@ -69,8 +73,9 @@ class LinkInferencer:
     _endpoints: list[Endpoint]
     _base_url: str | None
     _base_path: str
+    _links_field_name: str
 
-    __slots__ = ("_adapter", "_endpoints", "_base_url", "_base_path")
+    __slots__ = ("_adapter", "_endpoints", "_base_url", "_base_path", "_links_field_name")
 
     @classmethod
     def from_schema(cls, schema: BaseOpenAPISchema) -> LinkInferencer:
@@ -93,10 +98,11 @@ class LinkInferencer:
             rules.append(Rule(path, endpoint=endpoint, methods=[method.upper()]))
 
         return cls(
-            Map(rules).bind("", ""),
-            endpoints,
-            schema.config.base_url,
-            schema.base_path,
+            _adapter=Map(rules).bind("", ""),
+            _endpoints=endpoints,
+            _base_url=schema.config.base_url,
+            _base_path=schema.base_path,
+            _links_field_name=schema.links_field,
         )
 
     def match(self, path: str) -> tuple[Endpoint, Mapping[str, str]] | None:
@@ -203,3 +209,35 @@ class LinkInferencer:
             return relative_path if relative_path.startswith("/") else "/" + relative_path
         # Relative URL - use as is
         return location
+
+    def inject_links(self, operation: dict[str, Any], entries: list[LocationHeaderEntry]) -> int:
+        from schemathesis.specs.openapi.schemas import _get_response_definition_by_status
+
+        responses = operation.setdefault("responses", {})
+        # To avoid unnecessary work, we need to skip entries that we know will produce already inferred links
+        seen: set[SeenLinkKey] = set()
+        injected = 0
+
+        for entry in entries:
+            # TODO: Reuse logic from other methods
+            location = self._normalize_location(entry.value)
+            if location is None:
+                continue
+            match = self.match(location)
+            if match is None:
+                continue
+            exact, parameters = match
+            key = (exact.method, exact.path, entry.status_code, tuple(sorted(parameters)))
+            if key in seen:
+                continue
+            seen.add(key)
+            # Find the right bucket for the response status
+            definition = _get_response_definition_by_status(entry.status_code, responses)
+            if definition is None:
+                definition = responses.setdefault(str(entry.status_code), {})
+            links = definition.setdefault(self._links_field_name, {})
+
+            for idx, link in enumerate(self.build_links(entry.value)):
+                links[f"X-Inferred-Link-{idx}"] = link
+                injected += 1
+        return injected

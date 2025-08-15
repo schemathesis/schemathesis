@@ -87,22 +87,12 @@ class EngineContext:
             assert isinstance(self.schema, BaseOpenAPISchema)
 
             inferencer = inference.LinkInferencer.from_schema(self.schema)
+            injected = 0
             for operation, entries in self.repository.location_headers.items():
-                for entry in entries:
-                    status_code = entry.status_code
-                    responses = operation.definition.raw["responses"].setdefault(str(status_code), {})
-                    # TODO: Swagger has `x-links`
-                    links = responses.setdefault("links", {})
-                    # TODO: Don't override links
-                    for idx, link in enumerate(inferencer.build_links(entry.value)):
-                        links[f"Link{idx}"] = link
-
-                # NOTE: Simple responses[str(status_code)] won't work - there could be wildcards + default. Port logic from `spec-access` branch
-                # TODO: insert link to proper "responses" inside "operation.definition"
-                # TODO: Autogenerate link name. Avoid duplicates with existing links + do not do the same work here with similar Location header values
-            # TODO: Check that links were actually created
-            phase.is_enabled = True
-            phase.skip_reason = None
+                injected += inferencer.inject_links(operation.definition.raw, entries)
+            if injected:
+                phase.is_enabled = True
+                phase.skip_reason = None
 
     def stop(self) -> None:
         self.control.stop()

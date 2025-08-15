@@ -21,6 +21,22 @@ def assert_links_work(response_factory, location, results, schema):
             expressions.evaluate(expr, output)
 
 
+def link_by_id(operation_id: str, **parameters):
+    return _link_by("operationId", operation_id, **parameters)
+
+
+def link_by_ref(ref: str, **parameters):
+    return _link_by("operationRef", ref, **parameters)
+
+
+def _link_by(key: str, value: str, **parameters):
+    return {
+        key: value,
+        "x-inferred": True,
+        "parameters": {key: f"$response.header.Location#regex:{regex}" for key, regex in parameters.items()},
+    }
+
+
 @pytest.mark.parametrize(
     ["paths", "location", "expected"],
     [
@@ -38,14 +54,7 @@ def assert_links_work(response_factory, location, results, schema):
                 },
             },
             "/users/123",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
         # Without operationId (should use operationRef)
         (
@@ -55,14 +64,7 @@ def assert_links_work(response_factory, location, results, schema):
                 }
             },
             "/users/123",
-            [
-                {
-                    "operationRef": "#/paths/~1users~1{userId}/get",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_ref("#/paths/~1users~1{userId}/get", userId="/users/(.+)")],
         ),
         # No path parameters
         # Links without parameters don't make sense
@@ -93,13 +95,11 @@ def assert_links_work(response_factory, location, results, schema):
             },
             "/users/123/posts/456",
             [
-                {
-                    "operationId": "getUserPost",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)/posts/[^/]+",
-                        "postId": "$response.header.Location#regex:/users/[^/]+/posts/(.+)",
-                    },
-                }
+                link_by_id(
+                    "getUserPost",
+                    userId="/users/(.+)/posts/[^/]+",
+                    postId="/users/[^/]+/posts/(.+)",
+                )
             ],
         ),
         # Partial match - Location provides only first parameter
@@ -118,18 +118,8 @@ def assert_links_work(response_factory, location, results, schema):
             },
             "/users/123",
             [
-                {
-                    "operationId": "getUser",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                },
-                {
-                    "operationId": "getUserPost",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                },
+                link_by_id("getUser", userId="/users/(.+)"),
+                link_by_id("getUserPost", userId="/users/(.+)"),
             ],
         ),
         # Partial match - Location provides first part of nested path
@@ -148,20 +138,16 @@ def assert_links_work(response_factory, location, results, schema):
             },
             "/api/v1/users/123/posts/456",
             [
-                {
-                    "operationId": "getUserPost",
-                    "parameters": {
-                        "postId": "$response.header.Location#regex:/api/v1/users/[^/]+/posts/(.+)",
-                        "userId": "$response.header.Location#regex:/api/v1/users/(.+)/posts/[^/]+",
-                    },
-                },
-                {
-                    "operationId": "getUserPostComment",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/api/v1/users/(.+)/posts/[^/]+",
-                        "postId": "$response.header.Location#regex:/api/v1/users/[^/]+/posts/(.+)",
-                    },
-                },
+                link_by_id(
+                    "getUserPost",
+                    userId="/api/v1/users/(.+)/posts/[^/]+",
+                    postId="/api/v1/users/[^/]+/posts/(.+)",
+                ),
+                link_by_id(
+                    "getUserPostComment",
+                    userId="/api/v1/users/(.+)/posts/[^/]+",
+                    postId="/api/v1/users/[^/]+/posts/(.+)",
+                ),
             ],
         ),
         # Multiple partial matches
@@ -190,30 +176,10 @@ def assert_links_work(response_factory, location, results, schema):
             },
             "/users/123/",
             [
-                {
-                    "operationId": "getUser",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)/",
-                    },
-                },
-                {
-                    "operationId": "getUserPosts",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)/",
-                    },
-                },
-                {
-                    "operationId": "getUserPost",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)/",
-                    },
-                },
-                {
-                    "operationId": "getUserPostComment",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)/",
-                    },
-                },
+                link_by_id("getUser", userId="/users/(.+)/"),
+                link_by_id("getUserPosts", userId="/users/(.+)/"),
+                link_by_id("getUserPost", userId="/users/(.+)/"),
+                link_by_id("getUserPostComment", userId="/users/(.+)/"),
             ],
         ),
         # Root path
@@ -222,14 +188,7 @@ def assert_links_work(response_factory, location, results, schema):
                 "/{id}": {"get": {"operationId": "getById"}},
             },
             "/abc123",
-            [
-                {
-                    "operationId": "getById",
-                    "parameters": {
-                        "id": "$response.header.Location#regex:/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getById", id="/(.+)")],
         ),
         # Location doesn't match any endpoint
         (
@@ -255,27 +214,13 @@ def assert_links_work(response_factory, location, results, schema):
                 }
             },
             "/api/v1/users/user-123-abc",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/api/v1/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/api/v1/users/(.+)")],
         ),
         # Path with tildes
         (
             {"/path~with~tildes/{id}": {"get": {}}},
             "/path~with~tildes/123",
-            [
-                {
-                    "operationRef": "#/paths/~1path~0with~0tildes~1{id}/get",
-                    "parameters": {
-                        "id": "$response.header.Location#regex:/path~with~tildes/(.+)",
-                    },
-                }
-            ],
+            [link_by_ref("#/paths/~1path~0with~0tildes~1{id}/get", id="/path~with~tildes/(.+)")],
         ),
     ],
 )
@@ -309,42 +254,21 @@ def test_build_location_link_empty_path():
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "/users/123",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
         # Absolute Location matching base_url - should strip base and work
         (
             "http://localhost:8080/api/v1",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/v1/users/123",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
         # Base URL without subpath
         (
             "http://localhost:8080",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/users/123",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
         # Absolute Location with different host - should not match
         (
@@ -369,18 +293,8 @@ def test_build_location_link_empty_path():
             },
             "http://localhost:8080/api/users/123",
             [
-                {
-                    "operationId": "getUser",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                },
-                {
-                    "operationId": "getUserPost",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                },
+                link_by_id("getUser", userId="/users/(.+)"),
+                link_by_id("getUserPost", userId="/users/(.+)"),
             ],
         ),
         # Base URL with trailing slash vs Location without
@@ -388,42 +302,21 @@ def test_build_location_link_empty_path():
             "http://localhost:8080/api/",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
         # Location with query parameters (should be ignored in matching)
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123?expand=profile",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
         # Location with fragment (should be ignored in matching)
         (
             "http://localhost:8080/api",
             {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
             "http://localhost:8080/api/users/123#profile",
-            [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {
-                        "userId": "$response.header.Location#regex:/users/(.+)",
-                    },
-                }
-            ],
+            [link_by_id("getUserById", userId="/users/(.+)")],
         ),
     ],
 )
@@ -454,22 +347,10 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
             },
             "/users/123",
             [
-                {
-                    "operationId": "getUserById",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "updateUser",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "deleteUser",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "patchUser",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
+                link_by_id("getUserById", userId="/users/(.+)"),
+                link_by_id("updateUser", userId="/users/(.+)"),
+                link_by_id("deleteUser", userId="/users/(.+)"),
+                link_by_id("patchUser", userId="/users/(.+)"),
             ],
         ),
         # Prefix matching should find ALL methods on matching paths
@@ -491,34 +372,13 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
             },
             "/users/123",
             [
-                {
-                    "operationId": "getUser",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "updateUser",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "getUserPosts",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "createUserPost",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "getUserPost",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "updateUserPost",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
-                {
-                    "operationId": "deleteUserPost",
-                    "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-                },
+                link_by_id("getUser", userId="/users/(.+)"),
+                link_by_id("updateUser", userId="/users/(.+)"),
+                link_by_id("getUserPosts", userId="/users/(.+)"),
+                link_by_id("createUserPost", userId="/users/(.+)"),
+                link_by_id("getUserPost", userId="/users/(.+)"),
+                link_by_id("updateUserPost", userId="/users/(.+)"),
+                link_by_id("deleteUserPost", userId="/users/(.+)"),
             ],
         ),
     ],
@@ -562,18 +422,9 @@ def test_build_links_path_item_with_ref():
     schema = schemathesis.openapi.from_dict(raw_schema)
 
     assert LinkInferencer.from_schema(schema).build_links("/users/123") == [
-        {
-            "operationId": "getUserById",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "updateUser",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "deleteUser",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
+        link_by_id("getUserById", userId="/users/(.+)"),
+        link_by_id("updateUser", userId="/users/(.+)"),
+        link_by_id("deleteUser", userId="/users/(.+)"),
     ]
 
 
@@ -591,12 +442,7 @@ def test_build_links_path_item_broken_ref():
     inferencer = LinkInferencer.from_schema(schema)
 
     # Broken ref should not cause crashes, should just skip that path
-    assert inferencer.build_links("/orders/456") == [
-        {
-            "operationId": "getOrder",
-            "parameters": {"orderId": "$response.header.Location#regex:/orders/(.+)"},
-        }
-    ]
+    assert inferencer.build_links("/orders/456") == [link_by_id("getOrder", orderId="/orders/(.+)")]
 
     # The broken ref path should not match anything
     assert inferencer.build_links("/users/123") == []
@@ -621,22 +467,10 @@ def test_build_links_mixed_ref_and_inline_paths():
     schema = schemathesis.openapi.from_dict(raw_schema)
 
     assert LinkInferencer.from_schema(schema).build_links("/users/123") == [
-        {
-            "operationId": "getUser",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "updateUser",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "getUserPosts",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "createUserPost",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
+        link_by_id("getUser", userId="/users/(.+)"),
+        link_by_id("updateUser", userId="/users/(.+)"),
+        link_by_id("getUserPosts", userId="/users/(.+)"),
+        link_by_id("createUserPost", userId="/users/(.+)"),
     ]
 
 
@@ -653,14 +487,8 @@ def test_build_links_no_base_url_configured():
 
     # Relative Location should work fine
     assert inferencer.build_links("/users/123") == [
-        {
-            "operationId": "getUserById",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "updateUser",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
+        link_by_id("getUserById", userId="/users/(.+)"),
+        link_by_id("updateUser", userId="/users/(.+)"),
     ]
 
     # Absolute Location should be ignored (can't validate without base_url)
@@ -671,14 +499,8 @@ def test_build_links_no_base_url_configured():
 
     # Another relative path should work
     assert inferencer.build_links("/users/456") == [
-        {
-            "operationId": "getUserById",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
-        {
-            "operationId": "updateUser",
-            "parameters": {"userId": "$response.header.Location#regex:/users/(.+)"},
-        },
+        link_by_id("getUserById", userId="/users/(.+)"),
+        link_by_id("updateUser", userId="/users/(.+)"),
     ]
 
 
@@ -808,7 +630,6 @@ def test_link_inference_discovers_corruption_bug(ctx, cli, app_runner, snapshot_
         return "", 204
 
     port = app_runner.run_flask_app(app)
-
     assert (
         cli.run(
             "--max-examples=10",

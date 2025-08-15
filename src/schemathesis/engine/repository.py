@@ -1,16 +1,9 @@
 from dataclasses import dataclass
 
+from schemathesis.core.repository import LocationHeaderEntry
 from schemathesis.engine.phases import Phase, PhaseName, PhaseSkipReason
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.schemas import APIOperation
-
-
-@dataclass
-class LocationHeaderEntry:
-    status_code: int
-    value: str
-
-    __slots__ = ("status_code", "value")
 
 
 @dataclass
@@ -36,4 +29,9 @@ class DataRepository:
                 location = response.headers.get("location")
                 if location:
                     entries = self.location_headers.setdefault(recorder.cases[id].value.operation, [])
-                    entries.append(LocationHeaderEntry(response.status_code, location[0]))
+                    entries.append(
+                        LocationHeaderEntry(
+                            status_code=response.status_code,
+                            value=location[0],
+                        )
+                    )
