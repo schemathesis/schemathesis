@@ -2,6 +2,7 @@ import pytest
 from flask import Flask, jsonify, request
 
 import schemathesis
+from schemathesis.core.repository import LocationHeaderEntry
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
@@ -639,3 +640,78 @@ def test_link_inference_discovers_corruption_bug(ctx, cli, app_runner, snapshot_
         )
         == snapshot_cli
     )
+
+
+def test_inject_links_location_normalization_returns_none():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.1.0",
+            "paths": {
+                "/users": {
+                    "post": {
+                        "operationId": "createUser",
+                        "responses": {
+                            "201": {},
+                        },
+                    }
+                }
+            },
+        }
+    )
+    inferencer = LinkInferencer.from_schema(schema)
+    operation = {"responses": {"201": {}}}
+
+    # Empty location should be normalized to None
+    entries = [LocationHeaderEntry(value="", status_code=201)]
+
+    assert inferencer.inject_links(operation, entries) == 0
+    assert "links" not in operation["responses"]["201"]
+
+
+def test_inject_links_no_matches():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.1.0",
+            "paths": {
+                "/users": {
+                    "post": {
+                        "operationId": "createUser",
+                        "responses": {
+                            "201": {},
+                        },
+                    }
+                }
+            },
+        }
+    )
+    inferencer = LinkInferencer.from_schema(schema)
+    operation = {"responses": {"201": {}}}
+
+    # Location that doesn't match any endpoint
+    entries = [LocationHeaderEntry(value="/orders/123", status_code=201)]
+
+    assert inferencer.inject_links(operation, entries) == 0
+    assert "links" not in operation["responses"]["201"]
+
+
+def test_inject_links_creates_response_definition():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.1.0",
+            "paths": {
+                "/users": {"post": {"operationId": "createUser"}},
+                "/users/{userId}": {"get": {"operationId": "getUser"}},
+            },
+        }
+    )
+    inferencer = LinkInferencer.from_schema(schema)
+    # No 201 response defined
+    operation = {"responses": {}}
+
+    entries = [LocationHeaderEntry(value="/users/123", status_code=201)]
+
+    assert inferencer.inject_links(operation, entries) == 1
+    # Should create the 201 response definition
+    assert "201" in operation["responses"]
+    assert "links" in operation["responses"]["201"]
+    assert "X-Inferred-Link-0" in operation["responses"]["201"]["links"]
