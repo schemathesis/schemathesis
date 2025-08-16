@@ -6,15 +6,18 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.engine.control import ExecutionControl
+from schemathesis.engine.phases import PhaseName
+from schemathesis.engine.repository import DataRepository
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
-
-from .control import ExecutionControl
 
 if TYPE_CHECKING:
     import threading
 
     import requests
+
+    from schemathesis.engine.phases import Phase
 
 
 @dataclass
@@ -25,20 +28,31 @@ class EngineContext:
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
     start_time: float
+    repository: DataRepository
 
-    __slots__ = ("schema", "control", "outcome_cache", "start_time", "_session", "_transport_kwargs_cache")
+    __slots__ = (
+        "schema",
+        "control",
+        "outcome_cache",
+        "start_time",
+        "repository",
+        "_session",
+        "_transport_kwargs_cache",
+    )
 
     def __init__(
         self,
         *,
         schema: BaseSchema,
         stop_event: threading.Event,
+        repository: DataRepository,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
         self.control = ExecutionControl(stop_event=stop_event, max_failures=schema.config.max_failures)
         self.outcome_cache = {}
         self.start_time = time.monotonic()
+        self.repository = repository
         self._session = session
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
 
@@ -64,6 +78,21 @@ class EngineContext:
     @property
     def has_reached_the_failure_limit(self) -> bool:
         return self.control.has_reached_the_failure_limit
+
+    def update_phase(self, phase: Phase) -> None:
+        if phase.name == PhaseName.STATEFUL_TESTING and self.repository.location_headers:
+            from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+            from schemathesis.specs.openapi.stateful import inference
+
+            assert isinstance(self.schema, BaseOpenAPISchema)
+
+            inferencer = inference.LinkInferencer.from_schema(self.schema)
+            injected = 0
+            for operation, entries in self.repository.location_headers.items():
+                injected += inferencer.inject_links(operation.definition.raw, entries)
+            if injected:
+                phase.is_enabled = True
+                phase.skip_reason = None
 
     def stop(self) -> None:
         self.control.stop()
