@@ -19,7 +19,7 @@ class DataRepository:
         self.location_headers = {}
         self.is_enabled = True
         for phase in phases:
-            if Phase.name == PhaseName.STATEFUL_TESTING and phase.skip_reason == PhaseSkipReason.DISABLED:
+            if phase.name == PhaseName.STATEFUL_TESTING and phase.skip_reason == PhaseSkipReason.DISABLED:
                 self.is_enabled = False
 
     def process_recorder(self, recorder: ScenarioRecorder) -> None:

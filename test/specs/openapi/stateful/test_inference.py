@@ -505,9 +505,9 @@ def test_build_links_no_base_url_configured():
     ]
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_link_inference_discovers_corruption_bug(ctx, cli, app_runner, snapshot_cli):
-    raw_schema = ctx.openapi.build_schema(
+@pytest.fixture
+def user_api_schema(ctx):
+    return ctx.openapi.build_schema(
         {
             "/users": {
                 "post": {
@@ -580,13 +580,16 @@ def test_link_inference_discovers_corruption_bug(ctx, cli, app_runner, snapshot_
         }
     )
 
+
+@pytest.fixture
+def user_api_app(user_api_schema):
     app = Flask(__name__)
     users = {}
     next_id = 1
 
     @app.route("/openapi.json")
     def schema():
-        return jsonify(raw_schema)
+        return jsonify(user_api_schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():
@@ -630,13 +633,32 @@ def test_link_inference_discovers_corruption_bug(ctx, cli, app_runner, snapshot_
 
         return "", 204
 
-    port = app_runner.run_flask_app(app)
+    return app
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_link_inference_discovers_corruption_bug(cli, app_runner, snapshot_cli, user_api_app):
+    port = app_runner.run_flask_app(user_api_app)
     assert (
         cli.run(
             "--max-examples=10",
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_disabled_skips_link_inference(cli, app_runner, snapshot_cli, user_api_app):
+    port = app_runner.run_flask_app(user_api_app)
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c response_schema_conformance",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
         )
         == snapshot_cli
     )
