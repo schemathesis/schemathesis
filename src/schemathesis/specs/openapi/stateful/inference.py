@@ -112,10 +112,32 @@ class LinkInferencer:
         except (NotFound, MethodNotAllowed):
             return None
 
-    def find_all_matches(self, location: str) -> MatchList | None:
-        """Find all possible matches (both exact and partial) for the location."""
-        # Exact match first
-        match = self.match(location)
+    def build_links(self, location: str) -> list[dict]:
+        """Build all possible OpenAPI link definitions from Location header."""
+        # TODO: Move to tests?
+        normalized_location = self._normalize_location(location)
+        if normalized_location is None:
+            return []
+        matches = self._find_matches_from_normalized_location(normalized_location)
+        if matches is None:
+            return []
+        return self._build_links_from_matches(matches)
+
+    def _build_links_from_matches(self, matches: MatchList) -> list[dict]:
+        """Build links from already-found matches."""
+        exact = self._build_link_from_match(matches.exact, matches.parameters)
+        parameters = exact["parameters"]
+        links = [exact]
+        for inexact in matches.inexact:
+            link = inexact.to_link_base()
+            # Parameter extraction is the same, only operations are different
+            link["parameters"] = parameters
+            links.append(link)
+        return links
+
+    def _find_matches_from_normalized_location(self, normalized_location: str) -> MatchList | None:
+        """Find matches from an already-normalized location."""
+        match = self.match(normalized_location)
         if not match:
             # It may happen that there is no match, but it is unlikely as the API assumed to return a valid Location
             # that points to existing endpoint. In such cases, if they appear in practice the logic here could be extended
@@ -140,24 +162,6 @@ class LinkInferencer:
                 matches.inexact.append(candidate)
 
         return matches
-
-    def build_links(self, location: str) -> list[dict]:
-        """Build all possible OpenAPI link definitions from Location header."""
-        normalized_location = self._normalize_location(location)
-        if normalized_location is None:
-            return []
-        matches = self.find_all_matches(normalized_location)
-        if matches is None:
-            return []
-        exact = self._build_link_from_match(matches.exact, matches.parameters)
-        parameters = exact["parameters"]
-        links = [exact]
-        for inexact in matches.inexact:
-            link = inexact.to_link_base()
-            # Parameter extraction is the same, only operations are different
-            link["parameters"] = parameters
-            links.append(link)
-        return links
 
     def _build_link_from_match(
         self, endpoint: EndpointById | EndpointByRef, path_parameters: Mapping[str, Any]
@@ -219,15 +223,15 @@ class LinkInferencer:
         injected = 0
 
         for entry in entries:
-            # TODO: Reuse logic from other methods
             location = self._normalize_location(entry.value)
             if location is None:
                 continue
-            match = self.match(location)
-            if match is None:
+
+            matches = self._find_matches_from_normalized_location(location)
+            if matches is None:
                 continue
-            exact, parameters = match
-            key = (exact.method, exact.path, entry.status_code, tuple(sorted(parameters)))
+
+            key = (matches.exact.method, matches.exact.path, entry.status_code, tuple(sorted(matches.parameters)))
             if key in seen:
                 continue
             seen.add(key)
@@ -237,7 +241,7 @@ class LinkInferencer:
                 definition = responses.setdefault(str(entry.status_code), {})
             links = definition.setdefault(self._links_field_name, {})
 
-            for idx, link in enumerate(self.build_links(entry.value)):
+            for idx, link in enumerate(self._build_links_from_matches(matches)):
                 links[f"X-Inferred-Link-{idx}"] = link
                 injected += 1
         return injected
