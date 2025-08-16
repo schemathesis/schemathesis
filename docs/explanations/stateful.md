@@ -79,37 +79,40 @@ paths:
 
 ### Automatic Link Inference
 
-Writing OpenAPI links manually for every operation relationship can be time-consuming and error-prone. Schemathesis can automatically infer many of these connections by analyzing `Location` headers from API responses.
+Writing OpenAPI links manually for every operation relationship can be time-consuming and error-prone. Schemathesis can automatically infer many of these connections by analyzing `Location` headers from API responses during testing.
 
-When your API returns a `Location` header (typically after creating or updating resources), it reveals parameter values that can be used to test other operations on the same resource. Schemathesis extracts these parameters and generates links automatically.
+**How it works:**
 
-**How inference works:**
-
-1. **Exact matching**: Find the endpoint that exactly matches the Location path
-2. **Prefix matching**: Find related endpoints that can use the same extracted parameters  
-3. **Link generation**: Create links for all matching operations automatically
+1. **Data collection**: During earlier test phases, Schemathesis collects `Location` headers from API responses
+2. **Pattern analysis**: It analyzes these headers to understand how your API structures resource locations
+3. **Connection mapping**: Creates connections between operations - it learns how to extract parameters from `Location` headers and use them to call related operations
+4. **Stateful testing**: Uses this knowledge to chain operations together with real parameter values
 
 **Example:**
 
-```
-POST /users → 201 Created, Location: /users/123
+**Phase 1 - Learning**: During fuzzing, Schemathesis observes:
 
-Automatically inferred links:
-- GET /users/{userId}       -> Direct access to created resource
-- PUT /users/{userId}       -> Update the created resource
-- DELETE /users/{userId}    -> Delete the created resource
-- GET /users/{userId}/posts -> Access user's related resources
+```http
+POST /users → 201 Created
+Location: /users/123
 ```
 
-All operations automatically receive `userId: "123"` extracted from the Location header.
+From this, it learns these connections:
 
-- **Reduces manual work**: Automatically discovers many common API relationships
-- **Complements manual links**: Works alongside your existing link definitions (manual links take precedence)
-- **Uses real values**: Extracts actual IDs and parameters from your API responses
-- **Adapts automatically**: Discovers new relationships as your API schema evolves
+- `GET /users/{userId}` - can be called using `userId` extracted from `Location`
+- `PUT /users/{userId}` - can be called using `userId` extracted from `Location`
+- `GET /users/{userId}/posts` - can be called using `userId` extracted from `Location`
 
-!!! important "Prerequisites"
-    This feature requires your API to return `Location` headers. Not all frameworks include these headers by default, but they're considered a REST best practice for resource creation operations.
+**Phase 2 - Application**: During stateful testing, it uses this knowledge:
+
+```http
+POST /users → Location: /users/456 → automatically calls GET /users/456, PUT /users/456, etc.
+```
+
+This happens automatically when stateful testing is enabled - no additional configuration required.
+
+!!! note "Location Headers Required"
+    This feature requires your API to return `Location` headers pointing to created or updated resources.
 
 ## How Schemathesis Extends OpenAPI Links
 
