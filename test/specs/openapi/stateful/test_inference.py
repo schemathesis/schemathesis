@@ -22,6 +22,17 @@ def assert_links_work(response_factory, location, results, schema):
             expressions.evaluate(expr, output)
 
 
+def build_links(inferencer, location: str) -> list[dict]:
+    """Build all possible OpenAPI link definitions from Location header."""
+    normalized_location = inferencer._normalize_location(location)
+    if normalized_location is None:
+        return []
+    matches = inferencer._find_matches_from_normalized_location(normalized_location)
+    if matches is None:
+        return []
+    return inferencer._build_links_from_matches(matches)
+
+
 def link_by_id(operation_id: str, **parameters):
     return _link_by("operationId", operation_id, **parameters)
 
@@ -230,7 +241,7 @@ def test_build_location_link(paths, location, expected, response_factory):
         {"openapi": "3.1.0", "info": {"title": "Test API", "version": "0.0.1"}, "paths": paths}
     )
     inferencer = LinkInferencer.from_schema(schema)
-    results = inferencer.build_links(location)
+    results = build_links(inferencer, location)
     assert results == expected
     if results:
         assert_links_work(response_factory, location, results, schema)
@@ -242,9 +253,9 @@ def test_build_location_link_empty_path():
     )
     inferencer = LinkInferencer.from_schema(schema)
 
-    assert inferencer.build_links("") == []
-    assert inferencer.build_links("   ") == []
-    assert inferencer.build_links("not-a-path") == []
+    assert build_links(inferencer, "") == []
+    assert build_links(inferencer, "   ") == []
+    assert build_links(inferencer, "not-a-path") == []
 
 
 @pytest.mark.parametrize(
@@ -326,7 +337,7 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
     schema.config.base_url = base_url
 
     inferencer = LinkInferencer.from_schema(schema)
-    results = inferencer.build_links(location)
+    results = build_links(inferencer, location)
     assert results == expected
 
     if results:
@@ -387,7 +398,7 @@ def test_build_links_with_base_url(base_url, paths, location, expected, response
 def test_build_links_all_methods(paths, location, expected, response_factory):
     schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "paths": paths})
     inferencer = LinkInferencer.from_schema(schema)
-    results = inferencer.build_links(location)
+    results = build_links(inferencer, location)
     assert results == expected
 
     if results:
@@ -397,7 +408,8 @@ def test_build_links_all_methods(paths, location, expected, response_factory):
 def test_build_links_no_paths_in_schema():
     # OpenAPI 3.1.0 allows schemas without paths
     schema = schemathesis.openapi.from_dict({"openapi": "3.1.0", "info": {"title": "Test", "version": "1.0"}})
-    assert LinkInferencer.from_schema(schema).build_links("/users/123") == []
+    inferencer = LinkInferencer.from_schema(schema)
+    assert build_links(inferencer, "/users/123") == []
 
 
 def test_build_links_path_item_with_ref():
@@ -422,7 +434,8 @@ def test_build_links_path_item_with_ref():
 
     schema = schemathesis.openapi.from_dict(raw_schema)
 
-    assert LinkInferencer.from_schema(schema).build_links("/users/123") == [
+    inferencer = LinkInferencer.from_schema(schema)
+    assert build_links(inferencer, "/users/123") == [
         link_by_id("getUserById", userId="/users/(.+)"),
         link_by_id("updateUser", userId="/users/(.+)"),
         link_by_id("deleteUser", userId="/users/(.+)"),
@@ -443,10 +456,10 @@ def test_build_links_path_item_broken_ref():
     inferencer = LinkInferencer.from_schema(schema)
 
     # Broken ref should not cause crashes, should just skip that path
-    assert inferencer.build_links("/orders/456") == [link_by_id("getOrder", orderId="/orders/(.+)")]
+    assert build_links(inferencer, "/orders/456") == [link_by_id("getOrder", orderId="/orders/(.+)")]
 
     # The broken ref path should not match anything
-    assert inferencer.build_links("/users/123") == []
+    assert build_links(inferencer, "/users/123") == []
 
 
 def test_build_links_mixed_ref_and_inline_paths():
@@ -467,7 +480,8 @@ def test_build_links_mixed_ref_and_inline_paths():
 
     schema = schemathesis.openapi.from_dict(raw_schema)
 
-    assert LinkInferencer.from_schema(schema).build_links("/users/123") == [
+    inferencer = LinkInferencer.from_schema(schema)
+    assert build_links(inferencer, "/users/123") == [
         link_by_id("getUser", userId="/users/(.+)"),
         link_by_id("updateUser", userId="/users/(.+)"),
         link_by_id("getUserPosts", userId="/users/(.+)"),
@@ -487,19 +501,19 @@ def test_build_links_no_base_url_configured():
     inferencer = LinkInferencer.from_schema(schema)
 
     # Relative Location should work fine
-    assert inferencer.build_links("/users/123") == [
+    assert build_links(inferencer, "/users/123") == [
         link_by_id("getUserById", userId="/users/(.+)"),
         link_by_id("updateUser", userId="/users/(.+)"),
     ]
 
     # Absolute Location should be ignored (can't validate without base_url)
-    assert inferencer.build_links("http://api.example.com/users/123") == []
+    assert build_links(inferencer, "http://api.example.com/users/123") == []
 
     # Different absolute URLs should also be ignored
-    assert inferencer.build_links("https://localhost:8080/api/v1/users/123") == []
+    assert build_links(inferencer, "https://localhost:8080/api/v1/users/123") == []
 
     # Another relative path should work
-    assert inferencer.build_links("/users/456") == [
+    assert build_links(inferencer, "/users/456") == [
         link_by_id("getUserById", userId="/users/(.+)"),
         link_by_id("updateUser", userId="/users/(.+)"),
     ]

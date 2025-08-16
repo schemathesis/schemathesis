@@ -112,17 +112,6 @@ class LinkInferencer:
         except (NotFound, MethodNotAllowed):
             return None
 
-    def build_links(self, location: str) -> list[dict]:
-        """Build all possible OpenAPI link definitions from Location header."""
-        # TODO: Move to tests?
-        normalized_location = self._normalize_location(location)
-        if normalized_location is None:
-            return []
-        matches = self._find_matches_from_normalized_location(normalized_location)
-        if matches is None:
-            return []
-        return self._build_links_from_matches(matches)
-
     def _build_links_from_matches(self, matches: MatchList) -> list[dict]:
         """Build links from already-found matches."""
         exact = self._build_link_from_match(matches.exact, matches.parameters)
