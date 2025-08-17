@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(stateful=StatefulPhaseConfig(inference=InferenceConfig(enabled=False))))))

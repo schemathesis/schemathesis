@@ -33,7 +33,7 @@ class Engine:
             if (
                 phase.name == PhaseName.STATEFUL_TESTING
                 and phase.skip_reason in (None, PhaseSkipReason.NOT_APPLICABLE)
-                and self.schema.config.phases.stateful.inference.enabled
+                and self.schema.config.phases.stateful.inference.is_enabled
             ):
                 observations = Observations()
 

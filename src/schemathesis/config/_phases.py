@@ -111,24 +111,27 @@ class CoveragePhaseConfig(DiffBase):
 
 @dataclass(repr=False)
 class InferenceConfig(DiffBase):
-    enabled: bool
-    # Right now there is just a single algorithm to infer links
-    # When more algorithms will appear, this config could be extended with `list[InferenceAlgorithm]`
+    algorithms: list[str]
 
-    __slots__ = ("enabled",)
+    __slots__ = ("algorithms",)
 
     def __init__(
         self,
         *,
-        enabled: bool = True,
+        algorithms: list[str] | None = None,
     ) -> None:
-        self.enabled = enabled
+        self.algorithms = algorithms if algorithms is not None else ["location-headers"]
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> InferenceConfig:
         return cls(
-            enabled=data.get("enabled", True),
+            algorithms=data.get("algorithms", ["location-headers"]),
         )
+
+    @property
+    def is_enabled(self) -> bool:
+        """Inference is enabled if any algorithms are configured."""
+        return bool(self.algorithms)
 
 
 @dataclass(repr=False)

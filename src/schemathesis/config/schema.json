@@ -320,8 +320,15 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "enabled": {
-              "type": "boolean"
+            "algorithms": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "location-headers"
+                ]
+              },
+              "uniqueItems": true
             }
           }
         },
