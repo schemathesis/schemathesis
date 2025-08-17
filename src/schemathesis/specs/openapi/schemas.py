@@ -238,11 +238,14 @@ class BaseOpenAPISchema(BaseSchema):
         except KeyError:
             return
         resolve = self.resolver.resolve
+        should_skip = self._should_skip
         for path, path_item in paths.items():
             try:
                 if "$ref" in path_item:
                     _, path_item = resolve(path_item["$ref"])
                 for method, definition in path_item.items():
+                    if should_skip(path, method, definition):
+                        continue
                     yield (method, path, definition)
             except SCHEMA_PARSING_ERRORS:
                 continue
