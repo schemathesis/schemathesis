@@ -13,7 +13,6 @@ import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
-from schemathesis.engine.repository import DataRepository
 from schemathesis.generation.modes import GenerationMode
 
 
@@ -531,7 +530,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         if include is not None:
             schema = schema.include(**include)
         return stateful.execute(
-            engine=EngineContext(schema=schema, repository=DataRepository([]), stop_event=stop_event),
+            engine=EngineContext(schema=schema, stop_event=stop_event),
             phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 

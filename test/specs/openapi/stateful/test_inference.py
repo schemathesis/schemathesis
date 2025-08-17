@@ -2,7 +2,7 @@ import pytest
 from flask import Flask, jsonify, request
 
 import schemathesis
-from schemathesis.core.repository import LocationHeaderEntry
+from schemathesis.engine.observations import LocationHeaderEntry
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer

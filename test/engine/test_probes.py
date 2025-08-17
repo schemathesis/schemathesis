@@ -8,12 +8,11 @@ from requests import Session
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import probes
-from schemathesis.engine.repository import DataRepository
 
 
 @pytest.fixture()
 def ctx(openapi_30):
-    return EngineContext(schema=openapi_30, repository=DataRepository([]), stop_event=threading.Event())
+    return EngineContext(schema=openapi_30, stop_event=threading.Event())
 
 
 HERE = Path(__file__).absolute().parent

@@ -20,14 +20,15 @@ from urllib.parse import urlsplit
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, Rule
 
-from schemathesis.core.repository import LocationHeaderEntry
-
 if TYPE_CHECKING:
+    from schemathesis.engine.observations import LocationHeaderEntry
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
 @dataclass(unsafe_hash=True)
 class EndpointById:
+    """Endpoint identified by operationId."""
+
     value: str
     method: str
     path: str
@@ -40,6 +41,8 @@ class EndpointById:
 
 @dataclass(unsafe_hash=True)
 class EndpointByRef:
+    """Endpoint identified by JSON reference path."""
+
     value: str
     method: str
     path: str
@@ -57,6 +60,8 @@ SeenLinkKey = tuple[str, str, int, tuple[str, ...]]
 
 @dataclass
 class MatchList:
+    """Results of matching a location path against schema endpoints."""
+
     exact: Endpoint
     inexact: list[Endpoint]
     parameters: Mapping[str, Any]
@@ -214,17 +219,20 @@ class LinkInferencer:
         for entry in entries:
             location = self._normalize_location(entry.value)
             if location is None:
+                # Skip invalid/empty locations or absolute URLs that don't match base_url
                 continue
 
             matches = self._find_matches_from_normalized_location(location)
             if matches is None:
+                # Skip locations that don't match any schema endpoints
                 continue
 
             key = (matches.exact.method, matches.exact.path, entry.status_code, tuple(sorted(matches.parameters)))
             if key in seen:
+                # Skip duplicate link generation for same operation/status/parameters combination
                 continue
             seen.add(key)
-            # Find the right bucket for the response status
+            # Find the right bucket for the response status or create a new one
             definition = _get_response_definition_by_status(entry.status_code, responses)
             if definition is None:
                 definition = responses.setdefault(str(entry.status_code), {})
