@@ -4,18 +4,19 @@
 
 ### :rocket: Added
 
+- **Automatic Link Inference**: Schemathesis now automatically generates OpenAPI links by analyzing `Location` headers from API responses. [#2953](https://github.com/schemathesis/schemathesis/issues/2953) 
 - `--max-redirects` CLI & config file option. [#712](https://github.com/schemathesis/schemathesis/issues/712)
 - `enabled` config file option to disable all test phases. [#2951](https://github.com/schemathesis/schemathesis/issues/2951)
+- Support PyPy3.
 
 ### :bug: Fixed
 
 - Ignored `codec` for header generation.
-- Property try to load schema as YAML if the `Content-Type` header is unknown.
+- Properly try to load schema as YAML if the `Content-Type` header is unknown.
 
 ### :wrench: Changed
 
 - `before_call` hooks now accept `kwargs` as a regular parameter instead of `**kwargs`. There is a backward compatibility shim for existing hooks with `**kwargs` signatures. The old calling convention will be removed in Schemathesis 5.0. [#3028](https://github.com/schemathesis/schemathesis/issues/3028)
-- Schemathesis now runs under pypy3
 
 ## [4.0.26](https://github.com/schemathesis/schemathesis/compare/v4.0.25...v4.0.26) - 2025-08-12
 
