@@ -6,15 +6,17 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.engine.control import ExecutionControl
+from schemathesis.engine.observations import Observations
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
-
-from .control import ExecutionControl
 
 if TYPE_CHECKING:
     import threading
 
     import requests
+
+    from schemathesis.engine.recorder import ScenarioRecorder
 
 
 @dataclass
@@ -25,20 +27,31 @@ class EngineContext:
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
     start_time: float
+    observations: Observations | None
 
-    __slots__ = ("schema", "control", "outcome_cache", "start_time", "_session", "_transport_kwargs_cache")
+    __slots__ = (
+        "schema",
+        "control",
+        "outcome_cache",
+        "start_time",
+        "observations",
+        "_session",
+        "_transport_kwargs_cache",
+    )
 
     def __init__(
         self,
         *,
         schema: BaseSchema,
         stop_event: threading.Event,
+        observations: Observations | None = None,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
         self.control = ExecutionControl(stop_event=stop_event, max_failures=schema.config.max_failures)
         self.outcome_cache = {}
         self.start_time = time.monotonic()
+        self.observations = observations
         self._session = session
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
 
@@ -64,6 +77,27 @@ class EngineContext:
     @property
     def has_reached_the_failure_limit(self) -> bool:
         return self.control.has_reached_the_failure_limit
+
+    def record_observations(self, recorder: ScenarioRecorder) -> None:
+        """Add new observations from a scenario."""
+        if self.observations is not None:
+            self.observations.extract_observations_from(recorder)
+
+    def inject_links(self) -> int:
+        """Inject inferred OpenAPI links into API operations based on collected observations."""
+        injected = 0
+        if self.observations is not None and self.observations.location_headers:
+            from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+            from schemathesis.specs.openapi.stateful.inference import LinkInferencer
+
+            assert isinstance(self.schema, BaseOpenAPISchema)
+
+            # Generate links from collected Location headers
+            inferencer = LinkInferencer.from_schema(self.schema)
+            for operation, entries in self.observations.location_headers.items():
+                injected += inferencer.inject_links(operation.definition.raw, entries)
+
+        return injected
 
     def stop(self) -> None:
         self.control.stop()

@@ -77,6 +77,11 @@ class Phase:
         """Determine if phase should run based on context & configuration."""
         return self.is_enabled and not ctx.has_to_stop
 
+    def enable(self) -> None:
+        """Enable this test phase."""
+        self.is_enabled = True
+        self.skip_reason = None
+
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning

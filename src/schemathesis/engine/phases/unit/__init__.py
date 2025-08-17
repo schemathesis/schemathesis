@@ -76,6 +76,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                                 status = event.status
                             if event.status in (Status.ERROR, Status.FAILURE):
                                 engine.control.count_failure()
+                            engine.record_observations(event.recorder)
                         if isinstance(event, events.Interrupted) or engine.is_interrupted:
                             status = Status.INTERRUPTED
                             engine.stop()

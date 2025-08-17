@@ -77,6 +77,43 @@ paths:
 - Create user → Create user's orders → Get order details
 - Create parent → Create children → Get parent with children
 
+### Automatic Link Inference
+
+Writing OpenAPI links manually for every operation relationship can be time-consuming and error-prone. Schemathesis can automatically infer many of these connections by analyzing `Location` headers from API responses during testing.
+
+**How it works:**
+
+1. **Data collection**: During earlier test phases, Schemathesis collects `Location` headers from API responses
+2. **Pattern analysis**: It analyzes these headers to understand how your API structures resource locations
+3. **Connection mapping**: Creates connections between operations - it learns how to extract parameters from `Location` headers and use them to call related operations
+4. **Stateful testing**: Uses this knowledge to chain operations together with real parameter values
+
+**Example:**
+
+**Phase 1 - Learning**: During fuzzing, Schemathesis observes:
+
+```http
+POST /users → 201 Created
+Location: /users/123
+```
+
+From this, it learns these connections:
+
+- `GET /users/{userId}` - can be called using `userId` extracted from `Location`
+- `PUT /users/{userId}` - can be called using `userId` extracted from `Location`
+- `GET /users/{userId}/posts` - can be called using `userId` extracted from `Location`
+
+**Phase 2 - Application**: During stateful testing, it uses this knowledge:
+
+```http
+POST /users → Location: /users/456 → automatically calls GET /users/456, PUT /users/456, etc.
+```
+
+This happens automatically when stateful testing is enabled - no additional configuration required.
+
+!!! note "Location Headers Required"
+    This feature requires your API to return `Location` headers pointing to created or updated resources.
+
 ## How Schemathesis Extends OpenAPI Links
 
 ### Regex Extraction from Headers and Query Parameters

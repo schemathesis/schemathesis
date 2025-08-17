@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
-from typing import Sequence
 
-from schemathesis.auths import unregister as unregister_auth
+from schemathesis import auths
 from schemathesis.core import SpecificationFeature
 from schemathesis.engine import Status, events, phases
+from schemathesis.engine.observations import Observations
 from schemathesis.schemas import BaseSchema
 
 from .context import EngineContext
-from .events import EventGenerator
+from .events import EventGenerator, StatefulPhasePayload
 from .phases import Phase, PhaseName, PhaseSkipReason
 
 
@@ -24,10 +24,20 @@ class Engine:
         """Execute all test phases."""
         # Unregister auth if explicitly provided
         if self.schema.config.auth.is_defined:
-            unregister_auth()
+            auths.unregister()
 
-        ctx = EngineContext(schema=self.schema, stop_event=threading.Event())
         plan = self._create_execution_plan()
+
+        observations = None
+        for phase in plan.phases:
+            if (
+                phase.name == PhaseName.STATEFUL_TESTING
+                and phase.skip_reason in (None, PhaseSkipReason.NOT_APPLICABLE)
+                and self.schema.config.phases.stateful.inference.is_enabled
+            ):
+                observations = Observations()
+
+        ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), observations=observations)
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
     def _create_execution_plan(self) -> ExecutionPlan:
@@ -103,7 +113,7 @@ class Engine:
 class ExecutionPlan:
     """Manages test execution phases."""
 
-    phases: Sequence[Phase]
+    phases: list[Phase]
 
     __slots__ = ("phases",)
 
@@ -120,9 +130,8 @@ class ExecutionPlan:
 
             # Run main phases
             for phase in self.phases:
-                if engine.has_reached_the_failure_limit:
-                    phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
-                yield events.PhaseStarted(phase=phase)
+                payload = self._adapt_execution(engine, phase)
+                yield events.PhaseStarted(phase=phase, payload=payload)
                 if phase.should_execute(engine):
                     yield from phases.execute(engine, phase)
                 else:
@@ -142,6 +151,18 @@ class ExecutionPlan:
     def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
         yield events.EngineFinished(running_time=ctx.running_time)
+
+    def _adapt_execution(self, engine: EngineContext, phase: Phase) -> StatefulPhasePayload | None:
+        if engine.has_reached_the_failure_limit:
+            phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
+        # Phase can be enabled if certain conditions are met
+        if phase.name == PhaseName.STATEFUL_TESTING:
+            inferred = engine.inject_links()
+            # Enable stateful testing if we successfully generated any links
+            if inferred:
+                phase.enable()
+            return StatefulPhasePayload(inferred_links=inferred)
+        return None
 
 
 @dataclass
