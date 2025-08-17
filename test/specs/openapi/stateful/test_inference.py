@@ -669,7 +669,7 @@ def user_api_app(user_api_schema):
         user_id = next_id
         next_id += 1
 
-        users[user_id] = {"id": user_id, "name": data.get("name", "DefaultName"), "corrupted": False}
+        users[user_id] = {"id": user_id, "name": str(data.get("name", "DefaultName")), "corrupted": False}
 
         return jsonify({"id": user_id}), 201, {"Location": f"/users/{user_id}"}
 
