@@ -691,6 +691,41 @@ def test_inference_disabled_via_config(cli, app_runner, snapshot_cli, user_api_a
     )
 
 
+def test_location_points_to_nonexistent_endpoint(cli, app_runner, snapshot_cli, ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "create_item",
+                    "responses": {"201": {"description": "Item created"}},
+                }
+            },
+            # Note: No /items/{itemId} endpoint defined
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        # Returns Location pointing to endpoint not defined in schema
+        return jsonify({"message": "created"}), 201, {"Location": "/items/123"}
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            "--max-examples=5",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing,stateful",
+        )
+        == snapshot_cli
+    )
+
+
 def test_inject_links_location_normalization_returns_none():
     schema = schemathesis.openapi.from_dict(
         {

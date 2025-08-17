@@ -10,7 +10,7 @@ from schemathesis.engine.observations import Observations
 from schemathesis.schemas import BaseSchema
 
 from .context import EngineContext
-from .events import EventGenerator
+from .events import EventGenerator, StatefulPhasePayload
 from .phases import Phase, PhaseName, PhaseSkipReason
 
 
@@ -130,8 +130,8 @@ class ExecutionPlan:
 
             # Run main phases
             for phase in self.phases:
-                self._adapt_execution(engine, phase)
-                yield events.PhaseStarted(phase=phase)
+                payload = self._adapt_execution(engine, phase)
+                yield events.PhaseStarted(phase=phase, payload=payload)
                 if phase.should_execute(engine):
                     yield from phases.execute(engine, phase)
                 else:
@@ -152,16 +152,17 @@ class ExecutionPlan:
         """Finish the test run."""
         yield events.EngineFinished(running_time=ctx.running_time)
 
-    def _adapt_execution(self, engine: EngineContext, phase: Phase) -> None:
+    def _adapt_execution(self, engine: EngineContext, phase: Phase) -> StatefulPhasePayload | None:
         if engine.has_reached_the_failure_limit:
             phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
         # Phase can be enabled if certain conditions are met
-        #
         if phase.name == PhaseName.STATEFUL_TESTING:
-            injected = engine.inject_links()
+            inferred = engine.inject_links()
             # Enable stateful testing if we successfully generated any links
-            if injected:
+            if inferred:
                 phase.enable()
+            return StatefulPhasePayload(inferred_links=inferred)
+        return None
 
 
 @dataclass
