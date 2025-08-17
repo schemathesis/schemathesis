@@ -10,6 +10,7 @@
 ### :bug: Fixed
 
 - Ignored `codec` for header generation.
+- Property try to load schema as YAML if the `Content-Type` header is unknown.
 
 ### :wrench: Changed
 

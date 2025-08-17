@@ -282,7 +282,7 @@ def load_content(content: str, content_type: ContentType) -> dict[str, Any]:
     # If type is unknown, try JSON first, then YAML
     try:
         return _load_json(content)
-    except json.JSONDecodeError:
+    except LoaderError:
         return _load_yaml(content)
 
 
