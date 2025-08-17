@@ -330,6 +330,61 @@ def test_build_location_link_empty_path():
             "http://localhost:8080/api/users/123#profile",
             [link_by_id("getUserById", userId="/users/(.+)")],
         ),
+        # Relative Location includes base path - should be stripped
+        (
+            "http://api.example.com/api/v1",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/api/v1/users/123",
+            [link_by_id("getUserById", userId="/users/(.+)")],
+        ),
+        # Multiple levels of base path
+        (
+            "http://api.example.com/api/v2/internal",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/api/v2/internal/users/123",
+            [link_by_id("getUserById", userId="/users/(.+)")],
+        ),
+        # Location has wrong base path - should not match
+        (
+            "http://api.example.com/api/v1",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/api/v2/users/123",
+            [],
+        ),
+        # Location has partial base path - should not match
+        (
+            "http://api.example.com/api/v1",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/api/users/123",
+            [],
+        ),
+        # Base path with special characters
+        (
+            "http://api.example.com/api-v1.0",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/api-v1.0/users/123",
+            [link_by_id("getUserById", userId="/users/(.+)")],
+        ),
+        # Complex prefix matching with base path
+        (
+            "http://api.example.com/v1",
+            {
+                "/users/{userId}": {"get": {"operationId": "getUser"}},
+                "/users/{userId}/posts/{postId}": {"get": {"operationId": "getUserPost"}},
+            },
+            "/v1/users/123",
+            [
+                link_by_id("getUser", userId="/users/(.+)"),
+                link_by_id("getUserPost", userId="/users/(.+)"),
+            ],
+        ),
+        # Base path with trailing slash, Location without - should still work
+        (
+            "http://api.example.com/api/v1/",
+            {"/users/{userId}": {"get": {"operationId": "getUserById"}}},
+            "/api/v1/users/123",
+            [link_by_id("getUserById", userId="/users/(.+)")],
+        ),
     ],
 )
 def test_build_links_with_base_url(base_url, paths, location, expected, response_factory):

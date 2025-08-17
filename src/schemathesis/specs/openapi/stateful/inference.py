@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
 
 @dataclass(unsafe_hash=True)
-class EndpointById:
-    """Endpoint identified by operationId."""
+class OperationById:
+    """API operation identified by operationId."""
 
     value: str
     method: str
@@ -40,8 +40,8 @@ class EndpointById:
 
 
 @dataclass(unsafe_hash=True)
-class EndpointByRef:
-    """Endpoint identified by JSON reference path."""
+class OperationByRef:
+    """API operation identified by JSON reference path."""
 
     value: str
     method: str
@@ -53,17 +53,17 @@ class EndpointByRef:
         return {"operationRef": self.value, "x-inferred": True}
 
 
-Endpoint = Union[EndpointById, EndpointByRef]
+OperationReference = Union[OperationById, OperationByRef]
 # Method, path, response code, sorted path parameter names
 SeenLinkKey = tuple[str, str, int, tuple[str, ...]]
 
 
 @dataclass
 class MatchList:
-    """Results of matching a location path against schema endpoints."""
+    """Results of matching a location path against API operation."""
 
-    exact: Endpoint
-    inexact: list[Endpoint]
+    exact: OperationReference
+    inexact: list[OperationReference]
     parameters: Mapping[str, Any]
 
     __slots__ = ("exact", "inexact", "parameters")
@@ -74,44 +74,44 @@ class LinkInferencer:
     """Infer OpenAPI links from Location headers for stateful testing."""
 
     _adapter: MapAdapter
-    # All endpoints for prefix matching
-    _endpoints: list[Endpoint]
+    # All API operations for prefix matching
+    _operations: list[OperationReference]
     _base_url: str | None
     _base_path: str
     _links_field_name: str
 
-    __slots__ = ("_adapter", "_endpoints", "_base_url", "_base_path", "_links_field_name")
+    __slots__ = ("_adapter", "_operations", "_base_url", "_base_path", "_links_field_name")
 
     @classmethod
     def from_schema(cls, schema: BaseOpenAPISchema) -> LinkInferencer:
         # NOTE: Use `matchit` for routing in the future
         rules = []
-        endpoints = []
+        operations = []
         for method, path, definition in schema._operation_iter():
             operation_id = definition.get("operationId")
-            endpoint: EndpointById | EndpointByRef
+            operation: OperationById | OperationByRef
             if operation_id:
-                endpoint = EndpointById(operation_id, method=method, path=path)
+                operation = OperationById(operation_id, method=method, path=path)
             else:
                 encoded_path = path.replace("~", "~0").replace("/", "~1")
-                endpoint = EndpointByRef(f"#/paths/{encoded_path}/{method}", method=method, path=path)
+                operation = OperationByRef(f"#/paths/{encoded_path}/{method}", method=method, path=path)
 
-            endpoints.append(endpoint)
+            operations.append(operation)
 
             # Replace `{parameter}` with `<parameter>` as angle brackets are used for parameters in werkzeug
             path = re.sub(r"\{([^}]+)\}", r"<\1>", path)
-            rules.append(Rule(path, endpoint=endpoint, methods=[method.upper()]))
+            rules.append(Rule(path, endpoint=operation, methods=[method.upper()]))
 
         return cls(
             _adapter=Map(rules).bind("", ""),
-            _endpoints=endpoints,
+            _operations=operations,
             _base_url=schema.config.base_url,
             _base_path=schema.base_path,
             _links_field_name=schema.links_field,
         )
 
-    def match(self, path: str) -> tuple[Endpoint, Mapping[str, str]] | None:
-        """Match path to endpoint and extract path parameters."""
+    def match(self, path: str) -> tuple[OperationReference, Mapping[str, str]] | None:
+        """Match path to API operation and extract path parameters."""
         try:
             return self._adapter.match(path)
         except (NotFound, MethodNotAllowed):
@@ -134,7 +134,7 @@ class LinkInferencer:
         match = self.match(normalized_location)
         if not match:
             # It may happen that there is no match, but it is unlikely as the API assumed to return a valid Location
-            # that points to existing endpoint. In such cases, if they appear in practice the logic here could be extended
+            # that points to an existing API operation. In such cases, if they appear in practice the logic here could be extended
             # to support partial matches
             return None
         exact, parameters = match
@@ -149,7 +149,7 @@ class LinkInferencer:
         #  Location: /users/123 -> /users/{user_id} (exact match)
         #  /users/{user_id}/posts , /users/{user_id}/posts/{post_id} (partial matches)
         #
-        for candidate in self._endpoints:
+        for candidate in self._operations:
             if candidate == exact:
                 continue
             if candidate.path.startswith(exact.path):
@@ -158,15 +158,15 @@ class LinkInferencer:
         return matches
 
     def _build_link_from_match(
-        self, endpoint: EndpointById | EndpointByRef, path_parameters: Mapping[str, Any]
+        self, operation: OperationById | OperationByRef, path_parameters: Mapping[str, Any]
     ) -> dict:
-        link = endpoint.to_link_base()
+        link = operation.to_link_base()
 
         # Build regex expressions to extract path parameters
         parameters = {}
         for name in path_parameters:
             # Replace the target parameter with capture group and others with non-slash matcher
-            pattern = endpoint.path
+            pattern = operation.path
             for candidate in path_parameters:
                 if candidate == name:
                     pattern = pattern.replace(f"{{{candidate}}}", "(.+)")
@@ -198,15 +198,21 @@ class LinkInferencer:
             if parsed.scheme != base_parsed.scheme or parsed.netloc != base_parsed.netloc:
                 return None
 
-            base_path = self._base_path.rstrip("/")
-            if not parsed.path.startswith(base_path):
-                return None
+            return self._strip_base_path_from_location(parsed.path)
 
-            # Strip the base path to get relative path
-            relative_path = parsed.path[len(base_path) :]
-            return relative_path if relative_path.startswith("/") else "/" + relative_path
-        # Relative URL - use as is
-        return location
+        # Relative URL - strip base path if present, otherwise use as-is
+        stripped = self._strip_base_path_from_location(location)
+        return stripped if stripped is not None else location
+
+    def _strip_base_path_from_location(self, path: str) -> str | None:
+        """Strip base path from location path if it starts with base path."""
+        base_path = self._base_path.rstrip("/")
+        if not path.startswith(base_path):
+            return None
+
+        # Strip the base path to get relative path
+        relative_path = path[len(base_path) :]
+        return relative_path if relative_path.startswith("/") else "/" + relative_path
 
     def inject_links(self, operation: dict[str, Any], entries: list[LocationHeaderEntry]) -> int:
         from schemathesis.specs.openapi.schemas import _get_response_definition_by_status
@@ -224,7 +230,7 @@ class LinkInferencer:
 
             matches = self._find_matches_from_normalized_location(location)
             if matches is None:
-                # Skip locations that don't match any schema endpoints
+                # Skip locations that don't match any API apiration
                 continue
 
             key = (matches.exact.method, matches.exact.path, entry.status_code, tuple(sorted(matches.parameters)))
