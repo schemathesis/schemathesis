@@ -687,6 +687,7 @@ def test_stateful_disabled_skips_link_inference(cli, app_runner, snapshot_cli, u
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
+            config={"warnings": False},
         )
         == snapshot_cli
     )
