@@ -110,13 +110,36 @@ class CoveragePhaseConfig(DiffBase):
 
 
 @dataclass(repr=False)
+class InferenceConfig(DiffBase):
+    enabled: bool
+    # Right now there is just a single algorithm to infer links
+    # When more algorithms will appear, this config could be extended with `list[InferenceAlgorithm]`
+
+    __slots__ = ("enabled",)
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+    ) -> None:
+        self.enabled = enabled
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> InferenceConfig:
+        return cls(
+            enabled=data.get("enabled", True),
+        )
+
+
+@dataclass(repr=False)
 class StatefulPhaseConfig(DiffBase):
     enabled: bool
     generation: GenerationConfig
     checks: ChecksConfig
     max_steps: int
+    inference: InferenceConfig
 
-    __slots__ = ("enabled", "generation", "checks", "max_steps")
+    __slots__ = ("enabled", "generation", "checks", "max_steps", "inference")
 
     def __init__(
         self,
@@ -125,11 +148,13 @@ class StatefulPhaseConfig(DiffBase):
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
         max_steps: int | None = None,
+        inference: InferenceConfig | None = None,
     ) -> None:
         self.enabled = enabled
         self.max_steps = max_steps or DEFAULT_STATEFUL_STEP_COUNT
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
+        self.inference = inference or InferenceConfig()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StatefulPhaseConfig:
@@ -138,6 +163,7 @@ class StatefulPhaseConfig(DiffBase):
             max_steps=data.get("max-steps"),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
+            inference=InferenceConfig.from_dict(data.get("inference", {})),
         )
 
 

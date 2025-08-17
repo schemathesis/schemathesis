@@ -316,6 +316,15 @@
           "type": "integer",
           "minimum": 2
         },
+        "inference": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
         "generation": {
           "$ref": "#/$defs/GenerationConfig"
         },

@@ -490,6 +490,22 @@ These settings can only be applied at the project level.
     max-steps = 50
     ```
 
+#### `phases.stateful.inference.enabled`
+
+!!! note ""
+
+    **Type**: `Boolean`  
+    **Default**: `true`  
+
+    Controls whether automatic link inference is enabled during the **stateful** phase. When enabled, Schemathesis automatically analyzes `Location` headers from API responses collected during earlier phases and generates OpenAPI links to enable stateful testing of operation chains.
+
+    Disable this if you prefer to define all stateful testing relationships manually through explicit OpenAPI links in your schema.
+
+    ```toml
+    [phases.stateful.inference]
+    enabled = false
+    ```
+
 #### `phases.<phase>.checks`
 
 !!! note "" 

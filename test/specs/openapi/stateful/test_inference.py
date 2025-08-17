@@ -664,7 +664,6 @@ def test_link_inference_discovers_corruption_bug(cli, app_runner, snapshot_cli, 
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_disabled_skips_link_inference(cli, app_runner, snapshot_cli, user_api_app):
     port = app_runner.run_flask_app(user_api_app)
     assert (
@@ -673,6 +672,20 @@ def test_stateful_disabled_skips_link_inference(cli, app_runner, snapshot_cli, u
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
+        )
+        == snapshot_cli
+    )
+
+
+def test_inference_disabled_via_config(cli, app_runner, snapshot_cli, user_api_app):
+    port = app_runner.run_flask_app(user_api_app)
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c response_schema_conformance",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing,stateful",
+            config={"phases": {"stateful": {"inference": {"enabled": False}}}},
         )
         == snapshot_cli
     )

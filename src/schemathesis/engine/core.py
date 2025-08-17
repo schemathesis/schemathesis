@@ -30,7 +30,11 @@ class Engine:
 
         observations = None
         for phase in plan.phases:
-            if phase.name == PhaseName.STATEFUL_TESTING and phase.skip_reason in (None, PhaseSkipReason.NOT_APPLICABLE):
+            if (
+                phase.name == PhaseName.STATEFUL_TESTING
+                and phase.skip_reason in (None, PhaseSkipReason.NOT_APPLICABLE)
+                and self.schema.config.phases.stateful.inference.enabled
+            ):
                 observations = Observations()
 
         ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), observations=observations)
