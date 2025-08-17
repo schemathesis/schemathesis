@@ -592,6 +592,7 @@ class StatefulProgressManager:
     console: Console
     title: str
     links_selected: int
+    links_inferred: int
     links_total: int
     start_time: float
 
@@ -616,6 +617,7 @@ class StatefulProgressManager:
         "console",
         "title",
         "links_selected",
+        "links_inferred",
         "links_total",
         "start_time",
         "title_progress",
@@ -631,13 +633,16 @@ class StatefulProgressManager:
         "is_interrupted",
     )
 
-    def __init__(self, *, console: Console, title: str, links_selected: int, links_total: int) -> None:
+    def __init__(
+        self, *, console: Console, title: str, links_selected: int, links_inferred: int, links_total: int
+    ) -> None:
         from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
         from rich.style import Style
 
         self.console = console
         self.title = title
         self.links_selected = links_selected
+        self.links_inferred = links_inferred
         self.links_total = links_total
         self.start_time = time.monotonic()
 
@@ -686,9 +691,10 @@ class StatefulProgressManager:
 
         # Initialize progress displays
         self.title_task_id = self.title_progress.add_task("Stateful")
-        self.progress_task_id = self.progress_bar.add_task(
-            "", scenarios=0, links=f"0 covered / {self.links_selected} selected / {self.links_total} total links"
-        )
+        links = f"0 covered / {self.links_selected} selected / {self.links_total} total"
+        if self.links_inferred:
+            links += f" ({self.links_inferred} inferred)"
+        self.progress_task_id = self.progress_bar.add_task("", scenarios=0, links=links)
 
         # Create live display
         group = Group(
@@ -720,11 +726,10 @@ class StatefulProgressManager:
     def _update_progress_display(self) -> None:
         """Update the progress display."""
         assert self.progress_task_id is not None
-        self.progress_bar.update(
-            self.progress_task_id,
-            scenarios=self.scenarios,
-            links=f"{len(self.links_covered)} covered / {self.links_selected} selected / {self.links_total} total links",
-        )
+        links = f"{len(self.links_covered)} covered / {self.links_selected} selected / {self.links_total} total"
+        if self.links_inferred:
+            links += f" ({self.links_inferred} inferred)"
+        self.progress_bar.update(self.progress_task_id, scenarios=self.scenarios, links=links)
 
     def _get_stats_message(self) -> str:
         """Get formatted stats message."""
@@ -888,7 +893,7 @@ class OutputHandler(EventHandler):
         elif phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING] and phase.is_enabled:
             self._start_unit_tests(phase.name)
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
-            self._start_stateful_tests()
+            self._start_stateful_tests(event)
 
     def _start_probing(self) -> None:
         self.probing_manager = ProbingProgressManager(console=self.console)
@@ -904,13 +909,18 @@ class OutputHandler(EventHandler):
         )
         self.unit_tests_manager.start()
 
-    def _start_stateful_tests(self) -> None:
+    def _start_stateful_tests(self, event: events.PhaseStarted) -> None:
         assert self.statistic is not None
+        assert event.payload is not None
+        # Total number of links - original ones + inferred during tests
+        links_selected = self.statistic.links.selected + event.payload.inferred_links
+        links_total = self.statistic.links.total + event.payload.inferred_links
         self.stateful_tests_manager = StatefulProgressManager(
             console=self.console,
             title="Stateful",
-            links_selected=self.statistic.links.selected,
-            links_total=self.statistic.links.total,
+            links_selected=links_selected,
+            links_inferred=event.payload.inferred_links,
+            links_total=links_total,
         )
         self.stateful_tests_manager.start()
 
@@ -990,10 +1000,10 @@ class OutputHandler(EventHandler):
             table.add_column("Field", style=Style(color="bright_white", bold=True))
             table.add_column("Value", style="cyan")
             table.add_row("Scenarios:", f"{self.stateful_tests_manager.scenarios}")
-            table.add_row(
-                "API Links:",
-                f"{len(self.stateful_tests_manager.links_covered)} covered / {self.stateful_tests_manager.links_selected} selected / {self.stateful_tests_manager.links_total} total",
-            )
+            message = f"{len(self.stateful_tests_manager.links_covered)} covered / {self.stateful_tests_manager.links_selected} selected / {self.stateful_tests_manager.links_total} total"
+            if self.stateful_tests_manager.links_inferred:
+                message += f" ({self.stateful_tests_manager.links_inferred} inferred)"
+            table.add_row("API Links:", message)
 
             self.console.print()
             self.console.print(Padding(table, BLOCK_PADDING))

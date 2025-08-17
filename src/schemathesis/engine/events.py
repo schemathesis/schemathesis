@@ -46,15 +46,25 @@ class PhaseEvent(EngineEvent):
 
 
 @dataclass
+class StatefulPhasePayload:
+    inferred_links: int
+
+    __slots__ = ("inferred_links",)
+
+
+@dataclass
 class PhaseStarted(PhaseEvent):
     """Start of an execution phase."""
 
-    __slots__ = ("id", "timestamp", "phase")
+    payload: StatefulPhasePayload | None
 
-    def __init__(self, *, phase: Phase) -> None:
+    __slots__ = ("id", "timestamp", "phase", "payload")
+
+    def __init__(self, *, phase: Phase, payload: StatefulPhasePayload | None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
+        self.payload = payload
 
 
 @dataclass

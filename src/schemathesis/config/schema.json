@@ -316,6 +316,22 @@
           "type": "integer",
           "minimum": 2
         },
+        "inference": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "algorithms": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "location-headers"
+                ]
+              },
+              "uniqueItems": true
+            }
+          }
+        },
         "generation": {
           "$ref": "#/$defs/GenerationConfig"
         },

@@ -490,6 +490,26 @@ These settings can only be applied at the project level.
     max-steps = 50
     ```
 
+#### `phases.stateful.inference.algorithms`
+
+!!! note ""
+
+    **Type**: `Array[String]`  
+    **Default**: `["location-headers"]`  
+
+    Specifies which inference algorithms to use during the **stateful** phase. Schemathesis will use the specified algorithms to automatically analyze API responses and generate OpenAPI links for stateful testing.
+
+    Available algorithms:
+    - `location-headers` - Analyzes `Location` headers to infer parameter extraction rules between operations
+
+    Set to an empty array to disable automatic link inference entirely.
+
+    ```toml
+    # Disable all inference
+    [phases.stateful.inference]
+    algorithms = []
+    ```
+
 #### `phases.<phase>.checks`
 
 !!! note "" 
