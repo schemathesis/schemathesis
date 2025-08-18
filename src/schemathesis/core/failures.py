@@ -310,6 +310,7 @@ def format_failures(
         output += "\n    <NO RESPONSE>"
 
     # cURL
-    output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with: \n\n    {curl}")
+    _curl = "\n".join(f"    {line}" for line in curl.splitlines())
+    output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with: \n\n{_curl}")
 
     return output

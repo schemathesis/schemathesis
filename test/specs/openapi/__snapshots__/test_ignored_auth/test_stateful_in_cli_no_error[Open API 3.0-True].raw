@@ -37,6 +37,8 @@ ________________________________ Stateful tests ________________________________
 
 Reproduce with:
 
+    curl -X GET -H 'Authorization: [Filtered]' http://127.0.0.1/api/ignored_auth
+    curl -X POST -H 'Authorization: [Filtered]' -H 'Content-Type: application/json' -d '{"first_name": "John", "last_name": "Doe"}' http://127.0.0.1/api/users/
     curl -X GET http://127.0.0.1/api/ignored_auth
 
 =================================== SUMMARY ====================================
