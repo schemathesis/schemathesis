@@ -245,7 +245,8 @@ def test_not_a_server_error(cli, snapshot_cli, openapi3_schema_url):
     )
 
 
-def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_runner, cli, snapshot_cli):
+@pytest.fixture
+def app():
     app = Flask(__name__)
 
     organizations = {}
@@ -275,16 +276,46 @@ def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_r
                         "responses": {
                             "201": {
                                 "description": "Created",
-                                "headers": {"Location": {"schema": {"type": "string"}}},
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                        }
+                                    }
+                                },
                                 "links": {
+                                    "delete": {
+                                        "operationId": "organizations:delete",
+                                        "parameters": {
+                                            "organization_id": "$response.body#/id",
+                                        },
+                                    },
                                     "create_project": {
                                         "operationId": "organizations:projects:create",
                                         "parameters": {
                                             "organization_id": "$response.body#/id",
                                         },
-                                    }
+                                    },
                                 },
                             }
+                        },
+                    }
+                },
+                "/organizations/{organization_id}/": {
+                    "delete": {
+                        "operationId": "organizations:delete",
+                        "parameters": [
+                            {
+                                "name": "organization_id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "integer"},
+                            }
+                        ],
+                        "responses": {
+                            "204": {"description": "No Content"},
+                            "404": {"description": "Not Found"},
                         },
                     }
                 },
@@ -308,6 +339,7 @@ def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_r
                         },
                         "responses": {
                             "201": {"description": "Created"},
+                            "404": {"description": "Not Found"},
                             "422": {"description": "Unprocessable Content"},
                         },
                     }
@@ -329,17 +361,31 @@ def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_r
         next_id += 1
         return response, 201
 
-    @app.route("/organizations/<int:organization_id>/projects/", methods=["POST"])
-    def create_sub(organization_id):
+    @app.route("/organizations/<int:organization_id>/", methods=["DELETE"])
+    def delete_organization(organization_id):
         if organization_id not in organizations:
             return jsonify({"error": "Not found"}), 404
+        del organizations[organization_id]
+        return "", 204
 
+    @app.route("/organizations/<int:organization_id>/projects/", methods=["POST"])
+    def create_project(organization_id):
         data = request.get_json()
         if not isinstance(data, dict):
             return jsonify({"error": "Must be object"}), 422
+        if "name" not in data:
+            return jsonify({"error": "Name is missing"}), 422
+
+        # Only check organization existence AFTER validation
+        if organization_id not in organizations:
+            return jsonify({"error": "Not found"}), 404
 
         return jsonify({"id": 1}), 201
 
+    return app
+
+
+def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_runner, cli, snapshot_cli, app):
     port = app_runner.run_flask_app(app)
 
     assert (
@@ -349,6 +395,21 @@ def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_r
             "--max-examples=50",
             "--phases=stateful",
             "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_use_after_free_does_not_trigger_on_error(app_runner, cli, snapshot_cli, app):
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "-c use_after_free",
+            "--max-examples=50",
+            "--phases=stateful",
         )
         == snapshot_cli
     )
