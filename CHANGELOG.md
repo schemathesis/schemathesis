@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.1.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positives in `use_after_free` check when validation errors occur before resource existence checks.
+
 ## [4.1.0](https://github.com/schemathesis/schemathesis/compare/v4.0.26...v4.1.0) - 2025-08-17
 
 ### :rocket: Added

@@ -366,7 +366,10 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    if response.status_code == 404 or response.status_code >= 500:
+
+    # Only check for use-after-free on successful responses (2xx) or redirects (3xx)
+    # Other status codes indicate request-level issues / server errors, not successful resource access
+    if not (200 <= response.status_code < 400):
         return None
 
     for related_case in ctx._find_related(case_id=case.id):
