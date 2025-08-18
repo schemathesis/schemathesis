@@ -19,7 +19,7 @@ jobs:
             tag-suffix: "-bookworm"
 
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v5
 
       - name: Detect pre-release
         id: detect-prerelease
@@ -101,7 +101,7 @@ jobs:
     name: Build and publish package to pypi.org
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
