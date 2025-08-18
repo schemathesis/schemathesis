@@ -335,8 +335,8 @@ def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
                                 "schema": {
                                     "type": "object",
                                     "properties": {
-                                        "first_name": {"type": "string", "minLength": 3},
-                                        "last_name": {"type": "string", "minLength": 3},
+                                        "first_name": {"enum": ["John"]},
+                                        "last_name": {"enum": ["Doe"]},
                                     },
                                     "required": ["first_name", "last_name"],
                                     "additionalProperties": False,

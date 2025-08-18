@@ -330,10 +330,18 @@ def validate_response(
         if stateful_ctx.is_seen_in_suite(failure) or stateful_ctx.is_seen_in_run(failure):
             return
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
+
+        # Collect the whole chain of cURL commands
+        commands = []
+        parent = recorder.find_parent(case_id=failure_data.case.id)
+        while parent is not None:
+            commands.append(parent.as_curl_command(headers=failure_data.headers, verify=failure_data.verify))
+            parent = recorder.find_parent(case_id=parent.id)
+        commands.append(failure_data.case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify))
         recorder.record_check_failure(
             name=name,
             case_id=failure_data.case.id,
-            code_sample=failure_data.case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify),
+            code_sample="\n".join(commands),
             failure=failure,
         )
         control.count_failure()

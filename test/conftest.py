@@ -426,16 +426,15 @@ class CliSnapshotConfig:
             data = re.sub(r"Seed: \d+", "Seed: 42", data)
         if self.replace_reproduce_with:
             lines = []
-            replace_next_non_empty = False
+            seen = False
             for line in data.splitlines():
-                if replace_next_non_empty and line:
-                    lines.append("    <PLACEHOLDER>")
+                if "curl" in line:
+                    if not seen:
+                        lines.append("    <PLACEHOLDER>")
+                        seen = True
                 else:
+                    seen = False
                     lines.append(line)
-                if line.startswith("Reproduce with:"):
-                    replace_next_non_empty = True
-                elif line:
-                    replace_next_non_empty = False
             data = "\n".join(lines) + "\n"
         lines = []
         for line in data.splitlines():
