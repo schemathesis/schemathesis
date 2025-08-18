@@ -9,10 +9,11 @@ from typing import TYPE_CHECKING, Any, cast
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer
-from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 if TYPE_CHECKING:
+    from schemathesis.generation.stateful.state_machine import StepOutput
+
     from .extractors import Extractor
 
 
@@ -63,7 +64,7 @@ class URL(Node):
         base_url = output.case.operation.base_url or "http://127.0.0.1"
         kwargs = REQUESTS_TRANSPORT.serialize_case(output.case, base_url=base_url)
         prepared = requests.Request(**kwargs).prepare()
-        return cast(str, prepared.url)
+        return cast("str", prepared.url)
 
 
 @dataclass

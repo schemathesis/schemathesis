@@ -4,12 +4,12 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATEFUL_STEP_COUNT
 
 if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.stateful.state_machine import StepInput
     from schemathesis.specs.openapi.stateful import ApiTransitions
 

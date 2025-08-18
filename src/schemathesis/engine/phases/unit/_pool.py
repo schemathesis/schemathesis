@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import threading
-import uuid
 from queue import Queue
-from types import TracebackType
 from typing import TYPE_CHECKING, Callable
 
-from schemathesis.core.result import Result
-from schemathesis.engine.phases import PhaseName
-
 if TYPE_CHECKING:
+    import uuid
+    from types import TracebackType
+
+    from schemathesis.core.result import Result
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.phases import PhaseName
     from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 

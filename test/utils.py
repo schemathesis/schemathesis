@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache, wraps
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 import pytest
 import requests
@@ -17,8 +17,10 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
-from schemathesis.engine.recorder import Interaction
-from schemathesis.schemas import BaseSchema
+
+if TYPE_CHECKING:
+    from schemathesis.engine.recorder import Interaction
+    from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

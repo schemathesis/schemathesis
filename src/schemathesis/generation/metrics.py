@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import TYPE_CHECKING, Callable, Sequence
 
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import Response
-from schemathesis.generation.case import Case
+
+if TYPE_CHECKING:
+    from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
 
 
 @dataclass

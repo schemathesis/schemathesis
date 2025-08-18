@@ -11,11 +11,11 @@ import warnings
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis import graphql, openapi
-from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
 
 if TYPE_CHECKING:
+    from schemathesis.config import ProjectConfig
     from schemathesis.schemas import BaseSchema
 
 Loader = Callable[["ProjectConfig"], "BaseSchema"]

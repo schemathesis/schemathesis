@@ -8,12 +8,12 @@ from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 from schemathesis.core.marks import Mark
-from schemathesis.core.transport import Response
 from schemathesis.filters import FilterSet, attach_filter_chain
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
+    from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
 
@@ -63,7 +63,7 @@ def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
         if isinstance(hook, str):
 
             def decorator(func: Callable) -> Callable:
-                hook_name = cast(str, hook)
+                hook_name = cast("str", hook)
                 if filter_used:
                     validate_filterable_hook(hook)
                 func.filter_set = filter_set  # type: ignore[attr-defined]

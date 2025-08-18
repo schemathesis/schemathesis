@@ -4,7 +4,6 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Mapping, cast
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
-from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
     from requests import PreparedRequest
     from requests.structures import CaseInsensitiveDict
 
+    from schemathesis.config import SanitizationConfig
     from schemathesis.generation.case import Case
 
 
@@ -86,7 +86,7 @@ def normalize_base_url(base_url: str | None) -> str | None:
         return None
     parts = urlsplit(base_url)
     if not parts.hostname:
-        path = cast(str, parts.path or "")
+        path = cast("str", parts.path or "")
         return urlunsplit(("http", "localhost", path or "", "", ""))
     return base_url
 

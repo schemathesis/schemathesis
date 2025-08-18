@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.core.failures import Failure
-from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.generation.case import Case
 from schemathesis.generation.metrics import MetricCollector
+
+if TYPE_CHECKING:
+    from schemathesis.core.failures import Failure
+    from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
 
 
 @dataclass

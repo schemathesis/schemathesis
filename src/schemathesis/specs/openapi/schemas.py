@@ -35,17 +35,15 @@ from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, 
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
-from schemathesis.core.transport import Response
 from schemathesis.core.validation import INVALID_HEADER_RE
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CaseMetadata
+from schemathesis.hooks import HookContext, HookDispatcher
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from schemathesis.specs.openapi.stateful import links
 from schemathesis.specs.openapi.utils import expand_status_code
 
-from ...generation import GenerationMode
-from ...hooks import HookContext, HookDispatcher
-from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import serialization
 from ._hypothesis import openapi_cases
 from .converter import to_json_schema, to_json_schema_recursive
@@ -67,6 +65,8 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthStorage
+    from schemathesis.core.transport import Response
+    from schemathesis.generation.meta import CaseMetadata
     from schemathesis.generation.stateful import APIStateMachine
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
@@ -801,7 +801,7 @@ class MethodMap(Mapping):
     def _init_operation(self, method: str) -> APIOperation:
         method = method.lower()
         operation = self._path_item[method]
-        schema = cast(BaseOpenAPISchema, self._parent._schema)
+        schema = cast("BaseOpenAPISchema", self._parent._schema)
         path = self._path
         scope = self._scope
         schema.resolver.push_scope(scope)
@@ -960,7 +960,7 @@ class SwaggerV20(BaseOpenAPISchema):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:

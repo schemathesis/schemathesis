@@ -35,10 +35,9 @@ from schemathesis.core.validation import contains_unicode_surrogate_pair, has_in
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
-
-from ..specs.openapi.converter import update_pattern_in_schema
-from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
-from ..specs.openapi.patterns import update_quantifier
+from schemathesis.specs.openapi.converter import update_pattern_in_schema
+from schemathesis.specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
+from schemathesis.specs.openapi.patterns import update_quantifier
 
 
 def _replace_zero_with_nonzero(x: float) -> float:
@@ -378,11 +377,11 @@ def _cover_positive_for_type(
             elif ty == "integer" or ty == "number":
                 yield from _positive_number(ctx, schema)
             elif ty == "array":
-                yield from _positive_array(ctx, schema, cast(list, template))
+                yield from _positive_array(ctx, schema, cast("list", template))
             elif ty == "object":
-                yield from _positive_object(ctx, schema, cast(dict, template))
+                yield from _positive_object(ctx, schema, cast("dict", template))
         elif "properties" in schema or "required" in schema:
-            yield from _positive_object(ctx, schema, cast(dict, template))
+            yield from _positive_object(ctx, schema, cast("dict", template))
         elif "not" in schema and isinstance(schema["not"], (dict, bool)):
             nctx = ctx.with_negative()
             yield from cover_schema_iter(nctx, schema["not"], seen)
@@ -1102,7 +1101,7 @@ def _with_negated_key(schema: dict, key: str, value: Any) -> dict:
 
 
 def _negative_multiple_of(
-    ctx: CoverageContext, schema: dict, multiple_of: int | float
+    ctx: CoverageContext, schema: dict, multiple_of: float
 ) -> Generator[GeneratedValue, None, None]:
     yield NegativeValue(
         ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of)),

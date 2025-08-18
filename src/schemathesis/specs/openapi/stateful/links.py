@@ -2,16 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Generator, Literal, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Literal, cast
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
-from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.references import RECURSION_DEPTH_LIMIT
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
@@ -96,7 +98,7 @@ class OpenApiLink:
             try:
                 # The parameter name is prefixed with its location. Example: `path.id`
                 _location, name = tuple(parameter.split("."))
-                location = cast(ParameterLocation, _location)
+                location = cast("ParameterLocation", _location)
             except ValueError:
                 location = None
                 name = parameter

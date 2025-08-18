@@ -5,10 +5,11 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from schemathesis.core import media_types
-from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
     import yaml
+
+    from schemathesis.core.transport import Response
 
 
 @lru_cache

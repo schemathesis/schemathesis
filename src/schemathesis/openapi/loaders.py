@@ -3,7 +3,6 @@ from __future__ import annotations
 import enum
 import json
 import re
-from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Mapping
 
@@ -16,6 +15,8 @@ from schemathesis.hooks import HookContext, dispatch
 from schemathesis.python import asgi, wsgi
 
 if TYPE_CHECKING:
+    from os import PathLike
+
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 

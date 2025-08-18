@@ -8,7 +8,6 @@ from schemathesis.core import NotSet
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
-from schemathesis.generation.case import Case
 from schemathesis.generation.overrides import Override
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
@@ -24,6 +23,8 @@ from schemathesis.transport.serialization import serialize_binary, serialize_jso
 
 if TYPE_CHECKING:
     import werkzeug
+
+    from schemathesis.generation.case import Case
 
 
 class WSGITransport(BaseTransport["werkzeug.Client"]):

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from schemathesis.generation import GenerationMode
+if TYPE_CHECKING:
+    from schemathesis.generation import GenerationMode
 
 
 class TestPhase(str, Enum):

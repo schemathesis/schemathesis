@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import click
 
-from schemathesis.core.registries import Registry
+if TYPE_CHECKING:
+    from enum import Enum
+
+    from schemathesis.core.registries import Registry
 
 
 class CustomHelpMessageChoice(click.Choice):

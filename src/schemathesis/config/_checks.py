@@ -192,7 +192,7 @@ class ChecksConfig(DiffBase):
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ChecksConfig:
         # Use the outer "enabled" value as default for all checks.
-        default_enabled = data.get("enabled", None)
+        default_enabled = data.get("enabled")
 
         def merge(sub: dict[str, Any]) -> dict[str, Any]:
             # Merge the default enabled flag with the sub-dict; the sub-dict takes precedence.

@@ -79,7 +79,7 @@ class SchemathesisConfig(DiffBase):
         color: bool | None = None,
         suppress_health_check: list[HealthCheck] | None = None,
         seed: int | None = None,
-        wait_for_schema: float | int | None = None,
+        wait_for_schema: float | None = None,
         max_failures: int | None = None,
         reports: ReportsConfig | None = None,
         output: OutputConfig | None = None,
@@ -139,7 +139,7 @@ class SchemathesisConfig(DiffBase):
         color: bool | None = None,
         suppress_health_check: list[HealthCheck] | None = None,
         seed: int | None = None,
-        wait_for_schema: float | int | None = None,
+        wait_for_schema: float | None = None,
         max_failures: int | None,
     ) -> None:
         """Set top-level configuration options."""

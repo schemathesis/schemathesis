@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Collection
 
-from schemathesis.transport import SerializationContext
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
+
+    from schemathesis.transport import SerializationContext
 
 
 MEDIA_TYPES: dict[str, st.SearchStrategy[bytes]] = {}

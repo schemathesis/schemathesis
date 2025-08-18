@@ -3,16 +3,19 @@ from __future__ import annotations
 import http.client
 import textwrap
 import traceback
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from json import JSONDecodeError
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-from schemathesis.config import OutputConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transport import Response
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from json import JSONDecodeError
+
+    from schemathesis.config import OutputConfig
 
 
 class Severity(Enum):

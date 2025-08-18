@@ -4,19 +4,19 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.engine.control import ExecutionControl
-from schemathesis.engine.observations import Observations
-from schemathesis.generation.case import Case
-from schemathesis.schemas import APIOperation, BaseSchema
 
 if TYPE_CHECKING:
     import threading
 
     import requests
 
+    from schemathesis.config import ProjectConfig
+    from schemathesis.engine.observations import Observations
     from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.generation.case import Case
+    from schemathesis.schemas import APIOperation, BaseSchema
 
 
 @dataclass

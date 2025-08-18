@@ -5,12 +5,13 @@ from __future__ import annotations
 import enum
 import re
 import traceback
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
+    from types import TracebackType
+
     from jsonschema import SchemaError as JsonSchemaError
     from jsonschema import ValidationError
     from requests import RequestException

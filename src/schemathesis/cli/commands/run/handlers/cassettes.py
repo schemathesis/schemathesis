@@ -6,23 +6,26 @@ import sys
 import threading
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
-from pathlib import Path
 from queue import Queue
-from typing import IO, Callable, Iterator
+from typing import IO, TYPE_CHECKING, Callable, Iterator
 from urllib.parse import parse_qsl, urlparse
 
 import harfile
 
-from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
-from schemathesis.engine.recorder import CheckNode, Request, ScenarioRecorder
 from schemathesis.generation.meta import CoveragePhaseData
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from schemathesis.cli.commands.run.context import ExecutionContext
+    from schemathesis.core.transport import Response
+    from schemathesis.engine.recorder import CheckNode, Request, ScenarioRecorder
 
 # Wait until the worker terminates
 WRITER_WORKER_JOIN_TIMEOUT = 1

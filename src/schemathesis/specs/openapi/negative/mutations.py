@@ -12,8 +12,8 @@ from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 
 from schemathesis.core.transforms import deepclone
+from schemathesis.specs.openapi.utils import get_type, is_header_location
 
-from ..utils import get_type, is_header_location
 from .types import Draw, Schema
 from .utils import can_negate
 

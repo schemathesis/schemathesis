@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 import shutil
+from typing import TYPE_CHECKING
 
-import click
+if TYPE_CHECKING:
+    import click
 
 
 def get_terminal_width() -> int:

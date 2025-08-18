@@ -5,16 +5,18 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
-import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
-from schemathesis.config import GenerationConfig
+from schemathesis.specs.openapi.constants import ALL_KEYWORDS
 
-from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
 
 if TYPE_CHECKING:
+    import jsonschema
+
+    from schemathesis.config import GenerationConfig
+
     from .types import Draw, Schema
 
 

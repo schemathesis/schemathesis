@@ -117,7 +117,7 @@ class Response:
     def from_requests(cls, response: requests.Response, verify: bool, _override: Override | None = None) -> Response:
         raw = response.raw
         raw_headers = raw.headers if raw is not None else {}
-        headers = {name: response.raw.headers.getlist(name) for name in raw_headers.keys()}
+        headers = {name: response.raw.headers.getlist(name) for name in raw_headers}
         # Similar to http.client:319 (HTTP version detection in stdlib's `http` package)
         version = raw.version if raw is not None else 10
         http_version = "1.0" if version == 10 else "1.1"

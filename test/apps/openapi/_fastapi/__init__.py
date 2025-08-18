@@ -1,4 +1,5 @@
-from typing import Optional
+from __future__ import annotations
+
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
@@ -15,7 +16,7 @@ class User(BaseModel):
 
 class BuggyUser(BaseModel):
     first_name: str = Field(min_length=3)
-    last_name: Optional[str] = Field(None, min_length=3, json_schema_extra={"nullable": True})
+    last_name: str | None = Field(None, min_length=3, json_schema_extra={"nullable": True})
     model_config = ConfigDict(extra="forbid")
 
 

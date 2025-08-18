@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping, MutableSequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from schemathesis.config import SanitizationConfig
+if TYPE_CHECKING:
+    from schemathesis.config import SanitizationConfig
 
 
 def sanitize_value(item: Any, *, config: SanitizationConfig) -> None:

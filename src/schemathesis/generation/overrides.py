@@ -4,11 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Iterator
 
-from schemathesis.config import ProjectConfig
 from schemathesis.core.transforms import diff
 from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
+    from schemathesis.config import ProjectConfig
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, Parameter
 

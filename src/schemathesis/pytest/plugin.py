@@ -6,7 +6,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
 
 import pytest
-from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import InvalidArgument, Unsatisfiable
@@ -37,12 +36,12 @@ from schemathesis.generation.hypothesis.given import (
 )
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.pytest.control_flow import fail_on_no_matches
-from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
+    from _pytest import nodes
     from _pytest.fixtures import FuncFixtureInfo
 
-    from schemathesis.schemas import BaseSchema
+    from schemathesis.schemas import APIOperation, BaseSchema
 
 GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (
     "Unsupported test setup. Tests using `@schema.given` cannot be combined with explicit schema examples in the same "
@@ -234,7 +233,7 @@ class SchemathesisCase(PyCollector):
         if module is not None and hasattr(module, "pytest_generate_tests"):
             methods.append(module.pytest_generate_tests)
         if hasattr(cls, "pytest_generate_tests"):
-            cls = cast(Type, cls)
+            cls = cast("Type", cls)
             methods.append(cls().pytest_generate_tests)
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc

@@ -13,18 +13,18 @@ from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.meta import ComponentInfo, ComponentKind, TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
-from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.stateful.control import TransitionController
 from schemathesis.specs.openapi.stateful.links import OpenApiLink, get_all_links
 from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.generation.stateful.state_machine import StepOutput
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 FilterFunction = Callable[["StepOutput"], bool]

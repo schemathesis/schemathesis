@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import click
-from click.utils import LazyFile
 
 from schemathesis.checks import CHECKS, load_all_checks
 from schemathesis.cli.commands.run import executor, validation
@@ -29,6 +28,9 @@ from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.metrics import METRICS, MetricFunction
+
+if TYPE_CHECKING:
+    from click.utils import LazyFile
 
 load_all_checks()
 

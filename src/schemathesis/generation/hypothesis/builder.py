@@ -7,7 +7,7 @@ from enum import Enum
 from functools import wraps
 from itertools import combinations
 from time import perf_counter
-from typing import Any, Callable, Generator, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
 
 import hypothesis
 from hypothesis import Phase, Verbosity
@@ -19,7 +19,6 @@ from requests.models import CaseInsensitiveDict
 
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
-from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
@@ -27,10 +26,8 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode, coverage
-from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples, setup, strategies
 from schemathesis.generation.hypothesis.examples import add_single_example
-from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -40,7 +37,12 @@ from schemathesis.generation.meta import (
     PhaseInfo,
 )
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
-from schemathesis.schemas import APIOperation, ParameterSet
+
+if TYPE_CHECKING:
+    from schemathesis.config import GenerationConfig, ProjectConfig
+    from schemathesis.generation.case import Case
+    from schemathesis.generation.hypothesis.given import GivenInput
+    from schemathesis.schemas import APIOperation, ParameterSet
 
 setup()
 

@@ -242,7 +242,7 @@ class OperationConfig(DiffBase):
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
         max_redirects: int | None = None,
-        request_timeout: float | int | None = None,
+        request_timeout: float | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
@@ -309,7 +309,7 @@ class OperationConfig(DiffBase):
             if "headers" in data
             else None,
             proxy=resolve(data.get("proxy")),
-            continue_on_failure=data.get("continue-on-failure", None),
+            continue_on_failure=data.get("continue-on-failure"),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),

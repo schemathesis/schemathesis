@@ -6,12 +6,14 @@ https://swagger.io/docs/specification/links/#runtime-expressions
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable
-from schemathesis.generation.stateful.state_machine import StepOutput
 
 from . import lexer, nodes, parser
+
+if TYPE_CHECKING:
+    from schemathesis.generation.stateful.state_machine import StepOutput
 
 __all__ = ["lexer", "nodes", "parser"]
 

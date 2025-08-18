@@ -12,7 +12,7 @@ except NameError:
     from exceptiongroup import BaseExceptionGroup  # type: ignore
 
 
-def __getattr__(name: str) -> type[RefResolutionError] | type[RefResolver] | type[BaseExceptionGroup]:
+def __getattr__(name: str) -> type[RefResolutionError | RefResolver | BaseExceptionGroup]:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
         if name == "RefResolutionError":

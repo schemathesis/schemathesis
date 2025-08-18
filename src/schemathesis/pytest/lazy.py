@@ -9,7 +9,6 @@ import pytest
 from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
-from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
 from schemathesis.generation import overrides
@@ -30,6 +29,7 @@ if TYPE_CHECKING:
     import hypothesis
     from _pytest.fixtures import FixtureRequest
 
+    from schemathesis.core.errors import InvalidSchema
     from schemathesis.schemas import APIOperation
 
 

@@ -17,16 +17,13 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
-from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
-from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark
 
 from .auths import AuthStorage
@@ -46,7 +43,10 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from werkzeug.test import TestResponse
 
+    from schemathesis.config import ProjectConfig
     from schemathesis.core import Specification
+    from schemathesis.generation.case import Case
+    from schemathesis.generation.meta import CaseMetadata
     from schemathesis.generation.stateful.state_machine import APIStateMachine
 
 
@@ -407,7 +407,7 @@ class BaseSchema(Mapping):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:
@@ -581,7 +581,7 @@ class ParameterSet(Generic[P]):
     def __bool__(self) -> bool:
         return bool(self.items)
 
-    def __iter__(self) -> Generator[P, None, None]:
+    def __iter__(self) -> Iterator[P]:
         yield from iter(self.items)
 
     def __len__(self) -> int:
@@ -767,7 +767,7 @@ class APIOperation(Generic[P]):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         _meta: CaseMetadata | None = None,
     ) -> Case:

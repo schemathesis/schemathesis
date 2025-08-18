@@ -6,7 +6,6 @@ This module provides high-level flow for single-, and multi-threaded modes.
 from __future__ import annotations
 
 import queue
-import uuid
 import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
@@ -23,6 +22,8 @@ from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_outpu
 from ._pool import TaskProducer, WorkerPool
 
 if TYPE_CHECKING:
+    import uuid
+
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.phases import Phase
     from schemathesis.schemas import APIOperation

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, Generator, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List
 
-from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 Generated = Dict[str, Any]
 Definition = Dict[str, Any]

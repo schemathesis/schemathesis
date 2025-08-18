@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import sys
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import click
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers import display_handler_error
-from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
@@ -19,6 +18,9 @@ from schemathesis.core.errors import LoaderError
 from schemathesis.core.fs import file_exists
 from schemathesis.engine import from_schema
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
+
+if TYPE_CHECKING:
+    from schemathesis.cli.commands.run.handlers.base import EventHandler
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
 

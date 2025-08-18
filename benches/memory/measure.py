@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 import subprocess
@@ -40,7 +42,7 @@ def run_memray(schema_path: str, args: list[str]) -> dict[str, Any]:
         }
 
 
-def format_bytes(value: int | float) -> str:
+def format_bytes(value: float) -> str:
     for unit in ["B", "KB", "MB", "GB"]:
         if value < 1024.0:
             return f"{value:.2f} {unit}"

@@ -5,7 +5,7 @@ import operator
 import pathlib
 from contextlib import contextmanager
 from functools import reduce
-from typing import Callable, Generator
+from typing import TYPE_CHECKING, Callable, Generator
 from urllib.parse import urlparse
 
 import click
@@ -17,7 +17,9 @@ from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.filters import expression_to_filter_function
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.metrics import MetricFunction
+
+if TYPE_CHECKING:
+    from schemathesis.generation.metrics import MetricFunction
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."

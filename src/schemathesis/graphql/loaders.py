@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from functools import lru_cache
-from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, TypeVar, cast
 
@@ -13,6 +12,8 @@ from schemathesis.hooks import HookContext, dispatch
 from schemathesis.python import asgi, wsgi
 
 if TYPE_CHECKING:
+    from os import PathLike
+
     from graphql import DocumentNode
 
     from schemathesis.specs.graphql.schemas import GraphQLSchema
@@ -182,12 +183,12 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
         document = graphql.build_schema(data)
         result = graphql.execute(document, get_introspection_query_ast())
         # TYPES: We don't pass `is_awaitable` above, therefore `result` is of the `ExecutionResult` type
-        result = cast(graphql.ExecutionResult, result)
+        result = cast("graphql.ExecutionResult", result)
         # TYPES:
         #  - `document` is a valid schema, because otherwise `build_schema` will rise an error;
         #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
         # Therefore the execution result is always valid at this point and `result.data` is not `None`
-        schema = cast(Dict[str, Any], result.data)
+        schema = cast("Dict[str, Any]", result.data)
     except Exception as exc:
         try:
             schema = json.loads(data)

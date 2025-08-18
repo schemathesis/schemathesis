@@ -9,7 +9,7 @@ from schemathesis.schemas import Parameter
 from .converter import to_json_schema_recursive
 
 if TYPE_CHECKING:
-    from ...schemas import APIOperation
+    from schemathesis.schemas import APIOperation
 
 
 @dataclass(eq=False)

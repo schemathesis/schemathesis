@@ -9,7 +9,6 @@ from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, cu
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.transport import Response
 from schemathesis.generation import generate_random_case_id
-from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
@@ -21,6 +20,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from werkzeug.test import TestResponse
 
+    from schemathesis.generation.meta import CaseMetadata
     from schemathesis.schemas import APIOperation
 
 
@@ -89,7 +89,7 @@ class Case:
         headers: CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | "NotSet" = NOT_SET,
+        body: list | dict[str, Any] | str | float | bool | bytes | "NotSet" = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
         _auth: requests.auth.AuthBase | None = None,

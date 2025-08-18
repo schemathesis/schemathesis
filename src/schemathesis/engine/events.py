@@ -5,14 +5,14 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
 
-from schemathesis.core.result import Result
 from schemathesis.engine.errors import EngineErrorInfo
-from schemathesis.engine.phases import Phase, PhaseName
-from schemathesis.engine.recorder import ScenarioRecorder
 
 if TYPE_CHECKING:
+    from schemathesis.core.result import Result
     from schemathesis.engine import Status
+    from schemathesis.engine.phases import Phase, PhaseName
     from schemathesis.engine.phases.probes import ProbePayload
+    from schemathesis.engine.recorder import ScenarioRecorder
 
 EventGenerator = Generator["EngineEvent", None, None]
 

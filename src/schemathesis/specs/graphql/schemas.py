@@ -147,7 +147,7 @@ class GraphQLSchema(BaseSchema):
         return self._get_base_path()
 
     def _get_base_path(self) -> str:
-        return cast(str, urlsplit(self.location).path)
+        return cast("str", urlsplit(self.location).path)
 
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
@@ -250,7 +250,7 @@ class GraphQLSchema(BaseSchema):
         headers: dict[str, Any] | CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:
@@ -294,7 +294,7 @@ class FieldMap(Mapping):
         return iter(self._operation_type.fields)
 
     def _init_operation(self, field_name: str) -> APIOperation:
-        schema = cast(GraphQLSchema, self._parent._schema)
+        schema = cast("GraphQLSchema", self._parent._schema)
         operation_type = self._operation_type
         field_ = operation_type.fields[field_name]
         return schema._build_operation(self._root_type, operation_type, field_name, field_)
@@ -328,7 +328,7 @@ def graphql_cases(
     phase: TestPhase = TestPhase.FUZZING,
 ) -> Any:
     start = time.monotonic()
-    definition = cast(GraphQLOperationDefinition, operation.definition)
+    definition = cast("GraphQLOperationDefinition", operation.definition)
     strategy_factory = {
         RootType.QUERY: gql_st.queries,
         RootType.MUTATION: gql_st.mutations,
@@ -357,7 +357,7 @@ def graphql_cases(
         TestPhase.EXAMPLES: ExamplesPhaseData(),
         TestPhase.FUZZING: FuzzingPhaseData(),
     }[phase]
-    phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData], _phase_data)
+    phase_data = cast("Union[ExamplesPhaseData, FuzzingPhaseData]", _phase_data)
     instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,

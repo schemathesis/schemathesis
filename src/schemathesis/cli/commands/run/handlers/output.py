@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Generator, Iterable
 
 import click
 
-from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
@@ -25,10 +24,8 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
-from schemathesis.engine.recorder import Interaction, ScenarioRecorder
 from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
     from rich.console import Console, Group
@@ -36,7 +33,10 @@ if TYPE_CHECKING:
     from rich.progress import Progress, TaskID
     from rich.text import Text
 
+    from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
+    from schemathesis.engine.recorder import Interaction, ScenarioRecorder
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
+    from schemathesis.schemas import ApiStatistic
 
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
@@ -1597,7 +1597,7 @@ class StatusCodeStatistic:
 
     def _is_only_4xx_responses(self) -> bool:
         """Check if all responses are 4xx (excluding 5xx)."""
-        return all(400 <= code < 500 for code in self.counts.keys() if code not in {500})
+        return all(400 <= code < 500 for code in self.counts if code not in {500})
 
     def _can_warn_about_4xx(self) -> bool:
         """Check basic conditions for 4xx warnings."""

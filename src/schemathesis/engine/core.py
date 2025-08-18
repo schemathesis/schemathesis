@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from schemathesis import auths
 from schemathesis.core import SpecificationFeature
 from schemathesis.engine import Status, events, phases
 from schemathesis.engine.observations import Observations
-from schemathesis.schemas import BaseSchema
 
 from .context import EngineContext
 from .events import EventGenerator, StatefulPhasePayload
 from .phases import Phase, PhaseName, PhaseSkipReason
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import BaseSchema
 
 
 @dataclass

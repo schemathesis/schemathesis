@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
-from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import (
     CustomFailure,
     Failure,
@@ -13,14 +12,15 @@ from schemathesis.core.failures import (
     ServerError,
 )
 from schemathesis.core.registries import Registry
-from schemathesis.core.transport import Response
-from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
+    from schemathesis.config import ChecksConfig
+    from schemathesis.core.transport import Response
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
+    from schemathesis.generation.overrides import Override
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
 

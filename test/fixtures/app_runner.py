@@ -6,7 +6,6 @@ import socket
 import subprocess
 import sys
 import threading
-from pathlib import Path
 from time import sleep, time
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable
@@ -16,6 +15,8 @@ import requests
 from aiohttp import web
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from flask import Flask
 
 

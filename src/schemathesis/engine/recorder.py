@@ -5,14 +5,14 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterator, cast
 
-from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.core.failures import Failure
+    from schemathesis.generation.case import Case
     from schemathesis.generation.stateful.state_machine import Transition
 
 
@@ -201,8 +201,8 @@ class Request:
             body = body.encode("utf-8")
 
         # these values have `str` type at this point
-        uri = cast(str, prepared.url)
-        method = cast(str, prepared.method)
+        uri = cast("str", prepared.url)
+        method = cast("str", prepared.method)
         return cls(
             uri=uri,
             method=method,

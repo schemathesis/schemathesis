@@ -10,13 +10,10 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._operations import OperationConfig, OperationsConfig
-from schemathesis.config._output import OutputConfig
 from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
-from schemathesis.config._report import ReportsConfig
 from schemathesis.config._warnings import SchemathesisWarning, resolve_warnings
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, hooks
 from schemathesis.core.validation import validate_base_url
@@ -26,6 +23,9 @@ if TYPE_CHECKING:
     from pyrate_limiter import Limiter
 
     from schemathesis.config import SchemathesisConfig
+    from schemathesis.config._health_check import HealthCheck
+    from schemathesis.config._output import OutputConfig
+    from schemathesis.config._report import ReportsConfig
     from schemathesis.schemas import APIOperation
 
 DEFAULT_WORKERS = 1
@@ -103,7 +103,7 @@ class ProjectConfig(DiffBase):
         tls_verify: bool | str = True,
         rate_limit: str | None = None,
         max_redirects: int | None = None,
-        request_timeout: float | int | None = None,
+        request_timeout: float | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
@@ -194,7 +194,7 @@ class ProjectConfig(DiffBase):
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
         max_redirects: int | None = None,
-        request_timeout: float | int | None = None,
+        request_timeout: float | None = None,
         tls_verify: bool | str | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
 
 import jsonschema.protocols
@@ -12,12 +12,14 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis import auths
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -29,12 +31,9 @@ from schemathesis.generation.meta import (
     StatefulPhaseData,
     TestPhase,
 )
+from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
-from schemathesis.schemas import APIOperation
 
-from ... import auths
-from ...generation import GenerationMode
-from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from .constants import LOCATION_TO_CONTAINER
 from .formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
@@ -48,6 +47,9 @@ from .negative import negative_schema
 from .negative.utils import can_negate
 from .parameters import OpenAPIBody, OpenAPIParameter, parameters_to_json_schema
 from .utils import is_header_location
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 SLASH = "/"
 StrategyFactory = Callable[
@@ -159,7 +161,7 @@ def openapi_cases(
         TestPhase.FUZZING: FuzzingPhaseData(),
         TestPhase.STATEFUL: StatefulPhaseData(),
     }[phase]
-    phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+    phase_data = cast("Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData]", _phase_data)
 
     instance = operation.Case(
         media_type=media_type,

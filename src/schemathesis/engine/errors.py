@@ -230,7 +230,7 @@ class EngineErrorInfo:
 def scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str:
     # This one is always available as the format is checked upfront
     match = re.search(r"Scalar '(\w+)' is not supported", str(exception))
-    match = cast(re.Match, match)
+    match = cast("re.Match", match)
     return match.group(1)
 
 

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
-from schemathesis.config import ProjectConfig
-from schemathesis.core import Specification
 from schemathesis.engine import events
-from schemathesis.schemas import APIOperation, ApiStatistic
+
+if TYPE_CHECKING:
+    from schemathesis.config import ProjectConfig
+    from schemathesis.core import Specification
+    from schemathesis.schemas import APIOperation, ApiStatistic
 
 
 class LoadingStarted(events.EngineEvent):

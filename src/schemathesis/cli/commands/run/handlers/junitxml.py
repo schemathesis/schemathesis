@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import platform
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
-from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.core.failures import format_failures
 from schemathesis.engine import Status, events
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 
 
 @dataclass

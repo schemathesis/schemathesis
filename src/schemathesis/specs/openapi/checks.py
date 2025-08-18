@@ -8,10 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
 import schemathesis
-from schemathesis.checks import CheckContext
 from schemathesis.core import media_types, string_to_boolean
-from schemathesis.core.failures import Failure
-from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import ComponentKind, CoveragePhaseData
 from schemathesis.openapi.checks import (
@@ -35,7 +32,14 @@ from schemathesis.transport.prepare import prepare_path
 from .utils import expand_status_code, expand_status_codes
 
 if TYPE_CHECKING:
+    from requests.cookies import RequestsCookieJar
+
+    from schemathesis.checks import CheckContext
+    from schemathesis.core.failures import Failure
+    from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
+
+    from .schemas import BaseOpenAPISchema
 
 
 def is_unexpected_http_status_case(case: Case) -> bool:
@@ -310,7 +314,7 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
         if response.status_code != 405:
             raise UnsupportedMethodResponse(
                 operation=case.operation.label,
-                method=cast(str, response.request.method),
+                method=cast("str", response.request.method),
                 status_code=response.status_code,
                 failure_reason="wrong_status",
                 message=f"Wrong status for unsupported method {response.request.method} (got {response.status_code}, expected 405)",
@@ -320,7 +324,7 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
         if not allow_header:
             raise UnsupportedMethodResponse(
                 operation=case.operation.label,
-                method=cast(str, response.request.method),
+                method=cast("str", response.request.method),
                 status_code=response.status_code,
                 allow_header_present=False,
                 failure_reason="missing_allow_header",
@@ -572,9 +576,7 @@ SecurityParameter = Dict[str, Any]
 
 def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]:
     """Extract security definitions that are active for the given operation and convert them into parameters."""
-    from .schemas import BaseOpenAPISchema
-
-    schema = cast(BaseOpenAPISchema, operation.schema)
+    schema = cast("BaseOpenAPISchema", operation.schema)
     return [
         schema.security._to_parameter(parameter)
         for parameter in schema.security._get_active_definitions(schema.raw_schema, operation, schema.resolver)
@@ -586,8 +588,6 @@ def _contains_auth(
     ctx: CheckContext, case: Case, response: Response, security_parameters: list[SecurityParameter]
 ) -> AuthKind | None:
     """Whether a request has authentication declared in the schema."""
-    from requests.cookies import RequestsCookieJar
-
     # If auth comes from explicit `auth` option or a custom auth, it is always explicit
     if ctx._auth is not None or case._has_explicit_auth:
         return AuthKind.EXPLICIT
@@ -607,7 +607,7 @@ def _contains_auth(
         return p["in"] == "query" and p["name"] in query
 
     def has_cookie(p: dict[str, Any]) -> bool:
-        cookies = cast(RequestsCookieJar, request._cookies)  # type: ignore
+        cookies = cast("RequestsCookieJar", request._cookies)  # type: ignore
         return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
 
     for parameter in security_parameters:
@@ -629,7 +629,7 @@ def _contains_auth(
                 (response._override.headers if response._override else None),
             ]:
                 if headers is not None and "Cookie" in headers:
-                    jar = cast(RequestsCookieJar, headers["Cookie"])
+                    jar = cast("RequestsCookieJar", headers["Cookie"])
                     if name in jar:
                         return AuthKind.EXPLICIT
 

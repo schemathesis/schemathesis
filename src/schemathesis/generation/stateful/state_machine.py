@@ -9,17 +9,16 @@ import hypothesis
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
-from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
 from schemathesis.core.errors import NoLinksFound
-from schemathesis.core.result import Result
-from schemathesis.core.transport import Response
-from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
-    import hypothesis
     from requests.structures import CaseInsensitiveDict
 
+    from schemathesis.checks import CheckFunction
+    from schemathesis.core.result import Result
+    from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import BaseSchema
 
 

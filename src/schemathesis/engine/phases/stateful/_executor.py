@@ -1,26 +1,21 @@
 from __future__ import annotations  # noqa: I001
 
-import queue
 import time
 import unittest
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from warnings import catch_warnings
 
 import hypothesis
 import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
-from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
-from schemathesis.engine.context import EngineContext
-from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.errors import (
     TestingState,
     UnrecoverableNetworkError,
@@ -29,9 +24,7 @@ from schemathesis.engine.errors import (
 )
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
-from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import (
@@ -41,6 +34,17 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
+
+if TYPE_CHECKING:
+    import queue
+
+    from hypothesis.stateful import Rule
+
+    from schemathesis.core.transport import Response
+    from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.control import ExecutionControl
+    from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.generation.case import Case
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:

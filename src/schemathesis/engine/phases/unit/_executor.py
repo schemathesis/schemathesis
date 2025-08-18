@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 import unittest
-import uuid
 from typing import TYPE_CHECKING, Any, Callable
 from warnings import WarningMessage, catch_warnings
 
@@ -15,7 +14,6 @@ from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, run_checks
-from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -29,9 +27,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
-from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import (
     DeadlineExceeded,
     TestingState,
@@ -42,10 +38,8 @@ from schemathesis.engine.errors import (
     deduplicate_errors,
     is_unrecoverable_network_error,
 )
-from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import metrics, overrides
-from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
     InvalidHeadersExampleMark,
     InvalidRegexMark,
@@ -55,6 +49,13 @@ from schemathesis.generation.hypothesis.builder import (
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 if TYPE_CHECKING:
+    import uuid
+
+    from schemathesis.config._generation import GenerationConfig
+    from schemathesis.core.transport import Response
+    from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.phases import PhaseName
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 

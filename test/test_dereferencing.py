@@ -176,7 +176,6 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
             # jsonschema infinitely recurse on some cases
             if definition is not ALL_OF_ROOT:
                 raise
-            pass
 
     test()
 
