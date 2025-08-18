@@ -1372,6 +1372,13 @@ def test_incorrect_headers_with_enum(ctx):
                 {"headers": {"X-API-Key-1": "null"}},
                 {"headers": {"X-API-Key-1": "0"}},
             ],
+            [
+                {},
+                {"headers": {"X-API-Key-1": "{}"}},
+                {"headers": {"X-API-Key-1": "null,null"}},
+                {"headers": {"X-API-Key-1": "null"}},
+                {"headers": {"X-API-Key-1": "false"}},
+            ],
         ),
     )
 
