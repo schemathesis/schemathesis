@@ -910,6 +910,21 @@ def test(case):
     assert "while generating" not in result.stdout.str()
 
 
+@pytest.mark.operations("missing_path_parameter")
+def test_missing_path_parameter(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+
+@schema.parametrize()
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+
+
 @pytest.mark.operations("failure")
 def test_disable_checks_via_config(testdir, openapi3_schema_url):
     testdir.make_test(

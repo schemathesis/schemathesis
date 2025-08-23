@@ -20,7 +20,7 @@ from requests.models import CaseInsensitiveDict
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import GenerationConfig, ProjectConfig
-from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import deepclone
@@ -184,6 +184,18 @@ def create_test(
             unexpected_methods=phases_config.coverage.unexpected_methods,
             generation_config=generation,
         )
+
+    injected_path_parameter_names = [
+        parameter.name
+        for parameter in operation.path_parameters
+        if parameter.definition.get(INJECTED_PATH_PARAMETER_KEY)
+    ]
+    if injected_path_parameter_names:
+        names = ", ".join(f"'{name}'" for name in injected_path_parameter_names)
+        plural = "s" if len(injected_path_parameter_names) > 1 else ""
+        verb = "are" if len(injected_path_parameter_names) > 1 else "is"
+        error = InvalidSchema(f"Path parameter{plural} {names} {verb} not defined")
+        MissingPathParameters.set(hypothesis_test, error)
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
 
@@ -902,3 +914,4 @@ UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example"
 NonSerializableMark = Mark[SerializationNotPossible](attr_name="non_serializable")
 InvalidRegexMark = Mark[SchemaError](attr_name="invalid_regex")
 InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
+MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
