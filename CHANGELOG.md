@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positives in `use_after_free` check when validation errors occur before resource existence checks.
+- Ignored `apply_to` and `skip_for` filters in `map_case`, `filter_case`, `flatmap_case`, and `before_generate_case` hooks.
 
 ### :wrench: Changed
 

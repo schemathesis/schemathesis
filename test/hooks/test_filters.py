@@ -73,10 +73,35 @@ def test_simple_filter(schema_url, is_include):
     test()
 
 
+@pytest.mark.operations("success")
+def test_map_case_filter(ctx, cli, openapi3_schema_url, snapshot_cli):
+    # All these hooks should not be called because of the applied filter
+    with ctx.hook(
+        r"""
+@schemathesis.hook.apply_to(path_regex=r"/fake/path")
+def map_case(ctx, case):
+    1 / 0
+
+@schemathesis.hook.apply_to(path_regex=r"/fake/path")
+def filter_case(ctx, case):
+    1 / 0
+
+@schemathesis.hook.apply_to(path_regex=r"/fake/path")
+def flatmap_case(ctx, case):
+    1 / 0
+
+@schemathesis.hook.apply_to(path_regex=r"/fake/path")
+def before_generate_case(ctx, case):
+    1 / 0
+"""
+    ) as module:
+        assert cli.main("run", openapi3_schema_url, "--max-examples=1", hooks=module) == snapshot_cli
+
+
 def multiple_skip_for(schema):
     exec("""
 @schema.hook.skip_for(name="first").skip_for(name="second")
-def map_body(context, body):
+def map_body(ctx, body):
     return 42
     """)
 
@@ -84,7 +109,7 @@ def map_body(context, body):
 def multiple_apply_to(schema):
     exec("""
 @schema.hook.apply_to(method="POST").apply_to(path="/api/payload")
-def map_body(context, body):
+def map_body(ctx, body):
     return 42
     """)
 

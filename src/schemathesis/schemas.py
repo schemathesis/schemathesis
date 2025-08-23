@@ -27,7 +27,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata
-from schemathesis.hooks import HookDispatcherMark
+from schemathesis.hooks import HookDispatcherMark, _should_skip_hook
 
 from .auths import AuthStorage
 from .filters import (
@@ -712,14 +712,22 @@ class APIOperation(Generic[P]):
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
             context = HookContext(operation=self)
             for hook in dispatcher.get_all_by_name("before_generate_case"):
+                if _should_skip_hook(hook, context):
+                    continue
                 _strategy = hook(context, _strategy)
             for hook in dispatcher.get_all_by_name("filter_case"):
+                if _should_skip_hook(hook, context):
+                    continue
                 hook = partial(hook, context)
                 _strategy = _strategy.filter(hook)
             for hook in dispatcher.get_all_by_name("map_case"):
+                if _should_skip_hook(hook, context):
+                    continue
                 hook = partial(hook, context)
                 _strategy = _strategy.map(hook)
             for hook in dispatcher.get_all_by_name("flatmap_case"):
+                if _should_skip_hook(hook, context):
+                    continue
                 hook = partial(hook, context)
                 _strategy = _strategy.flatmap(hook)
             return _strategy
