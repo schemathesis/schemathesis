@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import itertools
+import string
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field
@@ -29,7 +30,7 @@ from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
-from schemathesis.core import NOT_SET, NotSet, Specification, deserialization, media_types
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -89,6 +90,17 @@ def check_header(parameter: dict[str, Any]) -> None:
         raise InvalidSchema(f"Invalid header name: {name}")
 
 
+def get_template_fields(template: str) -> set[str]:
+    """Extract named placeholders from a string template."""
+    try:
+        parameters = {name for _, name, _, _ in string.Formatter().parse(template) if name is not None}
+        # Check for malformed params to avoid injecting them - they will be checked later on in the workflow
+        template.format(**dict.fromkeys(parameters, ""))
+        return parameters
+    except (ValueError, IndexError):
+        return set()
+
+
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
     nullable_name: ClassVar[str] = ""
@@ -100,6 +112,7 @@ class BaseOpenAPISchema(BaseSchema):
     # excessive resolving
     _inline_reference_cache_lock: RLock = field(default_factory=RLock)
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
+    _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
 
     @property
     def specification(self) -> Specification:
@@ -391,7 +404,6 @@ class BaseOpenAPISchema(BaseSchema):
         resolved: dict[str, Any],
         scope: str,
     ) -> APIOperation:
-        """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
         base_url = self.get_base_url()
         operation: APIOperation[OpenAPIParameter] = APIOperation(
@@ -404,6 +416,14 @@ class BaseOpenAPISchema(BaseSchema):
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
+        # Inject unconstrained path parameters if any is missing
+        missing_parameter_names = get_template_fields(operation.path) - {
+            parameter.name for parameter in operation.path_parameters
+        }
+        for name in missing_parameter_names:
+            definition = {"name": name, INJECTED_PATH_PARAMETER_KEY: True, **deepclone(self._path_parameter_template)}
+            for parameter in self.collect_parameters([definition], resolved):
+                operation.add_parameter(parameter)
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
             self.security.process_definitions(self.raw_schema, operation, self.resolver)
@@ -835,6 +855,7 @@ class SwaggerV20(BaseOpenAPISchema):
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = (("definitions",),)
     links_field = "x-links"
+    _path_parameter_template = {"in": "path", "required": True, "type": "string"}
 
     @property
     def specification(self) -> Specification:
@@ -1003,6 +1024,7 @@ class OpenApi30(SwaggerV20):
     security = OpenAPISecurityProcessor()
     component_locations = (("components", "schemas"),)
     links_field = "links"
+    _path_parameter_template = {"in": "path", "required": True, "schema": {"type": "string"}}
 
     @property
     def specification(self) -> Specification:

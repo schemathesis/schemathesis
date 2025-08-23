@@ -298,6 +298,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     from schemathesis.generation.hypothesis.builder import (
         InvalidHeadersExampleMark,
         InvalidRegexMark,
+        MissingPathParameters,
         NonSerializableMark,
         UnsatisfiableExampleMark,
     )
@@ -333,8 +334,13 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             pytest.skip(exc.args[0])
         except SchemaError as exc:
             raise InvalidRegexPattern.from_schema_error(exc, from_examples=False) from exc
+
         invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
         if invalid_headers is not None:
             raise InvalidHeadersExample.from_headers(invalid_headers) from None
+
+        missing_path_parameters = MissingPathParameters.get(pyfuncitem.obj)
+        if missing_path_parameters:
+            raise missing_path_parameters from None
     else:
         yield

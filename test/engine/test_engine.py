@@ -598,6 +598,9 @@ def test_missing_path_parameter(real_app_schema):
     # Then it leads to an error
     stream.assert_errors()
     assert "Path parameter 'id' is not defined" in str(stream.find(events.NonFatalError).info)
+    # And tests still should be executed
+    event = stream.find_all(events.ScenarioFinished)[-1]
+    assert len(event.recorder.cases) > 0
 
 
 @pytest.mark.operations("failure", "multiple_failures", "unsatisfiable")
