@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generator, cast
 
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
@@ -54,18 +55,28 @@ def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
     filter_used = False
     filter_set = FilterSet()
 
+    @contextmanager
+    def _reset_on_error() -> Generator:
+        try:
+            yield
+        except Exception:
+            filter_set.clear()
+            raise
+
     def register(hook: str | Callable) -> Callable:
         nonlocal filter_set
 
         if filter_used:
-            validate_filterable_hook(hook)
+            with _reset_on_error():
+                validate_filterable_hook(hook)
 
         if isinstance(hook, str):
 
             def decorator(func: Callable) -> Callable:
                 hook_name = cast(str, hook)
                 if filter_used:
-                    validate_filterable_hook(hook)
+                    with _reset_on_error():
+                        validate_filterable_hook(hook)
                 func.filter_set = filter_set  # type: ignore[attr-defined]
                 return dispatcher.register_hook_with_name(func, hook_name)
 
@@ -86,13 +97,15 @@ def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
             nonlocal filter_used
 
             filter_used = True
-            filter_set.include(*args, **kwargs)
+            with _reset_on_error():
+                filter_set.include(*args, **kwargs)
 
         def exclude(*args: Any, **kwargs: Any) -> None:
             nonlocal filter_used
 
             filter_used = True
-            filter_set.exclude(*args, **kwargs)
+            with _reset_on_error():
+                filter_set.exclude(*args, **kwargs)
 
         attach_filter_chain(target, "apply_to", include)
         attach_filter_chain(target, "skip_for", exclude)
@@ -113,11 +126,9 @@ class HookDispatcher:
     _hooks: defaultdict[str, list[Callable]] = field(default_factory=lambda: defaultdict(list))
     _specs: ClassVar[dict[str, RegisteredHook]] = {}
 
-    def __post_init__(self) -> None:
-        self.hook = to_filterable_hook(self)  # type: ignore[method-assign]
-
-    def hook(self, hook: str | Callable) -> Callable:
-        raise NotImplementedError
+    @property
+    def hook(self) -> Callable:
+        return to_filterable_hook(self)
 
     def apply(self, hook: Callable, *, name: str | None = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.

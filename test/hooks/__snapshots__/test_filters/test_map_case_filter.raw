@@ -16,14 +16,6 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ⏭   Examples (in 0.00s)
-
-     ⏭  1 skipped
-
- ✅  Coverage (in 0.00s)
-
-     ✅ 1 passed
-
  ✅  Fuzzing (in 0.00s)
 
      ✅ 1 passed
@@ -35,10 +27,10 @@ API Operations:
   Tested: 1
 
 Test Phases:
-  ⏭  Examples
-  ✅ Coverage
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ✅ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Test cases:
   N generated, N passed
