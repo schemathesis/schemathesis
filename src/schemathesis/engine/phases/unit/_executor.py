@@ -49,6 +49,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
     InvalidHeadersExampleMark,
     InvalidRegexMark,
+    MissingPathParameters,
     NonSerializableMark,
     UnsatisfiableExampleMark,
 )
@@ -73,6 +74,7 @@ def run_test(
     yield scenario_started
     errors: list[Exception] = []
     skip_reason = None
+    error: Exception
     test_start_time = time.monotonic()
     recorder = ScenarioRecorder(label=operation.label)
     state = TestingState()
@@ -227,11 +229,15 @@ def run_test(
         and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
     ):
         status = Status.FAILURE
+
+    # Check for various errors during generation (tests may still have been generated)
+
     if UnsatisfiableExampleMark.is_set(test_function):
         status = Status.ERROR
         yield non_fatal_error(
             hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
         )
+
     non_serializable = NonSerializableMark.get(test_function)
     if non_serializable is not None and status != Status.ERROR:
         status = Status.ERROR
@@ -248,10 +254,17 @@ def run_test(
     if invalid_regex is not None and status != Status.ERROR:
         status = Status.ERROR
         yield non_fatal_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
+
     invalid_headers = InvalidHeadersExampleMark.get(test_function)
     if invalid_headers:
         status = Status.ERROR
         yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
+
+    missing_path_parameters = MissingPathParameters.get(test_function)
+    if missing_path_parameters:
+        status = Status.ERROR
+        yield non_fatal_error(missing_path_parameters)
+
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
 
