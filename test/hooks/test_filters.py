@@ -28,6 +28,10 @@ def test_invalid_hook(request, dispatcher_factory, register):
 
     assert str(exc_info.value) == "Filters are not applicable to this hook: `before_process_path`"
 
+    # Invalid hooks should not mutate global state
+    with pytest.raises(ValueError) as exc_info:
+        register(dispatcher)
+
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("payload")
@@ -93,9 +97,19 @@ def flatmap_case(ctx, case):
 @schemathesis.hook.apply_to(path_regex=r"/fake/path")
 def before_generate_case(ctx, case):
     1 / 0
+
+
+try:
+    @schemathesis.hook("before_process_path").apply_to(method="GET")
+    def custom_name(context, path, methods):
+        pass
+except:
+    pass
 """
     ) as module:
-        assert cli.main("run", openapi3_schema_url, "--max-examples=1", hooks=module) == snapshot_cli
+        assert (
+            cli.main("run", openapi3_schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
+        )
 
 
 def multiple_skip_for(schema):

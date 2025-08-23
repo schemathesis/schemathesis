@@ -175,6 +175,10 @@ class FilterSet:
         """Whether the filter set does not contain any filters."""
         return not self._includes and not self._excludes
 
+    def clear(self) -> None:
+        self._includes.clear()
+        self._excludes.clear()
+
     def include(
         self,
         func: MatcherFunc | None = None,
