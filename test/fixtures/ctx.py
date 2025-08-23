@@ -10,6 +10,7 @@ import pytest
 import yaml
 
 from schemathesis.checks import CHECKS
+from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 
 
 @dataclass
@@ -88,6 +89,19 @@ class Context:
             new_names = set(CHECKS.get_all_names()) - names
             for name in new_names:
                 CHECKS.unregister(name)
+
+    @contextmanager
+    def hook(self, content: str):
+        with self.restore_hooks():
+            yield self.write_pymodule(content)
+
+    @contextmanager
+    def restore_hooks(self):
+        before = GLOBAL_HOOK_DISPATCHER.get_all()
+        try:
+            yield
+        finally:
+            GLOBAL_HOOK_DISPATCHER._hooks = before
 
 
 @pytest.fixture
