@@ -201,6 +201,9 @@ class HookDispatcher:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
 
+    def get_all(self) -> dict[str, list[Callable]]:
+        return self._hooks
+
     def apply_to_container(
         self, strategy: st.SearchStrategy, container: str, context: HookContext
     ) -> st.SearchStrategy:
