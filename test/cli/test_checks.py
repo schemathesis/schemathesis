@@ -124,6 +124,44 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
     )
 
 
+def test_optional_auth_should_not_trigger_ignored_auth_check(app_runner, cli, snapshot_cli):
+    # See GH-3052
+    raw_schema = {
+        "openapi": "3.0.3",
+        "info": {"title": "example", "version": "1.0.0"},
+        "paths": {
+            "/": {
+                "get": {
+                    "security": [
+                        {},
+                        {"basic_auth": []},
+                    ],
+                    "responses": {"200": {"description": "200 OK"}},
+                }
+            },
+        },
+        "components": {
+            "securitySchemes": {"basic_auth": {"type": "http", "scheme": "basic"}},
+        },
+    }
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/", methods=["GET"])
+    def data_endpoint():
+        return jsonify({"status": "Ok"})
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(f"http://127.0.0.1:{port}/openapi.json", "-c ignored_auth", "--phases=fuzzing", "--max-examples=3")
+        == snapshot_cli
+    )
+
+
 def test_format_parameter_csv_response(app_runner, cli, snapshot_cli):
     raw_schema = {
         "openapi": "3.0.0",
