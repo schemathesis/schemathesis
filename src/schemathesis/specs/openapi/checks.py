@@ -497,7 +497,11 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
+    if (
+        not isinstance(case.operation.schema, BaseOpenAPISchema)
+        or is_unexpected_http_status_case(case)
+        or _has_optional_auth(case.operation)
+    ):
         return True
     security_parameters = _get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
@@ -583,6 +587,13 @@ def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]
         for parameter in schema.security._get_active_definitions(schema.raw_schema, operation, schema.resolver)
         if parameter["type"] in ("apiKey", "basic", "http")
     ]
+
+
+def _has_optional_auth(operation: APIOperation) -> bool:
+    from .schemas import BaseOpenAPISchema
+
+    schema = cast(BaseOpenAPISchema, operation.schema)
+    return schema.security.has_optional_auth(schema.raw_schema, operation)
 
 
 def _contains_auth(
