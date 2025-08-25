@@ -33,18 +33,26 @@ class BaseSecurityProcessor:
             self.process_http_security_definition(definition, operation)
 
     @staticmethod
+    def _get_security_requirements(schema: dict[str, Any], operation: APIOperation) -> list[dict]:
+        global_requirements = schema.get("security", [])
+        local_requirements = operation.definition.raw.get("security", None)
+        if local_requirements is not None:
+            return local_requirements
+        return global_requirements
+
+    @staticmethod
     def get_security_requirements(schema: dict[str, Any], operation: APIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
         # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#operation-object
         # > This definition overrides any declared top-level security.
         # > To remove a top-level security declaration, an empty array can be used.
-        global_requirements = schema.get("security", [])
-        local_requirements = operation.definition.raw.get("security", None)
-        if local_requirements is not None:
-            requirements = local_requirements
-        else:
-            requirements = global_requirements
+        requirements = BaseSecurityProcessor._get_security_requirements(schema, operation)
         return [key for requirement in requirements for key in requirement]
+
+    @staticmethod
+    def has_optional_auth(schema: dict[str, Any], operation: APIOperation) -> bool:
+        requirements = BaseSecurityProcessor._get_security_requirements(schema, operation)
+        return {} in requirements
 
     def _get_active_definitions(
         self, schema: dict[str, Any], operation: APIOperation, resolver: RefResolver
