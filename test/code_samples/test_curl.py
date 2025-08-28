@@ -29,13 +29,19 @@ def loose_schema(ctx):
     return schema
 
 
-@pytest.mark.parametrize("headers", [None, {"X-Key": "42"}])
+@pytest.mark.parametrize("headers", [None, {"X-Key": "42"}, {"X-Key": ""}])
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 def test_as_curl_command(case: Case, headers, curl):
     case.operation.schema.config.output.sanitization.update(enabled=False)
     command = case.as_curl_command(headers)
-    expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
+    expected_headers = ""
+    if headers:
+        for name, value in headers.items():
+            if not value:
+                expected_headers += f" -H '{name};'"
+            else:
+                expected_headers += f" -H '{name}: {value}'"
     assert command == f"curl -X GET{expected_headers} http://localhost/users"
     curl.assert_valid(command)
 
