@@ -23,7 +23,11 @@ def generate(
     _filter_headers(headers, known_generated_headers or {})
     command = f"curl -X {method}"
     for key, value in headers.items():
-        header = f"{key}: {value}"
+        # To send an empty header with cURL we need to use `;`, otherwise empty header is ignored
+        if not value:
+            header = f"{key};"
+        else:
+            header = f"{key}: {value}"
         command += f" -H {quote(header)}"
     if body:
         if isinstance(body, bytes):
