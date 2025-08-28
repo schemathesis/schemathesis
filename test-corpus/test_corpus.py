@@ -478,6 +478,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Failed to generate test cases from examples for this API operation" in formatted:
         return True
+    if formatted.splitlines()[-1].startswith("Path parameters") and formatted.endswith("are not defined"):
+        return True
     if "FailedHealthCheck" in formatted:
         return True
     if "Serialization not possible" in formatted:
