@@ -1244,6 +1244,33 @@ def test_path_parameter(ctx):
     )
 
 
+def test_path_parameter_as_string_non_empty(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {"name": "id", "in": "path", "required": True, "schema": {"type": "string", "minLength": 1}},
+        ],
+        path="/foo/{id}",
+    )
+    assert_coverage(
+        schema,
+        list(GenerationMode),
+        [
+            {
+                "path_parameters": {
+                    "id": "00",
+                },
+            },
+            {
+                "path_parameters": {
+                    "id": "0",
+                },
+            },
+        ],
+        path=("/foo/{id}", "post"),
+    )
+
+
 def test_incorrect_headers_with_loose_schema(ctx):
     schema = build_schema(
         ctx,

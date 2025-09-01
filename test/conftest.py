@@ -348,7 +348,7 @@ class CliSnapshotConfig:
                         pass
             with keep_cwd():
                 data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
-        data = re.sub(r"http://127\.0\.0\.1:[0-9]{3,}/", "http://127.0.0.1/", data)
+        data = re.sub(r"http://127\.0\.0\.1:[0-9]{3,}", "http://127.0.0.1", data)
         if self.replace_tmp_dir:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
