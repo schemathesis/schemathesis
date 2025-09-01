@@ -423,6 +423,74 @@ def app():
     return app
 
 
+def test_response_schema_conformance(ctx, app_runner, cli, snapshot_cli, app):
+    @app.route("/organizations/", methods=["GET"])
+    def list_organizations():
+        return [], 200
+
+    schema_file = ctx.openapi.write_schema(
+        {
+            "/organizations/": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "array"},
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/organizations/{organization_slug}/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "organization_slug",
+                            "in": "path",
+                            "schema": {"type": "string", "minLength": 1},
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "$ref": "#/components/schemas/Organization",
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Organization": {
+                    "properties": {
+                        "name": {"type": "string", "minLength": 1},
+                    },
+                    "type": "object",
+                }
+            }
+        },
+    )
+    port = app_runner.run_flask_app(app)
+    # There should be no empty `organization_slug` generated which will lead to request being handled by `GET /organizations/`
+    # onstead of `GET /organizations/{organization_slug}/` and will give a response schema conformance error
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--url=http://127.0.0.1:{port}",
+            "-c response_schema_conformance",
+            "--max-examples=10",
+        )
+        == snapshot_cli
+    )
+
+
 def test_ensure_resource_availability_does_not_trigger_on_subsequent_error(app_runner, cli, snapshot_cli, app):
     port = app_runner.run_flask_app(app)
 

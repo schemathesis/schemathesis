@@ -480,7 +480,7 @@ def cover_schema_iter(
                         # The `pattern` value may require an non-empty one and the generation will fail
                         # However, it is fine to violate `pattern` here as it is negative string generation anyway
                         value = ""
-                        if seen.insert(value):
+                        if ctx.is_valid_for_location(value) and seen.insert(value):
                             yield NegativeValue(
                                 value, description="String smaller than minLength", location=ctx.current_path
                             )
@@ -500,7 +500,7 @@ def cover_schema_iter(
                                     value = ctx.generate_from_schema(new_schema)
                             else:
                                 value = ctx.generate_from_schema(new_schema)
-                            if seen.insert(value):
+                            if ctx.is_valid_for_location(value) and seen.insert(value):
                                 yield NegativeValue(
                                     value, description="String smaller than minLength", location=ctx.current_path
                                 )
