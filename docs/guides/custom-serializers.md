@@ -35,7 +35,7 @@ paths:
                     type: string
                     pattern: "^[A-Za-z]+$"
                   last_name:
-                    type: string  
+                    type: string
                     pattern: "^[A-Za-z]+$"
 ```
 
@@ -90,7 +90,7 @@ schemathesis run http://localhost:8000/openapi.json
 !!! note "Skipping Serialization"
     If your serializer returns `None`, the resulting request will have no body.
 
-## Essential Patterns
+## Common Patterns
 
 ### Multiple aliases for the same format
 
@@ -104,6 +104,31 @@ def csv_serializer(ctx, value):
         return value
     return serialize_to_csv(value)  # Returns bytes
 ```
+
+### Extending Existing Serializers
+
+Add aliases to built-in serializers for custom media types that use the same format.
+
+```yaml
+# Your API spec uses application/custom-yaml but it's just YAML
+content:
+  application/custom-yaml:
+    schema:
+      type: object
+```
+
+```python
+schemathesis.serializers["application/xml"].extend_for(
+    "application/vnd.api+xml",
+    "application/soap+xml"
+)
+```
+
+That's it. Your custom media types now use the same serialization as their base format.
+
+!!! note "Auto-detected variants"
+    Common variants like `application/vnd.api+json` or `application/soap+xml` work automatically.
+
 
 ### Context-aware serialization
 
@@ -125,6 +150,8 @@ def context_aware_csv(ctx, value):
 
 !!! info "Automatic Transport Registration"
     Serializers are automatically registered for all transport types (HTTP requests, ASGI, WSGI)
+
+
 
 ## What's Next
 
