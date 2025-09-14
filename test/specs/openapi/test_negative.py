@@ -133,7 +133,12 @@ def test_failing_mutations(data, mutation, schema, location, validate):
     # When mutation can't be applied
     # Then it returns "failure"
     assert (
-        mutation(MutationContext(schema, {}, location, "application/json"), data.draw, schema) == MutationResult.FAILURE
+        mutation(
+            MutationContext(keywords=schema, non_keywords={}, location=location, media_type="application/json"),
+            data.draw,
+            schema,
+        )
+        == MutationResult.FAILURE
     )
     # And doesn't mutate the input schema
     assert schema == original_schema
@@ -145,7 +150,9 @@ def test_change_type_urlencoded(data):
     # When `application/x-www-form-urlencoded` media type is passed to `change_type`
     schema = {"type": "object"}
     original_schema = deepclone(schema)
-    context = MutationContext(schema, {}, "body", "application/x-www-form-urlencoded")
+    context = MutationContext(
+        keywords=schema, non_keywords={}, location="body", media_type="application/x-www-form-urlencoded"
+    )
     # Then it should not be mutated
     assert change_type(context, data.draw, schema) == MutationResult.FAILURE
     # And doesn't mutate the input schema
@@ -193,7 +200,12 @@ def test_successful_mutations(data, mutation, schema):
     # When mutation can be applied
     # Then it returns "success"
     assert (
-        mutation(MutationContext(schema, {}, "body", "application/json"), data.draw, schema) == MutationResult.SUCCESS
+        mutation(
+            MutationContext(keywords=schema, non_keywords={}, location="body", media_type="application/json"),
+            data.draw,
+            schema,
+        )
+        == MutationResult.SUCCESS
     )
     # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
@@ -290,7 +302,11 @@ def test_mutation_result_success(left, right, expected):
 def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
     # When `negate_constraints` is used
     schema = deepclone(schema)
-    negate_constraints(MutationContext(schema, {}, "body", "application/json"), data.draw, schema)
+    negate_constraints(
+        MutationContext(keywords=schema, non_keywords={}, location="body", media_type="application/json"),
+        data.draw,
+        schema,
+    )
     # Then it should always produce valid schemas
     validator_cls.check_schema(schema)
     # E.g. `exclusiveMaximum` / `exclusiveMinimum` only work when `maximum` / `minimum` are present in the same schema
