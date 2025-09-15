@@ -8,6 +8,7 @@ HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 INTERNAL_BUFFER_SIZE = 32 * 1024
 DEFAULT_STATEFUL_STEP_COUNT = 6
 INJECTED_PATH_PARAMETER_KEY = "x-schemathesis-injected"
+HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 
 
 class NotSet: ...

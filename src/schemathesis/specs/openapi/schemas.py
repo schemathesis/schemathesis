@@ -41,6 +41,7 @@ from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.specs.openapi import _adapter
 from schemathesis.specs.openapi.stateful import links
 from schemathesis.specs.openapi.utils import expand_status_code
 
@@ -103,6 +104,7 @@ def get_template_fields(template: str) -> set[str]:
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
+    _adapter: _adapter.OpenApi = field(init=False)
     nullable_name: ClassVar[str] = ""
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
@@ -114,13 +116,16 @@ class BaseOpenAPISchema(BaseSchema):
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
     _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
 
+    def __post_init__(self) -> None:
+        self._adapter = _adapter.OpenApi(self.raw_schema)
+        super().__post_init__()
+
     @property
     def specification(self) -> Specification:
         raise NotImplementedError
 
     def __repr__(self) -> str:
-        info = self.raw_schema["info"]
-        return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
+        return f"<{self.__class__.__name__} for {self._adapter.title} {self._adapter.version}>"
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.raw_schema.get("paths", {}))
@@ -316,35 +321,43 @@ class BaseOpenAPISchema(BaseSchema):
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
         make_operation = self.make_operation
-        for path, path_item in paths.items():
-            method = None
-            try:
-                dispatch_hook("before_process_path", context, path, path_item)
-                scope, path_item = resolve_path_item(path_item)
-                with in_scope(self.resolver, scope):
-                    shared_parameters = resolve_shared_parameters(path_item)
-                    for method, entry in path_item.items():
-                        if method not in HTTP_METHODS:
-                            continue
-                        try:
-                            resolved = resolve_operation(entry)
-                            if should_skip(path, method, resolved):
-                                continue
-                            parameters = resolved.get("parameters", ())
-                            parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-                            operation = make_operation(
-                                path,
-                                method,
-                                parameters,
-                                entry,
-                                resolved,
-                                scope,
-                            )
-                            yield Ok(operation)
-                        except SCHEMA_PARSING_ERRORS as exc:
-                            yield self._into_err(exc, path, method)
-            except SCHEMA_PARSING_ERRORS as exc:
-                yield self._into_err(exc, path, method)
+        for result in self._adapter:
+            if isinstance(result, Ok):
+                op = result.ok()
+                if should_skip(op.path, op.method, op.definition):
+                    continue
+                try:
+                    resolved = resolve_operation(op.definition)
+                    parameters = collect_parameters(
+                        itertools.chain(
+                            (
+                                # TODO: Resolve later on + cache result?
+                                # TODO: Extract util to inject dependent references / inline them
+                                self.resolver.resolve_all(param.definition, RECURSION_DEPTH_LIMIT - 8)
+                                for param in op.iter_parameters()
+                            ),
+                            (
+                                self.resolver.resolve_all(param.definition, RECURSION_DEPTH_LIMIT - 8)
+                                for param in op.shared_parameters
+                            ),
+                        ),
+                        resolved,
+                    )
+                    yield Ok(
+                        make_operation(
+                            op.path,
+                            op.method,
+                            parameters,
+                            op.definition,
+                            resolved,
+                            "",  # TODO
+                        )
+                    )
+                except SCHEMA_PARSING_ERRORS as exc:
+                    yield self._into_err(exc, op.path, op.method)
+            else:
+                error = result.err()
+                yield self._into_err(error, error.path, error.method)
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
         __tracebackhide__ = True
