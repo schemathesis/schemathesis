@@ -31,6 +31,7 @@ from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
+from schemathesis.core.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -41,6 +42,7 @@ from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.specs.openapi._adapter import prepare_parameters
 from schemathesis.specs.openapi.stateful import links
 from schemathesis.specs.openapi.utils import expand_status_code
 
@@ -268,16 +270,13 @@ class BaseOpenAPISchema(BaseSchema):
             _, value = self.resolver.resolve(value["$ref"])
         return value
 
-    def _resolve_shared_parameters(self, path_item: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return self.resolver.resolve_all(path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-
     def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
         return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
 
     def _collect_operation_parameters(
         self, path_item: Mapping[str, Any], operation: dict[str, Any]
     ) -> list[OpenAPIParameter]:
-        shared_parameters = self._resolve_shared_parameters(path_item)
+        shared_parameters = list(prepare_parameters(path_item, self.resolver))
         parameters = operation.get("parameters", ())
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
@@ -311,7 +310,6 @@ class BaseOpenAPISchema(BaseSchema):
         # Optimization: local variables are faster than attribute access
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
-        resolve_shared_parameters = self._resolve_shared_parameters
         resolve_operation = self._resolve_operation
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
@@ -322,7 +320,7 @@ class BaseOpenAPISchema(BaseSchema):
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
                 with in_scope(self.resolver, scope):
-                    shared_parameters = resolve_shared_parameters(path_item)
+                    shared_parameters = list(prepare_parameters(path_item, self.resolver))
                     for method, entry in path_item.items():
                         if method not in HTTP_METHODS:
                             continue
@@ -671,6 +669,10 @@ class BaseOpenAPISchema(BaseSchema):
 
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
+        if isinstance(schema, bool):
+            return schema
+        if BUNDLE_STORAGE_KEY in schema:
+            return schema
         schema = deepclone(schema)
         schema = transform(schema, self._rewrite_references, self.resolver)
         # Only add definitions that are reachable from the schema via references
