@@ -26,6 +26,8 @@ from .parameters import OpenAPIBody, OpenAPIParameter
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
+    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
 
 @dataclass
 class ParameterExample:
@@ -95,6 +97,10 @@ def get_strategies_from_examples(
 
 def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
+    from .schemas import BaseOpenAPISchema
+
+    assert isinstance(operation.schema, BaseOpenAPISchema)
+
     responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
@@ -114,7 +120,9 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
             unresolved_definition = _find_parameter_examples_definition(
                 operation, parameter.name, parameter.examples_field
             )
-            for value in extract_inner_examples(parameter.definition[parameter.examples_field], unresolved_definition):
+            for value in extract_inner_examples(
+                parameter.definition[parameter.examples_field], unresolved_definition, operation.schema
+            ):
                 yield ParameterExample(
                     container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
                 )
@@ -143,7 +151,7 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
         if alternative.examples_field in alternative.definition:
             unresolved_definition = _find_request_body_examples_definition(operation, alternative)
             for value in extract_inner_examples(
-                alternative.definition[alternative.examples_field], unresolved_definition
+                alternative.definition[alternative.examples_field], unresolved_definition, operation.schema
             ):
                 yield BodyExample(value=value, media_type=alternative.media_type)
         if "schema" in alternative.definition:
@@ -220,14 +228,14 @@ def _find_request_body_examples_definition(
 
 
 def extract_inner_examples(
-    examples: dict[str, Any] | list, unresolved_definition: dict[str, Any]
+    examples: dict[str, Any] | list, unresolved_definition: dict[str, Any], schema: BaseOpenAPISchema
 ) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
     if isinstance(examples, dict):
         for name, example in examples.items():
             if "$ref" in unresolved_definition[name] and "value" not in example and "externalValue" not in example:
-                # The example here is a resolved example and should be yielded as is
-                yield example
+                _, resolved = schema.resolver.resolve(unresolved_definition[name]["$ref"])
+                yield resolved
             if isinstance(example, dict):
                 if "value" in example:
                     yield example["value"]
