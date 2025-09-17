@@ -441,9 +441,6 @@ class BaseSchema(Mapping):
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         raise NotImplementedError
 
-    def prepare_schema(self, schema: Any) -> Any:
-        raise NotImplementedError
-
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         raise NotImplementedError
 
