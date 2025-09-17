@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.1.4...HEAD) - TBD
 
+### :bug: Fixed
+
+- Properly generate boundary values for negative `maximum` during the coverage phase.
+
 ### :racing_car: Performance
 
 - Avoid choosing mutations that aren't applicable in the current context.

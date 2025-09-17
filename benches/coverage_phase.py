@@ -10,10 +10,10 @@ setup()
 
 CONTEXTS = [
     CoverageContext(
-        location="body", is_required=True, custom_formats={}, validator_cls=Draft202012Validator
+        root_schema={}, location="body", is_required=True, custom_formats={}, validator_cls=Draft202012Validator
     ).with_positive(),
     CoverageContext(
-        location="body", is_required=True, custom_formats={}, validator_cls=Draft202012Validator
+        root_schema={}, location="body", is_required=True, custom_formats={}, validator_cls=Draft202012Validator
     ).with_negative(),
 ]
 CONTEXT_NAMES = [",".join([m.value for m in ctx.generation_modes]) for ctx in CONTEXTS]
