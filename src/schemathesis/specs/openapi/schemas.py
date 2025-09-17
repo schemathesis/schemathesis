@@ -328,8 +328,10 @@ class BaseOpenAPISchema(BaseSchema):
                             resolved = resolve_operation(entry)
                             if should_skip(path, method, resolved):
                                 continue
-                            parameters = resolved.get("parameters", ())
-                            parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
+                            raw_parameters = list(prepare_parameters(entry, self.resolver))
+                            parameters = collect_parameters(
+                                itertools.chain(raw_parameters, shared_parameters), resolved
+                            )
                             operation = make_operation(
                                 path,
                                 method,

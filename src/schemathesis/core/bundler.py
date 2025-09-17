@@ -22,6 +22,7 @@ def bundle(schema: JsonSchema, resolver: RefResolver) -> JsonSchema:
     # Track visited URIs and their local definition names
     visited: set[str] = set()
     uri_to_def_name: dict[str, str] = {}
+    defs = {}
     counter = 0
 
     def get_def_name(uri: str) -> str:
@@ -38,36 +39,34 @@ def bundle(schema: JsonSchema, resolver: RefResolver) -> JsonSchema:
             ref = current.get("$ref")
             if isinstance(ref, str) and not ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
                 resolved_uri, resolved_schema = resolver.resolve(ref)
+                def_name = get_def_name(resolved_uri)
 
                 # Bundle only new schemas
                 if resolved_uri not in visited:
                     visited.add(resolved_uri)
 
-                    defs = bundled.setdefault(BUNDLE_STORAGE_KEY, {})
-
-                    # Get unique definition name and embed the schema
-                    def_name = get_def_name(resolved_uri)
-                    defs[def_name] = deepclone(resolved_schema)
+                    cloned = deepclone(resolved_schema)
+                    defs[def_name] = cloned
 
                     # Recursively bundle the embedded schema too!
-                    bundle_recursive(bundled[BUNDLE_STORAGE_KEY][def_name])
+                    resolver.push_scope(resolved_uri)
+                    try:
+                        bundle_recursive(cloned)
+                    finally:
+                        resolver.pop_scope()
 
                 # Update reference to point to embedded definition
-                def_name = get_def_name(resolved_uri)
                 current["$ref"] = f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
 
-            if current is bundled:
-                # Root object: skip bundle storage to avoid reprocessing + count on its size change (due to bundle storage)
-                for key, value in list(current.items()):
-                    if key != BUNDLE_STORAGE_KEY:
-                        bundle_recursive(value)
-            else:
-                for value in current.values():
-                    bundle_recursive(value)
+            for value in current.values():
+                bundle_recursive(value)
 
         elif isinstance(current, list):
             for item in current:
                 bundle_recursive(item)
 
     bundle_recursive(bundled)
+
+    if defs:
+        bundled[BUNDLE_STORAGE_KEY] = defs
     return bundled
