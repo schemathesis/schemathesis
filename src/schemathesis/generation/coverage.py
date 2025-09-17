@@ -244,6 +244,8 @@ class CoverageContext:
         return cached_draw(strategy)
 
     def generate_from_schema(self, schema: dict | bool) -> Any:
+        if isinstance(schema, dict) and "$ref" in schema:
+            schema = self.resolve_ref(schema["$ref"])
         if isinstance(schema, bool):
             return 0
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
@@ -315,6 +317,10 @@ class CoverageContext:
                 )
 
         if keys == ["allOf"]:
+            for idx, sub_schema in enumerate(schema["allOf"]):
+                if "$ref" in sub_schema:
+                    schema["allOf"][idx] = self.resolve_ref(sub_schema["$ref"])
+
             schema = canonicalish(schema)
             if isinstance(schema, dict) and "allOf" not in schema:
                 return self.generate_from_schema(schema)
@@ -391,6 +397,9 @@ def _cover_positive_for_type(
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
                 with suppress(jsonschema.SchemaError):
+                    for idx, sub_schema in enumerate(all_of):
+                        if "$ref" in sub_schema:
+                            all_of[idx] = ctx.resolve_ref(sub_schema["$ref"])
                     canonical = canonicalish(schema)
                     yield from cover_schema_iter(ctx, canonical)
         if enum is not NOT_SET:
