@@ -4,11 +4,9 @@ import itertools
 import string
 from collections import defaultdict
 from contextlib import ExitStack, contextmanager, suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import get_close_matches
-from hashlib import sha1
 from json import JSONDecodeError
-from threading import RLock
 from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
@@ -31,12 +29,12 @@ from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
-from schemathesis.core.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.bundler import Bundler
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
+from schemathesis.core.errors import InternalError, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
-from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
@@ -51,7 +49,7 @@ from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import serialization
 from ._hypothesis import openapi_cases
-from .converter import to_json_schema, to_json_schema_recursive
+from .converter import to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .parameters import (
@@ -109,10 +107,6 @@ class BaseOpenAPISchema(BaseSchema):
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
-    _inline_reference_cache: dict[str, Any] = field(default_factory=dict)
-    # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
-    # excessive resolving
-    _inline_reference_cache_lock: RLock = field(default_factory=RLock)
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
     _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
 
@@ -276,8 +270,9 @@ class BaseOpenAPISchema(BaseSchema):
     def _collect_operation_parameters(
         self, path_item: Mapping[str, Any], operation: dict[str, Any]
     ) -> list[OpenAPIParameter]:
-        shared_parameters = list(prepare_parameters(path_item, self.resolver))
-        parameters = operation.get("parameters", ())
+        bundler = Bundler()
+        shared_parameters = list(prepare_parameters(path_item, resolver=self.resolver, bundler=bundler))
+        parameters = list(prepare_parameters(operation, resolver=self.resolver, bundler=bundler))
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
@@ -320,7 +315,8 @@ class BaseOpenAPISchema(BaseSchema):
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
                 with in_scope(self.resolver, scope):
-                    shared_parameters = list(prepare_parameters(path_item, self.resolver))
+                    bundler = Bundler()
+                    shared_parameters = list(prepare_parameters(path_item, resolver=self.resolver, bundler=bundler))
                     for method, entry in path_item.items():
                         if method not in HTTP_METHODS:
                             continue
@@ -328,7 +324,7 @@ class BaseOpenAPISchema(BaseSchema):
                             resolved = resolve_operation(entry)
                             if should_skip(path, method, resolved):
                                 continue
-                            raw_parameters = list(prepare_parameters(entry, self.resolver))
+                            raw_parameters = list(prepare_parameters(entry, resolver=self.resolver, bundler=bundler))
                             parameters = collect_parameters(
                                 itertools.chain(raw_parameters, shared_parameters), resolved
                             )
@@ -640,99 +636,6 @@ class BaseOpenAPISchema(BaseSchema):
         with in_scopes(resolver, scopes):
             yield resolver
 
-    @property
-    def rewritten_components(self) -> dict[str, Any]:
-        if not hasattr(self, "_rewritten_components"):
-
-            def callback(_schema: dict[str, Any], nullable_name: str) -> dict[str, Any]:
-                _schema = to_json_schema(_schema, nullable_name=nullable_name, copy=False)
-                return self._rewrite_references(_schema, self.resolver)
-
-            # Different spec versions allow different keywords to store possible reference targets
-            components: dict[str, Any] = {}
-            for path in self.component_locations:
-                schema = self.raw_schema
-                target = components
-                for chunk in path:
-                    if chunk in schema:
-                        schema = schema[chunk]
-                        target = target.setdefault(chunk, {})
-                    else:
-                        break
-                else:
-                    target.update(transform(deepclone(schema), callback, self.nullable_name))
-            if self._inline_reference_cache:
-                components[INLINED_REFERENCES_KEY] = self._inline_reference_cache
-            self._rewritten_components = components
-        return self._rewritten_components
-
-    def prepare_schema(self, schema: Any) -> Any:
-        """Inline Open API definitions.
-
-        Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
-        """
-        if isinstance(schema, bool):
-            return schema
-        if BUNDLE_STORAGE_KEY in schema:
-            return schema
-        schema = deepclone(schema)
-        schema = transform(schema, self._rewrite_references, self.resolver)
-        # Only add definitions that are reachable from the schema via references
-        stack = [schema]
-        seen = set()
-        while stack:
-            item = stack.pop()
-            if isinstance(item, dict):
-                if "$ref" in item:
-                    reference = item["$ref"]
-                    if isinstance(reference, str) and reference.startswith("#/") and reference not in seen:
-                        seen.add(reference)
-                        # Resolve the component and add it to the proper place in the schema
-                        pointer = reference[1:]
-                        resolved = resolve_pointer(self.rewritten_components, pointer)
-                        if resolved is UNRESOLVABLE:
-                            raise LoaderError(
-                                LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
-                                message=f"Unresolvable JSON pointer in the schema: {pointer}",
-                            )
-                        if isinstance(resolved, dict):
-                            container = schema
-                            for key in pointer.split("/")[1:]:
-                                container = container.setdefault(key, {})
-                            container.update(resolved)
-                        # Explore the resolved value too
-                        stack.append(resolved)
-                # Still explore other values as they may have nested references in other keys
-                for value in item.values():
-                    if isinstance(value, (dict, list)):
-                        stack.append(value)
-            elif isinstance(item, list):
-                for sub_item in item:
-                    if isinstance(sub_item, (dict, list)):
-                        stack.append(sub_item)
-        return schema
-
-    def _rewrite_references(self, schema: dict[str, Any], resolver: InliningResolver) -> dict[str, Any]:
-        """Rewrite references present in the schema.
-
-        The idea is to resolve references, cache the result and replace these references with new ones
-        that point to a local path which is populated from this cache later on.
-        """
-        reference = schema.get("$ref")
-        # If `$ref` is not a property name and should be processed
-        if reference is not None and isinstance(reference, str) and not reference.startswith("#/"):
-            key = _make_reference_key(resolver._scopes_stack, reference)
-            with self._inline_reference_cache_lock:
-                if key not in self._inline_reference_cache:
-                    with resolver.resolving(reference) as resolved:
-                        # Resolved object also may have references
-                        self._inline_reference_cache[key] = transform(
-                            resolved, lambda s: self._rewrite_references(s, resolver)
-                        )
-            # Rewrite the reference with the new location
-            schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"
-        return schema
-
 
 def _get_response_definition_by_status(status_code: int, responses: dict[str, Any]) -> dict[str, Any] | None:
     # Cast to string, as integers are often there due to YAML deserialization
@@ -758,22 +661,6 @@ def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
     if len(failures) == 1:
         raise failures[0] from None
     raise FailureGroup(failures) from None
-
-
-def _make_reference_key(scopes: list[str], reference: str) -> str:
-    """A name under which the resolved reference data will be stored."""
-    # Using a hexdigest is the simplest way to associate practically unique keys with each reference
-    digest = sha1()
-    for scope in scopes:
-        digest.update(scope.encode("utf-8"))
-        # Separator to avoid collisions like this: ["a"], "bc" vs. ["ab"], "c". Otherwise, the resulting digest
-        # will be the same for both cases
-        digest.update(b"#")
-    digest.update(reference.encode("utf-8"))
-    return digest.hexdigest()
-
-
-INLINED_REFERENCES_KEY = "x-inlined"
 
 
 @contextmanager
@@ -833,7 +720,10 @@ class MethodMap(Mapping):
             resolved = schema._resolve_operation(operation)
         finally:
             schema.resolver.pop_scope()
-        parameters = schema._collect_operation_parameters(self._path_item, resolved)
+        try:
+            parameters = schema._collect_operation_parameters(self._path_item, resolved)
+        except SCHEMA_PARSING_ERRORS as exc:
+            schema._raise_invalid_schema(exc, path, method)
         return schema.make_operation(path, method, parameters, operation, resolved, scope)
 
     def __getitem__(self, item: str) -> APIOperation:

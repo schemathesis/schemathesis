@@ -16,7 +16,7 @@ from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, run_checks
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.core.compat import BaseExceptionGroup
+from schemathesis.core.compat import BaseExceptionGroup, RefResolutionError
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
@@ -190,7 +190,7 @@ def run_test(
                     config=ctx.config.output,
                 )
             )
-    except HypothesisRefResolutionError:
+    except (HypothesisRefResolutionError, RefResolutionError):
         status = Status.ERROR
         yield non_fatal_error(UnsupportedRecursiveReference())
     except InvalidArgument as exc:

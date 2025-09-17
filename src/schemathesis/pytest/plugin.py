@@ -12,6 +12,7 @@ from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -312,7 +313,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
                 raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
             raise InvalidSchema(exc.args[0]) from None
-        except HypothesisRefResolutionError:
+        except (HypothesisRefResolutionError, RefResolutionError):
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except (SkipTest, unittest.SkipTest) as exc:
             if UnsatisfiableExampleMark.is_set(pyfuncitem.obj):

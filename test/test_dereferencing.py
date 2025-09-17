@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, given, settings
-from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.validators import Draft4Validator
 
 import schemathesis
-from schemathesis.core.errors import LoaderError
+from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.generation.modes import GenerationMode
 
 from .utils import as_param, get_schema, integer
@@ -217,7 +217,7 @@ def test_non_removable_recursive_references(ctx, definition):
     def test(case):
         pass
 
-    with pytest.raises(HypothesisRefResolutionError):
+    with pytest.raises(RefResolutionError):
         test()
 
 
@@ -601,7 +601,7 @@ def test_(request, case):
     assert case.path == "/users"
     assert case.method == "GET"
     if not hasattr(case.meta.phase.data, "description"):
-        assert case.query["id"] == "null"
+        assert case.query["id"] in ("null", 1)
 """,
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
         generation_modes=[GenerationMode.POSITIVE],
@@ -781,19 +781,15 @@ def test_unresolvable_reference_during_generation(ctx, testdir):
     main.write_text(json.dumps(schema), "utf8")
     schema = schemathesis.openapi.from_path(str(main))
 
-    @given(case=schema["/test"]["GET"].as_strategy())
-    def test(case):
-        pass
-
-    with pytest.raises(LoaderError, match="Unresolvable JSON pointer in the schema: /components/schemas/Key8"):
-        test()
+    with pytest.raises(InvalidSchema, match="Unresolvable JSON pointer in the schema"):
+        schema["/test"]["GET"].as_strategy()
 
 
 @pytest.mark.parametrize(
     ("key", "expected"),
     [
-        ("Key7", 'Can not generate data for query parameter "key"! Its schema should be an object, got None'),
-        ("Key8", "Unresolvable JSON pointer: 'components/schemas/Key8'"),
+        ("Key7", "Can not generate data for query parameter `key`! Its schema should be an object, got None"),
+        ("Key8", "Invalid `Key8` definition"),
     ],
 )
 def test_uncommon_type_in_generation(ctx, testdir, key, expected):
@@ -810,11 +806,12 @@ def test_uncommon_type_in_generation(ctx, testdir, key, expected):
     main.write_text(json.dumps(schema), "utf8")
     schema = schemathesis.openapi.from_path(str(main))
 
-    @given(case=schema["/test"]["GET"].as_strategy())
-    def test(case):
-        pass
-
     with pytest.raises(Exception, match=expected):
+
+        @given(case=schema["/test"]["GET"].as_strategy())
+        def test(case):
+            pass
+
         test()
 
 

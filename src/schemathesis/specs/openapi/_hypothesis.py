@@ -206,7 +206,6 @@ def _get_body_strategy(
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
     schema = parameter.as_json_schema(operation)
-    schema = operation.schema.prepare_schema(schema)
     assert isinstance(operation.schema, BaseOpenAPISchema)
     strategy = strategy_factory(
         schema, operation.label, "body", parameter.media_type, generation_config, operation.schema.validator_cls
@@ -331,7 +330,7 @@ def get_schema_for_location(
         for prop in schema.get("properties", {}).values():
             if prop.get("type") == "string":
                 prop.setdefault("minLength", 1)
-    return operation.schema.prepare_schema(schema)
+    return schema
 
 
 def get_parameters_strategy(

@@ -12,7 +12,6 @@ def to_json_schema(
     schema: dict[str, Any],
     *,
     nullable_name: str,
-    copy: bool = True,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
 ) -> dict[str, Any]:
@@ -21,8 +20,7 @@ def to_json_schema(
     NOTE. This function is applied to all keywords (including nested) during a schema resolving, thus it is not recursive.
     See a recursive version below.
     """
-    if copy:
-        schema = deepclone(schema)
+    schema = deepclone(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
         schema = {"anyOf": [schema, {"type": "null"}]}
