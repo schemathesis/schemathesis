@@ -67,6 +67,7 @@ def assert_not_conform(values: list, schema: dict):
 @pytest.fixture
 def ctx():
     return CoverageContext(
+        root_schema={},
         location="query",
         is_required=True,
         custom_formats=get_default_format_strategies(),
@@ -77,6 +78,7 @@ def ctx():
 @pytest.fixture
 def pctx():
     return CoverageContext(
+        root_schema={},
         location="query",
         generation_modes=[GenerationMode.POSITIVE],
         is_required=True,
@@ -88,6 +90,7 @@ def pctx():
 @pytest.fixture
 def nctx():
     return CoverageContext(
+        root_schema={},
         location="query",
         generation_modes=[GenerationMode.NEGATIVE],
         is_required=True,
@@ -1216,6 +1219,7 @@ def test_negative_combinators(nctx, schema, expected):
 def test_negative_one_of(schema, expected):
     # See GH-2975
     nctx = CoverageContext(
+        root_schema=schema,
         location="body",
         generation_modes=[GenerationMode.NEGATIVE],
         is_required=True,
@@ -1647,3 +1651,158 @@ def test_large_arrays_nested(nctx):
         for item in cover_schema(nctx, schema)
         if isinstance(item, dict) and isinstance(item.get("questions"), list)
     }
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        # Basic $ref to simple type in $defs
+        (
+            {"$defs": {"SimpleString": {"type": "string", "minLength": 2}}, "$ref": "#/$defs/SimpleString"},
+            ["00", "000"],
+        ),
+        # $ref in object properties
+        (
+            {
+                "$defs": {"UserId": {"type": "integer", "minimum": 1}},
+                "type": "object",
+                "properties": {"id": {"$ref": "#/$defs/UserId"}},
+                "required": ["id"],
+            },
+            [{"id": 1}, {"id": 2}],
+        ),
+        # $ref in array items
+        (
+            {
+                "$defs": {"Tag": {"type": "string", "enum": ["red", "blue"]}},
+                "type": "array",
+                "items": {"$ref": "#/$defs/Tag"},
+            },
+            [[], ["red"], ["blue"]],
+        ),
+        # Nested $refs - reference pointing to another reference
+        (
+            {
+                "$defs": {
+                    "BaseString": {"type": "string"},
+                    "LimitedString": {"allOf": [{"$ref": "#/$defs/BaseString"}, {"maxLength": 3}]},
+                },
+                "$ref": "#/$defs/LimitedString",
+            },
+            ["000", "00"],
+        ),
+        # $ref in combinators
+        (
+            {
+                "$defs": {
+                    "PositiveInt": {"type": "integer", "minimum": 1},
+                    "NegativeInt": {"type": "integer", "maximum": -1},
+                },
+                "anyOf": [
+                    {"$ref": "#/$defs/PositiveInt"},
+                    {"$ref": "#/$defs/NegativeInt"},
+                ],
+            },
+            [1, 2, -1, -2],
+        ),
+        # $ref to boolean schema
+        (
+            {
+                "$defs": {"Anything": True},
+                "$ref": "#/$defs/Anything",
+            },
+            [
+                None,
+                True,
+                False,
+                "",
+                0,
+                [
+                    None,
+                    None,
+                ],
+                {},
+            ],
+        ),
+    ],
+    ids=["basic", "properties", "array", "nested", "combinators", "bool"],
+)
+def test_positive_bundled_schema_refs(pctx, schema, expected):
+    pctx.root_schema = schema
+    covered = cover_schema(pctx, schema)
+    assert covered == expected
+    assert_unique(covered)
+    assert_conform(covered, schema)
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        # Basic $ref negative case
+        (
+            {"$defs": {"PositiveInt": {"type": "integer", "minimum": 1}}, "$ref": "#/$defs/PositiveInt"},
+            [AnyNumber(), "false", "null", "", ["null", "null"], 0],
+        ),
+        # $ref in object properties - missing required property
+        (
+            {
+                "$defs": {"RequiredString": {"type": "string", "minLength": 3}},
+                "type": "object",
+                "properties": {"name": {"$ref": "#/$defs/RequiredString"}},
+                "required": ["name"],
+            },
+            [
+                0,
+                "false",
+                "null",
+                "",
+                ["null", "null"],
+                {"name": 0},
+                {"name": "00"},
+                {},
+            ],
+        ),
+        # $ref with complex validation
+        (
+            {
+                "$defs": {"Email": {"type": "string", "format": "email", "maxLength": 10}},
+                "type": "object",
+                "properties": {"contact": {"$ref": "#/$defs/Email"}},
+            },
+            [
+                0,
+                "false",
+                "null",
+                "",
+                [
+                    "null",
+                    "null",
+                ],
+                {
+                    "contact": 0,
+                },
+                {
+                    "contact": "false",
+                },
+                {
+                    "contact": "null",
+                },
+                {
+                    "contact": [
+                        "null",
+                        "null",
+                    ],
+                },
+                {"contact": ""},
+                {"contact": AnyString()},
+            ],
+        ),
+    ],
+    ids=["basic", "properties", "nested"],
+)
+def test_negative_bundled_schema_refs(nctx, schema, expected):
+    nctx.root_schema = schema
+    covered = cover_schema(nctx, schema)
+    assert covered == expected
+    assert_unique(covered)
+    assert_not_conform(covered, schema)

@@ -29,7 +29,7 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
@@ -121,31 +121,58 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
 
 @dataclass
 class CoverageContext:
+    root_schema: dict[str, Any]
     generation_modes: list[GenerationMode]
     location: str
     is_required: bool
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema.protocols.Validator]
+    _resolver: RefResolver | None
 
-    __slots__ = ("location", "generation_modes", "is_required", "path", "custom_formats", "validator_cls")
+    __slots__ = (
+        "root_schema",
+        "location",
+        "generation_modes",
+        "is_required",
+        "path",
+        "custom_formats",
+        "validator_cls",
+        "_resolver",
+    )
 
     def __init__(
         self,
         *,
+        root_schema: dict[str, Any],
         location: str,
         generation_modes: list[GenerationMode] | None = None,
         is_required: bool,
         path: list[str | int] | None = None,
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema.protocols.Validator],
+        _resolver: RefResolver | None = None,
     ) -> None:
+        self.root_schema = root_schema
         self.location = location
         self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
         self.is_required = is_required
         self.path = path or []
         self.custom_formats = custom_formats
         self.validator_cls = validator_cls
+        self._resolver = _resolver
+
+    @property
+    def resolver(self) -> RefResolver:
+        """Lazy-initialized cached resolver."""
+        if self._resolver is None:
+            self._resolver = RefResolver.from_schema(self.root_schema)
+        return cast(RefResolver, self._resolver)
+
+    def resolve_ref(self, ref: str) -> dict | bool:
+        """Resolve a $ref to its schema definition."""
+        _, resolved = self.resolver.resolve(ref)
+        return resolved
 
     @contextmanager
     def at(self, key: str | int) -> Generator[None, None, None]:
@@ -161,22 +188,26 @@ class CoverageContext:
 
     def with_positive(self) -> CoverageContext:
         return CoverageContext(
+            root_schema=self.root_schema,
             location=self.location,
             generation_modes=[GenerationMode.POSITIVE],
             is_required=self.is_required,
             path=self.path,
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
+            _resolver=self._resolver,
         )
 
     def with_negative(self) -> CoverageContext:
         return CoverageContext(
+            root_schema=self.root_schema,
             location=self.location,
             generation_modes=[GenerationMode.NEGATIVE],
             is_required=self.is_required,
             path=self.path,
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
+            _resolver=self._resolver,
         )
 
     def is_valid_for_location(self, value: Any) -> bool:
@@ -306,7 +337,7 @@ else:
 
 
 def _encode(o: Any) -> str:
-    return "".join(_iterencode(o, 0))
+    return "".join(_iterencode(o, False))
 
 
 def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
@@ -414,6 +445,16 @@ def cover_schema_iter(
 ) -> Generator[GeneratedValue, None, None]:
     if seen is None:
         seen = HashSet()
+
+    if isinstance(schema, dict) and "$ref" in schema:
+        resolved = ctx.resolve_ref(schema["$ref"])
+        if isinstance(resolved, dict):
+            schema = {**resolved, **{k: v for k, v in schema.items() if k != "$ref"}}
+            yield from cover_schema_iter(ctx, schema, seen)
+        else:
+            yield from cover_schema_iter(ctx, resolved, seen)
+        return
+
     if schema == {} or schema is True:
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
@@ -881,7 +922,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             smaller = largest - multiple_of
         else:
             smaller = maximum - 1
-        if (smaller > 0 and (minimum is None or smaller >= minimum)) and seen.insert(smaller):
+        if (minimum is None or smaller >= minimum) and seen.insert(smaller):
             yield PositiveValue(smaller, description="Near-boundary number")
 
 

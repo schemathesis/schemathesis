@@ -538,6 +538,7 @@ def _iter_coverage_cases(
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
             coverage.CoverageContext(
+                root_schema=schema,
                 location=location,
                 generation_modes=generation_modes,
                 is_required=parameter.is_required,
@@ -563,6 +564,7 @@ def _iter_coverage_cases(
                 schema.setdefault("examples", []).extend(examples)
             gen = coverage.cover_schema_iter(
                 coverage.CoverageContext(
+                    root_schema=schema,
                     location="body",
                     generation_modes=generation_modes,
                     is_required=body.is_required,
@@ -798,6 +800,7 @@ def _iter_coverage_cases(
             iterator = iter(
                 coverage.cover_schema_iter(
                     coverage.CoverageContext(
+                        root_schema=subschema,
                         location=_location,
                         generation_modes=[GenerationMode.NEGATIVE],
                         is_required=is_required,
