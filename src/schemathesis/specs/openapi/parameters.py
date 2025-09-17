@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable
 
+from schemathesis.core.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.schemas import Parameter
 
@@ -351,22 +352,30 @@ def parameters_to_json_schema(
     """
     properties = {}
     required = []
+    bundled = {}
     for parameter in parameters:
         name = parameter.name
-        properties[name] = parameter.as_json_schema(operation, update_quantifiers=update_quantifiers)
+        subschema = parameter.as_json_schema(operation, update_quantifiers=update_quantifiers)
+        subschema_bundle = subschema.pop(BUNDLE_STORAGE_KEY, None)
+        if subschema_bundle is not None:
+            bundled.update(subschema_bundle)
+        properties[name] = subschema
         # If parameter names are duplicated, we need to avoid duplicate entries in `required` anyway
         if parameter.is_required and name not in required:
             required.append(name)
-    return {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
+    merged = {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
+    if bundled:
+        merged[BUNDLE_STORAGE_KEY] = bundled
+    return merged
 
 
 MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
-    'Can not generate data for {location} parameter "{name}"! '
+    "Can not generate data for {location} parameter `{name}`! "
     "It should have either `schema` or `content` keywords defined"
 )
 
 INVALID_SCHEMA_MESSAGE = (
-    'Can not generate data for {location} parameter "{name}"! Its schema should be an object, got {schema}'
+    "Can not generate data for {location} parameter `{name}`! Its schema should be an object, got {schema}"
 )
 
 

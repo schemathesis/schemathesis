@@ -606,7 +606,7 @@ def test_missing_content_and_schema(ctx, location):
     # Then the proper error should be shown
     with pytest.raises(
         InvalidSchema,
-        match=f'Can not generate data for {location} parameter "X-Foo"! '
+        match=f"Can not generate data for {location} parameter `X-Foo`! "
         "It should have either `schema` or `content` keywords defined",
     ):
         test()

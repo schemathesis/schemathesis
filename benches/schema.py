@@ -215,14 +215,6 @@ def test_events():
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
-def test_rewritten_components(raw_schema):
-    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
-
-    _ = schema.rewritten_components
-
-
-@pytest.mark.benchmark
-@pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
 def test_links_count(raw_schema):
     schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
 
