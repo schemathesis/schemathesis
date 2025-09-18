@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
 
+from schemathesis.core.jsonschema import references
+
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
 except ImportError:
@@ -25,7 +27,7 @@ import jsonschema.protocols
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._canonicalise import canonicalish
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
@@ -243,9 +245,17 @@ class CoverageContext:
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
         return cached_draw(strategy)
 
-    def generate_from_schema(self, schema: dict | bool) -> Any:
+    def generate_from_schema(self, schema: dict | bool, *, seen_references: set[str] | None = None) -> Any:
         if isinstance(schema, dict) and "$ref" in schema:
-            schema = self.resolve_ref(schema["$ref"])
+            reference = schema["$ref"]
+            seen_references = seen_references or set()
+            if reference in seen_references:
+                # Try to remove recursive references to avoid infinite recursion
+                remaining_references = references.sanitize(schema)
+                if reference in remaining_references:
+                    raise HypothesisRefResolutionError(f"Required reference {reference} creates cycle")
+            seen_references.add(reference)
+            schema = self.resolve_ref(reference)
         if isinstance(schema, bool):
             return 0
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
@@ -269,7 +279,7 @@ class CoverageContext:
                 if isinstance(sub_schema, dict) and "const" in sub_schema:
                     obj[key] = sub_schema["const"]
                 else:
-                    obj[key] = self.generate_from_schema(sub_schema)
+                    obj[key] = self.generate_from_schema(sub_schema, seen_references=seen_references)
             return obj
         if (
             keys == ["maximum", "minimum", "type"] or keys == ["maximum", "type"] or keys == ["minimum", "type"]
@@ -323,7 +333,7 @@ class CoverageContext:
 
             schema = canonicalish(schema)
             if isinstance(schema, dict) and "allOf" not in schema:
-                return self.generate_from_schema(schema)
+                return self.generate_from_schema(schema, seen_references=seen_references)
 
         return self.generate_from(from_schema(schema, custom_formats=self.custom_formats))
 
