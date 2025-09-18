@@ -9,12 +9,11 @@ import requests
 
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.deserialization import deserialize_yaml
+from schemathesis.core.jsonschema import references
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
-from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
-from .utils import get_type
 
 # Reference resolving will stop after this depth
 RECURSION_DEPTH_LIMIT = 100
@@ -93,7 +92,7 @@ class InliningResolver(RefResolver):
                     next_recursion_level = recursion_level + 1
                     if next_recursion_level > RECURSION_DEPTH_LIMIT:
                         copied = deepclone(resolved)
-                        remove_optional_references(copied)
+                        references.sanitize(copied)
                         return copied
                     return resolve(resolved, next_recursion_level)
                 finally:
@@ -144,94 +143,3 @@ class ConvertingResolver(InliningResolver):
             update_quantifiers=False,
         )
         return url, document
-
-
-def remove_optional_references(schema: dict[str, Any]) -> None:
-    """Remove optional parts of the schema that contain references.
-
-    It covers only the most popular cases, as removing all optional parts is complicated.
-    We might fall back to filtering out invalid cases in the future.
-    """
-
-    def clean_properties(s: dict[str, Any]) -> None:
-        properties = s["properties"]
-        required = s.get("required", [])
-        for name, value in list(properties.items()):
-            if name not in required and contains_ref(value):
-                # Drop the property - it will not be generated
-                del properties[name]
-            elif on_single_item_combinators(value):
-                properties.pop(name, None)
-            else:
-                stack.append(value)
-
-    def clean_items(s: dict[str, Any]) -> None:
-        items = s["items"]
-        min_items = s.get("minItems", 0)
-        if not min_items:
-            if isinstance(items, dict) and ("$ref" in items or on_single_item_combinators(items)):
-                force_empty_list(s)
-            if isinstance(items, list) and any_ref(items):
-                force_empty_list(s)
-
-    def clean_additional_properties(s: dict[str, Any]) -> None:
-        additional_properties = s["additionalProperties"]
-        if isinstance(additional_properties, dict) and "$ref" in additional_properties:
-            s["additionalProperties"] = False
-
-    def force_empty_list(s: dict[str, Any]) -> None:
-        del s["items"]
-        s["maxItems"] = 0
-
-    def any_ref(i: list[dict[str, Any]]) -> bool:
-        return any("$ref" in item for item in i)
-
-    def contains_ref(s: dict[str, Any]) -> bool:
-        if "$ref" in s:
-            return True
-        i = s.get("items")
-        return (isinstance(i, dict) and "$ref" in i) or isinstance(i, list) and any_ref(i)
-
-    def can_elide(s: dict[str, Any]) -> bool:
-        # Whether this schema could be dropped from a list of schemas
-        type_ = get_type(s)
-        if type_ == ["object"]:
-            # Empty object is valid for this schema -> could be dropped
-            return s.get("required", []) == [] and s.get("minProperties", 0) == 0
-        # Has at least one keyword -> should not be removed
-        return not any(k in ALL_KEYWORDS for k in s)
-
-    def on_single_item_combinators(s: dict[str, Any]) -> list[str]:
-        # Schema example:
-        # {
-        #     "type": "object",
-        #     "properties": {
-        #         "parent": {
-        #             "allOf": [{"$ref": "#/components/schemas/User"}]
-        #         }
-        #     }
-        # }
-        found = []
-        for keyword in ("allOf", "oneOf", "anyOf"):
-            v = s.get(keyword)
-            if v is not None:
-                elided = [sub for sub in v if not can_elide(sub)]
-                if len(elided) == 1 and contains_ref(elided[0]):
-                    found.append(keyword)
-        return found
-
-    stack = [schema]
-    while stack:
-        definition = stack.pop()
-        if isinstance(definition, dict):
-            # Optional properties
-            if "properties" in definition:
-                clean_properties(definition)
-            # Optional items
-            if "items" in definition:
-                clean_items(definition)
-            # Not required additional properties
-            if "additionalProperties" in definition:
-                clean_additional_properties(definition)
-            for k in on_single_item_combinators(definition):
-                del definition[k]
