@@ -25,7 +25,7 @@ import jsonschema.protocols
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
-from hypothesis_jsonschema._canonicalise import canonicalish
+from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
@@ -245,7 +245,10 @@ class CoverageContext:
 
     def generate_from_schema(self, schema: dict | bool) -> Any:
         if isinstance(schema, dict) and "$ref" in schema:
-            schema = self.resolve_ref(schema["$ref"])
+            try:
+                schema = self.resolve_ref(schema["$ref"])
+            except RecursionError:
+                raise HypothesisRefResolutionError("Could not resolve recursive references") from None
         if isinstance(schema, bool):
             return 0
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])

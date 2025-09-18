@@ -534,7 +534,7 @@ def test_(request, case):
     assert case.path == "/users"
     assert case.method == "POST"
     if not hasattr(case.meta.phase.data, "description"):
-        assert case.body is None or case.body == 0
+        assert case.body in (None, 0, 1)
 """,
         paths={
             "/users": {

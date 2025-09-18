@@ -182,7 +182,10 @@ def _resolve_bundled(schema: bool, resolver: RefResolver) -> bool: ...
 
 def _resolve_bundled(schema: dict[str, Any] | bool, resolver: RefResolver) -> dict[str, Any] | bool:
     if isinstance(schema, dict) and "$ref" in schema and schema["$ref"].startswith(REFERENCE_TO_BUNDLE_PREFIX):
-        _, schema = resolver.resolve(schema["$ref"])
+        try:
+            _, schema = resolver.resolve(schema["$ref"])
+        except RecursionError:
+            return schema
     return schema
 
 
@@ -314,6 +317,7 @@ def extract_from_schema(
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties` and `items`
+    schema = _resolve_bundled(schema, resolver)
     if "properties" in schema:
         variants = {}
         required = schema.get("required", [])
