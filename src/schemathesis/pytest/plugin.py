@@ -313,7 +313,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
                 raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
             raise InvalidSchema(exc.args[0]) from None
-        except (HypothesisRefResolutionError, RefResolutionError):
+        except (HypothesisRefResolutionError, RefResolutionError, RecursionError):
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except (SkipTest, unittest.SkipTest) as exc:
             if UnsatisfiableExampleMark.is_set(pyfuncitem.obj):
