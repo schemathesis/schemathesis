@@ -13,6 +13,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, me
 from schemathesis.config import GenerationConfig
 from schemathesis.core.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.compat import RefResolver
+from schemathesis.core.jsonschema import references
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
@@ -173,23 +174,38 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
 
 
 @overload
-def _resolve_bundled(schema: dict[str, Any], resolver: RefResolver) -> dict[str, Any]: ...
+def _resolve_bundled(
+    schema: dict[str, Any], resolver: RefResolver, seen_references: set[str] | None = None
+) -> dict[str, Any]: ...  # pragma: no cover
 
 
 @overload
-def _resolve_bundled(schema: bool, resolver: RefResolver) -> bool: ...
+def _resolve_bundled(
+    schema: bool, resolver: RefResolver, seen_references: set[str] | None = None
+) -> bool: ...  # pragma: no cover
 
 
-def _resolve_bundled(schema: dict[str, Any] | bool, resolver: RefResolver) -> dict[str, Any] | bool:
-    if isinstance(schema, dict) and "$ref" in schema and schema["$ref"].startswith(REFERENCE_TO_BUNDLE_PREFIX):
-        _, schema = resolver.resolve(schema["$ref"])
+def _resolve_bundled(
+    schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str] | None = None
+) -> dict[str, Any] | bool:
+    if isinstance(schema, dict):
+        reference = schema.get("$ref")
+        if isinstance(reference, str) and reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
+            if seen_references is not None:
+                if reference in seen_references:
+                    # Try to remove recursive references to avoid infinite recursion
+                    remaining_references = references.sanitize(schema)
+                    if reference in remaining_references:
+                        raise HypothesisRefResolutionError(f"Required reference {reference} creates cycle")
+                seen_references.add(reference)
+            _, schema = resolver.resolve(schema["$ref"])
     return schema
 
 
 def _expand_subschemas(
-    schema: dict[str, Any] | bool, resolver: RefResolver
+    schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str] | None = None
 ) -> Generator[dict[str, Any] | bool, None, None]:
-    schema = _resolve_bundled(schema, resolver)
+    schema = _resolve_bundled(schema, resolver, seen_references)
     yield schema
     if isinstance(schema, dict):
         for key in ("anyOf", "oneOf"):
@@ -198,10 +214,10 @@ def _expand_subschemas(
                     yield subschema
         if "allOf" in schema:
             subschema = deepclone(schema["allOf"][0])
-            subschema = _resolve_bundled(subschema, resolver)
+            subschema = _resolve_bundled(subschema, resolver, seen_references)
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
-                    sub = _resolve_bundled(sub, resolver)
+                    sub = _resolve_bundled(sub, resolver, seen_references)
                     for key, value in sub.items():
                         if key == "properties":
                             subschema.setdefault("properties", {}).update(value)
@@ -290,8 +306,14 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema(operation)
         resolver = RefResolver.from_schema(schema)
+        seen_references: set[str] = set()
         for value in extract_from_schema(
-            operation, schema, parameter.example_field, parameter.examples_field, resolver
+            operation=operation,
+            schema=schema,
+            example_field_name=parameter.example_field,
+            examples_field_name=parameter.examples_field,
+            resolver=resolver,
+            seen_references=seen_references,
         ):
             yield ParameterExample(
                 container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
@@ -301,26 +323,37 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator
         schema = alternative.as_json_schema(operation)
         resolver = RefResolver.from_schema(schema)
         for example_field, examples_field in (("example", "examples"), ("x-example", "x-examples")):
-            for value in extract_from_schema(operation, schema, example_field, examples_field, resolver):
+            seen_references = set()
+            for value in extract_from_schema(
+                operation=operation,
+                schema=schema,
+                example_field_name=example_field,
+                examples_field_name=examples_field,
+                resolver=resolver,
+                seen_references=seen_references,
+            ):
                 yield BodyExample(value=value, media_type=alternative.media_type)
 
 
 def extract_from_schema(
+    *,
     operation: APIOperation[OpenAPIParameter],
     schema: dict[str, Any],
     example_field_name: str,
     examples_field_name: str,
     resolver: RefResolver,
+    seen_references: set[str],
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties` and `items`
+    schema = _resolve_bundled(schema, resolver, seen_references)
     if "properties" in schema:
         variants = {}
         required = schema.get("required", [])
         to_generate: dict[str, Any] = {}
         for name, subschema in schema["properties"].items():
             values = []
-            for subsubschema in _expand_subschemas(subschema, resolver):
+            for subsubschema in _expand_subschemas(subschema, resolver, seen_references):
                 if isinstance(subsubschema, bool):
                     to_generate[name] = subsubschema
                     continue
@@ -331,7 +364,14 @@ def extract_from_schema(
                     values.extend(subsubschema[examples_field_name])
                 # Check nested examples as well
                 values.extend(
-                    extract_from_schema(operation, subsubschema, example_field_name, examples_field_name, resolver)
+                    extract_from_schema(
+                        operation=operation,
+                        schema=subsubschema,
+                        example_field_name=example_field_name,
+                        examples_field_name=examples_field_name,
+                        resolver=resolver,
+                        seen_references=seen_references,
+                    )
                 )
                 if not values:
                     if name in required:
@@ -358,7 +398,14 @@ def extract_from_schema(
                 }
     elif "items" in schema and isinstance(schema["items"], dict):
         # Each inner value should be wrapped in an array
-        for value in extract_from_schema(operation, schema["items"], example_field_name, examples_field_name, resolver):
+        for value in extract_from_schema(
+            operation=operation,
+            schema=schema["items"],
+            example_field_name=example_field_name,
+            examples_field_name=examples_field_name,
+            resolver=resolver,
+            seen_references=seen_references,
+        ):
             yield [value]
 
 
