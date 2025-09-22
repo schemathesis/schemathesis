@@ -13,6 +13,7 @@
 ### :wrench: Changed
 
 - Improve error reporting on incorrect `type` values.
+- **pytest**: Schemas with infinitely recursive references are reported as failures. [#947](https://github.com/schemathesis/schemathesis/issues/947)
 
 ### :racing_car: Performance
 
@@ -34,7 +35,7 @@
 
 ### :bug: Fixed
 
-- False positives in `ignored_auth` check if auth is declared as optional. [#3052](https://github.com/schemathesis/schemathesis/issues/3052) 
+- False positives in `ignored_auth` check if auth is declared as optional. [#3052](https://github.com/schemathesis/schemathesis/issues/3052)
 
 ## [4.1.1](https://github.com/schemathesis/schemathesis/compare/v4.1.0...v4.1.1) - 2025-08-23
 

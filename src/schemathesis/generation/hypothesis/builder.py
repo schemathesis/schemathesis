@@ -21,7 +21,12 @@ from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, SpecificationFeature, media_types
-from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
+from schemathesis.core.errors import (
+    InfiniteRecursiveReference,
+    InvalidSchema,
+    SerializationNotPossible,
+    UnresolvableReference,
+)
 from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
@@ -263,16 +268,15 @@ def generate_example_cases(
     **kwargs: Any,
 ) -> Generator[Case]:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
-    from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
-
     try:
         result: list[Case] = [
             examples.generate_one(strategy) for strategy in operation.get_strategies_from_examples(**kwargs)
         ]
     except (
         InvalidSchema,
-        HypothesisRefResolutionError,
+        InfiniteRecursiveReference,
         Unsatisfiable,
+        UnresolvableReference,
         SerializationNotPossible,
         SchemaError,
     ) as exc:
@@ -283,6 +287,10 @@ def generate_example_cases(
             NonSerializableMark.set(test, exc)
         if isinstance(exc, SchemaError):
             InvalidRegexMark.set(test, exc)
+        if isinstance(exc, InfiniteRecursiveReference):
+            InfiniteRecursiveReferenceMark.set(test, exc)
+        if isinstance(exc, UnresolvableReference):
+            UnresolvableReferenceMark.set(test, exc)
 
     if fill_missing and not result:
         strategy = operation.as_strategy()
@@ -920,3 +928,5 @@ NonSerializableMark = Mark[SerializationNotPossible](attr_name="non_serializable
 InvalidRegexMark = Mark[SchemaError](attr_name="invalid_regex")
 InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
 MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
+InfiniteRecursiveReferenceMark = Mark[InfiniteRecursiveReference](attr_name="infinite_recursive_reference")
+UnresolvableReferenceMark = Mark[UnresolvableReference](attr_name="unresolvable_reference")

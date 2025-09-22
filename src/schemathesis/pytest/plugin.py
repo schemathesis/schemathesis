@@ -12,10 +12,8 @@ from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
-from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SERIALIZERS_SUGGESTION_MESSAGE,
     IncorrectUsage,
     InvalidHeadersExample,
@@ -294,8 +292,6 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
 
     For example - kwargs validation is failed for some strategy.
     """
-    from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
-
     from schemathesis.generation.hypothesis.builder import (
         InvalidHeadersExampleMark,
         InvalidRegexMark,
@@ -313,8 +309,6 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
                 raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
             raise InvalidSchema(exc.args[0]) from None
-        except (HypothesisRefResolutionError, RefResolutionError, RecursionError):
-            pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except (SkipTest, unittest.SkipTest) as exc:
             if UnsatisfiableExampleMark.is_set(pyfuncitem.obj):
                 raise Unsatisfiable("Failed to generate test cases from examples for this API operation") from None

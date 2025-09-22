@@ -8,7 +8,6 @@ from warnings import WarningMessage, catch_warnings
 
 import requests
 from hypothesis.errors import InvalidArgument
-from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.exceptions import ChunkedEncodingError
@@ -16,7 +15,7 @@ from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, run_checks
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.core.compat import BaseExceptionGroup, RefResolutionError
+from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
@@ -37,7 +36,6 @@ from schemathesis.engine.errors import (
     TestingState,
     UnexpectedError,
     UnrecoverableNetworkError,
-    UnsupportedRecursiveReference,
     clear_hypothesis_notes,
     deduplicate_errors,
     is_unrecoverable_network_error,
@@ -47,10 +45,12 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import metrics, overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
+    InfiniteRecursiveReferenceMark,
     InvalidHeadersExampleMark,
     InvalidRegexMark,
     MissingPathParameters,
     NonSerializableMark,
+    UnresolvableReferenceMark,
     UnsatisfiableExampleMark,
 )
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -200,9 +200,6 @@ def run_test(
                     config=ctx.config.output,
                 )
             )
-    except (HypothesisRefResolutionError, RefResolutionError):
-        status = Status.ERROR
-        yield non_fatal_error(UnsupportedRecursiveReference())
     except InvalidArgument as exc:
         status = Status.ERROR
         message = get_invalid_regular_expression_message(warnings)
@@ -274,6 +271,16 @@ def run_test(
     if missing_path_parameters:
         status = Status.ERROR
         yield non_fatal_error(missing_path_parameters)
+
+    infinite_recursive_reference = InfiniteRecursiveReferenceMark.get(test_function)
+    if infinite_recursive_reference:
+        status = Status.ERROR
+        yield non_fatal_error(infinite_recursive_reference)
+
+    unresolvable_reference = UnresolvableReferenceMark.get(test_function)
+    if unresolvable_reference:
+        status = Status.ERROR
+        yield non_fatal_error(unresolvable_reference)
 
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)

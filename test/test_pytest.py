@@ -2,7 +2,6 @@ import platform
 
 import pytest
 
-from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.generation.modes import GenerationMode
 
 
@@ -329,8 +328,8 @@ def test(case):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
-def test_skip_operations_with_recursive_references(testdir, schema_with_recursive_references):
-    # When the test schema contains recursive references
+def test_fail_on_operations_with_infinite_recursive_references(testdir, schema_with_recursive_references):
+    # When the test schema contains infinite recursive references
     testdir.make_test(
         """
 @schema.parametrize()
@@ -340,9 +339,9 @@ def test(case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-rs")
-    # Then this test should be skipped with a proper error message
-    result.assert_outcomes(skipped=1)
-    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in result.stdout.str()
+    # Then this test should be failed with a proper error message
+    result.assert_outcomes(failed=1)
+    assert "Required reference `#/components/schemas/Node` creates a cycle" in result.stdout.str()
 
 
 def test_checks_as_a_list(testdir, openapi3_base_url):

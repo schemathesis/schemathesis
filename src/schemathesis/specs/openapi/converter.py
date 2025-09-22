@@ -3,6 +3,7 @@ from __future__ import annotations
 from itertools import chain
 from typing import Any, Callable
 
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.transforms import deepclone, transform
 
 from .patterns import update_quantifier
@@ -23,7 +24,10 @@ def to_json_schema(
     schema = deepclone(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
+        bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
         schema = {"anyOf": [schema, {"type": "null"}]}
+        if bundled:
+            schema[BUNDLE_STORAGE_KEY] = bundled
     schema_type = schema.get("type")
     if schema_type == "file":
         schema["type"] = "string"
