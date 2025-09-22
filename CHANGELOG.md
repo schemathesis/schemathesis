@@ -7,6 +7,10 @@
 - Properly generate boundary values for negative `maximum` during the coverage phase.
 - **CLI**: Internal error if referenced API operation is unresolvable.
 
+### :wrench: Changed
+
+- Improve error reporting on incorrect `type` values.
+
 ### :racing_car: Performance
 
 - Avoid choosing mutations that aren't applicable in the current context.

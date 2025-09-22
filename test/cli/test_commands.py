@@ -272,12 +272,37 @@ def test_unsatisfiable(cli, schema_url, workers, snapshot_cli):
 
 
 @pytest.mark.operations("invalid")
-@pytest.mark.parametrize("workers", [1])
-def test_invalid_operation(cli, schema_url, workers, snapshot_cli):
+def test_invalid_operation(cli, schema_url, snapshot_cli):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    assert cli.run(schema_url, f"--workers={workers}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
+    assert cli.run(schema_url, "--phases=fuzzing", "--mode=positive") == snapshot_cli
+
+
+def test_invalid_type_with_ref(cli, ctx, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "header",
+                            "name": "h",
+                            "schema": {
+                                "$ref": "#/components/schemas/S",
+                                "type": "invalid",
+                            },
+                        },
+                    ],
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            }
+        },
+        components={"schemas": {"S": {"type": "object"}}},
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
+    )
 
 
 @pytest.mark.operations("teapot")

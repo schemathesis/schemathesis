@@ -491,6 +491,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Malformed path template" in formatted:
         return True
+    if "Unknown type:" in formatted:
+        return True
     if "Unresolvable JSON pointer" in formatted:
         return True
     if "Ensure that the definition complies with the OpenAPI specification" in formatted:
