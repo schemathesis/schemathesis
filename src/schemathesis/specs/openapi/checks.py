@@ -166,7 +166,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                     parameter = OpenAPI30Parameter(parameter_definition)
                 else:
                     parameter = OpenAPI20Parameter(parameter_definition)
-                schema = parameter.as_json_schema(case.operation)
+                schema = parameter.as_json_schema()
                 coerced = _coerce_header_value(value, schema)
                 try:
                     jsonschema.validate(
@@ -352,7 +352,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
             parameters = getattr(case.operation, container)
             value_without_additional_properties = {k: v for k, v in value.items() if k in parameters}
-            schema = get_schema_for_location(case.operation, container, parameters)
+            schema = get_schema_for_location(container, parameters)
             if not validator_cls(schema).is_valid(value_without_additional_properties):
                 # Other types of negation found
                 return False

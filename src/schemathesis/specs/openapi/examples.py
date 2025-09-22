@@ -303,7 +303,7 @@ def load_external_example(url: str) -> bytes:
 def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     for parameter in operation.iter_parameters():
-        schema = parameter.as_json_schema(operation)
+        schema = parameter.as_json_schema()
         resolver = RefResolver.from_schema(schema)
         seen_references: set[str] = set()
         for value in extract_from_schema(
@@ -319,7 +319,7 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator
             )
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
-        schema = alternative.as_json_schema(operation)
+        schema = alternative.as_json_schema()
         resolver = RefResolver.from_schema(schema)
         for example_field, examples_field in (("example", "examples"), ("x-example", "x-examples")):
             seen_references = set()
