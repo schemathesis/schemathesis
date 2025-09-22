@@ -17,13 +17,14 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
-          # Python 3.12 for flamegraph support
-          python-version: "3.12"
+          # Python 3.13 for flamegraph support
+          python-version: "3.13"
 
       - uses: astral-sh/setup-uv@v6
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v3
+        uses: CodSpeedHQ/action@v4
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
+          mode: "instrumentation"
           run: uvx --from=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
