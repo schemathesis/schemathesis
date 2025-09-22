@@ -12,7 +12,6 @@ from fastapi import FastAPI
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.phases import PhaseName
@@ -621,7 +620,9 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     stream = EventStream(schema).execute()
     # Then it causes an error with a proper error message
     stream.assert_after_execution_status(Status.ERROR)
-    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in str(stream.find(events.NonFatalError).info)
+    assert "Required reference `#/components/schemas/Node` creates a cycle" in str(
+        stream.find(events.NonFatalError).info
+    )
 
 
 @pytest.mark.parametrize(

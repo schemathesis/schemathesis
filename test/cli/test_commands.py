@@ -1350,13 +1350,10 @@ def test_invalid_schema_with_disabled_validation(
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
 
 
-def test_unresolvable_reference_with_disabled_validation(
-    ctx, cli, open_api_3_schema_with_recoverable_errors, snapshot_cli, openapi3_base_url
-):
+def test_unresolvable_reference(ctx, cli, open_api_3_schema_with_recoverable_errors, snapshot_cli, openapi3_base_url):
     # When there is an error in the schema
     del open_api_3_schema_with_recoverable_errors["paths"]["/bar"]["get"]
     schema_path = ctx.makefile(open_api_3_schema_with_recoverable_errors)
-    # And the validation is disabled (default)
     # Then we should show an error message derived from JSON Schema
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
 
@@ -1789,6 +1786,63 @@ def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url, no
 def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_references, openapi3_base_url, snapshot_cli):
     schema_path = ctx.makefile(schema_with_recursive_references)
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli
+
+
+def test_nullable_reference(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q",
+                            "schema": {
+                                "$ref": "#/components/schemas/MessageStatus",
+                                "nullable": True,
+                            },
+                        }
+                    ],
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            }
+        },
+        components={"schemas": {"MessageStatus": {}}},
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive", "--phases=fuzzing") == snapshot_cli
+    )
+
+
+def test_reference_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {"$ref": "#components/parameters/metadata"},
+                        {"$ref": "#components/parameters/applicationId"},
+                    ]
+                }
+            }
+        },
+        components={
+            "parameters": {
+                "applicationId": {
+                    "example": 0,
+                    "in": "header",
+                    "name": "xd",
+                    "schema": {},
+                },
+                "metadata": {
+                    "content": {"text/plain": {"schema": {"$ref": "t"}}},
+                    "in": "header",
+                    "name": "xa",
+                },
+            }
+        },
+    )
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")

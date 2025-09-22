@@ -16,7 +16,6 @@ from schemathesis.config import HealthCheck
 from schemathesis.config._report import ReportFormat
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
     IncorrectUsage,
     InvalidSchema,
     InvalidStateMachine,
@@ -426,8 +425,8 @@ def test_coverage_phase(corpus, filename):
 def _load_schema(corpus, filename):
     if filename in SLOW_DEFAULT:
         pytest.skip("Data generation is extremely slow for this schema")
-    raw_content = CORPUS_FILES[corpus].extractfile(filename)
-    raw_schema = json_loads(raw_content.read())
+    raw_content = CORPUS_FILES[corpus].extractfile(filename).read()
+    raw_schema = json_loads(raw_content)
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
         schema.config.update(base_url="http://127.0.0.1:8080/")
@@ -505,7 +504,9 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Cannot bundle" in formatted:
         return True
-    if RECURSIVE_REFERENCE_ERROR_MESSAGE in formatted:
+    if "creates a cycle" in formatted:
+        return True
+    if "cannot be resolved" in formatted:
         return True
     if (schema_id, event.label) in KNOWN_ISSUES:
         return True

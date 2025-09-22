@@ -7,7 +7,6 @@ from hypothesis import HealthCheck, given, settings
 from jsonschema.validators import Draft4Validator
 
 import schemathesis
-from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.generation.modes import GenerationMode
 
@@ -212,13 +211,8 @@ def test_non_removable_recursive_references(ctx, definition):
     build_schema_with_recursion(schema, definition)
     schema = schemathesis.openapi.from_dict(schema)
 
-    @given(case=schema["/users"]["POST"].as_strategy())
-    @settings(max_examples=1)
-    def test(case):
-        pass
-
-    with pytest.raises(RefResolutionError):
-        test()
+    with pytest.raises(InvalidSchema):
+        schema["/users"]["POST"]
 
 
 def test_nested_recursive_references(ctx):
@@ -887,6 +881,67 @@ def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
         }
     )
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing") == snapshot_cli
+
+
+@pytest.mark.parametrize(
+    ["paths", "components"],
+    [
+        (
+            {
+                "/changes": {
+                    "post": {
+                        "requestBody": {
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/issue_change"}}}
+                        },
+                        "responses": {"default": {"description": "Ok"}},
+                    }
+                }
+            },
+            {
+                "schemas": {
+                    "account": {"$ref": "#/components/schemas/object"},
+                    "issue": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/object"},
+                            {"properties": {"key": {"$ref": "#/components/schemas/account"}}},
+                        ]
+                    },
+                    "issue_change": {"properties": {"key": {"$ref": "#/components/schemas/issue"}}},
+                    "object": {},
+                }
+            },
+        ),
+        (
+            {
+                "/changes": {
+                    "post": {
+                        "requestBody": {
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/issue_change"}}}
+                        }
+                    }
+                }
+            },
+            {
+                "schemas": {
+                    "issue": {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/object"},
+                            {"properties": {"key": {"$ref": "#/components/schemas/milestone"}}},
+                        ]
+                    },
+                    "issue_change": {"properties": {"key": {"$ref": "#/components/schemas/issue"}}},
+                    "milestone": {"allOf": [{"$ref": "#/components/schemas/object"}]},
+                    "object": {},
+                }
+            },
+        ),
+    ],
+)
+@pytest.mark.filterwarnings("error")
+def test_multiple_hops_references(ctx, cli, openapi3_base_url, snapshot_cli, paths, components):
+    schema_path = ctx.openapi.write_schema(paths, components=components)
+    # There should be no recursion error in another thread
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
 
 
 def test_iter_when_ref_resolves_to_none_in_body(ctx):
