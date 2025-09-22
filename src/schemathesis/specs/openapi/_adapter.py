@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Iterator, Mapping, TypedDict
 
-from schemathesis.core.bundler import BundleError, Bundler
 from schemathesis.core.compat import RefResolver
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.jsonschema import BundleError, Bundler
 
 PathItem = Mapping[str, Any]
 Operation = TypedDict("Operation", {"responses": dict})

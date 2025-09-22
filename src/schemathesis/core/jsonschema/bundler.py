@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any
 
 from schemathesis.core.compat import RefResolver
+from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import deepclone
-
-JsonSchema = Union[dict[str, Any], bool]
-
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
@@ -42,6 +40,9 @@ class Bundler:
         uri_to_def_name: dict[str, str] = {}
         defs = {}
 
+        resolve = resolver.resolve
+        visit = visited.add
+
         def get_def_name(uri: str) -> str:
             """Generate or retrieve the local definition name for a URI."""
             if uri not in uri_to_def_name:
@@ -54,7 +55,7 @@ class Bundler:
             if isinstance(current, dict):
                 ref = current.get("$ref")
                 if isinstance(ref, str) and not ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
-                    resolved_uri, resolved_schema = resolver.resolve(ref)
+                    resolved_uri, resolved_schema = resolve(ref)
 
                     if not isinstance(resolved_schema, (dict, bool)):
                         raise BundleError(ref, resolved_schema)
@@ -62,7 +63,7 @@ class Bundler:
 
                     # Bundle only new schemas
                     if resolved_uri not in visited:
-                        visited.add(resolved_uri)
+                        visit(resolved_uri)
 
                         cloned = deepclone(resolved_schema)
                         defs[def_name] = cloned

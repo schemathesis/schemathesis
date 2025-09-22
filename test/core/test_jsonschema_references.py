@@ -63,6 +63,15 @@ def array_schema(items: Any, **kwargs) -> dict[str, Any]:
         ),
         # Complex nested case - all optional references removed
         (object_schema({"level1": object_schema({"level2": array_schema(ref_schema("#/ref1"))})}), set()),
+        (object_schema({"$ref": ref_schema("#/ref1")}, required=["$ref"]), {"#/ref1"}),
+        (object_schema({"key": True}), set()),
+        (object_schema(additionalProperties=True), set()),
+        (object_schema({"key": {"anyOf": [True]}}), set()),
+        (object_schema(anyOf=[True]), set()),
+        (object_schema(anyOf=[{"type": "object"}]), set()),
+        # Incorrect but should not fail
+        (object_schema({"key": []}), set()),
+        ([], set()),
     ],
 )
 def test_sanitize(schema, expected):
