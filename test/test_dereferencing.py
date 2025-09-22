@@ -869,3 +869,32 @@ def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli, openapi3_ba
     raw_schema_path.write_text(json.dumps(schema), "utf8")
 
     assert cli.run(str(raw_schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+
+
+def test_iter_when_ref_resolves_to_none_in_body(ctx):
+    # Key0 -> Key1 -> Key2 -> Key3 (None)
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Key0"}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                **{f"Key{idx}": {"$ref": f"#/components/schemas/Key{idx + 1}"} for idx in range(3)},
+                "Key3": None,
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+
+    # Should not fail
+    for _ in schema.get_all_operations():
+        pass

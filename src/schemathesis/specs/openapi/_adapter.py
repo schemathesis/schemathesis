@@ -29,7 +29,5 @@ def prepare_parameters(item: PathItem | Operation, *, resolver: RefResolver, bun
             except BundleError as exc:
                 location = parameter.get("in", "")
                 name = parameter.get("name", "<UNKNOWN>")
-                raise InvalidSchema(
-                    f"Can not generate data for {location} parameter `{name}`! Reference `{exc.reference}` should resolve to a valid schema, got {exc.value}",
-                ) from exc
+                raise InvalidSchema.from_bundle_error(exc, location, name) from exc
         yield definition
