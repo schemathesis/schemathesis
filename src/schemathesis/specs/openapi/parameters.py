@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable
 
-from schemathesis.core.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.schemas import Parameter
 
 from .converter import to_json_schema_recursive

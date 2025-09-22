@@ -23,7 +23,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v6
 
-      - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_default
+      - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_default --duration=20
 
   corpus-coverage:
     name: Corpus tests for the coverage phase
@@ -40,4 +40,4 @@ jobs:
 
       - uses: astral-sh/setup-uv@v6
 
-      - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_coverage_phase
+      - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_coverage_phase --duration=20

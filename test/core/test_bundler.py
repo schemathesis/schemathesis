@@ -1,7 +1,7 @@
 import pytest
 
-from schemathesis.core.bundler import BUNDLE_STORAGE_KEY, bundle
 from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle
 
 USER = {"type": "string"}
 COMPANY = {"type": "object"}

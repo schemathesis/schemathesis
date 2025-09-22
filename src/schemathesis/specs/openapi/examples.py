@@ -11,9 +11,8 @@ from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, merged
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.compat import RefResolver
-from schemathesis.core.jsonschema import references
+from schemathesis.core.jsonschema import REFERENCE_TO_BUNDLE_PREFIX, references
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case

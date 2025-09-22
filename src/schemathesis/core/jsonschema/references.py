@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
-
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
-from schemathesis.core.jsonschema.types import get_type
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 
 
-def sanitize(schema: dict[str, Any] | bool) -> set[str]:
+def sanitize(schema: JsonSchema) -> set[str]:
     """Remove optional parts of the schema that contain references.
 
     It covers only the most popular cases, as removing all optional parts is complicated.
@@ -24,13 +22,14 @@ def sanitize(schema: dict[str, Any] | bool) -> set[str]:
                 properties = current["properties"]
                 required = current.get("required", [])
                 for name, value in list(properties.items()):
-                    if name not in required and _has_references(value):
-                        # Drop the property - it will not be generated
-                        del properties[name]
-                    elif _find_single_reference_combinators(value):
-                        properties.pop(name, None)
-                    else:
-                        stack.append(value)
+                    if isinstance(value, dict):
+                        if name not in required and _has_references(value):
+                            del properties[name]
+                        elif _find_single_reference_combinators(value):
+                            properties.pop(name, None)
+                        else:
+                            stack.append(value)
+
             # Optional items
             if "items" in current:
                 _sanitize_items(current)
@@ -45,11 +44,12 @@ def sanitize(schema: dict[str, Any] | bool) -> set[str]:
     return remaining
 
 
-def _collect_all_references(schema: dict[str, Any] | list[dict[str, Any]], remaining: set[str]) -> None:
+def _collect_all_references(schema: JsonSchema | list[JsonSchema], remaining: set[str]) -> None:
     """Recursively collect all $ref present in the schema."""
     if isinstance(schema, dict):
-        if "$ref" in schema:
-            remaining.add(schema["$ref"])
+        reference = schema.get("$ref")
+        if isinstance(reference, str):
+            remaining.add(reference)
         for value in schema.values():
             _collect_all_references(value, remaining)
     elif isinstance(schema, list):
@@ -57,24 +57,21 @@ def _collect_all_references(schema: dict[str, Any] | list[dict[str, Any]], remai
             _collect_all_references(item, remaining)
 
 
-def _convert_to_empty_array(schema: dict[str, Any]) -> None:
-    del schema["items"]
-    schema["maxItems"] = 0
+def _has_references_in_items(items: list[JsonSchema]) -> bool:
+    return any("$ref" in item for item in items if isinstance(item, dict))
 
 
-def _has_references_in_items(items: list[dict[str, Any]]) -> bool:
-    return any("$ref" in item for item in items)
-
-
-def _has_references(schema: dict[str, Any]) -> bool:
+def _has_references(schema: JsonSchemaObject) -> bool:
     if "$ref" in schema:
         return True
     items = schema.get("items")
     return (isinstance(items, dict) and "$ref" in items) or isinstance(items, list) and _has_references_in_items(items)
 
 
-def _is_optional_schema(schema: dict[str, Any]) -> bool:
+def _is_optional_schema(schema: JsonSchema) -> bool:
     # Whether this schema could be dropped from a list of schemas
+    if isinstance(schema, bool):
+        return True
     type_ = get_type(schema)
     if type_ == ["object"]:
         # Empty object is valid for this schema -> could be dropped
@@ -83,7 +80,7 @@ def _is_optional_schema(schema: dict[str, Any]) -> bool:
     return not any(k in ALL_KEYWORDS for k in schema)
 
 
-def _find_single_reference_combinators(schema: dict[str, Any]) -> list[str]:
+def _find_single_reference_combinators(schema: JsonSchemaObject) -> list[str]:
     # Schema example:
     # {
     #     "type": "object",
@@ -98,12 +95,13 @@ def _find_single_reference_combinators(schema: dict[str, Any]) -> list[str]:
         combinator = schema.get(keyword)
         if combinator is not None:
             optionals = [subschema for subschema in combinator if not _is_optional_schema(subschema)]
+            # NOTE: The first schema is not bool, hence it is safe to pass it to `_has_references`
             if len(optionals) == 1 and _has_references(optionals[0]):
                 found.append(keyword)
     return found
 
 
-def _sanitize_items(schema: dict[str, Any]) -> None:
+def _sanitize_items(schema: JsonSchemaObject) -> None:
     items = schema["items"]
     min_items = schema.get("minItems", 0)
     if not min_items:
@@ -113,7 +111,12 @@ def _sanitize_items(schema: dict[str, Any]) -> None:
             _convert_to_empty_array(schema)
 
 
-def _sanitize_additional_properties(schema: dict[str, Any]) -> None:
+def _convert_to_empty_array(schema: JsonSchemaObject) -> None:
+    del schema["items"]
+    schema["maxItems"] = 0
+
+
+def _sanitize_additional_properties(schema: JsonSchemaObject) -> None:
     additional_properties = schema["additionalProperties"]
     if isinstance(additional_properties, dict) and "$ref" in additional_properties:
         schema["additionalProperties"] = False

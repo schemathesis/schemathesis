@@ -29,10 +29,10 @@ from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
-from schemathesis.core.bundler import Bundler
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
+from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response

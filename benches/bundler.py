@@ -1,7 +1,7 @@
 import pytest
 
-from schemathesis.core.bundler import bundle
 from schemathesis.core.compat import RefResolver
+from schemathesis.core.jsonschema import bundle
 
 
 @pytest.mark.benchmark
