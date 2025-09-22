@@ -488,14 +488,18 @@ def cover_schema_iter(
 
     if isinstance(schema, dict) and "$ref" in schema:
         reference = schema["$ref"]
-        with ctx.resolving(reference) as (is_recursive, resolved):
-            if isinstance(resolved, dict):
-                schema = {**resolved, **{k: v for k, v in schema.items() if k != "$ref"}}
-                if is_recursive:
-                    sanitize_references(schema, reference)
-                yield from cover_schema_iter(ctx, schema, seen)
-            else:
-                yield from cover_schema_iter(ctx, resolved, seen)
+        try:
+            with ctx.resolving(reference) as (is_recursive, resolved):
+                if isinstance(resolved, dict):
+                    schema = {**resolved, **{k: v for k, v in schema.items() if k != "$ref"}}
+                    if is_recursive:
+                        sanitize_references(schema, reference)
+                    yield from cover_schema_iter(ctx, schema, seen)
+                else:
+                    yield from cover_schema_iter(ctx, resolved, seen)
+                return
+        except RefResolutionError:
+            # Can't resolve a reference - at this point, we can't generate anything useful as `$ref` is in the current schema root
             return
 
     if schema == {} or schema is True:
