@@ -24,6 +24,7 @@ from schemathesis.core.errors import (
     format_exception,
 )
 from schemathesis.core.failures import Failure
+from schemathesis.core.jsonschema import BundleError
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
@@ -378,7 +379,7 @@ def test_default(corpus, filename, tmp_path):
     schema = _load_schema(corpus, filename)
     try:
         schema.as_state_machine()()
-    except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
+    except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine, BundleError):
         pass
 
     schema.config.update(suppress_health_check=list(HealthCheck))
@@ -499,6 +500,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
     if "is not defined in API operation" in formatted:
         return True
     if "contain invalid link definitions" in formatted:
+        return True
+    if "Cannot bundle" in formatted:
         return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in formatted:
         return True
