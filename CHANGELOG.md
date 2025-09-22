@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Properly generate boundary values for negative `maximum` during the coverage phase.
+- **CLI**: Internal error if referenced API operation is unresolvable.
 
 ### :racing_car: Performance
 
