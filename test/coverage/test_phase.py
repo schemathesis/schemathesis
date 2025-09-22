@@ -2039,52 +2039,77 @@ def test_nested_parameters(ctx):
     assert ranges == {"0"}
 
 
+def _request_body(inner):
+    return {
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": inner,
+                }
+            }
+        }
+    }
+
+
+def _schemas(inner):
+    return {}
+
+
 @pytest.mark.parametrize(
-    ["request_body", "referenced"],
+    ["operation", "components"],
     [
         (
-            {
-                "properties": {
-                    "p1": {
-                        "$ref": "#components/schemas/Key",
-                    }
-                }
-            },
-            {
-                "allOf": [
-                    {"$ref": ""},
-                ]
-            },
-        ),
-        (
-            {"$ref": "#components/schemas/Key"},
-            {
-                "default": 0,
-                "items": {
-                    "$ref": "",
-                },
-            },
-        ),
-    ],
-)
-def test_recursive_refs(ctx, request_body, referenced):
-    raw_schema = ctx.openapi.build_schema(
-        {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": request_body,
-                            }
+            _request_body(
+                {
+                    "properties": {
+                        "p1": {
+                            "$ref": "#components/schemas/Key",
                         }
                     }
                 }
-            }
-        },
-        components={"schemas": {"Key": referenced}},
-    )
-
+            ),
+            {
+                "schemas": {
+                    "Key": {
+                        "allOf": [
+                            {"$ref": ""},
+                        ]
+                    }
+                }
+            },
+        ),
+        (
+            _request_body({"$ref": "#components/schemas/Key"}),
+            {
+                "schemas": {
+                    "Key": {
+                        "default": 0,
+                        "items": {
+                            "$ref": "",
+                        },
+                    }
+                }
+            },
+        ),
+        (
+            {"parameters": [{"$ref": "#components/parameters/q"}]},
+            {
+                "parameters": {
+                    "q": {
+                        "in": "header",
+                        "name": "q",
+                        "content": {
+                            "text/plain": {"schema": {"$ref": "#unknown"}},
+                        },
+                    }
+                }
+            },
+        ),
+    ],
+    ids=["body-combinator", "body-items", "parameter-unresolvable"],
+)
+def test_references(ctx, operation, components):
+    raw_schema = ctx.openapi.build_schema({"/test": {"post": operation}}, components=components)
     schema = schemathesis.openapi.from_dict(raw_schema)
     for operation in schema.get_all_operations():
         for _ in _iter_coverage_cases(
