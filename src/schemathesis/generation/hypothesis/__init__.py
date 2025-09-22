@@ -8,9 +8,10 @@ def setup() -> None:
     from hypothesis.internal.reflection import is_first_param_referenced_in_function
     from hypothesis.strategies._internal import collections, core
     from hypothesis.vendor import pretty
-    from hypothesis_jsonschema import _from_schema, _resolve
+    from hypothesis_jsonschema import _canonicalise, _from_schema, _resolve
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
+    from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
 
     # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
@@ -37,6 +38,8 @@ def setup() -> None:
     root_core.RepresentationPrinter = RepresentationPrinter  # type: ignore
     _resolve.deepcopy = deepclone  # type: ignore
     _from_schema.deepcopy = deepclone  # type: ignore
+    _from_schema.get_type = _get_type  # type: ignore
+    _canonicalise.get_type = _get_type  # type: ignore
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore

@@ -3,16 +3,26 @@ from typing import Any, Union
 JsonSchemaObject = dict[str, Any]
 JsonSchema = Union[JsonSchemaObject, bool]
 
-ANY_TYPE = ["null", "boolean", "integer", "number", "string", "array", "object"]
+ANY_TYPE = ["null", "boolean", "number", "string", "array", "object"]
+ALL_TYPES = ["null", "boolean", "integer", "number", "string", "array", "object"]
 
 
-def get_type(schema: JsonSchema) -> list[str]:
+def get_type(schema: JsonSchema, *, _check_type: bool = False) -> list[str]:
     if isinstance(schema, bool):
         return ANY_TYPE
-    type_ = schema.get("type", ANY_TYPE)
-    if isinstance(type_, str):
-        return [type_]
-    return type_
+    ty = schema.get("type", ANY_TYPE)
+    if isinstance(ty, str):
+        if _check_type and ty not in ALL_TYPES:
+            raise AssertionError(f"Unknown type: `{ty}`. Should be one of {', '.join(ALL_TYPES)}")
+        return [ty]
+    if ty is ANY_TYPE:
+        return list(ty)
+    return list(ty)
+
+
+def _get_type(schema: JsonSchema) -> list[str]:
+    # Special version to patch `hypothesis-jsonschema`
+    return get_type(schema, _check_type=True)
 
 
 def to_json_type_name(v: Any) -> str:
