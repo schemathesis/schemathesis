@@ -154,6 +154,6 @@ def assert_parameters():
         operation = schema["/users"]["POST"]
         container = getattr(operation, location)
         _compare(container, expected)
-        assert [item.as_json_schema(operation) for item in container] == json_schemas
+        assert [item.as_json_schema() for item in container] == json_schemas
 
     return check

@@ -912,7 +912,7 @@ def test_partial_examples(ctx):
     strategy = operation.get_strategies_from_examples()[0]
     # Then all generated examples should have those missing parts generated according to the API schema
     example = examples.generate_one(strategy)
-    parameters_schema = parameters_to_json_schema(operation, operation.path_parameters)
+    parameters_schema = parameters_to_json_schema(operation.path_parameters)
     jsonschema.validate(example.path_parameters, parameters_schema)
 
 

@@ -287,7 +287,7 @@ def into_step_input(
                     # It is possible that the new body is now valid and the whole test case could be valid too
                     for alternative in case.operation.body:
                         if alternative.media_type == case.media_type:
-                            schema = alternative.as_json_schema(case.operation)
+                            schema = alternative.as_json_schema()
                             if jsonschema.validators.validator_for(schema)(schema).is_valid(new):
                                 case.meta.components[ComponentKind.BODY] = ComponentInfo(mode=GenerationMode.POSITIVE)
                                 if all(info.mode == GenerationMode.POSITIVE for info in case.meta.components.values()):

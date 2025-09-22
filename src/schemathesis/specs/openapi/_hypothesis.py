@@ -102,7 +102,7 @@ def openapi_cases(
             body_generator = generation_mode
             if generation_mode.is_negative:
                 # Consider only schemas that are possible to negate
-                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
+                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema())]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
@@ -205,7 +205,7 @@ def _get_body_strategy(
 
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
-    schema = parameter.as_json_schema(operation)
+    schema = parameter.as_json_schema()
     assert isinstance(operation.schema, BaseOpenAPISchema)
     strategy = strategy_factory(
         schema, operation.label, "body", parameter.media_type, generation_config, operation.schema.validator_cls
@@ -302,7 +302,7 @@ def generate_parameter(
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
     """Check if any path parameter can be negated."""
-    schema = parameters_to_json_schema(operation, operation.path_parameters)
+    schema = parameters_to_json_schema(operation.path_parameters)
     # No path parameters to negate
     parameters = schema["properties"]
     if not parameters:
@@ -313,7 +313,7 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
 def can_negate_headers(operation: APIOperation, location: str) -> bool:
     """Check if any header can be negated."""
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
-    schema = parameters_to_json_schema(operation, parameters)
+    schema = parameters_to_json_schema(parameters)
     # No headers to negate
     headers = schema["properties"]
     if not headers:
@@ -321,10 +321,8 @@ def can_negate_headers(operation: APIOperation, location: str) -> bool:
     return any(header != {"type": "string"} for header in headers.values())
 
 
-def get_schema_for_location(
-    operation: APIOperation, location: str, parameters: Iterable[OpenAPIParameter]
-) -> dict[str, Any]:
-    schema = parameters_to_json_schema(operation, parameters)
+def get_schema_for_location(location: str, parameters: Iterable[OpenAPIParameter]) -> dict[str, Any]:
+    schema = parameters_to_json_schema(parameters)
     if location == "path":
         schema["required"] = list(schema["properties"])
         for prop in schema.get("properties", {}).values():
@@ -345,7 +343,7 @@ def get_parameters_strategy(
 
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
-        schema = get_schema_for_location(operation, location, parameters)
+        schema = get_schema_for_location(location, parameters)
         if location == "header" and exclude:
             # Remove excluded headers case-insensitively
             exclude_lower = {name.lower() for name in exclude}
