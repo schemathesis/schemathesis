@@ -173,14 +173,24 @@ def run_test(
         status = Status.ERROR
         try:
             operation.schema.validate()
-            msg = "Unexpected error during testing of this API operation"
-            exc_msg = str(exc)
-            if exc_msg:
-                msg += f": {exc_msg}"
-            try:
-                raise InternalError(msg) from exc
-            except InternalError as exc:
-                yield non_fatal_error(exc)
+            # JSON Schema validation can miss it if there is `$ref` adjacent to `type` on older specifications
+            if str(exc).startswith("Unknown type"):
+                yield non_fatal_error(
+                    InvalidSchema(
+                        message=str(exc),
+                        path=operation.path,
+                        method=operation.method,
+                    )
+                )
+            else:
+                msg = "Unexpected error during testing of this API operation"
+                exc_msg = str(exc)
+                if exc_msg:
+                    msg += f": {exc_msg}"
+                try:
+                    raise InternalError(msg) from exc
+                except InternalError as exc:
+                    yield non_fatal_error(exc)
         except ValidationError as exc:
             yield non_fatal_error(
                 InvalidSchema.from_jsonschema_error(
