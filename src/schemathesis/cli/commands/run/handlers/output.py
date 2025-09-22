@@ -17,6 +17,7 @@ from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
@@ -1060,7 +1061,11 @@ class OutputHandler(EventHandler):
 
         assert ctx.find_operation_by_label is not None
         assert event.label is not None
-        operation = ctx.find_operation_by_label(event.label)
+        try:
+            operation = ctx.find_operation_by_label(event.label)
+        except RefResolutionError:
+            # This error will be reported elsewhere anyway
+            return None
 
         warnings = self.config.warnings_for(operation=operation)
 

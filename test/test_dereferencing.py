@@ -871,6 +871,24 @@ def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli, openapi3_ba
     assert cli.run(str(raw_schema_path), f"--url={openapi3_base_url}") == snapshot_cli
 
 
+def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "post": {
+                    "$ref": "#/0",
+                    "responses": {
+                        "default": {
+                            "description": "Ok",
+                        }
+                    },
+                }
+            }
+        }
+    )
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing") == snapshot_cli
+
+
 def test_iter_when_ref_resolves_to_none_in_body(ctx):
     # Key0 -> Key1 -> Key2 -> Key3 (None)
     schema = ctx.openapi.build_schema(
