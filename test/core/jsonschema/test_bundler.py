@@ -2,6 +2,7 @@ import pytest
 
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle
+from schemathesis.core.jsonschema.bundler import BundleError
 
 USER = {"type": "string"}
 COMPANY = {"type": "object"}
@@ -203,3 +204,10 @@ def test_unresolvable_pointer():
     resolver = RefResolver.from_schema({})
     with pytest.raises(RefResolutionError):
         bundle({"$ref": "#/definitions/NonExistent"}, resolver)
+
+
+def test_bundle_ref_resolves_to_none_error_message():
+    resolver = RefResolver.from_schema({"definitions": {"User": None}})
+    with pytest.raises(BundleError) as exc:
+        bundle({"$ref": "#/definitions/User"}, resolver)
+    assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"

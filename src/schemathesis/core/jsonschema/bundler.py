@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from schemathesis.core.compat import RefResolver
-from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.types import JsonSchema, to_json_type_name
 from schemathesis.core.transforms import deepclone
 
 BUNDLE_STORAGE_KEY = "x-bundled"
@@ -15,6 +15,9 @@ class BundleError(Exception):
     def __init__(self, reference: str, value: Any) -> None:
         self.reference = reference
         self.value = value
+
+    def __str__(self) -> str:
+        return f"Cannot bundle `{self.reference}`: expected JSON Schema (object or boolean), got {to_json_type_name(self.value)}"
 
 
 @dataclass

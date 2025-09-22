@@ -8,6 +8,7 @@ import traceback
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
+from schemathesis.core.jsonschema import BundleError
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
@@ -49,6 +50,14 @@ class InvalidSchema(SchemathesisError):
         self.message = message
         self.path = path
         self.method = method
+
+    @classmethod
+    def from_bundle_error(cls, error: BundleError, location: str, name: str | None = None) -> InvalidSchema:
+        if location == "body":
+            message = f"Can not generate data for {location}! {error}"
+        else:
+            message = f"Can not generate data for {location} parameter `{name}`! {error}"
+        return InvalidSchema(message)
 
     @classmethod
     def from_jsonschema_error(
