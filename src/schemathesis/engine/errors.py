@@ -14,9 +14,10 @@ from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 
 from schemathesis import errors
 from schemathesis.core.errors import (
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    InfiniteRecursiveReference,
     InvalidTransition,
     SerializationNotPossible,
+    UnresolvableReference,
     format_exception,
     get_request_error_extras,
     get_request_error_message,
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
     import requests
     from requests.exceptions import ChunkedEncodingError
 
-__all__ = ["EngineErrorInfo", "DeadlineExceeded", "UnsupportedRecursiveReference", "UnexpectedError"]
+__all__ = ["EngineErrorInfo", "DeadlineExceeded", "UnexpectedError"]
 
 
 class DeadlineExceeded(errors.SchemathesisError):
@@ -41,13 +42,6 @@ class DeadlineExceeded(errors.SchemathesisError):
         return cls(
             f"Test running time is too slow! It took {runtime:.2f}ms, which exceeds the deadline of {deadline:.2f}ms.\n"
         )
-
-
-class UnsupportedRecursiveReference(errors.SchemathesisError):
-    """Recursive reference is impossible to resolve due to current limitations."""
-
-    def __init__(self) -> None:
-        super().__init__(RECURSIVE_REFERENCE_ERROR_MESSAGE)
 
 
 class UnexpectedError(errors.SchemathesisError):
@@ -103,7 +97,6 @@ class EngineErrorInfo:
             return "Schema Error"
 
         return {
-            RuntimeErrorKind.SCHEMA_UNSUPPORTED: "Unsupported Schema",
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Missing Open API links",
             RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE: "Invalid OpenAPI Links Definition",
             RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Unknown GraphQL Scalar",
@@ -119,9 +112,6 @@ class EngineErrorInfo:
 
         if isinstance(self._error, requests.RequestException):
             return get_request_error_message(self._error)
-
-        if self._kind == RuntimeErrorKind.SCHEMA_UNSUPPORTED:
-            return str(self._error).strip()
 
         if self._kind == RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR and isinstance(
             self._error, hypothesis.errors.InvalidArgument
@@ -175,7 +165,8 @@ class EngineErrorInfo:
         return self._kind not in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE,
-            RuntimeErrorKind.SCHEMA_UNSUPPORTED,
+            RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE,
+            RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND,
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
@@ -312,8 +303,9 @@ class RuntimeErrorKind(str, enum.Enum):
 
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
     SCHEMA_INVALID_STATE_MACHINE = "schema_invalid_state_machine"
+    SCHEMA_INVALID_INFINITE_RECURSION = "schema_invalid_infinite_recursion"
+    SCHEMA_INVALID_UNRESOLVABLE_REFERENCE = "schema_invalid_unresolvable_reference"
     SCHEMA_NO_LINKS_FOUND = "schema_no_links_found"
-    SCHEMA_UNSUPPORTED = "schema_unsupported"
     SCHEMA_GENERIC = "schema_generic"
 
     SERIALIZATION_NOT_POSSIBLE = "serialization_not_possible"
@@ -368,9 +360,10 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
         return RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE
     if isinstance(error, errors.NoLinksFound):
         return RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND
-    if isinstance(error, UnsupportedRecursiveReference):
-        # Recursive references are not supported right now
-        return RuntimeErrorKind.SCHEMA_UNSUPPORTED
+    if isinstance(error, InfiniteRecursiveReference):
+        return RuntimeErrorKind.SCHEMA_INVALID_INFINITE_RECURSION
+    if isinstance(error, UnresolvableReference):
+        return RuntimeErrorKind.SCHEMA_INVALID_UNRESOLVABLE_REFERENCE
     if isinstance(error, errors.SerializationError):
         if isinstance(error, errors.UnboundPrefix):
             return RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX

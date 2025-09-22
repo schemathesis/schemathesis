@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from schemathesis.core.compat import RefResolver
+from schemathesis.core.errors import InfiniteRecursiveReference
+from schemathesis.core.jsonschema.references import sanitize
 from schemathesis.core.jsonschema.types import JsonSchema, to_json_type_name
 from schemathesis.core.transforms import deepclone
 
@@ -56,16 +58,37 @@ class Bundler:
         def bundle_recursive(current: JsonSchema | list[JsonSchema]) -> None:
             """Recursively process and bundle references in the current schema."""
             if isinstance(current, dict):
-                ref = current.get("$ref")
-                if isinstance(ref, str) and not ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
-                    resolved_uri, resolved_schema = resolve(ref)
+                reference = current.get("$ref")
+                if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
+                    resolved_uri, resolved_schema = resolve(reference)
 
                     if not isinstance(resolved_schema, (dict, bool)):
-                        raise BundleError(ref, resolved_schema)
+                        raise BundleError(reference, resolved_schema)
                     def_name = get_def_name(resolved_uri)
 
-                    # Bundle only new schemas
-                    if resolved_uri not in visited:
+                    if resolved_uri in resolver._scopes_stack:
+                        # This is a recursive reference! As of Sep 2025, `hypothesis-jsonschema` does not support
+                        # recursive references and Schemathesis has to remove them if possible.
+                        #
+                        # Cutting them of immediately would limit the quality of generated data, since it would have
+                        # just a single level of recursion. Currently, the only way to generate recursive data is to
+                        # inline definitions directly, which can lead to schema size explosion.
+                        #
+                        # To balance it, Schemathesis inlines one level, that avoids exponential blowup of O(B ^ L)
+                        # in worst case, where B is branching factor (number of recursive references per schema), and
+                        # L is the number of levels. Even quadratic growth can be unacceptable for large schemas.
+                        #
+                        # In the future, it **should** be handled by `hypothesis-jsonschema` instead.
+                        cloned = deepclone(resolved_schema)
+                        remaining_references = sanitize(cloned)
+                        if remaining_references:
+                            # This schema is either infinitely recursive or the sanitization logic misses it, in any
+                            # event, we git up here
+                            raise InfiniteRecursiveReference(reference)
+                        del current["$ref"]
+                        current.update(cloned)
+                    elif resolved_uri not in visited:
+                        # Bundle only new schemas
                         visit(resolved_uri)
 
                         cloned = deepclone(resolved_schema)
@@ -77,9 +100,9 @@ class Bundler:
                             bundle_recursive(cloned)
                         finally:
                             resolver.pop_scope()
-
-                    # Update reference to point to embedded definition
-                    current["$ref"] = f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
+                        current["$ref"] = f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
+                    else:
+                        current["$ref"] = f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
 
                 for value in current.values():
                     bundle_recursive(value)

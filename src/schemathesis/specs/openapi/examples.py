@@ -11,8 +11,9 @@ from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError, merged
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core.compat import RefResolver
-from schemathesis.core.jsonschema import REFERENCE_TO_BUNDLE_PREFIX, references
+from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
+from schemathesis.core.jsonschema import references
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
@@ -105,11 +106,16 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
     assert isinstance(operation.schema, BaseOpenAPISchema)
 
     responses = find_in_responses(operation)
+    seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
             schema = parameter.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            definitions = [parameter.definition, *_expand_subschemas(schema, resolver)]
+            seen_references.clear()
+            definitions = [
+                parameter.definition,
+                *_expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references),
+            ]
         else:
             definitions = [parameter.definition]
         for definition in definitions:
@@ -134,7 +140,8 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
         if "schema" in parameter.definition:
             schema = parameter.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            for expanded in _expand_subschemas(schema, resolver):
+            seen_references.clear()
+            for expanded in _expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references):
                 if isinstance(expanded, dict) and parameter.examples_field in expanded:
                     for value in expanded[parameter.examples_field]:
                         yield ParameterExample(
@@ -149,7 +156,11 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
         if "schema" in alternative.definition:
             schema = alternative.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            definitions = [alternative.definition, *_expand_subschemas(schema, resolver)]
+            seen_references.clear()
+            definitions = [
+                alternative.definition,
+                *_expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references),
+            ]
         else:
             definitions = [alternative.definition]
         for definition in definitions:
@@ -166,7 +177,8 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
         if "schema" in alternative.definition:
             schema = alternative.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            for expanded in _expand_subschemas(schema, resolver):
+            seen_references.clear()
+            for expanded in _expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references):
                 if isinstance(expanded, dict) and alternative.examples_field in expanded:
                     for value in expanded[alternative.examples_field]:
                         yield BodyExample(value=value, media_type=alternative.media_type)
@@ -174,35 +186,35 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Ex
 
 @overload
 def _resolve_bundled(
-    schema: dict[str, Any], resolver: RefResolver, seen_references: set[str] | None = None
+    schema: dict[str, Any], resolver: RefResolver, seen_references: set[str]
 ) -> dict[str, Any]: ...  # pragma: no cover
 
 
 @overload
-def _resolve_bundled(
-    schema: bool, resolver: RefResolver, seen_references: set[str] | None = None
-) -> bool: ...  # pragma: no cover
+def _resolve_bundled(schema: bool, resolver: RefResolver, seen_references: set[str]) -> bool: ...  # pragma: no cover
 
 
 def _resolve_bundled(
-    schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str] | None = None
+    schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str]
 ) -> dict[str, Any] | bool:
     if isinstance(schema, dict):
         reference = schema.get("$ref")
-        if isinstance(reference, str) and reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
-            if seen_references is not None:
-                if reference in seen_references:
-                    # Try to remove recursive references to avoid infinite recursion
-                    remaining_references = references.sanitize(schema)
-                    if reference in remaining_references:
-                        raise HypothesisRefResolutionError(f"Required reference {reference} creates cycle")
-                seen_references.add(reference)
-            _, schema = resolver.resolve(schema["$ref"])
+        if isinstance(reference, str):
+            if reference in seen_references:
+                # Try to remove recursive references to avoid infinite recursion
+                remaining_references = references.sanitize(schema)
+                if reference in remaining_references:
+                    raise InfiniteRecursiveReference(reference)
+            seen_references.add(reference)
+            try:
+                _, schema = resolver.resolve(schema["$ref"])
+            except RefResolutionError as exc:
+                raise UnresolvableReference(reference) from exc
     return schema
 
 
 def _expand_subschemas(
-    schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str] | None = None
+    *, schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str]
 ) -> Generator[dict[str, Any] | bool, None, None]:
     schema = _resolve_bundled(schema, resolver, seen_references)
     yield schema
@@ -302,10 +314,11 @@ def load_external_example(url: str) -> bytes:
 
 def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
+    seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema()
         resolver = RefResolver.from_schema(schema)
-        seen_references: set[str] = set()
+        seen_references.clear()
         for value in extract_from_schema(
             operation=operation,
             schema=schema,
@@ -322,7 +335,7 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator
         schema = alternative.as_json_schema()
         resolver = RefResolver.from_schema(schema)
         for example_field, examples_field in (("example", "examples"), ("x-example", "x-examples")):
-            seen_references = set()
+            seen_references.clear()
             for value in extract_from_schema(
                 operation=operation,
                 schema=schema,
@@ -352,7 +365,9 @@ def extract_from_schema(
         to_generate: dict[str, Any] = {}
         for name, subschema in schema["properties"].items():
             values = []
-            for subsubschema in _expand_subschemas(subschema, resolver, seen_references):
+            for subsubschema in _expand_subschemas(
+                schema=subschema, resolver=resolver, seen_references=seen_references
+            ):
                 if isinstance(subsubschema, bool):
                     to_generate[name] = subsubschema
                     continue

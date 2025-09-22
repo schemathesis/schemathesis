@@ -8,7 +8,6 @@ import traceback
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
-from schemathesis.core.jsonschema import BundleError
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
 
     from schemathesis.config import OutputConfig
     from schemathesis.core.compat import RefResolutionError
+    from schemathesis.core.jsonschema import BundleError
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
@@ -26,11 +26,6 @@ SERIALIZERS_SUGGESTION_MESSAGE = f"Check your schema or add custom serializers: 
 SERIALIZATION_NOT_POSSIBLE_MESSAGE = f"No supported serializers for media types: {{}}\n{SERIALIZERS_SUGGESTION_MESSAGE}"
 SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
     f"Cannot serialize to '{{}}' (unsupported media type)\n{SERIALIZERS_SUGGESTION_MESSAGE}"
-)
-RECURSIVE_REFERENCE_ERROR_MESSAGE = (
-    "Currently, Schemathesis can't generate data for this operation due to "
-    "recursive references in the operation definition. See more information in "
-    "this issue - https://github.com/schemathesis/schemathesis/issues/947"
 )
 
 
@@ -290,6 +285,26 @@ class UnboundPrefix(SerializationError):
 
     def __init__(self, prefix: str):
         super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
+
+
+class UnresolvableReference(SchemathesisError):
+    """A reference cannot be resolved."""
+
+    def __init__(self, reference: str) -> None:
+        self.reference = reference
+
+    def __str__(self) -> str:
+        return f"Reference `{self.reference}` cannot be resolved"
+
+
+class InfiniteRecursiveReference(SchemathesisError):
+    """Required recursive reference creates a cycle."""
+
+    def __init__(self, reference: str) -> None:
+        self.reference = reference
+
+    def __str__(self) -> str:
+        return f"Required reference `{self.reference}` creates a cycle"
 
 
 class SerializationNotPossible(SerializationError):

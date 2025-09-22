@@ -161,7 +161,11 @@ DEFINITIONS = {
                     "schema1": {
                         "type": "object",
                         "properties": {
-                            "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
+                            "child": {
+                                # Inlined 1 level
+                                "properties": {},
+                                "type": "object",
+                            },
                         },
                     }
                 },
@@ -180,7 +184,11 @@ DEFINITIONS = {
                     "B": {
                         "type": "object",
                         "properties": {
-                            "a": {"$ref": "#/definitions/A"},
+                            "a": {
+                                # Inlined 1 level
+                                "properties": {},
+                                "type": "object",
+                            },
                         },
                     },
                 }
@@ -188,8 +196,24 @@ DEFINITIONS = {
             {
                 "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
                 BUNDLE_STORAGE_KEY: {
-                    "schema1": {"type": "object", "properties": {"b": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2"}}},
-                    "schema2": {"type": "object", "properties": {"a": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}}},
+                    "schema1": {
+                        "type": "object",
+                        "properties": {
+                            "b": {
+                                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema2",
+                            }
+                        },
+                    },
+                    "schema2": {
+                        "type": "object",
+                        "properties": {
+                            "a": {
+                                # Inlined 1 level
+                                "properties": {},
+                                "type": "object",
+                            }
+                        },
+                    },
                 },
             },
         ),
