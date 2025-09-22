@@ -533,7 +533,8 @@ def _iter_coverage_cases(
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
-        schema = parameter.as_json_schema(operation, update_quantifiers=False)
+        # NOTE: Do not update quantifiers to allow for mutating individual keywords
+        schema = parameter.as_json_schema(update_quantifiers=False)
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
@@ -556,7 +557,8 @@ def _iter_coverage_cases(
     if operation.body:
         for body in operation.body:
             instant = Instant()
-            schema = body.as_json_schema(operation, update_quantifiers=False)
+            # NOTE: Do not update quantifiers to allow for mutating individual keywords
+            schema = body.as_json_schema(update_quantifiers=False)
             # Definition could be a list for Open API 2.0
             definition = body.definition if isinstance(body.definition, dict) else {}
             examples = [example["value"] for example in definition.get("examples", {}).values() if "value" in example]
@@ -786,7 +788,7 @@ def _iter_coverage_cases(
         ) -> dict[str, Any]:
             return {
                 "properties": {
-                    parameter.name: parameter.as_json_schema(operation)
+                    parameter.name: parameter.as_json_schema()
                     for parameter in _parameter_set
                     if parameter.name in combination
                 },

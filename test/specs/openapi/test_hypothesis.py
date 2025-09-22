@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 from hypothesis import Phase, assume, given, settings
@@ -277,7 +278,10 @@ def _scoped_remote_schema(testdir):
 def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     # See GH-986
     setup(testdir)
-    deeply_nested_schema["components"]["schemas"]["foo9"] = {"$ref": "bar.json#/bar"}
+
+    deeply_nested_schema["components"]["schemas"]["foo9"] = {
+        "$ref": Path(str(testdir.tmpdir / "bar.json")).as_uri() + "#/bar"
+    }
 
     original = json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True)
     schema = schemathesis.openapi.from_dict(deeply_nested_schema)

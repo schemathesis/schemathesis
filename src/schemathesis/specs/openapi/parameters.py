@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, Iterable
+from typing import Any, ClassVar, Iterable
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.schemas import Parameter
 
 from .converter import to_json_schema_recursive
-
-if TYPE_CHECKING:
-    from ...schemas import APIOperation
 
 
 @dataclass(eq=False)
@@ -50,7 +47,7 @@ class OpenAPIParameter(Parameter):
     def is_header(self) -> bool:
         return self.location in ("header", "cookie")
 
-    def as_json_schema(self, operation: APIOperation, *, update_quantifiers: bool = True) -> dict[str, Any]:
+    def as_json_schema(self, *, update_quantifiers: bool = True) -> dict[str, Any]:
         """Convert parameter's definition to JSON Schema."""
         # JSON Schema allows `examples` as an array
         examples = []
@@ -62,7 +59,7 @@ class OpenAPIParameter(Parameter):
                 examples.extend(container)
         if self.example_field in self.definition:
             examples.append(self.definition[self.example_field])
-        schema = self.from_open_api_to_json_schema(operation, self.definition)
+        schema = self.from_open_api_to_json_schema(self.definition)
         if examples:
             schema["examples"] = examples
         return self.transform_keywords(schema, update_quantifiers=update_quantifiers)
@@ -81,7 +78,7 @@ class OpenAPIParameter(Parameter):
             definition.setdefault("type", "string")
         return definition
 
-    def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
+    def from_open_api_to_json_schema(self, open_api_schema: dict[str, Any]) -> dict[str, Any]:
         """Convert Open API's `Schema` to JSON Schema."""
         return {
             key: value
@@ -183,9 +180,9 @@ class OpenAPI30Parameter(OpenAPIParameter):
         "default",
     )
 
-    def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
-        open_api_schema = get_parameter_schema(operation, open_api_schema)
-        return super().from_open_api_to_json_schema(operation, open_api_schema)
+    def from_open_api_to_json_schema(self, open_api_schema: dict[str, Any]) -> dict[str, Any]:
+        open_api_schema = get_parameter_schema(open_api_schema)
+        return super().from_open_api_to_json_schema(open_api_schema)
 
 
 @dataclass(eq=False)
@@ -238,7 +235,7 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     # NOTE. For Open API 2.0 bodies, we still give `x-example` precedence over the schema-level `example` field to keep
     # the precedence rules consistent.
 
-    def as_json_schema(self, operation: APIOperation, *, update_quantifiers: bool = True) -> dict[str, Any]:
+    def as_json_schema(self, *, update_quantifiers: bool = True) -> dict[str, Any]:
         """Convert body definition to JSON Schema."""
         # `schema` is required in Open API 2.0 when the `in` keyword is `body`
         schema = self.definition["schema"]
@@ -260,9 +257,9 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     # Therefore, it is passed here explicitly
     required: bool = False
 
-    def as_json_schema(self, operation: APIOperation, *, update_quantifiers: bool = True) -> dict[str, Any]:
+    def as_json_schema(self, *, update_quantifiers: bool = True) -> dict[str, Any]:
         """Convert body definition to JSON Schema."""
-        schema = get_media_type_schema(self.definition)
+        schema = self.definition.get("schema", {})
         return self.transform_keywords(schema, update_quantifiers=update_quantifiers)
 
     def transform_keywords(self, schema: dict[str, Any], *, update_quantifiers: bool = True) -> dict[str, Any]:
@@ -300,13 +297,13 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
         # We generate an object for formData - it is always required.
         return bool(self.definition)
 
-    def as_json_schema(self, operation: APIOperation, *, update_quantifiers: bool = True) -> dict[str, Any]:
+    def as_json_schema(self, *, update_quantifiers: bool = True) -> dict[str, Any]:
         """The composite body is transformed into an "object" JSON Schema."""
-        return parameters_to_json_schema(operation, self.definition, update_quantifiers=update_quantifiers)
+        return parameters_to_json_schema(self.definition, update_quantifiers=update_quantifiers)
 
 
 def parameters_to_json_schema(
-    operation: APIOperation, parameters: Iterable[OpenAPIParameter], *, update_quantifiers: bool = True
+    parameters: Iterable[OpenAPIParameter], *, update_quantifiers: bool = True
 ) -> dict[str, Any]:
     """Create an "object" JSON schema from a list of Open API parameters.
 
@@ -345,7 +342,7 @@ def parameters_to_json_schema(
     bundled = {}
     for parameter in parameters:
         name = parameter.name
-        subschema = parameter.as_json_schema(operation, update_quantifiers=update_quantifiers)
+        subschema = parameter.as_json_schema(update_quantifiers=update_quantifiers)
         subschema_bundle = subschema.pop(BUNDLE_STORAGE_KEY, None)
         if subschema_bundle is not None:
             bundled.update(subschema_bundle)
@@ -369,7 +366,7 @@ INVALID_SCHEMA_MESSAGE = (
 )
 
 
-def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[str, Any]:
+def get_parameter_schema(data: dict[str, Any]) -> dict[str, Any]:
     """Extract `schema` from Open API 3.0 `Parameter`."""
     # In Open API 3.0, there could be "schema" or "content" field. They are mutually exclusive.
     if "schema" in data:
@@ -378,8 +375,6 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
                 INVALID_SCHEMA_MESSAGE.format(
                     location=data.get("in", ""), name=data.get("name", "<UNKNOWN>"), schema=data["schema"]
                 ),
-                path=operation.path,
-                method=operation.method,
             )
         return data["schema"]
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
@@ -389,16 +384,7 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
     except KeyError as exc:
         raise InvalidSchema(
             MISSING_SCHEMA_OR_CONTENT_MESSAGE.format(location=data.get("in", ""), name=data.get("name", "<UNKNOWN>")),
-            path=operation.path,
-            method=operation.method,
         ) from exc
     options = iter(content.values())
     media_type_object = next(options)
-    return get_media_type_schema(media_type_object)
-
-
-def get_media_type_schema(definition: dict[str, Any]) -> dict[str, Any]:
-    """Extract `schema` from Open API 3.0 `MediaType`."""
-    # The `schema` keyword is optional, and we treat it as the payload could be any value of the specified media type
-    # Note, the main reason to have this function is to have an explicit name for the action we're doing.
-    return definition.get("schema", {})
+    return media_type_object.get("schema", {})

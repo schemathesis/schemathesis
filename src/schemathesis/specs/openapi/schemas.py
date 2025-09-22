@@ -460,9 +460,8 @@ class BaseOpenAPISchema(BaseSchema):
                 if method not in HTTP_METHODS:
                     continue
                 if "operationId" in operation and operation["operationId"] == operation_id:
-                    resolved = self._resolve_operation(operation)
-                    parameters = self._collect_operation_parameters(path_item, resolved)
-                    return self.make_operation(path, method, parameters, operation, resolved, scope)
+                    parameters = self._collect_operation_parameters(path_item, operation)
+                    return self.make_operation(path, method, parameters, operation, operation, scope)
         self._on_missing_operation(operation_id, None, [])
 
     def get_operation_by_reference(self, reference: str) -> APIOperation:
@@ -473,12 +472,11 @@ class BaseOpenAPISchema(BaseSchema):
         scope, operation = self.resolver.resolve(reference)
         path, method = scope.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
-        with in_scope(self.resolver, scope):
-            resolved = self._resolve_operation(operation)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = self.resolver.resolve(parent_ref)
-        parameters = self._collect_operation_parameters(path_item, resolved)
-        return self.make_operation(path, method, parameters, operation, resolved, scope)
+        with in_scope(self.resolver, scope):
+            parameters = self._collect_operation_parameters(path_item, operation)
+        return self.make_operation(path, method, parameters, operation, operation, scope)
 
     def get_case_strategy(
         self,
