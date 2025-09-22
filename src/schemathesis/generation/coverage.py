@@ -255,7 +255,8 @@ class CoverageContext:
                 if reference in remaining_references:
                     raise HypothesisRefResolutionError(f"Required reference {reference} creates cycle")
             seen_references.add(reference)
-            schema = self.resolve_ref(reference)
+            # Deep clone to avoid circular references in Python objects
+            schema = deepclone(self.resolve_ref(reference))
         if isinstance(schema, bool):
             return 0
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
