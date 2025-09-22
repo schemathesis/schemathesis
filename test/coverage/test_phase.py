@@ -2039,7 +2039,35 @@ def test_nested_parameters(ctx):
     assert ranges == {"0"}
 
 
-def test_recursive_all_of(ctx):
+@pytest.mark.parametrize(
+    ["request_body", "referenced"],
+    [
+        (
+            {
+                "properties": {
+                    "p1": {
+                        "$ref": "#components/schemas/Key",
+                    }
+                }
+            },
+            {
+                "allOf": [
+                    {"$ref": ""},
+                ]
+            },
+        ),
+        (
+            {"$ref": "#components/schemas/Key"},
+            {
+                "default": 0,
+                "items": {
+                    "$ref": "",
+                },
+            },
+        ),
+    ],
+)
+def test_recursive_refs(ctx, request_body, referenced):
     raw_schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -2047,28 +2075,14 @@ def test_recursive_all_of(ctx):
                     "requestBody": {
                         "content": {
                             "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "p1": {
-                                            "$ref": "#components/schemas/Key",
-                                        }
-                                    }
-                                }
+                                "schema": request_body,
                             }
                         }
                     }
                 }
             }
         },
-        components={
-            "schemas": {
-                "Key": {
-                    "allOf": [
-                        {"$ref": ""},
-                    ]
-                }
-            }
-        },
+        components={"schemas": {"Key": referenced}},
     )
 
     schema = schemathesis.openapi.from_dict(raw_schema)
