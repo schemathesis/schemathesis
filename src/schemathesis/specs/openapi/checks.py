@@ -284,8 +284,6 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
         and data.description.startswith("Missing ")
     ):
         if data.parameter.lower() == "authorization":
-            if _has_optional_auth(case.operation):
-                return None
             expected_statuses = {401}
         else:
             config = ctx.config.missing_required_header
