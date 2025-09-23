@@ -1,3 +1,4 @@
+import platform
 import textwrap
 
 import pytest
@@ -87,6 +88,7 @@ def test_non_existing_file(cli, snapshot_cli):
     assert cli.main("--config-file=unknown-file.toml", "run", "http://127.0.0.1") == snapshot_cli
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Has different error message on Windows")
 def test_with_null_byte(cli, snapshot_cli):
     assert (
         cli.main("run", "http://127.0.0.1", config={"reports": {"junit": {"enabled": True, "path": "\x00"}}})
