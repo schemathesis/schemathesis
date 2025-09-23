@@ -12,5 +12,5 @@ def open_file(file: Path) -> None:
         raise click.BadParameter(f"'{file.name}': {exc.strerror}") from exc
     try:
         file.open("w", encoding="utf-8")
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         raise click.BadParameter(f"Could not open file {file.name}: {exc}") from exc
