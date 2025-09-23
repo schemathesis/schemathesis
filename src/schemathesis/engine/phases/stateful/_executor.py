@@ -46,7 +46,7 @@ from schemathesis.generation.metrics import MetricCollector
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
     """Get the settings that should be overridden to match the defaults for API state machines."""
     kwargs = {}
-    hypothesis_default = hypothesis.settings()
+    hypothesis_default = hypothesis.settings.get_profile("default")
     if settings.phases == hypothesis_default.phases:
         kwargs["phases"] = DEFAULT_STATE_MACHINE_SETTINGS.phases
     if settings.stateful_step_count == hypothesis_default.stateful_step_count:

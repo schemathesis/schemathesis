@@ -7,6 +7,7 @@
 - Properly generate boundary values for negative `maximum` during the coverage phase.
 - **CLI**: Internal error if referenced API operation is unresolvable.
 - **CLI**: Gracefully handle NULL byte in report path.
+- Use default Hypothesis profile in to detect changed settings for stateful testing instead of the current one.
 - Prevent missing required header check for optional authorization in OpenAPI.
 
 ### :wrench: Changed
