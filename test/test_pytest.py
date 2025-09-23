@@ -169,7 +169,10 @@ def test_c(case):
     assert settings().deadline.microseconds == 100 * 1000
 
 def test_d():
-    assert settings().deadline.microseconds == 200 * 1000
+    deadline = settings().deadline
+    # E.g. changed globally via a custom profile in Schemathesis' test suite
+    if deadline is not None:
+        assert deadline.microseconds == 200 * 1000
 """,
     )
     # When there is a test with Pytest
