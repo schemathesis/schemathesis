@@ -6,6 +6,7 @@
 
 - Properly generate boundary values for negative `maximum` during the coverage phase.
 - **CLI**: Internal error if referenced API operation is unresolvable.
+- Prevent missing required header check for optional authorization in OpenAPI.
 
 ### :wrench: Changed
 

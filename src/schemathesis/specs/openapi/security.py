@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, Generator
+from typing import TYPE_CHECKING, Any, ClassVar, Generator, cast
 
 from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
 
@@ -86,8 +86,16 @@ class BaseSecurityProcessor:
         operation.add_parameter(parameter)
 
     def process_http_security_definition(self, definition: dict[str, Any], operation: APIOperation) -> None:
+        from .schemas import BaseOpenAPISchema
+
+        schema = cast(BaseOpenAPISchema, operation.schema)
+
         if definition["type"] == self.http_security_name:
-            parameter = self.parameter_cls(self._make_http_auth_parameter(definition))
+            http_auth_parameter = self._make_http_auth_parameter(definition)
+            if schema.security.has_optional_auth(schema.raw_schema, operation):
+                http_auth_parameter["required"] = False
+
+            parameter = self.parameter_cls(http_auth_parameter)
             operation.add_parameter(parameter)
 
     def _is_match(self, definition: dict[str, Any], location: str) -> bool:
