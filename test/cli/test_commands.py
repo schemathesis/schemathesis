@@ -298,7 +298,7 @@ def test_invalid_type_with_ref(cli, ctx, openapi3_base_url, snapshot_cli):
                 }
             }
         },
-        components={"schemas": {"S": {"type": "object"}}},
+        components={"schemas": {"S": {"maxProperties": 5}}},
     )
     assert (
         cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
