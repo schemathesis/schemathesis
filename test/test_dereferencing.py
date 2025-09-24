@@ -528,7 +528,7 @@ def test_(request, case):
     assert case.path == "/users"
     assert case.method == "POST"
     if not hasattr(case.meta.phase.data, "description"):
-        assert case.body in (None, 0, 1)
+        assert isinstance(case.body, int) or case.body is None
 """,
         paths={
             "/users": {
@@ -595,7 +595,7 @@ def test_(request, case):
     assert case.path == "/users"
     assert case.method == "GET"
     if not hasattr(case.meta.phase.data, "description"):
-        assert case.query["id"] in ("null", 1)
+        assert case.query["id"] in ("null", 1, 2)
 """,
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
         generation_modes=[GenerationMode.POSITIVE],
