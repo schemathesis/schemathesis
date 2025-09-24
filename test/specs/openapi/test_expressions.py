@@ -13,6 +13,7 @@ from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
+from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 DOCUMENT = {
     "foo": ["bar", "baz"],
@@ -31,18 +32,19 @@ DOCUMENT = {
 
 @pytest.fixture
 def operation(openapi_30):
-    return APIOperation(
+    media_type = "application/json"
+    content = {"schema": {}}
+    definition = {"requestBody": {"content": {media_type: content}}}
+    instance = APIOperation(
         "/users/{user_id}",
         "PUT",
-        OperationDefinition(
-            {"requestBody": {"content": {"application/json": {"schema": {}}}}},
-            {"requestBody": {"content": {"application/json": {"schema": {}}}}},
-            "",
-        ),
+        OperationDefinition(definition, definition, ""),
         openapi_30,
         label="PUT /users/{user_id}",
         base_url="http://127.0.0.1:8080/api",
     )
+    instance.add_parameter(OpenAPI30Body(content, media_type=media_type, required=False))
+    return instance
 
 
 @pytest.fixture
