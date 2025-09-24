@@ -11,7 +11,6 @@ from schemathesis.generation.stateful.state_machine import ExtractedParam, StepO
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
-from schemathesis.specs.openapi.references import RECURSION_DEPTH_LIMIT
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
 ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
@@ -200,11 +199,20 @@ class StepOutputWrapper:
 def get_all_links(
     operation: APIOperation,
 ) -> Generator[tuple[str, Result[OpenApiLink, InvalidTransition]], None, None]:
+    resolver = operation.schema.resolver  # type: ignore[attr-defined]
     for status_code, definition in operation.definition.raw["responses"].items():
-        definition = operation.schema.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)  # type: ignore[attr-defined]
+        in_scope = False
+        if "$ref" in definition:
+            scope, definition = resolver.resolve(definition["$ref"])
+            resolver.push_scope(scope)
+            in_scope = True
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
+            if "$ref" in link_definition:
+                _, link_definition = resolver.resolve(link_definition["$ref"])
             try:
                 link = OpenApiLink(name, status_code, link_definition, operation)
                 yield status_code, Ok(link)
             except InvalidTransition as exc:
                 yield status_code, Err(exc)
+        if in_scope:
+            resolver.pop_scope()
