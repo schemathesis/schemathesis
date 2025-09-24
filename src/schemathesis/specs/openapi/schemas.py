@@ -259,11 +259,6 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 continue
 
-    def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
-        while "$ref" in value:
-            _, value = self.resolver.resolve(value["$ref"])
-        return value
-
     def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
         return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
 
@@ -993,8 +988,7 @@ class OpenApi30(SwaggerV20):
         return serialization.serialize_openapi3_parameters(definitions)
 
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        request_body = self._resolve_until_no_references(operation.definition.raw["requestBody"])
-        return list(request_body["content"])
+        return [body.media_type for body in operation.body]
 
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation
