@@ -42,6 +42,7 @@ from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi._adapter import prepare_parameters
 from schemathesis.specs.openapi.stateful import links
+from schemathesis.specs.openapi.types import v3
 from schemathesis.specs.openapi.utils import expand_status_code
 
 from ...generation import GenerationMode
@@ -60,7 +61,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver
+from .references import ConvertingResolver, InliningResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -154,7 +155,7 @@ class BaseOpenAPISchema(BaseSchema):
                 method="",
                 path="",
                 label="",
-                definition=OperationDefinition(raw=None, resolved=None, scope=""),
+                definition=OperationDefinition(raw=None, scope=""),
                 schema=None,  # type: ignore
             )
         ),
@@ -169,7 +170,6 @@ class BaseOpenAPISchema(BaseSchema):
         operation.path = path
         operation.label = f"{method.upper()} {path}"
         operation.definition.raw = definition
-        operation.definition.resolved = definition
         operation.schema = self
         return not self.filter_set.match(_ctx_cache)
 
@@ -259,9 +259,6 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 continue
 
-    def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
-        return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
-
     def _collect_operation_parameters(
         self, path_item: Mapping[str, Any], operation: dict[str, Any]
     ) -> list[OpenAPIParameter]:
@@ -323,8 +320,6 @@ class BaseOpenAPISchema(BaseSchema):
                                 path,
                                 method,
                                 parameters,
-                                entry,
-                                # TODO: Remove
                                 entry,
                                 scope,
                             )
@@ -390,8 +385,7 @@ class BaseOpenAPISchema(BaseSchema):
         path: str,
         method: str,
         parameters: list[OpenAPIParameter],
-        raw: dict[str, Any],
-        resolved: dict[str, Any],
+        definition: dict[str, Any],
         scope: str,
     ) -> APIOperation:
         __tracebackhide__ = True
@@ -399,7 +393,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation[OpenAPIParameter] = APIOperation(
             path=path,
             method=method,
-            definition=OperationDefinition(raw, resolved, scope),
+            definition=OperationDefinition(definition, scope),
             base_url=base_url,
             app=self.app,
             schema=self,
@@ -412,7 +406,7 @@ class BaseOpenAPISchema(BaseSchema):
         }
         for name in missing_parameter_names:
             definition = {"name": name, INJECTED_PATH_PARAMETER_KEY: True, **deepclone(self._path_parameter_template)}
-            for parameter in self.collect_parameters([definition], raw):
+            for parameter in self.collect_parameters([definition], definition):
                 operation.add_parameter(parameter)
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
@@ -458,7 +452,7 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 if "operationId" in operation and operation["operationId"] == operation_id:
                     parameters = self._collect_operation_parameters(path_item, operation)
-                    return self.make_operation(path, method, parameters, operation, operation, scope)
+                    return self.make_operation(path, method, parameters, operation, scope)
         self._on_missing_operation(operation_id, None, [])
 
     def get_operation_by_reference(self, reference: str) -> APIOperation:
@@ -473,7 +467,7 @@ class BaseOpenAPISchema(BaseSchema):
         _, path_item = self.resolver.resolve(parent_ref)
         with in_scope(self.resolver, scope):
             parameters = self._collect_operation_parameters(path_item, operation)
-        return self.make_operation(path, method, parameters, operation, operation, scope)
+        return self.make_operation(path, method, parameters, operation, scope)
 
     def get_case_strategy(
         self,
@@ -707,17 +701,12 @@ class MethodMap(Mapping):
         schema = cast(BaseOpenAPISchema, self._parent._schema)
         path = self._path
         scope = self._scope
-        schema.resolver.push_scope(scope)
-        try:
-            resolved = schema._resolve_operation(operation)
-        finally:
-            schema.resolver.pop_scope()
         with in_scope(schema.resolver, scope):
             try:
-                parameters = schema._collect_operation_parameters(self._path_item, resolved)
+                parameters = schema._collect_operation_parameters(self._path_item, operation)
             except SCHEMA_PARSING_ERRORS as exc:
                 schema._raise_invalid_schema(exc, path, method)
-        return schema.make_operation(path, method, parameters, operation, resolved, scope)
+        return schema.make_operation(path, method, parameters, operation, scope)
 
     def __getitem__(self, item: str) -> APIOperation:
         try:
@@ -781,7 +770,8 @@ class SwaggerV20(BaseOpenAPISchema):
                 form_parameters.append(parameter)
             elif parameter["in"] == "body":
                 for media_type in body_media_types:
-                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type))
+                    # TODO: Add proper resource name
+                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type, resource_name=None))
             else:
                 if parameter["in"] in ("header", "cookie"):
                     check_header(parameter)
@@ -894,14 +884,6 @@ class SwaggerV20(BaseOpenAPISchema):
             consumes = global_consumes
         return consumes
 
-    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
-        for parameter in definition.get("parameters", []):
-            if "$ref" in parameter:
-                _, parameter = self.resolver.resolve(parameter["$ref"])
-            if parameter["in"] == "body":
-                return parameter["schema"]
-        return None
-
 
 class OpenApi30(SwaggerV20):
     nullable_name = "nullable"
@@ -939,25 +921,49 @@ class OpenApi30(SwaggerV20):
     ) -> list[OpenAPIParameter]:
         # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
         collected: list[OpenAPIParameter] = []
+        operation = cast(v3.Operation, definition)
 
         for parameter in parameters:
             if parameter["in"] in ("header", "cookie"):
                 check_header(parameter)
             collected.append(OpenAPI30Parameter(definition=parameter))
-        if "requestBody" in definition:
-            if "$ref" in definition["requestBody"]:
-                _, body = self.resolver.resolve(definition["requestBody"]["$ref"])
+
+        request_body_or_ref = operation.get("requestBody")
+        if request_body_or_ref is not None:
+            reference = request_body_or_ref.get("$ref")
+            # TODO: Use scopes here
+            if isinstance(reference, str):
+                _, resolved = self.resolver.resolve(reference)
+                request_body_or_ref = cast(v3.RequestBodyOrRef, resolved)
             else:
-                body = definition["requestBody"]
-            required = body.get("required", False)
-            for media_type, content in body["content"].items():
-                if "schema" in content:
-                    content = dict(content)
+                request_body_or_ref = cast(v3.RequestBodyOrRef, request_body_or_ref)
+
+            # It could be an object inside `requestBodies`, which could be a reference itself
+            reference = request_body_or_ref.get("$ref")
+            # TODO: Use scopes here
+            if isinstance(reference, str):
+                _, resolved = self.resolver.resolve(reference)
+                request_body = cast(v3.RequestBody, resolved)
+            else:
+                request_body = cast(v3.RequestBody, request_body_or_ref)
+
+            required = request_body.get("required", False)
+            for media_type, content in request_body["content"].items():
+                resource_name = None
+                schema = content.get("schema")
+                if isinstance(schema, dict):
+                    content = cast(v3.MediaType, dict(content))
+                    if "$ref" in schema:
+                        resource_name = _get_resource_name(schema["$ref"])
                     try:
-                        content["schema"] = Bundler().bundle(content["schema"], self.resolver)
+                        to_bundle = cast(dict[str, Any], schema)
+                        bundled = Bundler().bundle(to_bundle, self.resolver)
+                        content["schema"] = cast(v3.Schema, bundled)
                     except BundleError as exc:
                         raise InvalidSchema.from_bundle_error(exc, "body") from exc
-                collected.append(OpenAPI30Body(content, media_type=media_type, required=required))
+                collected.append(
+                    OpenAPI30Body(content, media_type=media_type, required=required, resource_name=resource_name)
+                )
         return collected
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
@@ -1018,15 +1024,6 @@ class OpenApi30(SwaggerV20):
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
 
-    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
-        if "requestBody" in definition:
-            if "$ref" in definition["requestBody"]:
-                body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
-            else:
-                body = definition["requestBody"]
-            if "content" in body:
-                main, sub = media_types.parse(media_type)
-                for defined_media_type, item in body["content"].items():
-                    if media_types.parse(defined_media_type) == (main, sub):
-                        return item["schema"]
-        return None
+
+def _get_resource_name(reference: str) -> str:
+    return reference.rsplit("/", maxsplit=1)[1]

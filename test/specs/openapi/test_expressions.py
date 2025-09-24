@@ -38,12 +38,12 @@ def operation(openapi_30):
     instance = APIOperation(
         "/users/{user_id}",
         "PUT",
-        OperationDefinition(definition, definition, ""),
+        OperationDefinition(definition, ""),
         openapi_30,
         label="PUT /users/{user_id}",
         base_url="http://127.0.0.1:8080/api",
     )
-    instance.add_parameter(OpenAPI30Body(content, media_type=media_type, required=False))
+    instance.add_parameter(OpenAPI30Body(content, media_type=media_type, required=False, resource_name=None))
     return instance
 
 

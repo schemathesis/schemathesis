@@ -26,6 +26,7 @@ def test_forms_open_api_2(
                 OpenAPI20CompositeBody(
                     definition=[OpenAPI20Parameter(parameter) for parameter in open_api_2_user_form_parameters],
                     media_type=value,
+                    resource_name=None,
                 )
                 for value in consumes
             ]
@@ -62,6 +63,7 @@ def test_multipart_form_open_api_2(
                         OpenAPI20Parameter(parameter) for parameter in open_api_2_user_form_with_file_parameters
                     ],
                     media_type="multipart/form-data",
+                    resource_name=None,
                 )
             ]
         ),
@@ -85,6 +87,7 @@ def test_urlencoded_form_open_api_3(assert_parameters, make_openapi_3_schema, op
                     definition={"schema": open_api_3_user},
                     media_type="application/x-www-form-urlencoded",
                     required=True,
+                    resource_name=None,
                 )
             ]
         ),
@@ -105,7 +108,14 @@ def test_loose_urlencoded_form_open_api_3(assert_parameters, make_openapi_3_sche
     assert_parameters(
         schema,
         PayloadAlternatives(
-            [OpenAPI30Body(definition=loose_schema, media_type="application/x-www-form-urlencoded", required=True)]
+            [
+                OpenAPI30Body(
+                    definition=loose_schema,
+                    media_type="application/x-www-form-urlencoded",
+                    required=True,
+                    resource_name=None,
+                )
+            ]
         ),
         # But when it is converted to JSON Schema, Schemathesis sets `type` to `object`
         # Therefore it corresponds to the default JSON Schema defined for a User
@@ -128,7 +138,10 @@ def test_multipart_form_open_api_3(
         PayloadAlternatives(
             [
                 OpenAPI30Body(
-                    definition={"schema": open_api_3_user_with_file}, media_type="multipart/form-data", required=True
+                    definition={"schema": open_api_3_user_with_file},
+                    media_type="multipart/form-data",
+                    required=True,
+                    resource_name=None,
                 )
             ]
         ),

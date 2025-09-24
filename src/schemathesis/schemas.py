@@ -18,7 +18,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
 from schemathesis.config import ProjectConfig
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
@@ -441,9 +441,6 @@ class BaseSchema(Mapping):
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         raise NotImplementedError
 
-    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
-        raise NotImplementedError
-
     def as_strategy(
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
@@ -605,10 +602,9 @@ class OperationDefinition(Generic[D]):
     """
 
     raw: D
-    resolved: D
     scope: str
 
-    __slots__ = ("raw", "resolved", "scope")
+    __slots__ = ("raw", "scope")
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -686,6 +682,13 @@ class APIOperation(Generic[P]):
         if container is not None:
             return container.get(name)
         return None
+
+    def get_bodies_for_media_type(self, media_type: str) -> Iterator[P]:
+        main_target, sub_target = media_types.parse(media_type)
+        for body in self.body:
+            main, sub = media_types.parse(body.media_type)  # type:ignore[attr-defined]
+            if main in ("*", main_target) and sub in ("*", sub_target):
+                yield body
 
     def as_strategy(
         self,
@@ -836,9 +839,3 @@ class APIOperation(Generic[P]):
             return True
         except AssertionError:
             return False
-
-    def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition.raw, media_type)
-
-    def get_resolved_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition.resolved, media_type)

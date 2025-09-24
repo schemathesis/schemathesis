@@ -32,9 +32,7 @@ CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig()
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:
-    return APIOperation(
-        "/path", "GET", definition=OperationDefinition(definition, definition, ""), schema=schema
-    ).Case()
+    return APIOperation("/path", "GET", definition=OperationDefinition(definition, ""), schema=schema).Case()
 
 
 @pytest.fixture

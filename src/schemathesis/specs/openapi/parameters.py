@@ -188,6 +188,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
 @dataclass(eq=False)
 class OpenAPIBody(OpenAPIParameter):
     media_type: str
+    resource_name: str | None
 
     @property
     def location(self) -> str:
@@ -290,6 +291,8 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
         return cls(
             definition=[OpenAPI20Parameter(parameter) for parameter in parameters],
             media_type=media_type,
+            # Resource name is only relevant for regular body
+            resource_name=None,
         )
 
     @property
