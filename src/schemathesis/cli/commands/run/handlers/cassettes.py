@@ -454,7 +454,6 @@ def har_writer(path: Path, config: SchemathesisConfig, queue: Queue) -> None:
                     )
             elif isinstance(item, Finalize):
                 break
-    har.flush()
 
 
 HARFILE_NO_RESPONSE = harfile.Response(
