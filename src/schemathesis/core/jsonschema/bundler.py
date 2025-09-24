@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from schemathesis.core.compat import RefResolver
@@ -22,7 +21,6 @@ class BundleError(Exception):
         return f"Cannot bundle `{self.reference}`: expected JSON Schema (object or boolean), got {to_json_type_name(self.value)}"
 
 
-@dataclass
 class Bundler:
     """Bundler tracks schema ids stored in a bundle."""
 
@@ -38,8 +36,6 @@ class Bundler:
         if isinstance(schema, bool):
             return schema
 
-        bundled = deepclone(schema)
-
         # Track visited URIs and their local definition names
         visited: set[str] = set()
         uri_to_def_name: dict[str, str] = {}
@@ -50,13 +46,18 @@ class Bundler:
 
         def get_def_name(uri: str) -> str:
             """Generate or retrieve the local definition name for a URI."""
-            if uri not in uri_to_def_name:
+            name = uri_to_def_name.get(uri)
+            if name is None:
                 self.counter += 1
-                uri_to_def_name[uri] = f"schema{self.counter}"
-            return uri_to_def_name[uri]
+                name = f"schema{self.counter}"
+                uri_to_def_name[uri] = name
+            return name
 
-        def bundle_recursive(current: JsonSchema | list[JsonSchema]) -> None:
+        def bundle_recursive(current: JsonSchema | list[JsonSchema]) -> JsonSchema | list[JsonSchema]:
             """Recursively process and bundle references in the current schema."""
+            # Local lookup is cheaper and it matters for large schemas.
+            # It works because this recursive call goes to every nested value
+            _bundle_recursive = bundle_recursive
             if isinstance(current, dict):
                 reference = current.get("$ref")
                 if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
@@ -85,33 +86,52 @@ class Bundler:
                             # This schema is either infinitely recursive or the sanitization logic misses it, in any
                             # event, we git up here
                             raise InfiniteRecursiveReference(reference)
-                        del current["$ref"]
-                        current.update(cloned)
+
+                        result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
+                        result.update(cloned)
+                        return result
                     elif resolved_uri not in visited:
                         # Bundle only new schemas
                         visit(resolved_uri)
 
-                        cloned = deepclone(resolved_schema)
-                        defs[def_name] = cloned
-
                         # Recursively bundle the embedded schema too!
                         resolver.push_scope(resolved_uri)
                         try:
-                            bundle_recursive(cloned)
+                            bundled_resolved = _bundle_recursive(resolved_schema)
                         finally:
                             resolver.pop_scope()
-                        current["$ref"] = f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
+
+                        defs[def_name] = bundled_resolved
+
+                        return {
+                            key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
+                            if key == "$ref"
+                            else _bundle_recursive(value)
+                            if isinstance(value, (dict, list))
+                            else value
+                            for key, value in current.items()
+                        }
                     else:
-                        current["$ref"] = f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
-
-                for value in current.values():
-                    bundle_recursive(value)
-
+                        # Already visited - just update $ref
+                        return {
+                            key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
+                            if key == "$ref"
+                            else _bundle_recursive(value)
+                            if isinstance(value, (dict, list))
+                            else value
+                            for key, value in current.items()
+                        }
+                return {
+                    key: _bundle_recursive(value) if isinstance(value, (dict, list)) else value
+                    for key, value in current.items()
+                }
             elif isinstance(current, list):
-                for item in current:
-                    bundle_recursive(item)
+                return [_bundle_recursive(item) if isinstance(item, (dict, list)) else item for item in current]  # type: ignore[misc]
+            return current
 
-        bundle_recursive(bundled)
+        bundled = bundle_recursive(schema)
+
+        assert isinstance(bundled, dict)
 
         if defs:
             bundled[BUNDLE_STORAGE_KEY] = defs
