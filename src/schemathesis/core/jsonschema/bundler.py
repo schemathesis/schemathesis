@@ -127,11 +127,20 @@ class Bundler:
                 }
             elif isinstance(current, list):
                 return [_bundle_recursive(item) if isinstance(item, (dict, list)) else item for item in current]  # type: ignore[misc]
-            return current
+            # `isinstance` guards won't let it happen
+            # Otherwise is present to make type checker happy
+            return current  # pragma: no cover
 
         bundled = bundle_recursive(schema)
 
         assert isinstance(bundled, dict)
+
+        if "$ref" in bundled and len(defs) == 1:
+            result = {key: value for key, value in bundled.items() if key != "$ref"}
+            for value in defs.values():
+                if isinstance(value, dict):
+                    result.update(value)
+            return result
 
         if defs:
             bundled[BUNDLE_STORAGE_KEY] = defs

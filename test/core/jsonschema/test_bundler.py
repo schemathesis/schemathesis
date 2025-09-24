@@ -25,13 +25,12 @@ DEFINITIONS = {
             DEFINITIONS,
             {"type": "string", "minLength": 1},
         ),
+        ({"$ref": "#/definitions/User"}, DEFINITIONS, USER),
         (
             {"$ref": "#/definitions/User"},
-            DEFINITIONS,
-            {
-                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
-                BUNDLE_STORAGE_KEY: {"schema1": USER},
-            },
+            {"definitions": {"User": True}},
+            # "Truthy" schema is equal to an empty one
+            {},
         ),
         (
             {
@@ -40,12 +39,7 @@ DEFINITIONS = {
                 "title": "User Schema",
             },
             DEFINITIONS,
-            {
-                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
-                "description": "A user",
-                "title": "User Schema",
-                BUNDLE_STORAGE_KEY: {"schema1": USER},
-            },
+            {"description": "A user", "title": "User Schema", **USER},
         ),
         (
             {
@@ -156,18 +150,13 @@ DEFINITIONS = {
                 },
             },
             {
-                "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
-                BUNDLE_STORAGE_KEY: {
-                    "schema1": {
+                "type": "object",
+                "properties": {
+                    "child": {
+                        # Inlined 1 level
+                        "properties": {},
                         "type": "object",
-                        "properties": {
-                            "child": {
-                                # Inlined 1 level
-                                "properties": {},
-                                "type": "object",
-                            },
-                        },
-                    }
+                    },
                 },
             },
         ),
