@@ -20,6 +20,14 @@ Schemathesis dev
 
      ✅ 1 passed
 
+=================================== WARNINGS ===================================
+
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - POST /test
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -31,6 +39,9 @@ Test Phases:
   ⏭  Coverage (disabled)
   ✅ Fuzzing
   ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
 
 Test cases:
   N generated, N passed

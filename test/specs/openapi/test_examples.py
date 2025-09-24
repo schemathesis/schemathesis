@@ -1043,7 +1043,7 @@ def test_external_value_network_error(ctx):
     ],
 )
 def test_empty_example(value, expected):
-    assert list(extract_inner_examples(value, value, None)) == expected
+    assert list(extract_inner_examples(value, None)) == expected
 
 
 def test_example_override():

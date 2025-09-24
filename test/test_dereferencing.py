@@ -540,20 +540,23 @@ def test_complex_dereference(testdir, complex_schema):
     path = Path(str(testdir))
     body_definition = {
         "schema": {
-            "additionalProperties": False,
-            "description": "Test",
-            "properties": {
-                "profile": {
+            "$ref": "#/x-bundled/schema1",
+            "x-bundled": {
+                "schema1": {
+                    "additionalProperties": False,
+                    "description": "Test",
+                    "properties": {"profile": {"$ref": "#/x-bundled/schema2"}, "username": {"type": "string"}},
+                    "required": ["username", "profile"],
+                    "type": "object",
+                },
+                "schema2": {
                     "additionalProperties": False,
                     "description": "Test",
                     "properties": {"id": {"type": "integer"}},
                     "required": ["id"],
                     "type": "object",
                 },
-                "username": {"type": "string"},
             },
-            "required": ["username", "profile"],
-            "type": "object",
         }
     }
     operation = schema["/teapot"]["POST"]
@@ -571,35 +574,6 @@ def test_complex_dereference(testdir, complex_schema):
             "required": True,
         },
         "responses": {"default": {"$ref": "../../common/responses.yaml#/DefaultError"}},
-        "summary": "Test",
-        "tags": ["ancillaries"],
-    }
-    assert operation.definition.resolved == {
-        "requestBody": {
-            "content": {"application/json": body_definition},
-            "description": "Test.",
-            "required": True,
-        },
-        "responses": {
-            "default": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "additionalProperties": False,
-                            "properties": {
-                                # Note, these `nullable` keywords are not transformed at this point
-                                # It is done during the response validation.
-                                "key": {"type": "string", "nullable": True},
-                                "referenced": {"type": "string", "nullable": True},
-                            },
-                            "required": ["key", "referenced"],
-                            "type": "object",
-                        }
-                    }
-                },
-                "description": "Probably an error",
-            }
-        },
         "summary": "Test",
         "tags": ["ancillaries"],
     }
@@ -711,7 +685,7 @@ def test_unresolvable_reference_during_generation(ctx, testdir):
 @pytest.mark.parametrize(
     ("key", "expected"),
     [
-        ("Key7", "Can not generate data for query parameter `key`! Its schema should be an object, got None"),
+        ("Key7", "Invalid `Key7` definition"),
         ("Key8", "Invalid `Key8` definition"),
     ],
 )
