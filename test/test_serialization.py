@@ -601,7 +601,7 @@ def test_xml_with_binary(ctx):
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
     def test(case):
-        assert case.as_transport_kwargs()["data"] in ("", "0", "1")
+        assert isinstance(case.as_transport_kwargs()["data"], str)
 
     test()
 

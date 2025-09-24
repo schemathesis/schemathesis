@@ -30,7 +30,7 @@ from requests.utils import check_header_validity
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InfiniteRecursiveReference, InternalError, InvalidSchema, OperationNotFound
+from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema import BundleError, Bundler
 from schemathesis.core.result import Err, Ok, Result
@@ -1000,25 +1000,14 @@ class OpenApi30(SwaggerV20):
         self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         files = []
-        definition = operation.definition.raw
-        if "$ref" in definition["requestBody"]:
-            self.resolver.push_scope(operation.definition.scope)
-            try:
-                body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
-            finally:
-                self.resolver.pop_scope()
-        else:
-            body = definition["requestBody"]
-        content = body["content"]
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
         # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
-        for media_type, entry in content.items():
-            main, sub = media_types.parse(media_type)
+        schema = {}
+        for body in operation.body:
+            main, sub = media_types.parse(body.media_type)
             if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
-                schema = entry.get("schema")
+                schema = body.definition.get("schema")
                 break
-        else:
-            raise InternalError("No 'multipart/form-data' media type found in the schema")
         for name, value in form_data.items():
             property_schema = (schema or {}).get("properties", {}).get(name)
             if property_schema:
