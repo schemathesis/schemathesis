@@ -86,23 +86,28 @@ def test_resolving_multiple_files():
     assert isinstance(body, OpenAPI20Body)
     assert body.media_type == "application/json"
     assert body.definition == {
-        "schema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "format": "int64"},
-                "username": {"type": "string"},
-                "firstName": {"type": "string"},
-                "lastName": {"type": "string"},
-                "email": {"type": "string"},
-                "password": {"type": "string"},
-                "phone": {"type": "string"},
-                "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
-            },
-            "xml": {"name": "User"},
-        },
         "in": "body",
         "name": "user",
         "required": True,
+        "schema": {
+            "$ref": "#/x-bundled/schema1",
+            "x-bundled": {
+                "schema1": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer", "format": "int64"},
+                        "username": {"type": "string"},
+                        "firstName": {"type": "string"},
+                        "lastName": {"type": "string"},
+                        "email": {"type": "string"},
+                        "password": {"type": "string"},
+                        "phone": {"type": "string"},
+                        "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
+                    },
+                    "xml": {"name": "User"},
+                }
+            },
+        },
     }
 
 
@@ -245,26 +250,6 @@ def test_get_operation_by_id_no_paths_on_openapi_3_1():
     schema = schemathesis.openapi.from_dict(raw_schema)
     with pytest.raises(OperationNotFound):
         schema.get_operation_by_id("getFoo")
-
-
-@pytest.mark.parametrize(
-    ("fixture", "path"),
-    [
-        ("simple_schema", "/users"),
-        ("simple_openapi", "/query"),
-    ],
-)
-def test_missing_payload_schema(request, fixture, path):
-    raw_schema = request.getfixturevalue(fixture)
-    schema = schemathesis.openapi.from_dict(raw_schema)
-    operation = schema[path]["GET"]
-    assert operation.get_raw_payload_schema("application/xml") is None
-    assert operation.get_resolved_payload_schema("application/xml") is None
-
-
-def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
-    schema = schemathesis.openapi.from_dict(open_api_3_schema_with_yaml_payload)
-    assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None
 
 
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")

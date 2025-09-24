@@ -154,14 +154,7 @@ def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any
 
 @WSGI_TRANSPORT.serializer("application/xml", "text/xml")
 def xml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
-    media_type = ctx.case.media_type
-
-    assert media_type is not None
-
-    raw_schema = ctx.case.operation.get_raw_payload_schema(media_type)
-    resolved_schema = ctx.case.operation.get_resolved_payload_schema(media_type)
-
-    return serialize_xml(value, raw_schema, resolved_schema)
+    return serialize_xml(ctx.case, value)
 
 
 @WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")

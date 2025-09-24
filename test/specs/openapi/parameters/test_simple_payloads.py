@@ -27,7 +27,10 @@ def test_payload_open_api_2(
     assert_parameters(
         schema,
         PayloadAlternatives(
-            [OpenAPI20Body(definition=open_api_2_user_in_body, media_type=value) for value in consumes]
+            [
+                OpenAPI20Body(definition=open_api_2_user_in_body, media_type=value, resource_name=None)
+                for value in consumes
+            ]
         ),
         # For each one the schema is extracted from the parameter definition and transformed to the proper JSON Schema
         [user_jsonschema] * len(consumes),
@@ -55,7 +58,9 @@ def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schem
         schema,
         PayloadAlternatives(
             [
-                OpenAPI30Body(definition={"schema": open_api_3_user}, media_type=media_type, required=True)
+                OpenAPI30Body(
+                    definition={"schema": open_api_3_user}, media_type=media_type, required=True, resource_name=None
+                )
                 for media_type in media_types
             ]
         ),

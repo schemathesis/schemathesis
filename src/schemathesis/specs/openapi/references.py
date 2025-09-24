@@ -2,21 +2,16 @@ from __future__ import annotations
 
 import sys
 from functools import lru_cache
-from typing import Any, Callable, Dict, Union, overload
+from typing import Any, Callable, Dict, Union
 from urllib.request import urlopen
 
 import requests
 
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.deserialization import deserialize_yaml
-from schemathesis.core.jsonschema import references
-from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
 from .converter import to_json_schema_recursive
-
-# Reference resolving will stop after this depth
-RECURSION_DEPTH_LIMIT = 100
 
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
@@ -71,42 +66,6 @@ class InliningResolver(RefResolver):
             except RefResolutionError as exc:
                 exc.__notes__ = [ref]
                 raise
-
-    @overload
-    def resolve_all(self, item: dict[str, Any], recursion_level: int = 0) -> dict[str, Any]: ...
-
-    @overload
-    def resolve_all(self, item: list, recursion_level: int = 0) -> list: ...
-
-    def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
-        """Recursively resolve all references in the given object."""
-        resolve = self.resolve_all
-        if isinstance(item, dict):
-            ref = item.get("$ref")
-            if isinstance(ref, str):
-                url, resolved = self.resolve(ref)
-                self.push_scope(url)
-                try:
-                    # If the next level of recursion exceeds the limit, then we need to copy it explicitly
-                    # In other cases, this method create new objects for mutable types (dict & list)
-                    next_recursion_level = recursion_level + 1
-                    if next_recursion_level > RECURSION_DEPTH_LIMIT:
-                        copied = deepclone(resolved)
-                        references.sanitize(copied)
-                        return copied
-                    return resolve(resolved, next_recursion_level)
-                finally:
-                    self.pop_scope()
-            return {
-                key: resolve(sub_item, recursion_level) if isinstance(sub_item, (dict, list)) else sub_item
-                for key, sub_item in item.items()
-            }
-        if isinstance(item, list):
-            return [
-                self.resolve_all(sub_item, recursion_level) if isinstance(sub_item, (dict, list)) else sub_item
-                for sub_item in item
-            ]
-        return item
 
     def resolve_in_scope(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any]]:
         scopes = [scope]

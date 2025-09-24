@@ -16,7 +16,6 @@ def operation(openapi_30):
         "PUT",
         OperationDefinition(
             {"requestBody": {"content": {"application/json": {"schema": {}}}}},
-            {"requestBody": {"content": {"application/json": {"schema": {}}}}},
             "",
         ),
         openapi_30,

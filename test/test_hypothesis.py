@@ -25,7 +25,7 @@ from test.utils import assert_requests_call
 
 
 def make_operation(schema, **kwargs) -> APIOperation:
-    return APIOperation("/users", "POST", definition=OperationDefinition({}, {}, "foo"), schema=schema, **kwargs)
+    return APIOperation("/users", "POST", definition=OperationDefinition({}, "foo"), schema=schema, **kwargs)
 
 
 @pytest.mark.parametrize("location", sorted(LOCATION_TO_CONTAINER))
@@ -38,7 +38,7 @@ def test_get_examples(location, swagger_20):
         media_type = "application/json"
         cls = PayloadAlternatives
         parameter_cls = OpenAPI20Body
-        kwargs = {"media_type": media_type}
+        kwargs = {"media_type": media_type, "resource_name": None}
         definition = {
             "in": location,
             "name": "name",
@@ -81,7 +81,7 @@ def test_no_body_in_get(swagger_20):
     operation = APIOperation(
         path="/api/success",
         method="GET",
-        definition=OperationDefinition({}, {}, "foo"),
+        definition=OperationDefinition({}, "foo"),
         schema=swagger_20,
         query=ParameterSet(
             [
@@ -211,6 +211,7 @@ def test_default_strategies_bytes(swagger_20):
                 OpenAPI20Body(
                     {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}},
                     media_type="text/plain",
+                    resource_name=None,
                 )
             ]
         ),
@@ -241,7 +242,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
     operation = APIOperation(
         "/api/success",
         "GET",
-        definition=OperationDefinition({}, {}, "foo"),
+        definition=OperationDefinition({}, "foo"),
         schema=swagger_20,
         base_url=openapi2_base_url,
         headers=ParameterSet([OpenAPI20Parameter(definition)]),

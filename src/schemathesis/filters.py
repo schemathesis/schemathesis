@@ -382,13 +382,13 @@ def expression_to_filter_function(expression: str) -> Callable[[HasAPIOperation]
     if op == "==":
 
         def filter_function(ctx: HasAPIOperation) -> bool:
-            definition = ctx.operation.definition.resolved
+            definition = ctx.operation.definition.raw
             resolved = resolve_pointer(definition, pointer)
             return resolved == value
     else:
 
         def filter_function(ctx: HasAPIOperation) -> bool:
-            definition = ctx.operation.definition.resolved
+            definition = ctx.operation.definition.raw
             resolved = resolve_pointer(definition, pointer)
             return resolved != value
 
