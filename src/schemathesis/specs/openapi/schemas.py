@@ -61,7 +61,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import ConvertingResolver, InliningResolver
+from .references import ConvertingResolver, ReferenceResolver, resolve_in_scope
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -415,9 +415,9 @@ class BaseOpenAPISchema(BaseSchema):
         return operation
 
     @property
-    def resolver(self) -> InliningResolver:
+    def resolver(self) -> ReferenceResolver:
         if not hasattr(self, "_resolver"):
-            self._resolver = InliningResolver(self.location or "", self.raw_schema)
+            self._resolver = ReferenceResolver(self.location or "", self.raw_schema)
         return self._resolver
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
@@ -513,7 +513,7 @@ class BaseOpenAPISchema(BaseSchema):
         definition = _get_response_definition_by_status(response.status_code, responses)
         if definition is None:
             return None
-        return self.resolver.resolve_in_scope(definition, operation.definition.scope)
+        return resolve_in_scope(self.resolver, definition, operation.definition.scope)
 
     def get_headers(
         self, operation: APIOperation, response: Response
@@ -616,9 +616,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     @contextmanager
     def _validating_response(self, scopes: list[str]) -> Generator[ConvertingResolver, None, None]:
-        resolver = ConvertingResolver(
-            self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
-        )
+        resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
         with in_scopes(resolver, scopes):
             yield resolver
 
@@ -790,7 +788,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return get_strategies_from_examples(operation, **kwargs)
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
+        scopes, definition = resolve_in_scope(self.resolver, definition, scope)
         schema = definition.get("schema")
         if not schema:
             return scopes, None
@@ -967,7 +965,7 @@ class OpenApi30(SwaggerV20):
         return collected
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
+        scopes, definition = resolve_in_scope(self.resolver, definition, scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object

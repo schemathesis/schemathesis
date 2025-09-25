@@ -6,7 +6,7 @@ import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
 from schemathesis.core.result import Err, Ok
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
-from schemathesis.specs.openapi.schemas import InliningResolver
+from schemathesis.specs.openapi.schemas import ReferenceResolver
 
 
 @pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
@@ -46,13 +46,13 @@ def test_open_api_specification(openapi_30):
 
 def test_resolver_cache(simple_schema, mocker):
     schema = schemathesis.openapi.from_dict(simple_schema)
-    spy = mocker.patch("schemathesis.specs.openapi.schemas.InliningResolver", wraps=InliningResolver)
+    spy = mocker.patch("schemathesis.specs.openapi.schemas.ReferenceResolver", wraps=ReferenceResolver)
     assert "_resolver" not in schema.__dict__
-    assert isinstance(schema.resolver, InliningResolver)
+    assert isinstance(schema.resolver, ReferenceResolver)
     assert spy.call_count == 1
     # Cached
     assert "_resolver" in schema.__dict__
-    assert isinstance(schema.resolver, InliningResolver)
+    assert isinstance(schema.resolver, ReferenceResolver)
     assert spy.call_count == 1
 
 
