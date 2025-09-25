@@ -10,6 +10,7 @@
 - Use default Hypothesis profile in to detect changed settings for stateful testing instead of the current one.
 - Prevent missing required header check for optional authorization in OpenAPI.
 - Properly close HAR files.
+- Avoid excessive memory consumption in resolved schemas. [#1697](https://github.com/schemathesis/schemathesis/issues/1697)
 
 ### :wrench: Changed
 

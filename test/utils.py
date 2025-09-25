@@ -13,7 +13,6 @@ import schemathesis
 from schemathesis import Case
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
-from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
@@ -49,7 +48,7 @@ def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
 
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict[str, Any]:
-    schema = deepclone(load_schema(schema_name))
+    schema = load_schema(schema_name)
     return merge_recursively(kwargs, schema)
 
 
