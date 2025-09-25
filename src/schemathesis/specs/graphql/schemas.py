@@ -83,6 +83,11 @@ class GraphQLOperationDefinition(OperationDefinition):
         return self.root_type == RootType.MUTATION
 
 
+class GraphQLResponses:
+    def find_by_status_code(self, status_code: int) -> None:
+        return None  # pragma: no cover
+
+
 @dataclass
 class GraphQLSchema(BaseSchema):
     def __repr__(self) -> str:
@@ -158,6 +163,7 @@ class GraphQLSchema(BaseSchema):
             label="",
             method="POST",
             schema=self,
+            responses=GraphQLResponses(),
             definition=None,  # type: ignore
         )
 
@@ -210,6 +216,7 @@ class GraphQLSchema(BaseSchema):
             method="POST",
             app=self.app,
             schema=self,
+            responses=GraphQLResponses(),
             # Parameters are not yet supported
             definition=GraphQLOperationDefinition(
                 raw=field,

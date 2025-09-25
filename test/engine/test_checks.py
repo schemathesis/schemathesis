@@ -32,7 +32,10 @@ CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig()
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:
-    return APIOperation("/path", "GET", definition=OperationDefinition(definition, ""), schema=schema).Case()
+    responses = schema._parse_responses(definition, "")
+    return APIOperation(
+        "/path", "GET", definition=OperationDefinition(definition, ""), schema=schema, responses=responses
+    ).Case()
 
 
 @pytest.fixture
@@ -239,7 +242,7 @@ def test_not_a_server_error(value, swagger_20, response_factory):
 def test_status_code_conformance_valid(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
-    case = make_case(swagger_20, {"responses": {"4XX"}})
+    case = make_case(swagger_20, {"responses": {"4XX": {}}})
     status_code_conformance(CTX, response, case)
 
 
@@ -247,7 +250,7 @@ def test_status_code_conformance_valid(value, swagger_20, response_factory):
 def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
-    case = make_case(swagger_20, {"responses": {"5XX"}})
+    case = make_case(swagger_20, {"responses": {"5XX": {}}})
     with pytest.raises(UndefinedStatusCode):
         status_code_conformance(CTX, response, case)
 
@@ -276,9 +279,8 @@ def test_invalid_schema_on_content_type_check(response_factory):
     operation = schema["/users"]["get"]
     case = operation.Case()
     response = response_factory.requests(content_type="application/json")
-    # Then an error should be risen
-    with pytest.raises(InvalidSchema):
-        content_type_conformance(CTX, response, case)
+    # Then there should be no error
+    content_type_conformance(CTX, response, case)
 
 
 def test_missing_content_type_header(case, response_factory):
@@ -429,7 +431,14 @@ def test_response_schema_conformance_yaml(openapi_30, response_factory):
     assert case.operation.is_valid_response(response)
 
 
-def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_factory):
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"success": True}, "required": ["success"]},
+        True,
+    ],
+)
+def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_factory, schema):
     response = Response.from_requests(response_factory.requests(content=b'{"success": true}'), True)
     case = make_case(
         openapi_30,
@@ -437,11 +446,7 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
             "responses": {
                 "default": {
                     "description": "text",
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "object", "properties": {"success": True}, "required": ["success"]}
-                        }
-                    },
+                    "content": {"application/json": {"schema": schema}},
                 }
             }
         },
@@ -502,6 +507,35 @@ def assert_no_media_types(response_factory, schema, definition):
     response = Response.from_requests(response_factory.requests(content_type=None, status_code=204), True)
     # Then there should be no errors
     assert response_schema_conformance(CTX, response, case) is None
+
+
+def test_response_conformance_unresolvable_file(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "put": {
+                    "responses": {
+                        "default": {
+                            "schema": {
+                                "$ref": "#/components/schemas/Unit",
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Unit": {
+                    "$ref": "./unknown.json",
+                }
+            }
+        },
+        version="2.0",
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=response_schema_conformance") == snapshot_cli
+    )
 
 
 @pytest.mark.parametrize("spec", ["swagger_20", "openapi_30"])
@@ -618,6 +652,18 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
             },
         ),
         (
+            "application/json",
+            b'{"value": "text"}',
+            {
+                "responses": {
+                    "default": {
+                        "description": "text",
+                        "content": {"application/json": {"schema": False}},
+                    }
+                }
+            },
+        ),
+        (
             "application/problem+json",
             b'{"random": "text"}',
             {
@@ -632,6 +678,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
     ],
 )
 def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, content, definition, response_factory):
+    openapi_30.raw_schema["openapi"] = "3.1.0"
     response = Response.from_requests(response_factory.requests(content=content, content_type=media_type), True)
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):

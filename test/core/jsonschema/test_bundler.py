@@ -210,17 +210,60 @@ DEFINITIONS = {
 )
 def test_bundle(schema, store, expected):
     resolver = RefResolver.from_schema(store)
-    assert bundle(schema, resolver) == expected
+    assert bundle(schema, resolver, inline_recursive=True) == expected
 
 
 def test_unresolvable_pointer():
     resolver = RefResolver.from_schema({})
     with pytest.raises(RefResolutionError):
-        bundle({"$ref": "#/definitions/NonExistent"}, resolver)
+        bundle({"$ref": "#/definitions/NonExistent"}, resolver, inline_recursive=True)
 
 
 def test_bundle_ref_resolves_to_none_error_message():
     resolver = RefResolver.from_schema({"definitions": {"User": None}})
     with pytest.raises(BundleError) as exc:
-        bundle({"$ref": "#/definitions/User"}, resolver)
+        bundle({"$ref": "#/definitions/User"}, resolver, inline_recursive=True)
     assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"
+
+
+def test_bundle_recursive_not_inlined():
+    # When recursive references are not inlined via inline_recursive=False
+    schema = {"$ref": "#/definitions/Node"}
+    store = {
+        "definitions": {
+            "Node": {
+                "type": "object",
+                "properties": {
+                    "child": {"$ref": "#/definitions/Node"},
+                },
+            }
+        },
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    assert bundle(schema, resolver, inline_recursive=False) == {
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        BUNDLE_STORAGE_KEY: {
+            "schema1": {
+                "type": "object",
+                "properties": {
+                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},  # Self-reference preserved
+                },
+            }
+        },
+    }
+
+
+def test_bundle_non_recursive_inlined():
+    # When non-recursive references are not inlined via inline_recursive=False
+    schema = {"$ref": "#/definitions/User"}
+    store = {
+        "definitions": {
+            "User": {"type": "object"},
+        },
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    assert bundle(schema, resolver, inline_recursive=False) == {"type": "object"}

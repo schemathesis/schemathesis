@@ -19,6 +19,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 from schemathesis import transport
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
+from schemathesis.core.adapter import ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
@@ -589,6 +590,7 @@ class PayloadAlternatives(ParameterSet[P]):
     """A set of alternative payloads."""
 
 
+R = TypeVar("R", bound=ResponsesContainer)
 D = TypeVar("D", bound=dict)
 
 
@@ -610,7 +612,7 @@ class OperationDefinition(Generic[D]):
 
 
 @dataclass()
-class APIOperation(Generic[P]):
+class APIOperation(Generic[P, R]):
     """An API operation (e.g., `GET /users`)."""
 
     # `path` does not contain `basePath`
@@ -620,6 +622,7 @@ class APIOperation(Generic[P]):
     method: str
     definition: OperationDefinition = field(repr=False)
     schema: BaseSchema
+    responses: R
     label: str = None  # type: ignore
     app: Any = None
     base_url: str | None = None
@@ -633,7 +636,7 @@ class APIOperation(Generic[P]):
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore
 
-    def __deepcopy__(self, memo: dict) -> APIOperation[P]:
+    def __deepcopy__(self, memo: dict) -> APIOperation[P, R]:
         return self
 
     def __hash__(self) -> int:

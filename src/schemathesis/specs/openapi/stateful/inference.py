@@ -215,7 +215,7 @@ class LinkInferencer:
         return relative_path if relative_path.startswith("/") else "/" + relative_path
 
     def inject_links(self, operation: dict[str, Any], entries: list[LocationHeaderEntry]) -> int:
-        from schemathesis.specs.openapi.schemas import _get_response_definition_by_status
+        from schemathesis.specs.openapi.adapter.responses import _find_by_status_code
 
         responses = operation.setdefault("responses", {})
         # To avoid unnecessary work, we need to skip entries that we know will produce already inferred links
@@ -239,7 +239,7 @@ class LinkInferencer:
                 continue
             seen.add(key)
             # Find the right bucket for the response status or create a new one
-            definition = _get_response_definition_by_status(entry.status_code, responses)
+            definition = _find_by_status_code(responses, entry.status_code)
             if definition is None:
                 definition = responses.setdefault(str(entry.status_code), {})
             links = definition.setdefault(self._links_field_name, {})

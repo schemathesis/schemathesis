@@ -40,17 +40,17 @@ from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
-from schemathesis.specs.openapi._adapter import prepare_parameters
+from schemathesis.specs.openapi import adapter
+from schemathesis.specs.openapi.adapter import OpenApiResponses, prepare_parameters
+from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.stateful import links
 from schemathesis.specs.openapi.types import v3
-from schemathesis.specs.openapi.utils import expand_status_code
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import serialization
 from ._hypothesis import openapi_cases
-from .converter import to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .parameters import (
@@ -61,7 +61,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import ConvertingResolver, ReferenceResolver, resolve_in_scope
+from .references import ConvertingResolver, ReferenceResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -115,6 +115,10 @@ class BaseOpenAPISchema(BaseSchema):
     def specification(self) -> Specification:
         raise NotImplementedError
 
+    @property
+    def adapter(self) -> SpecificationAdapter:
+        raise NotImplementedError
+
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
         return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
@@ -157,6 +161,7 @@ class BaseOpenAPISchema(BaseSchema):
                 label="",
                 definition=OperationDefinition(raw=None, scope=""),
                 schema=None,  # type: ignore
+                responses=None,  # type: ignore
             )
         ),
     ) -> bool:
@@ -372,6 +377,12 @@ class BaseOpenAPISchema(BaseSchema):
         """
         raise NotImplementedError
 
+    def _parse_responses(self, definition: dict[str, Any], scope: str) -> OpenApiResponses:
+        responses = definition.get("responses", {})
+        return OpenApiResponses.from_definition(
+            definition=responses, resolver=self.resolver, scope=scope, adapter=self.adapter
+        )
+
     def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         # The path item could be behind a reference
         # In this case, we need to resolve it to get the proper scope for reference inside the item.
@@ -390,13 +401,15 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> APIOperation:
         __tracebackhide__ = True
         base_url = self.get_base_url()
-        operation: APIOperation[OpenAPIParameter] = APIOperation(
+        responses = self._parse_responses(definition, scope)
+        operation: APIOperation[OpenAPIParameter, OpenApiResponses] = APIOperation(
             path=path,
             method=method,
             definition=OperationDefinition(definition, scope),
             base_url=base_url,
             app=self.app,
             schema=self,
+            responses=responses,
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
@@ -431,10 +444,6 @@ class BaseOpenAPISchema(BaseSchema):
     def get_security_requirements(self, operation: APIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
         return self.security.get_security_requirements(self.raw_schema, operation)
-
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        """Extract response schema from `responses`."""
-        raise NotImplementedError
 
     def get_operation_by_id(self, operation_id: str) -> APIOperation:
         """Get an `APIOperation` instance by its `operationId`."""
@@ -502,27 +511,14 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def _get_response_definitions(
-        self, operation: APIOperation, response: Response
-    ) -> tuple[list[str], dict[str, Any]] | None:
-        try:
-            responses = operation.definition.raw["responses"]
-        except KeyError as exc:
-            path = operation.path
-            self._raise_invalid_schema(exc, path, operation.method)
-        definition = _get_response_definition_by_status(response.status_code, responses)
-        if definition is None:
-            return None
-        return resolve_in_scope(self.resolver, definition, operation.definition.scope)
-
     def get_headers(
         self, operation: APIOperation, response: Response
     ) -> tuple[list[str], dict[str, dict[str, Any]] | None] | None:
-        resolved = self._get_response_definitions(operation, response)
-        if not resolved:
+        definition = operation.responses.find_by_status_code(response.status_code)
+        if definition is None:
             return None
-        scopes, definitions = resolved
-        return scopes, definitions.get("headers")
+        # TODO: It should be proper scopes / resolve it eagerly
+        return [], definition.definition.get("headers")
 
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
@@ -549,17 +545,14 @@ class BaseOpenAPISchema(BaseSchema):
 
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         __tracebackhide__ = True
-        responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
-        definition = _get_response_definition_by_status(response.status_code, responses)
-        if definition is None:
-            # No response defined for the received response status code
+        definition = operation.responses.find_by_status_code(response.status_code)
+        if definition is None or definition.schema is None:
+            # No definition for the given HTTP response, or missing "schema" in the matching definition
             return None
-        scopes, schema = self.get_response_schema(definition, operation.definition.scope)
-        if not schema:
-            # No schema to check against
-            return None
-        content_types = response.headers.get("content-type")
+
         failures: list[Failure] = []
+
+        content_types = response.headers.get("content-type")
         if content_types is None:
             all_media_types = self.get_content_types(operation, response)
             formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
@@ -569,6 +562,7 @@ class BaseOpenAPISchema(BaseSchema):
             content_type = "application/json"
         else:
             content_type = content_types[0]
+
         try:
             data = deserialization.deserialize_response(response, content_type)
         except JSONDecodeError as exc:
@@ -589,28 +583,27 @@ class BaseOpenAPISchema(BaseSchema):
             )
             _maybe_raise_one_or_more(failures)
             return None
-        with self._validating_response(scopes) as resolver:
-            try:
-                jsonschema.validate(
-                    data,
-                    schema,
-                    cls=self.validator_cls,
-                    resolver=resolver,
-                    # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
-                    format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+
+        try:
+            jsonschema.validate(
+                data,
+                definition.schema,
+                cls=self.validator_cls,
+                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
+                format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+            )
+        except jsonschema.SchemaError as exc:
+            raise InvalidSchema.from_jsonschema_error(
+                exc, path=operation.path, method=operation.method, config=self.config.output
+            ) from exc
+        except jsonschema.ValidationError as exc:
+            failures.append(
+                JsonSchemaError.from_exception(
+                    operation=operation.label,
+                    exc=exc,
+                    config=operation.schema.config.output,
                 )
-            except jsonschema.SchemaError as exc:
-                raise InvalidSchema.from_jsonschema_error(
-                    exc, path=operation.path, method=operation.method, config=self.config.output
-                ) from exc
-            except jsonschema.ValidationError as exc:
-                failures.append(
-                    JsonSchemaError.from_exception(
-                        operation=operation.label,
-                        exc=exc,
-                        config=operation.schema.config.output,
-                    )
-                )
+            )
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 
@@ -619,24 +612,6 @@ class BaseOpenAPISchema(BaseSchema):
         resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
         with in_scopes(resolver, scopes):
             yield resolver
-
-
-def _get_response_definition_by_status(status_code: int, responses: dict[str, Any]) -> dict[str, Any] | None:
-    # Cast to string, as integers are often there due to YAML deserialization
-    responses = {str(status): definition for status, definition in responses.items()}
-    if str(status_code) in responses:
-        return responses[str(status_code)]
-    # More specific should go first
-    keys = sorted(responses, key=lambda k: k.count("X"))
-    for key in keys:
-        if key == "default":
-            continue
-        status_codes = expand_status_code(key)
-        if status_code in status_codes:
-            return responses[key]
-    if "default" in responses:
-        return responses["default"]
-    return None
 
 
 def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
@@ -658,12 +633,7 @@ def in_scope(resolver: jsonschema.RefResolver, scope: str) -> Generator[None, No
 
 @contextmanager
 def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[None, None, None]:
-    """Push all available scopes into the resolver.
-
-    There could be an additional scope change during a schema resolving in `get_response_schema`, so in total there
-    could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
-    way.
-    """
+    """Push all available scopes into the resolver."""
     with ExitStack() as stack:
         for scope in scopes:
             stack.enter_context(in_scope(resolver, scope))
@@ -742,6 +712,10 @@ class SwaggerV20(BaseOpenAPISchema):
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
 
+    @property
+    def adapter(self) -> SpecificationAdapter:
+        return adapter.v2
+
     def collect_parameters(
         self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
     ) -> list[OpenAPIParameter]:
@@ -796,17 +770,6 @@ class SwaggerV20(BaseOpenAPISchema):
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
-
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = resolve_in_scope(self.resolver, definition, scope)
-        schema = definition.get("schema")
-        if not schema:
-            return scopes, None
-        # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-        # because it is not converted
-        return scopes, to_json_schema_recursive(
-            schema, self.nullable_name, is_response_schema=True, update_quantifiers=False
-        )
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         produces = operation.definition.raw.get("produces", None)
@@ -924,6 +887,10 @@ class OpenApi30(SwaggerV20):
             return urlsplit(url).path
         return "/"
 
+    @property
+    def adapter(self) -> SpecificationAdapter:
+        return adapter.v3
+
     def collect_parameters(
         self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
     ) -> list[OpenAPIParameter]:
@@ -965,7 +932,7 @@ class OpenApi30(SwaggerV20):
                         resource_name = _get_resource_name(schema["$ref"])
                     try:
                         to_bundle = cast(dict[str, Any], schema)
-                        bundled = Bundler().bundle(to_bundle, self.resolver)
+                        bundled = Bundler().bundle(to_bundle, self.resolver, inline_recursive=True)
                         content["schema"] = cast(v3.Schema, bundled)
                     except BundleError as exc:
                         raise InvalidSchema.from_bundle_error(exc, "body") from exc
@@ -974,29 +941,15 @@ class OpenApi30(SwaggerV20):
                 )
         return collected
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = resolve_in_scope(self.resolver, definition, scope)
-        options = iter(definition.get("content", {}).values())
-        option = next(options, None)
-        # "schema" is an optional key in the `MediaType` object
-        if option and "schema" in option:
-            # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-            # because it is not converted
-            return scopes, to_json_schema_recursive(
-                option["schema"], self.nullable_name, is_response_schema=True, update_quantifiers=False
-            )
-        return scopes, None
-
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
-        resolved = self._get_response_definitions(operation, response)
-        if not resolved:
+        definition = operation.responses.find_by_status_code(response.status_code)
+        if definition is None:
             return []
-        _, definitions = resolved
-        return list(definitions.get("content", {}).keys())
+        return list(definition.definition.get("content", {}).keys())
 
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return serialization.serialize_openapi3_parameters(definitions)

@@ -20,6 +20,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.references import resolve_in_scope
 from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
@@ -73,7 +74,7 @@ def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_strategies_from_examples(
-    operation: APIOperation[OpenAPIParameter], **kwargs: Any
+    operation: APIOperation[OpenAPIParameter, OpenApiResponses], **kwargs: Any
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = get_serializers_for_operation(operation)
@@ -100,7 +101,7 @@ def get_strategies_from_examples(
     ]
 
 
-def extract_top_level(operation: APIOperation[OpenAPIParameter]) -> Generator[Example, None, None]:
+def extract_top_level(operation: APIOperation[OpenAPIParameter, OpenApiResponses]) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
     from .schemas import BaseOpenAPISchema
 
@@ -263,7 +264,7 @@ def load_external_example(url: str) -> bytes:
     return response.content
 
 
-def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator[Example, None, None]:
+def extract_from_schemas(operation: APIOperation[OpenAPIParameter, OpenApiResponses]) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
@@ -304,7 +305,7 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter]) -> Generator
 
 def extract_from_schema(
     *,
-    operation: APIOperation[OpenAPIParameter],
+    operation: APIOperation[OpenAPIParameter, OpenApiResponses],
     schema: dict[str, Any],
     example_field_name: str,
     examples_field_name: str,

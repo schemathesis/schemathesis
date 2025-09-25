@@ -500,7 +500,14 @@ def test_register_check(new_check, cli, schema_url, snapshot_cli):
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, workers, snapshot_cli):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
-    operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
+    operation = APIOperation(
+        "/success",
+        "GET",
+        {},
+        swagger_20,
+        base_url=base_url,
+        responses=swagger_20._parse_responses({}, ""),
+    )
     original = operation.Case().call
     counter = 0
 

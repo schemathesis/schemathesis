@@ -11,6 +11,7 @@ from schemathesis.core.transport import Response
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
+from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
 from schemathesis.specs.openapi.parameters import OpenAPI30Body
@@ -40,6 +41,7 @@ def operation(openapi_30):
         "PUT",
         OperationDefinition(definition, ""),
         openapi_30,
+        responses=OpenApiResponses.from_definition({}, None, None, None),
         label="PUT /users/{user_id}",
         base_url="http://127.0.0.1:8080/api",
     )

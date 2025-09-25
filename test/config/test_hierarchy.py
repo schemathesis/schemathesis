@@ -21,6 +21,7 @@ def operation(openapi_30):
         openapi_30,
         label=LABEL,
         base_url="http://127.0.0.1:8080/api",
+        responses=openapi_30._parse_responses({}, ""),
     )
 
 

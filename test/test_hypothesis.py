@@ -25,7 +25,14 @@ from test.utils import assert_requests_call
 
 
 def make_operation(schema, **kwargs) -> APIOperation:
-    return APIOperation("/users", "POST", definition=OperationDefinition({}, "foo"), schema=schema, **kwargs)
+    return APIOperation(
+        "/users",
+        "POST",
+        definition=OperationDefinition({}, "foo"),
+        schema=schema,
+        responses=schema._parse_responses({}, ""),
+        **kwargs,
+    )
 
 
 @pytest.mark.parametrize("location", sorted(LOCATION_TO_CONTAINER))
@@ -83,6 +90,7 @@ def test_no_body_in_get(swagger_20):
         method="GET",
         definition=OperationDefinition({}, "foo"),
         schema=swagger_20,
+        responses=swagger_20._parse_responses({}, ""),
         query=ParameterSet(
             [
                 OpenAPI20Parameter(
@@ -244,6 +252,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         "GET",
         definition=OperationDefinition({}, "foo"),
         schema=swagger_20,
+        responses=swagger_20._parse_responses({}, ""),
         base_url=openapi2_base_url,
         headers=ParameterSet([OpenAPI20Parameter(definition)]),
     )

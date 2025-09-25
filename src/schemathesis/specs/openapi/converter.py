@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from itertools import chain
-from typing import Any, Callable
+from typing import Any, Callable, overload
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.transforms import deepclone, transform
@@ -107,11 +107,39 @@ def is_read_only(schema: dict[str, Any] | bool) -> bool:
     return schema.get("readOnly", False)
 
 
+@overload
 def to_json_schema_recursive(
-    schema: dict[str, Any], nullable_name: str, is_response_schema: bool = False, update_quantifiers: bool = True
-) -> dict[str, Any]:
+    schema: dict[str, Any],
+    nullable_name: str,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
+    clone: bool = True,
+) -> dict[str, Any]: ...  # pragma: no cover
+
+
+@overload
+def to_json_schema_recursive(
+    schema: bool,
+    nullable_name: str,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
+    clone: bool = True,
+) -> bool: ...  # pragma: no cover
+
+
+def to_json_schema_recursive(
+    schema: dict[str, Any] | bool,
+    nullable_name: str,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
+    clone: bool = True,
+) -> dict[str, Any] | bool:
+    if isinstance(schema, bool):
+        return schema
+    if clone:
+        schema = deepclone(schema)
     return transform(
-        deepclone(schema),
+        schema,
         to_json_schema,
         nullable_name=nullable_name,
         is_response_schema=is_response_schema,
