@@ -642,3 +642,132 @@ def test_duplicate_xml_attributes(ctx):
 
     serialized_data = case.as_transport_kwargs()["data"].decode("utf8")
     ElementTree.fromstring(serialized_data)
+
+
+def test_xml_with_referenced_property_schema(ctx):
+    # When a property references a subschema that contains XML configuration
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Main",
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Main": {
+                    "type": "object",
+                    "properties": {
+                        "id": {
+                            "$ref": "#/components/schemas/IdField",
+                        }
+                    },
+                    "xml": {"name": "Root"},
+                },
+                "IdField": {"type": "integer", "xml": {"name": "custom-id", "attribute": True}},
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body={"id": 42})
+
+    # Then the XML should use the configuration from the referenced schema
+    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
+    assert data == b'<Root custom-id="42"></Root>'
+
+
+def test_xml_with_referenced_array_items(ctx):
+    # When array items reference a subschema with XML configuration
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ItemList",
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "ItemList": {
+                    "type": "array",
+                    "items": {"$ref": "#/components/schemas/Item"},
+                    "xml": {"name": "items", "wrapped": True},
+                },
+                "Item": {"type": "integer", "xml": {"name": "item"}},
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body=[42, 43])
+
+    # Then the XML should use the referenced item configuration
+    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
+    assert data == b"<items><item>42</item><item>43</item></items>"
+
+
+def test_xml_with_nested_schema_references(ctx):
+    # When schemas reference other schemas that also contain references with XML config
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Container",
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Container": {
+                    "type": "object",
+                    "properties": {"user": {"$ref": "#/components/schemas/User"}},
+                    "xml": {"name": "container"},
+                },
+                "User": {
+                    "type": "object",
+                    "properties": {"profile": {"$ref": "#/components/schemas/Profile"}},
+                    "xml": {"name": "user-data"},
+                },
+                "Profile": {"type": "string", "xml": {"name": "user-profile", "attribute": True}},
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body={"user": {"profile": "admin"}})
+
+    # Then XML should resolve the entire reference chain correctly
+    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
+    assert data == b'<container><user-data user-profile="admin"></user-data></container>'
