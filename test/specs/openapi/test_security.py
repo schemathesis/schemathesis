@@ -2,7 +2,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.specs.openapi.references import InliningResolver
+from schemathesis.specs.openapi.references import ReferenceResolver
 from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
 
 
@@ -15,7 +15,7 @@ def test_ref_resolving():
         "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
         "components": {"securitySchemes": {"$ref": "#/components/HTTPSchema"}, "HTTPSchema": http_schema},
     }
-    resolver = InliningResolver("", schema)
+    resolver = ReferenceResolver("", schema)
     assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == http_schema
 
 
@@ -31,7 +31,7 @@ def test_ref_resolving_nested():
             "HTTPSchema": http_schema,
         },
     }
-    resolver = InliningResolver("", schema)
+    resolver = ReferenceResolver("", schema)
     assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == {"basic_auth": http_schema}
 
 
