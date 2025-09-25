@@ -771,3 +771,38 @@ def test_xml_with_nested_schema_references(ctx):
     # Then XML should resolve the entire reference chain correctly
     data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
     assert data == b'<container><user-data user-profile="admin"></user-data></container>'
+
+
+def test_xml_root_tag_from_reference_openapi2(ctx):
+    # When OpenAPI 2.0 schema references a definition for the request body
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "consumes": [
+                        "application/xml",
+                    ],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {"$ref": "#/definitions/UserProfile"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        definitions={
+            "UserProfile": {"type": "object", "properties": {"name": {"type": "string"}, "age": {"type": "integer"}}}
+        },
+        version="2.0",
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body={"name": "John", "age": 30}, media_type="application/xml")
+
+    # Then the root XML tag should be derived from the reference name "UserProfile"
+    data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
+    assert data == b"<UserProfile><name>John</name><age>30</age></UserProfile>"
