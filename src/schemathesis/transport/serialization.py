@@ -105,14 +105,13 @@ def _serialize_xml(value: Any, schema: dict[str, Any], resource_name: str | None
     if isinstance(value, (bytes, str)):
         return {"data": value}
     resolver = RefResolver.from_schema(schema)
-    # TODO: Pass resolver to inner parts - there could be `$ref` too!
     if "$ref" in schema:
         _, schema = resolver.resolve(schema["$ref"])
     tag = _get_xml_tag(schema, resource_name)
     buffer = StringIO()
     # Collect all namespaces to ensure that all child nodes with prefixes have proper namespaces in their parent nodes
     namespace_stack: list[str] = []
-    _write_xml(buffer, value, tag, schema, namespace_stack)
+    _write_xml(buffer, value, tag, schema, namespace_stack, resolver)
     data = buffer.getvalue()
     return {"data": data.encode("utf8")}
 
@@ -129,12 +128,17 @@ def _get_xml_tag(schema: dict[str, Any] | None, resource_name: str | None) -> st
 
 
 def _write_xml(
-    buffer: StringIO, value: JSON, tag: str, schema: dict[str, Any] | None, namespace_stack: list[str]
+    buffer: StringIO,
+    value: JSON,
+    tag: str,
+    schema: dict[str, Any] | None,
+    namespace_stack: list[str],
+    resolver: RefResolver,
 ) -> None:
     if isinstance(value, dict):
-        _write_object(buffer, value, tag, schema, namespace_stack)
+        _write_object(buffer, value, tag, schema, namespace_stack, resolver)
     elif isinstance(value, list):
-        _write_array(buffer, value, tag, schema, namespace_stack)
+        _write_array(buffer, value, tag, schema, namespace_stack, resolver)
     else:
         _write_primitive(buffer, value, tag, schema, namespace_stack)
 
@@ -159,7 +163,12 @@ def pop_namespace_if_any(namespace_stack: list[str], options: dict[str, Any]) ->
 
 
 def _write_object(
-    buffer: StringIO, obj: dict[str, JSON], tag: str, schema: dict[str, Any] | None, stack: list[str]
+    buffer: StringIO,
+    obj: dict[str, JSON],
+    tag: str,
+    schema: dict[str, Any] | None,
+    stack: list[str],
+    resolver: RefResolver,
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
@@ -176,6 +185,8 @@ def _write_object(
     properties = (schema or {}).get("properties", {})
     for child_name, value in obj.items():
         property_schema = properties.get(child_name, {})
+        if "$ref" in property_schema:
+            _, property_schema = resolver.resolve(property_schema["$ref"])
         child_options = property_schema.get("xml", {})
         push_namespace_if_any(stack, child_options)
         child_tag = child_options.get("name", child_name)
@@ -199,7 +210,7 @@ def _write_object(
             _validate_prefix(child_options, stack)
             prefix = child_options["prefix"]
             child_tag = f"{prefix}:{child_tag}"
-        _write_xml(children_buffer, value, child_tag, property_schema, stack)
+        _write_xml(children_buffer, value, child_tag, property_schema, stack, resolver)
         pop_namespace_if_any(stack, child_options)
 
     # Write namespace declarations for attributes
@@ -214,7 +225,9 @@ def _write_object(
     pop_namespace_if_any(stack, options)
 
 
-def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, Any] | None, stack: list[str]) -> None:
+def _write_array(
+    buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, Any] | None, stack: list[str], resolver: RefResolver
+) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
     if options.get("prefix"):
@@ -229,6 +242,8 @@ def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, 
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
     items = deepclone((schema or {}).get("items", {}))
+    if "$ref" in items:
+        _, items = resolver.resolve(items["$ref"])
     child_options = items.get("xml", {})
     child_tag = child_options.get("name", tag)
     if not is_namespace_specified and "namespace" in options:
@@ -238,7 +253,7 @@ def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, 
     items["xml"] = child_options
     _validate_prefix(child_options, stack)
     for item in obj:
-        _write_xml(buffer, item, child_tag, items, stack)
+        _write_xml(buffer, item, child_tag, items, stack, resolver)
     if wrapped:
         buffer.write(f"</{tag}>")
     pop_namespace_if_any(stack, options)
