@@ -10,8 +10,7 @@ import requests
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-
-from .converter import to_json_schema_recursive
+from schemathesis.specs.openapi.converter import to_json_schema_recursive
 
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
@@ -41,9 +40,7 @@ def load_remote_uri(uri: str) -> Any:
 JSONType = Union[None, bool, float, str, list, Dict[str, Any]]
 
 
-class InliningResolver(RefResolver):
-    """Inlines resolved schemas."""
-
+class ReferenceResolver(RefResolver):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault(
             "handlers", {"file": load_file_uri, "": load_file, "http": load_remote_uri, "https": load_remote_uri}
@@ -67,38 +64,33 @@ class InliningResolver(RefResolver):
                 exc.__notes__ = [ref]
                 raise
 
-    def resolve_in_scope(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any]]:
-        scopes = [scope]
-        # if there is `$ref` then we have a scope change that should be used during validation later to
-        # resolve nested references correctly
-        if "$ref" in definition:
-            self.push_scope(scope)
-            try:
-                new_scope, definition = self.resolve(definition["$ref"])
-            finally:
-                self.pop_scope()
-            scopes.append(new_scope)
-        return scopes, definition
+
+def resolve_in_scope(
+    resolver: ReferenceResolver, definition: dict[str, Any], scope: str
+) -> tuple[list[str], dict[str, Any]]:
+    scopes = [scope]
+    # if there is `$ref` then we have a scope change that should be used during validation later to
+    # resolve nested references correctly
+    if "$ref" in definition:
+        resolver.push_scope(scope)
+        try:
+            new_scope, definition = resolver.resolve(definition["$ref"])
+        finally:
+            resolver.pop_scope()
+        scopes.append(new_scope)
+    return scopes, definition
 
 
-class ConvertingResolver(InliningResolver):
-    """Convert resolved OpenAPI schemas to JSON Schema.
+class ConvertingResolver(ReferenceResolver):
+    """Convert resolved schemas to JSON Schema."""
 
-    When recursive schemas are validated we need to have resolved documents properly converted.
-    This approach is the simplest one, since this logic isolated in a single place.
-    """
-
-    def __init__(self, *args: Any, nullable_name: Any, is_response_schema: bool = False, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, nullable_name: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.nullable_name = nullable_name
-        self.is_response_schema = is_response_schema
 
     def resolve(self, ref: str) -> tuple[str, Any]:
         url, document = super().resolve(ref)
         document = to_json_schema_recursive(
-            document,
-            nullable_name=self.nullable_name,
-            is_response_schema=self.is_response_schema,
-            update_quantifiers=False,
+            document, nullable_name=self.nullable_name, is_response_schema=True, update_quantifiers=False
         )
         return url, document
