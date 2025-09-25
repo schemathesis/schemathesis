@@ -10,7 +10,7 @@ import schemathesis
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.generation.modes import GenerationMode
 
-from .utils import as_param, integer
+from .utils import as_param, get_schema_path, integer
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
 ELIDABLE_SCHEMA = {"description": "Test", "type": "object", "properties": {"foo": {"type": "integer"}}}
@@ -870,6 +870,38 @@ def test_iter_when_ref_resolves_to_none_in_body(ctx):
     )
 
     schema = schemathesis.openapi.from_dict(schema)
+
+    # Should not fail
+    for _ in schema.get_all_operations():
+        pass
+
+
+def test_resolve_large_schema():
+    path = get_schema_path("openapi3.json")
+    raw_schema = {
+        "openapi": "3.0.3",
+        "info": {"version": "1.0.0", "title": "My API", "description": "My HTTP interface."},
+        "paths": {
+            "/": {
+                "get": {
+                    "summary": "OpenAPI description (this document)",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/openapi+json": {
+                                    "schema": {
+                                        "$ref": Path(path).as_uri(),
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     # Should not fail
     for _ in schema.get_all_operations():
