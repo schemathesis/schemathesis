@@ -767,9 +767,19 @@ class SwaggerV20(BaseOpenAPISchema):
                 # We need to gather form parameters first before creating a composite parameter for them
                 form_parameters.append(parameter)
             elif parameter["in"] == "body":
+                # Take the original definition & extract the resource_name from there
+                resource_name = None
+                for param in definition["parameters"]:
+                    if "$ref" in param:
+                        _, param = self.resolver.resolve(param["$ref"])
+                    if param.get("in") == "body":
+                        if "$ref" in param["schema"]:
+                            resource_name = _get_resource_name(param["schema"]["$ref"])
+                # TODO: It is a corner case, but body could come from shared parameters. Fix it later
                 for media_type in body_media_types:
-                    # TODO: Add proper resource name
-                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type, resource_name=None))
+                    collected.append(
+                        OpenAPI20Body(definition=parameter, media_type=media_type, resource_name=resource_name)
+                    )
             else:
                 if parameter["in"] in ("header", "cookie"):
                     check_header(parameter)
