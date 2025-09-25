@@ -31,8 +31,9 @@ class Bundler:
     def __init__(self) -> None:
         self.counter = 0
 
-    def bundle(self, schema: JsonSchema, resolver: RefResolver) -> JsonSchema:
+    def bundle(self, schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> JsonSchema:
         """Bundle a JSON Schema by embedding all references."""
+        # Inlining recursive reference is required (for now) for data generation, but is unsound for data validation
         if isinstance(schema, bool):
             return schema
 
@@ -41,6 +42,7 @@ class Bundler:
         uri_to_def_name: dict[str, str] = {}
         defs = {}
 
+        has_recursive_references = False
         resolve = resolver.resolve
         visit = visited.add
 
@@ -57,6 +59,7 @@ class Bundler:
             """Recursively process and bundle references in the current schema."""
             # Local lookup is cheaper and it matters for large schemas.
             # It works because this recursive call goes to every nested value
+            nonlocal has_recursive_references
             _bundle_recursive = bundle_recursive
             if isinstance(current, dict):
                 reference = current.get("$ref")
@@ -67,7 +70,9 @@ class Bundler:
                         raise BundleError(reference, resolved_schema)
                     def_name = get_def_name(resolved_uri)
 
-                    if resolved_uri in resolver._scopes_stack:
+                    is_recursive_reference = resolved_uri in resolver._scopes_stack
+                    has_recursive_references |= is_recursive_reference
+                    if inline_recursive and is_recursive_reference:
                         # This is a recursive reference! As of Sep 2025, `hypothesis-jsonschema` does not support
                         # recursive references and Schemathesis has to remove them if possible.
                         #
@@ -137,7 +142,8 @@ class Bundler:
 
         assert isinstance(bundled, dict)
 
-        if "$ref" in bundled and len(defs) == 1:
+        # Inlining such a schema is only possible if recursive references were inlined
+        if (inline_recursive or not has_recursive_references) and "$ref" in bundled and len(defs) == 1:
             result = {key: value for key, value in bundled.items() if key != "$ref"}
             for value in defs.values():
                 if isinstance(value, dict):
@@ -149,5 +155,6 @@ class Bundler:
         return bundled
 
 
-def bundle(schema: JsonSchema, resolver: RefResolver) -> JsonSchema:
-    return Bundler().bundle(schema, resolver)
+def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> JsonSchema:
+    """Bundle a JSON Schema by embedding all references."""
+    return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
