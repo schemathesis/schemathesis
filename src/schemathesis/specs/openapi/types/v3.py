@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, TypedDict, Union
+from typing import Any, Mapping, TypedDict, Union
 
 from typing_extensions import NotRequired
 
+Reference = TypedDict("Reference", {"$ref": str})
+
 
 class Operation(TypedDict):
-    responses: dict[str, Response | Reference]
-    requestBody: RequestBodyOrRef
+    responses: Responses
+    requestBody: NotRequired[RequestBodyOrRef]
 
 
 class RequestBody(TypedDict):
@@ -20,11 +22,40 @@ class MediaType(TypedDict):
     example: Any
 
 
+class Example(TypedDict):
+    value: NotRequired[Any]
+    externalValue: NotRequired[str]
+
+
+class Link(TypedDict):
+    operationId: NotRequired[str]
+    operationRef: NotRequired[str]
+    parameters: NotRequired[dict[str, Any]]
+    requestBody: NotRequired[Any]
+    server: NotRequired[Any]
+
+
+class Header(TypedDict):
+    required: NotRequired[bool]
+
+
 class Response(TypedDict):
+    headers: NotRequired[dict[str, HeaderOrRef]]
+    content: NotRequired[dict[str, MediaType]]
+    links: NotRequired[dict[str, LinkOrRef]]
+
+
+_ResponsesBase = Mapping[str, Union[Response, Reference]]
+
+
+class Responses(_ResponsesBase):
     pass
 
 
 SchemaObject = TypedDict("SchemaObject", {"$ref": str})
 Schema = Union[SchemaObject, bool]
-Reference = TypedDict("Reference", {"$ref": str})
 RequestBodyOrRef = Union[RequestBody, Reference]
+ExampleOrRef = Union[Example, Reference]
+HeaderOrRef = Union[Header, Reference]
+LinkOrRef = Union[Link, Reference]
+ResponseOrRef = Union[Response, Reference]

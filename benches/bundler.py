@@ -20,7 +20,7 @@ def test_bundle_many_flat_references(benchmark):
 
     resolver = RefResolver.from_schema({"definitions": definitions})
 
-    benchmark(bundle, schema, resolver)
+    benchmark(bundle, schema, resolver, inline_recursive=True)
 
 
 @pytest.mark.benchmark
@@ -39,7 +39,7 @@ def test_bundle_deep_nested_references(benchmark):
 
     resolver = RefResolver.from_schema({"definitions": definitions})
 
-    benchmark(bundle, schema, resolver)
+    benchmark(bundle, schema, resolver, inline_recursive=True)
 
 
 @pytest.mark.benchmark
@@ -64,4 +64,4 @@ def test_bundle_duplicate_references(benchmark):
 
     resolver = RefResolver.from_schema({"definitions": definitions})
 
-    benchmark(bundle, schema, resolver)
+    benchmark(bundle, schema, resolver, inline_recursive=True)
