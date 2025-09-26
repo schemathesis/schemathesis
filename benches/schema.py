@@ -237,5 +237,5 @@ def test_links_count(raw_schema):
     ],
     ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
-def test_deepclone(schema):
-    deepclone(schema)
+def test_deepclone(benchmark, schema):
+    benchmark(deepclone, schema)
