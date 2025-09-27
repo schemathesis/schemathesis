@@ -1,6 +1,20 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Mapping, Union, overload
+from typing import Any, Callable, Dict, List, Mapping, TypeVar, Union, overload
+
+T = TypeVar("T")
+
+
+@overload
+def deepclone(value: dict) -> dict: ...  # pragma: no cover
+
+
+@overload
+def deepclone(value: list) -> list: ...  # pragma: no cover
+
+
+@overload
+def deepclone(value: T) -> T: ...  # pragma: no cover
 
 
 def deepclone(value: Any) -> Any:

@@ -21,7 +21,6 @@ def to_json_schema(
     NOTE. This function is applied to all keywords (including nested) during a schema resolving, thus it is not recursive.
     See a recursive version below.
     """
-    schema = deepclone(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
         bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
@@ -112,7 +111,7 @@ def to_json_schema_recursive(
     schema: dict[str, Any], nullable_name: str, is_response_schema: bool = False, update_quantifiers: bool = True
 ) -> dict[str, Any]:
     return transform(
-        schema,
+        deepclone(schema),
         to_json_schema,
         nullable_name=nullable_name,
         is_response_schema=is_response_schema,

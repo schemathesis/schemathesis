@@ -88,6 +88,8 @@ class Bundler:
                             raise InfiniteRecursiveReference(reference)
 
                         result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
+                        # Recursive references need `$ref` to be in them, which is only possible with `dict`
+                        assert isinstance(cloned, dict)
                         result.update(cloned)
                         return result
                     elif resolved_uri not in visited:
