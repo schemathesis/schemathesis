@@ -908,6 +908,64 @@ def test_header_conformance_definition_behind_ref(ctx, response_factory):
         response_headers_conformance(CTX, response, case)
 
 
+def test_header_conformance_schema_behind_ref(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {
+                                "X-RateLimit-Limit": {
+                                    "description": "Header",
+                                    "schema": {"$ref": "#/components/schemas/IntegerLimit"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "IntegerLimit": {"type": "integer", "maximum": 100},
+            },
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
+
+    response = Response.from_requests(response_factory.requests(headers={"X-RateLimit-Limit": "50"}), True)
+    assert response_headers_conformance(CTX, response, case) is None
+
+    response = Response.from_requests(response_factory.requests(headers={"X-RateLimit-Limit": "150"}), True)
+    with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+        response_headers_conformance(CTX, response, case)
+
+
+def test_header_conformance_no_headers_defined(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        }
+                    },
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
+    response = Response.from_requests(response_factory.requests(), True)
+
+    assert response_headers_conformance(CTX, response, case) is None
+
+
 MULTIPLE_HEADERS = {
     "/data": {
         "get": {
@@ -979,13 +1037,6 @@ def test_header_conformance_missing_and_invalid(ctx, response_factory):
         response_headers_conformance(CTX, response, case)
     assert (
         str(exc.value.exceptions[0])
-        == """Missing required headers
-
-The following required headers are missing from the response:
-- `X-RateLimit-Reset`"""
-    )
-    assert (
-        str(exc.value.exceptions[1])
         == """Response header does not conform to the schema
 
 150 is greater than the maximum of 100
@@ -1000,6 +1051,13 @@ Schema:
 Value:
 
     150"""
+    )
+    assert (
+        str(exc.value.exceptions[1])
+        == """Missing required headers
+
+The following required headers are missing from the response:
+- `X-RateLimit-Reset`"""
     )
 
 

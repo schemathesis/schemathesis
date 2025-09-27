@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterator, Mapping, TypeVar
+from typing import Any, ItemsView, Iterator, Mapping, TypeVar, cast
 
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
@@ -28,15 +28,16 @@ class OpenApiResponse:
     scope: str
     adapter: SpecificationAdapter
 
-    __slots__ = ("status_code", "definition", "resolver", "scope", "adapter", "_schema", "_validator")
+    __slots__ = ("status_code", "definition", "resolver", "scope", "adapter", "_schema", "_validator", "_headers")
 
     def __post_init__(self) -> None:
         self._schema: JsonSchema | None | NotSet = NOT_SET
         self._validator: Validator | NotSet = NOT_SET
+        self._headers: OpenApiResponseHeaders | NotSet = NOT_SET
 
     @property
     def schema(self) -> JsonSchema | None:
-        """The response body schema extracted from the definition.
+        """The response body schema extracted from its definition.
 
         Returns `None` if the response has no schema.
         """
@@ -63,6 +64,17 @@ class OpenApiResponse:
             )
         assert not isinstance(self._validator, NotSet)
         return self._validator
+
+    @property
+    def headers(self) -> OpenApiResponseHeaders:
+        """A collection of header definitions for this response."""
+        if self._headers is NOT_SET:
+            headers = self.definition.get("headers", {})
+            self._headers = OpenApiResponseHeaders(
+                dict(_iter_resolved_headers(headers, self.resolver, self.scope, self.adapter))
+            )
+        assert not isinstance(self._headers, NotSet)
+        return self._headers
 
 
 @dataclass
@@ -158,3 +170,88 @@ def _find_by_status_code(responses: dict[str, T], status_code: int) -> T | None:
             return responses[key]
     # The default response has the lowest priority
     return responses.get("default")
+
+
+@dataclass
+class OpenApiResponseHeaders:
+    """Collection of OpenAPI response header definitions."""
+
+    _inner: dict[str, OpenApiResponseHeader]
+
+    __slots__ = ("_inner",)
+
+    def __bool__(self) -> bool:
+        return bool(self._inner)
+
+    def items(self) -> ItemsView[str, OpenApiResponseHeader]:
+        return self._inner.items()
+
+
+@dataclass
+class OpenApiResponseHeader:
+    """OpenAPI response header definition."""
+
+    name: str
+    definition: Mapping[str, Any]
+    resolver: RefResolver
+    scope: str
+    adapter: SpecificationAdapter
+
+    __slots__ = ("name", "definition", "resolver", "scope", "adapter", "_schema", "_validator")
+
+    def __post_init__(self) -> None:
+        self._schema: JsonSchema | NotSet = NOT_SET
+        self._validator: Validator | NotSet = NOT_SET
+
+    @property
+    def is_required(self) -> bool:
+        return self.definition.get(self.adapter.header_required_keyword, False)
+
+    @property
+    def schema(self) -> JsonSchema:
+        """The header schema extracted from its definition."""
+        if self._schema is NOT_SET:
+            self._schema = self.adapter.extract_header_schema(
+                self.definition, self.resolver, self.scope, self.adapter.nullable_keyword
+            )
+        assert not isinstance(self._schema, NotSet)
+        return self._schema
+
+    @property
+    def validator(self) -> Validator:
+        """JSON Schema validator for this header."""
+        schema = self.schema
+        if self._validator is NOT_SET:
+            self.adapter.jsonschema_validator_cls.check_schema(schema)
+            self._validator = self.adapter.jsonschema_validator_cls(
+                schema,
+                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
+                format_checker=Draft202012Validator.FORMAT_CHECKER,
+                resolver=RefResolver.from_schema(schema),
+            )
+        assert not isinstance(self._validator, NotSet)
+        return self._validator
+
+
+def _iter_resolved_headers(
+    definition: types.v3.Headers, resolver: RefResolver, scope: str, adapter: SpecificationAdapter
+) -> Iterator[tuple[str, OpenApiResponseHeader]]:
+    for name, header in definition.items():
+        scope, resolved = maybe_resolve(header, resolver, scope)
+        yield (
+            name,
+            OpenApiResponseHeader(name=name, definition=resolved, resolver=resolver, scope=scope, adapter=adapter),
+        )
+
+
+def extract_header_schema_v2(
+    header: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
+) -> JsonSchema:
+    return _prepare_schema(cast(dict, header), resolver, scope, nullable_keyword)
+
+
+def extract_header_schema_v3(
+    header: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
+) -> JsonSchema:
+    schema = header.get("schema", {})
+    return _prepare_schema(schema, resolver, scope, nullable_keyword)

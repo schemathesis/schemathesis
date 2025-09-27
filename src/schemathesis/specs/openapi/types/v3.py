@@ -35,10 +35,6 @@ class Link(TypedDict):
     server: NotRequired[Any]
 
 
-class Header(TypedDict):
-    required: NotRequired[bool]
-
-
 class Response(TypedDict):
     headers: NotRequired[dict[str, HeaderOrRef]]
     content: NotRequired[dict[str, MediaType]]
@@ -49,6 +45,17 @@ _ResponsesBase = Mapping[str, Union[Response, Reference]]
 
 
 class Responses(_ResponsesBase):
+    pass
+
+
+class Header(TypedDict):
+    required: NotRequired[bool]
+
+
+_HeadersBase = Mapping[str, Union[Header, Reference]]
+
+
+class Headers(_HeadersBase):
     pass
 
 
