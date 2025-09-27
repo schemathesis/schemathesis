@@ -110,13 +110,10 @@ class BaseOpenAPISchema(BaseSchema):
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
     _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
+    adapter: SpecificationAdapter = None  # type: ignore
 
     @property
     def specification(self) -> Specification:
-        raise NotImplementedError
-
-    @property
-    def adapter(self) -> SpecificationAdapter:
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -537,12 +534,6 @@ class BaseOpenAPISchema(BaseSchema):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")
 
-    @property
-    def validator_cls(self) -> type[jsonschema.Validator]:
-        if self.specification.version.startswith("3.1"):
-            return jsonschema.Draft202012Validator
-        return jsonschema.Draft4Validator
-
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         __tracebackhide__ = True
         definition = operation.responses.find_by_status_code(response.status_code)
@@ -585,13 +576,7 @@ class BaseOpenAPISchema(BaseSchema):
             return None
 
         try:
-            jsonschema.validate(
-                data,
-                definition.schema,
-                cls=self.validator_cls,
-                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
-                format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
-            )
+            definition.validator.validate(data)
         except jsonschema.SchemaError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc, path=operation.path, method=operation.method, config=self.config.output
@@ -701,6 +686,10 @@ class SwaggerV20(BaseOpenAPISchema):
     links_field = "x-links"
     _path_parameter_template = {"in": "path", "required": True, "type": "string"}
 
+    def __post_init__(self) -> None:
+        self.adapter = adapter.v2
+        super().__post_init__()
+
     @property
     def specification(self) -> Specification:
         version = self.raw_schema.get("swagger", "2.0")
@@ -711,10 +700,6 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
-
-    @property
-    def adapter(self) -> SpecificationAdapter:
-        return adapter.v2
 
     def collect_parameters(
         self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
@@ -866,6 +851,13 @@ class OpenApi30(SwaggerV20):
     links_field = "links"
     _path_parameter_template = {"in": "path", "required": True, "schema": {"type": "string"}}
 
+    def __post_init__(self) -> None:
+        if self.specification.version.startswith("3.1"):
+            self.adapter = adapter.v3_0
+        else:
+            self.adapter = adapter.v3_1
+        BaseOpenAPISchema.__post_init__(self)
+
     @property
     def specification(self) -> Specification:
         version = self.raw_schema["openapi"]
@@ -886,10 +878,6 @@ class OpenApi30(SwaggerV20):
             url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
             return urlsplit(url).path
         return "/"
-
-    @property
-    def adapter(self) -> SpecificationAdapter:
-        return adapter.v3
 
     def collect_parameters(
         self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]

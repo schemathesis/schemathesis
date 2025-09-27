@@ -2310,7 +2310,7 @@ def _validate_serialized_items_are_negative(serialized_items, parameter, case):
 
     # Get the JSON schema for validation
     schema = parameter.as_json_schema()
-    validator = case.operation.schema.validator_cls(
+    validator = case.operation.schema.adapter.jsonschema_validator_cls(
         schema,
         format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
     )

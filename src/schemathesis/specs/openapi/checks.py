@@ -172,7 +172,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                     jsonschema.validate(
                         coerced,
                         schema,
-                        cls=case.operation.schema.validator_cls,
+                        cls=case.operation.schema.adapter.jsonschema_validator_cls,
                         resolver=resolver,
                         format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
                     )
@@ -334,9 +334,10 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     # This function is used to determine if negation is solely in the form of extra properties,
     # which are often ignored for backward-compatibility by the tested apps
     from ._hypothesis import get_schema_for_location
+    from .schemas import BaseOpenAPISchema
 
     meta = case.meta
-    if meta is None:
+    if meta is None or not isinstance(case.operation.schema, BaseOpenAPISchema):
         # Ignore manually created cases
         return False
     if (ComponentKind.BODY in meta.components and meta.components[ComponentKind.BODY].mode.is_negative) or (
@@ -345,7 +346,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     ):
         # Body or path negations always imply other negations
         return False
-    validator_cls = case.operation.schema.validator_cls  # type: ignore[attr-defined]
+    validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
     for container in (ComponentKind.QUERY, ComponentKind.HEADERS, ComponentKind.COOKIES):
         meta_for_location = meta.components.get(container)
         value = getattr(case, container.value)

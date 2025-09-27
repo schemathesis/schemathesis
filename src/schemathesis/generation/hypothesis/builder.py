@@ -536,7 +536,7 @@ def _iter_coverage_cases(
     seen_negative = coverage.HashSet()
     seen_positive = coverage.HashSet()
     assert isinstance(operation.schema, BaseOpenAPISchema)
-    validator_cls = operation.schema.validator_cls
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
 
     for parameter in operation.iter_parameters():
         location = parameter.location
