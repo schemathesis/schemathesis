@@ -78,9 +78,9 @@ class LinkInferencer:
     _operations: list[OperationReference]
     _base_url: str | None
     _base_path: str
-    _links_field_name: str
+    _links_keyword: str
 
-    __slots__ = ("_adapter", "_operations", "_base_url", "_base_path", "_links_field_name")
+    __slots__ = ("_adapter", "_operations", "_base_url", "_base_path", "_links_keyword")
 
     @classmethod
     def from_schema(cls, schema: BaseOpenAPISchema) -> LinkInferencer:
@@ -107,7 +107,7 @@ class LinkInferencer:
             _operations=operations,
             _base_url=schema.config.base_url,
             _base_path=schema.base_path,
-            _links_field_name=schema.links_field,
+            _links_keyword=schema.adapter.links_keyword,
         )
 
     def match(self, path: str) -> tuple[OperationReference, Mapping[str, str]] | None:
@@ -242,7 +242,7 @@ class LinkInferencer:
             definition = _find_by_status_code(responses, entry.status_code)
             if definition is None:
                 definition = responses.setdefault(str(entry.status_code), {})
-            links = definition.setdefault(self._links_field_name, {})
+            links = definition.setdefault(self._links_keyword, {})
 
             for idx, link in enumerate(self._build_links_from_matches(matches)):
                 links[f"X-Inferred-Link-{idx}"] = link

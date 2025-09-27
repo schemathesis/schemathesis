@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import itertools
 import string
-from collections import defaultdict
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from difflib import get_close_matches
@@ -43,7 +42,6 @@ from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses, prepare_parameters
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
-from schemathesis.specs.openapi.stateful import links
 from schemathesis.specs.openapi.types import v3
 
 from ...generation import GenerationMode
@@ -104,9 +102,7 @@ def get_template_fields(template: str) -> set[str]:
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
-    links_field: ClassVar[str] = ""
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
-    component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
     _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
     adapter: SpecificationAdapter = None  # type: ignore
 
@@ -183,7 +179,7 @@ class BaseOpenAPISchema(BaseSchema):
         resolve = self.resolver.resolve
         resolve_path_item = self._resolve_path_item
         should_skip = self._should_skip
-        links_field = self.links_field
+        links_keyword = self.adapter.links_keyword
 
         # For operationId lookup
         selected_operations_by_id: set[str] = set()
@@ -210,7 +206,7 @@ class BaseOpenAPISchema(BaseSchema):
                         for response in definition.get("responses", {}).values():
                             if "$ref" in response:
                                 _, response = resolve(response["$ref"])
-                            defined_links = response.get(links_field)
+                            defined_links = response.get(links_keyword)
                             if defined_links is not None:
                                 statistic.links.total += len(defined_links)
                                 if is_selected:
@@ -509,17 +505,6 @@ class BaseOpenAPISchema(BaseSchema):
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
 
-    def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
-        result: dict[str, dict[str, Any]] = defaultdict(dict)
-        for status_code, link in links.get_all_links(operation):
-            if isinstance(link, Ok):
-                name = link.ok().name
-            else:
-                name = link.err().name
-            result[status_code][name] = link
-
-        return result
-
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")
 
@@ -654,8 +639,6 @@ class SwaggerV20(BaseOpenAPISchema):
     example_field = "x-example"
     examples_field = "x-examples"
     security = SwaggerSecurityProcessor()
-    component_locations: ClassVar[tuple[tuple[str, ...], ...]] = (("definitions",),)
-    links_field = "x-links"
     _path_parameter_template = {"in": "path", "required": True, "type": "string"}
 
     def __post_init__(self) -> None:
@@ -817,8 +800,6 @@ class OpenApi30(SwaggerV20):
     example_field = "example"
     examples_field = "examples"
     security = OpenAPISecurityProcessor()
-    component_locations = (("components", "schemas"),)
-    links_field = "links"
     _path_parameter_template = {"in": "path", "required": True, "schema": {"type": "string"}}
 
     def __post_init__(self) -> None:

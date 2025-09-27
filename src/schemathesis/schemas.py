@@ -433,9 +433,6 @@ class BaseSchema(Mapping):
         """
         raise NotImplementedError
 
-    def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
-        raise NotImplementedError
-
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
@@ -649,10 +646,6 @@ class APIOperation(Generic[P, R]):
     @property
     def full_path(self) -> str:
         return self.schema.get_full_path(self.path)
-
-    @property
-    def links(self) -> dict[str, dict[str, Any]]:
-        return self.schema.get_links(self)
 
     @property
     def tags(self) -> list[str] | None:

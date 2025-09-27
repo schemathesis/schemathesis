@@ -6,14 +6,6 @@ from schemathesis.core.errors import InvalidStateMachine
 pytestmark = [pytest.mark.openapi_version("3.0")]
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_links_access(schema_url):
-    schema = schemathesis.openapi.from_url(schema_url)
-    links = schema["/users/"]["POST"].links["201"]
-    assert len(links) == 2
-    assert links["GetUserByUserId"].ok().name == "GetUserByUserId"
-
-
 def test_missing_operation(ctx):
     schema = ctx.openapi.build_schema(
         {
