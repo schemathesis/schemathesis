@@ -208,7 +208,12 @@ def _get_body_strategy(
     schema = parameter.as_json_schema()
     assert isinstance(operation.schema, BaseOpenAPISchema)
     strategy = strategy_factory(
-        schema, operation.label, "body", parameter.media_type, generation_config, operation.schema.validator_cls
+        schema,
+        operation.label,
+        "body",
+        parameter.media_type,
+        generation_config,
+        operation.schema.adapter.jsonschema_validator_cls,
     )
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
@@ -364,7 +369,12 @@ def get_parameters_strategy(
         else:
             assert isinstance(operation.schema, BaseOpenAPISchema)
             strategy = strategy_factory(
-                schema, operation.label, location, None, generation_config, operation.schema.validator_cls
+                schema,
+                operation.label,
+                location,
+                None,
+                generation_config,
+                operation.schema.adapter.jsonschema_validator_cls,
             )
             serialize = operation.get_parameter_serializer(location)
             if serialize is not None:
