@@ -99,6 +99,12 @@ class OpenApiResponses:
             dict(_iter_resolved_responses(definition=definition, resolver=resolver, scope=scope, adapter=adapter))
         )
 
+    @property
+    def status_codes(self) -> tuple[str, ...]:
+        """All defined status codes."""
+        # Defined as a tuple, so it can be used in a cache key
+        return tuple(self._inner)
+
     def find_by_status_code(self, status_code: int) -> OpenApiResponse | None:
         """Find the most specific response definition matching the given HTTP status code."""
         return _find_by_status_code(self._inner, status_code)
