@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ItemsView, Iterator, Mapping, TypeVar, cast
+from typing import Any, ItemsView, Iterator, Mapping, cast
 
 from jsonschema import Draft202012Validator
 from jsonschema.protocols import Validator
@@ -94,8 +94,11 @@ class OpenApiResponses:
     """Collection of OpenAPI response definitions."""
 
     _inner: dict[str, OpenApiResponse]
+    resolver: RefResolver
+    scope: str
+    adapter: SpecificationAdapter
 
-    __slots__ = ("_inner",)
+    __slots__ = ("_inner", "resolver", "scope", "adapter")
 
     @classmethod
     def from_definition(
@@ -104,11 +107,25 @@ class OpenApiResponses:
         """Build new collection of responses from their raw definition."""
         # TODO: Add also `v2` type
         return OpenApiResponses(
-            dict(_iter_resolved_responses(definition=definition, resolver=resolver, scope=scope, adapter=adapter))
+            dict(_iter_resolved_responses(definition=definition, resolver=resolver, scope=scope, adapter=adapter)),
+            resolver=resolver,
+            scope=scope,
+            adapter=adapter,
         )
 
     def items(self) -> ItemsView[str, OpenApiResponse]:
         return self._inner.items()
+
+    def add(self, status_code: str, definition: dict[str, Any]) -> OpenApiResponse:
+        instance = OpenApiResponse(
+            status_code=status_code,
+            definition=definition,
+            resolver=self.resolver,
+            scope=self.scope,
+            adapter=self.adapter,
+        )
+        self._inner[status_code] = instance
+        return instance
 
     @property
     def status_codes(self) -> tuple[str, ...]:
@@ -118,7 +135,21 @@ class OpenApiResponses:
 
     def find_by_status_code(self, status_code: int) -> OpenApiResponse | None:
         """Find the most specific response definition matching the given HTTP status code."""
-        return _find_by_status_code(self._inner, status_code)
+        responses = self._inner
+        # Full match has the highest priority
+        full_match = responses.get(str(status_code))
+        if full_match is not None:
+            return full_match
+        # Then, ones with wildcards
+        keys = sorted(responses, key=lambda k: k.count("X"))
+        for key in keys:
+            if key == "default":
+                continue
+            status_codes = expand_status_code(key)
+            if status_code in status_codes:
+                return responses[key]
+        # The default response has the lowest priority
+        return responses.get("default")
 
     def iter_examples(self) -> Iterator[tuple[str, object]]:
         """Iterate over all examples for all responses."""
@@ -176,26 +207,6 @@ def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> J
         raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
     finally:
         resolver.pop_scope()
-
-
-T = TypeVar("T")
-
-
-def _find_by_status_code(responses: dict[str, T], status_code: int) -> T | None:
-    # Full match has the highest priority
-    full_match = responses.get(str(status_code))
-    if full_match is not None:
-        return full_match
-    # Then, ones with wildcards
-    keys = sorted(responses, key=lambda k: k.count("X"))
-    for key in keys:
-        if key == "default":
-            continue
-        status_codes = expand_status_code(key)
-        if status_code in status_codes:
-            return responses[key]
-    # The default response has the lowest priority
-    return responses.get("default")
 
 
 @dataclass

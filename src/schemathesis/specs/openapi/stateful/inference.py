@@ -20,6 +20,8 @@ from urllib.parse import urlsplit
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, Rule
 
+from schemathesis.core.adapter import ResponsesContainer
+
 if TYPE_CHECKING:
     from schemathesis.engine.observations import LocationHeaderEntry
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -214,10 +216,7 @@ class LinkInferencer:
         relative_path = path[len(base_path) :]
         return relative_path if relative_path.startswith("/") else "/" + relative_path
 
-    def inject_links(self, operation: dict[str, Any], entries: list[LocationHeaderEntry]) -> int:
-        from schemathesis.specs.openapi.adapter.responses import _find_by_status_code
-
-        responses = operation.setdefault("responses", {})
+    def inject_links(self, responses: ResponsesContainer, entries: list[LocationHeaderEntry]) -> int:
         # To avoid unnecessary work, we need to skip entries that we know will produce already inferred links
         seen: set[SeenLinkKey] = set()
         injected = 0
@@ -239,10 +238,13 @@ class LinkInferencer:
                 continue
             seen.add(key)
             # Find the right bucket for the response status or create a new one
-            definition = _find_by_status_code(responses, entry.status_code)
-            if definition is None:
-                definition = responses.setdefault(str(entry.status_code), {})
-            links = definition.setdefault(self._links_keyword, {})
+            response = responses.find_by_status_code(entry.status_code)
+            links: dict[str, dict[str, dict]]
+            if response is None:
+                links = {}
+                responses.add(str(entry.status_code), {self._links_keyword: links})
+            else:
+                links = response.definition.setdefault(self._links_keyword, {})
 
             for idx, link in enumerate(self._build_links_from_matches(matches)):
                 links[f"X-Inferred-Link-{idx}"] = link
