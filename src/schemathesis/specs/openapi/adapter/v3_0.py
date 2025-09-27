@@ -3,6 +3,6 @@ from jsonschema import Draft4Validator
 from schemathesis.specs.openapi.adapter import responses
 from schemathesis.specs.openapi.adapter.protocol import ExtractResponseSchema
 
-nullable_keyword = "x-nullable"
-extract_response_schema: ExtractResponseSchema = responses.extract_response_schema_v2
+nullable_keyword = "nullable"
+extract_response_schema: ExtractResponseSchema = responses.extract_response_schema_v3
 jsonschema_validator_cls = Draft4Validator

@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterator, Mapping, TypeVar
 
+from jsonschema import Draft202012Validator
+from jsonschema.protocols import Validator
+
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InvalidSchema
@@ -25,10 +28,11 @@ class OpenApiResponse:
     scope: str
     adapter: SpecificationAdapter
 
-    __slots__ = ("status_code", "definition", "resolver", "scope", "adapter", "_schema")
+    __slots__ = ("status_code", "definition", "resolver", "scope", "adapter", "_schema", "_validator")
 
     def __post_init__(self) -> None:
         self._schema: JsonSchema | None | NotSet = NOT_SET
+        self._validator: Validator | NotSet = NOT_SET
 
     @property
     def schema(self) -> JsonSchema | None:
@@ -42,6 +46,22 @@ class OpenApiResponse:
             )
         assert not isinstance(self._schema, NotSet)
         return self._schema
+
+    @property
+    def validator(self) -> Validator | None:
+        """JSON Schema validator for this response."""
+        schema = self.schema
+        if schema is None:
+            return None
+        if self._validator is NOT_SET:
+            self.adapter.jsonschema_validator_cls.check_schema(schema)
+            self._validator = self.adapter.jsonschema_validator_cls(
+                schema,
+                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
+                format_checker=Draft202012Validator.FORMAT_CHECKER,
+            )
+        assert not isinstance(self._validator, NotSet)
+        return self._validator
 
 
 @dataclass
