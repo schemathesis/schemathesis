@@ -106,7 +106,7 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, OpenApiResponses
 
     assert isinstance(operation.schema, BaseOpenAPISchema)
 
-    responses = find_in_responses(operation)
+    responses = list(operation.responses.iter_examples())
     seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
@@ -444,74 +444,37 @@ def _produce_parameter_combinations(parameters: dict[str, dict[str, list]]) -> G
         }
 
 
-def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]]:
-    """Find schema examples in responses."""
-    output: dict[str, list[dict[str, Any]]] = {}
-    for status_code, response in operation.definition.raw.get("responses", {}).items():
-        if not str(status_code).startswith("2"):
-            # Check only 2xx responses
-            continue
-        if isinstance(response, dict) and "$ref" in response:
-            resolver = operation.schema.resolver  # type:ignore[attr-defined]
-            resolver.push_scope(operation.definition.scope)
-            try:
-                _, response = resolver.resolve(response["$ref"])
-            finally:
-                resolver.pop_scope()
-        for media_type, definition in response.get("content", {}).items():
-            schema_ref = definition.get("schema", {}).get("$ref")
-            if schema_ref:
-                name = schema_ref.split("/")[-1]
-            else:
-                name = f"{status_code}/{media_type}"
-            for examples_field, example_field in (
-                ("examples", "example"),
-                ("x-examples", "x-example"),
-            ):
-                examples = definition.get(examples_field, {})
-                if isinstance(examples, dict):
-                    for example in examples.values():
-                        if "value" in example:
-                            output.setdefault(name, []).append(example["value"])
-                elif isinstance(examples, list):
-                    output.setdefault(name, []).extend(examples)
-                if example_field in definition:
-                    output.setdefault(name, []).append(definition[example_field])
-    return output
-
-
 NOT_FOUND = object()
 
 
-def find_matching_in_responses(examples: dict[str, list], param: str) -> Iterator[Any]:
+def find_matching_in_responses(examples: list[tuple[str, object]], param: str) -> Iterator[Any]:
     """Find matching parameter examples."""
     normalized = param.lower()
     is_id_param = normalized.endswith("id")
     # Extract values from response examples that match input parameters.
     # E.g., for `GET /orders/{id}/`, use "id" or "orderId" from `Order` response
     # as examples for the "id" path parameter.
-    for schema_name, schema_examples in examples.items():
-        for example in schema_examples:
-            if not isinstance(example, dict):
-                continue
-            # Unwrapping example from `{"item": [{...}]}`
-            if isinstance(example, dict):
-                inner = next((value for key, value in example.items() if key.lower() == schema_name.lower()), None)
-                if inner is not None:
-                    if isinstance(inner, list):
-                        for sub_example in inner:
-                            if isinstance(sub_example, dict):
-                                for found in _find_matching_in_responses(
-                                    sub_example, schema_name, param, normalized, is_id_param
-                                ):
-                                    if found is not NOT_FOUND:
-                                        yield found
-                        continue
-                    if isinstance(inner, dict):
-                        example = inner
-            for found in _find_matching_in_responses(example, schema_name, param, normalized, is_id_param):
-                if found is not NOT_FOUND:
-                    yield found
+    for schema_name, example in examples:
+        if not isinstance(example, dict):
+            continue
+        # Unwrapping example from `{"item": [{...}]}`
+        if isinstance(example, dict):
+            inner = next((value for key, value in example.items() if key.lower() == schema_name.lower()), None)
+            if inner is not None:
+                if isinstance(inner, list):
+                    for sub_example in inner:
+                        if isinstance(sub_example, dict):
+                            for found in _find_matching_in_responses(
+                                sub_example, schema_name, param, normalized, is_id_param
+                            ):
+                                if found is not NOT_FOUND:
+                                    yield found
+                    continue
+                if isinstance(inner, dict):
+                    example = inner
+        for found in _find_matching_in_responses(example, schema_name, param, normalized, is_id_param):
+            if found is not NOT_FOUND:
+                yield found
 
 
 def _find_matching_in_responses(

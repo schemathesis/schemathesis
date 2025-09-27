@@ -11,6 +11,7 @@
 - Prevent missing required header check for optional authorization in OpenAPI.
 - Properly close HAR files.
 - Avoid excessive memory consumption in resolved schemas. [#1697](https://github.com/schemathesis/schemathesis/issues/1697)
+- Properly search for `examples` in Open API 2.0 responses.
 
 ### :wrench: Changed
 
