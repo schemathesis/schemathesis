@@ -1,6 +1,8 @@
 import re
 from urllib.parse import urlparse
 
+from schemathesis.core.errors import InvalidSchema
+
 # Adapted from http.client._is_illegal_header_value
 INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
 
@@ -27,6 +29,23 @@ def is_latin_1_encodable(value: object) -> bool:
         return True
     except UnicodeEncodeError:
         return False
+
+
+def check_header_name(name: str) -> None:
+    from requests.exceptions import InvalidHeader
+    from requests.utils import check_header_validity
+
+    if not name:
+        raise InvalidSchema("Header name should not be empty")
+    if not name.isascii():
+        # `urllib3` encodes header names to ASCII
+        raise InvalidSchema(f"Header name should be ASCII: {name}")
+    try:
+        check_header_validity((name, ""))
+    except InvalidHeader as exc:
+        raise InvalidSchema(str(exc)) from None
+    if bool(INVALID_HEADER_RE.search(name)):
+        raise InvalidSchema(f"Invalid header name: {name}")
 
 
 SURROGATE_PAIR_RE = re.compile(r"[\ud800-\udfff]")

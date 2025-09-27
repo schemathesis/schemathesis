@@ -971,6 +971,13 @@ def openapi_30():
 
 
 @pytest.fixture
+def openapi_31():
+    raw = make_schema("simple_openapi.yaml")
+    raw["openapi"] = "3.1.0"
+    return schemathesis.openapi.from_dict(raw)
+
+
+@pytest.fixture
 def app_schema(openapi_version, operations):
     return openapi._aiohttp.make_openapi_schema(operations=operations, version=openapi_version)
 
