@@ -4,23 +4,60 @@ from itertools import chain
 from typing import Any, Callable, overload
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
-from schemathesis.core.transforms import deepclone, transform
+from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.transforms import deepclone
+from schemathesis.specs.openapi.patterns import update_quantifier
 
-from .patterns import update_quantifier
+
+@overload
+def to_json_schema(
+    schema: dict[str, Any],
+    nullable_keyword: str,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
+    clone: bool = True,
+) -> dict[str, Any]: ...  # pragma: no cover
+
+
+@overload
+def to_json_schema(
+    schema: bool,
+    nullable_keyword: str,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
+    clone: bool = True,
+) -> bool: ...  # pragma: no cover
 
 
 def to_json_schema(
-    schema: dict[str, Any],
+    schema: dict[str, Any] | bool,
+    nullable_keyword: str,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
+    clone: bool = True,
+) -> dict[str, Any] | bool:
+    if isinstance(schema, bool):
+        return schema
+    if clone:
+        schema = deepclone(schema)
+    return _to_json_schema(
+        schema,
+        nullable_keyword=nullable_keyword,
+        is_response_schema=is_response_schema,
+        update_quantifiers=update_quantifiers,
+    )
+
+
+def _to_json_schema(
+    schema: JsonSchema,
     *,
     nullable_keyword: str,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
-) -> dict[str, Any]:
-    """Convert Open API parameters to JSON Schema.
+) -> JsonSchema:
+    if isinstance(schema, bool):
+        return schema
 
-    NOTE. This function is applied to all keywords (including nested) during a schema resolving, thus it is not recursive.
-    See a recursive version below.
-    """
     if schema.get(nullable_keyword) is True:
         del schema[nullable_keyword]
         bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
@@ -55,7 +92,68 @@ def to_json_schema(
         else:
             # Read-only properties should not occur in requests
             rewrite_properties(schema, is_read_only)
+
+    for keyword, value in schema.items():
+        if keyword in IN_VALUE and isinstance(value, dict):
+            schema[keyword] = _to_json_schema(
+                value,
+                nullable_keyword=nullable_keyword,
+                is_response_schema=is_response_schema,
+                update_quantifiers=update_quantifiers,
+            )
+        elif keyword in IN_ITEM and isinstance(value, list):
+            for idx, subschema in enumerate(value):
+                value[idx] = _to_json_schema(
+                    subschema,
+                    nullable_keyword=nullable_keyword,
+                    is_response_schema=is_response_schema,
+                    update_quantifiers=update_quantifiers,
+                )
+        elif keyword in IN_CHILD and isinstance(value, dict):
+            for name, subschema in value.items():
+                value[name] = _to_json_schema(
+                    subschema,
+                    nullable_keyword=nullable_keyword,
+                    is_response_schema=is_response_schema,
+                    update_quantifiers=update_quantifiers,
+                )
+
     return schema
+
+
+IN_VALUE = frozenset(
+    (
+        "additionalProperties",
+        "contains",
+        "contentSchema",
+        "else",
+        "if",
+        "items",
+        "not",
+        "propertyNames",
+        "then",
+        "unevaluatedItems",
+        "unevaluatedProperties",
+    )
+)
+IN_ITEM = frozenset(
+    (
+        "allOf",
+        "anyOf",
+        "oneOf",
+    )
+)
+IN_CHILD = frozenset(
+    (
+        "prefixItems",
+        "$defs",
+        "definitions",
+        "dependentSchemas",
+        "patternProperties",
+        "properties",
+        BUNDLE_STORAGE_KEY,
+    )
+)
 
 
 def update_pattern_in_schema(schema: dict[str, Any]) -> None:
@@ -105,43 +203,3 @@ def is_read_only(schema: dict[str, Any] | bool) -> bool:
     if isinstance(schema, bool):
         return False
     return schema.get("readOnly", False)
-
-
-@overload
-def to_json_schema_recursive(
-    schema: dict[str, Any],
-    nullable_keyword: str,
-    is_response_schema: bool = False,
-    update_quantifiers: bool = True,
-    clone: bool = True,
-) -> dict[str, Any]: ...  # pragma: no cover
-
-
-@overload
-def to_json_schema_recursive(
-    schema: bool,
-    nullable_keyword: str,
-    is_response_schema: bool = False,
-    update_quantifiers: bool = True,
-    clone: bool = True,
-) -> bool: ...  # pragma: no cover
-
-
-def to_json_schema_recursive(
-    schema: dict[str, Any] | bool,
-    nullable_keyword: str,
-    is_response_schema: bool = False,
-    update_quantifiers: bool = True,
-    clone: bool = True,
-) -> dict[str, Any] | bool:
-    if isinstance(schema, bool):
-        return schema
-    if clone:
-        schema = deepclone(schema)
-    return transform(
-        schema,
-        to_json_schema,
-        nullable_keyword=nullable_keyword,
-        is_response_schema=is_response_schema,
-        update_quantifiers=update_quantifiers,
-    )

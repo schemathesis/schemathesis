@@ -14,7 +14,7 @@ from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
-from schemathesis.specs.openapi.converter import to_json_schema_recursive
+from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.utils import expand_status_code
 
 
@@ -137,9 +137,7 @@ def extract_response_schema_v3(
 def _prepare_schema(schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str) -> JsonSchema:
     schema = _bundle_in_scope(schema, resolver, scope)
     # Do not clone the schema, as bundling already does it
-    return to_json_schema_recursive(
-        schema, nullable_keyword, is_response_schema=True, update_quantifiers=False, clone=False
-    )
+    return to_json_schema(schema, nullable_keyword, is_response_schema=True, update_quantifiers=False, clone=False)
 
 
 def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> JsonSchema:

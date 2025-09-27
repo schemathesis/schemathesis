@@ -198,12 +198,16 @@ def test_get_operation_by_reference_repeatedly(schema, key):
     _ = schema.get_operation_by_reference(key)
 
 
-@pytest.mark.benchmark
-@pytest.mark.parametrize("operations", [BBCI_OPERATIONS, VMWARE_OPERATIONS], ids=("bbci", "vmware"))
-def test_as_json_schema(operations):
+def _as_jsonschema(operations):
     for operation in operations:
         for parameter in operation.ok().iter_parameters():
             _ = parameter.as_json_schema()
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("operations", [BBCI_OPERATIONS, VMWARE_OPERATIONS], ids=("bbci", "vmware"))
+def test_as_json_schema(operations, benchmark):
+    benchmark(_as_jsonschema, operations)
 
 
 @pytest.mark.benchmark

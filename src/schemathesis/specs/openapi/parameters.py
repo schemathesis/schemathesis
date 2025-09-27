@@ -7,7 +7,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.schemas import Parameter
 
-from .converter import to_json_schema_recursive
+from .converter import to_json_schema
 
 
 @dataclass(eq=False)
@@ -16,7 +16,7 @@ class OpenAPIParameter(Parameter):
 
     example_field: ClassVar[str]
     examples_field: ClassVar[str]
-    nullable_field: ClassVar[str]
+    nullable_keyword: ClassVar[str]
     supported_jsonschema_keywords: ClassVar[tuple[str, ...]]
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
@@ -66,7 +66,7 @@ class OpenAPIParameter(Parameter):
 
     def transform_keywords(self, schema: dict[str, Any], *, update_quantifiers: bool = True) -> dict[str, Any]:
         """Transform Open API specific keywords into JSON Schema compatible form."""
-        definition = to_json_schema_recursive(schema, self.nullable_field, update_quantifiers=update_quantifiers)
+        definition = to_json_schema(schema, self.nullable_keyword, update_quantifiers=update_quantifiers)
         # Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly, we
         # can achieve significant performance improvements for such cases.
         # For reference (my machine) - running a single test with 100 examples with the resulting strategy:
@@ -84,7 +84,7 @@ class OpenAPIParameter(Parameter):
             key: value
             for key, value in open_api_schema.items()
             # Allow only supported keywords or vendor extensions
-            if key in self.supported_jsonschema_keywords or key.startswith("x-") or key == self.nullable_field
+            if key in self.supported_jsonschema_keywords or key.startswith("x-") or key == self.nullable_keyword
         }
 
 
@@ -97,7 +97,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
 
     example_field = "x-example"
     examples_field = "x-examples"
-    nullable_field = "x-nullable"
+    nullable_keyword = "x-nullable"
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/2.0.md#parameterObject
     # Excluding informative keywords - `title`, `description`, `default`.
     # `required` is not included because it has a different meaning here. It determines whether or not this parameter
@@ -136,7 +136,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
 
     example_field = "example"
     examples_field = "examples"
-    nullable_field = "nullable"
+    nullable_keyword = "nullable"
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#schema-object
     # Excluding informative keywords - `title`, `description`, `default`.
     # In contrast with Open API 2.0 non-body parameters, in Open API 3.0, all parameters have the `schema` keyword.
