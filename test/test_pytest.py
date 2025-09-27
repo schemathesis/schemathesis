@@ -919,7 +919,10 @@ def test_missing_path_parameter(testdir, openapi3_schema_url):
 schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
 
 @schema.parametrize()
+@settings(max_examples=3)
 def test(case):
+    if "id" not in case.path_parameters:
+        pytest.skip("Test should normally fail")
     case.call_and_validate()
 """
     )

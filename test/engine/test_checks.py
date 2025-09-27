@@ -438,10 +438,10 @@ def test_response_schema_conformance_yaml(openapi_30, response_factory):
         True,
     ],
 )
-def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_factory, schema):
+def test_response_schema_conformance_openapi_31_boolean(openapi_31, response_factory, schema):
     response = Response.from_requests(response_factory.requests(content=b'{"success": true}'), True)
     case = make_case(
-        openapi_30,
+        openapi_31,
         {
             "responses": {
                 "default": {
@@ -451,7 +451,6 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
             }
         },
     )
-    openapi_30.raw_schema["openapi"] = "3.1.0"
     assert response_schema_conformance(CTX, response, case) is None
     assert case.operation.is_valid_response(response)
 
@@ -677,10 +676,9 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
         ),
     ],
 )
-def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, content, definition, response_factory):
-    openapi_30.raw_schema["openapi"] = "3.1.0"
+def test_response_schema_conformance_invalid_openapi(openapi_31, media_type, content, definition, response_factory):
     response = Response.from_requests(response_factory.requests(content=content, content_type=media_type), True)
-    case = make_case(openapi_30, definition)
+    case = make_case(openapi_31, definition)
     with pytest.raises(AssertionError):
         response_schema_conformance(CTX, response, case)
     assert not case.operation.is_valid_response(response)

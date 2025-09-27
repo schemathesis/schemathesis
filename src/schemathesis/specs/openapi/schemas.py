@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import itertools
 import string
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from difflib import get_close_matches
+from functools import cached_property, lru_cache
 from json import JSONDecodeError
 from types import SimpleNamespace
 from typing import (
@@ -13,36 +13,31 @@ from typing import (
     Callable,
     ClassVar,
     Generator,
-    Iterable,
     Iterator,
     Mapping,
     NoReturn,
+    Sequence,
     cast,
 )
 from urllib.parse import urlsplit
 
 import jsonschema
 from packaging import version
-from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
-from requests.utils import check_header_validity
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
-from schemathesis.core.jsonschema import BundleError, Bundler
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
-from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi import adapter
-from schemathesis.specs.openapi.adapter import OpenApiResponses, prepare_parameters
+from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
-from schemathesis.specs.openapi.types import v3
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -51,14 +46,7 @@ from . import serialization
 from ._hypothesis import openapi_cases
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
-from .parameters import (
-    OpenAPI20Body,
-    OpenAPI20CompositeBody,
-    OpenAPI20Parameter,
-    OpenAPI30Body,
-    OpenAPI30Parameter,
-    OpenAPIParameter,
-)
+from .parameters import OpenAPI20CompositeBody, OpenAPIParameter
 from .references import ReferenceResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
@@ -74,21 +62,7 @@ SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI spe
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
 
-def check_header(parameter: dict[str, Any]) -> None:
-    name = parameter["name"]
-    if not name:
-        raise InvalidSchema("Header name should not be empty")
-    if not name.isascii():
-        # `urllib3` encodes header names to ASCII
-        raise InvalidSchema(f"Header name should be ASCII: {name}")
-    try:
-        check_header_validity((name, ""))
-    except InvalidHeader as exc:
-        raise InvalidSchema(str(exc)) from None
-    if bool(INVALID_HEADER_RE.search(name)):
-        raise InvalidSchema(f"Invalid header name: {name}")
-
-
+@lru_cache()
 def get_template_fields(template: str) -> set[str]:
     """Extract named placeholders from a string template."""
     try:
@@ -116,6 +90,10 @@ class BaseOpenAPISchema(BaseSchema):
 
     def __iter__(self) -> Iterator[str]:
         return iter(self.raw_schema.get("paths", {}))
+
+    @cached_property
+    def default_media_types(self) -> list[str]:
+        raise NotImplementedError
 
     def _get_operation_map(self, path: str) -> APIOperationMap:
         path_item = self.raw_schema.get("paths", {})[path]
@@ -255,14 +233,6 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 continue
 
-    def _collect_operation_parameters(
-        self, path_item: Mapping[str, Any], operation: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        bundler = Bundler()
-        shared_parameters = list(prepare_parameters(path_item, resolver=self.resolver, bundler=bundler))
-        parameters = list(prepare_parameters(operation, resolver=self.resolver, bundler=bundler))
-        return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
-
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
@@ -294,7 +264,7 @@ class BaseOpenAPISchema(BaseSchema):
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
         should_skip = self._should_skip
-        collect_parameters = self.collect_parameters
+        iter_parameters = self._iter_parameters
         make_operation = self.make_operation
         for path, path_item in paths.items():
             method = None
@@ -302,16 +272,14 @@ class BaseOpenAPISchema(BaseSchema):
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
                 with in_scope(self.resolver, scope):
-                    bundler = Bundler()
-                    shared_parameters = list(prepare_parameters(path_item, resolver=self.resolver, bundler=bundler))
+                    shared_parameters = path_item.get("parameters", [])
                     for method, entry in path_item.items():
                         if method not in HTTP_METHODS:
                             continue
                         try:
                             if should_skip(path, method, entry):
                                 continue
-                            raw_parameters = list(prepare_parameters(entry, resolver=self.resolver, bundler=bundler))
-                            parameters = collect_parameters(itertools.chain(raw_parameters, shared_parameters), entry)
+                            parameters = iter_parameters(entry, shared_parameters)
                             operation = make_operation(
                                 path,
                                 method,
@@ -358,15 +326,12 @@ class BaseOpenAPISchema(BaseSchema):
     def _validate(self) -> None:
         raise NotImplementedError
 
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
+    def _iter_parameters(
+        self, definition: dict[str, Any], shared_parameters: Sequence[dict[str, Any]]
     ) -> list[OpenAPIParameter]:
-        """Collect Open API parameters.
-
-        They should be used uniformly during the generation step; therefore, we need to convert them into
-        a spec-independent list of parameters.
-        """
-        raise NotImplementedError
+        return list(
+            self.adapter.iter_parameters(definition, shared_parameters, self.default_media_types, self.resolver)
+        )
 
     def _parse_responses(self, definition: dict[str, Any], scope: str) -> OpenApiResponses:
         responses = definition.get("responses", {})
@@ -390,6 +355,8 @@ class BaseOpenAPISchema(BaseSchema):
         definition: dict[str, Any],
         scope: str,
     ) -> APIOperation:
+        from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
+
         __tracebackhide__ = True
         base_url = self.get_base_url()
         responses = self._parse_responses(definition, scope)
@@ -410,8 +377,11 @@ class BaseOpenAPISchema(BaseSchema):
         }
         for name in missing_parameter_names:
             definition = {"name": name, INJECTED_PATH_PARAMETER_KEY: True, **deepclone(self._path_parameter_template)}
-            for parameter in self.collect_parameters([definition], definition):
-                operation.add_parameter(parameter)
+            # TODO: fix this hack
+            if isinstance(self, OpenApi30):
+                operation.add_parameter(OpenAPI30Parameter(definition))
+            else:
+                operation.add_parameter(OpenAPI20Parameter(definition))
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
             self.security.process_definitions(self.raw_schema, operation, self.resolver)
@@ -451,7 +421,7 @@ class BaseOpenAPISchema(BaseSchema):
                 if method not in HTTP_METHODS:
                     continue
                 if "operationId" in operation and operation["operationId"] == operation_id:
-                    parameters = self._collect_operation_parameters(path_item, operation)
+                    parameters = self._iter_parameters(operation, path_item.get("parameters", []))
                     return self.make_operation(path, method, parameters, operation, scope)
         self._on_missing_operation(operation_id, None, [])
 
@@ -466,7 +436,7 @@ class BaseOpenAPISchema(BaseSchema):
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = self.resolver.resolve(parent_ref)
         with in_scope(self.resolver, scope):
-            parameters = self._collect_operation_parameters(path_item, operation)
+            parameters = self._iter_parameters(operation, path_item.get("parameters", []))
         return self.make_operation(path, method, parameters, operation, scope)
 
     def get_case_strategy(
@@ -615,7 +585,7 @@ class MethodMap(Mapping):
         scope = self._scope
         with in_scope(schema.resolver, scope):
             try:
-                parameters = schema._collect_operation_parameters(self._path_item, operation)
+                parameters = schema._iter_parameters(operation, self._path_item.get("parameters", []))
             except SCHEMA_PARSING_ERRORS as exc:
                 schema._raise_invalid_schema(exc, path, method)
         return schema.make_operation(path, method, parameters, operation, scope)
@@ -631,15 +601,9 @@ class MethodMap(Mapping):
             raise LookupError(message) from exc
 
 
-OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
-OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
-
-
 class SwaggerV20(BaseOpenAPISchema):
-    example_field = "x-example"
-    examples_field = "x-examples"
     security = SwaggerSecurityProcessor()
-    _path_parameter_template = {"in": "path", "required": True, "type": "string"}
+    _path_parameter_template = {"in": "path", "required": True, "type": "string", "minLength": 1}
 
     def __post_init__(self) -> None:
         self.adapter = adapter.v2
@@ -650,62 +614,15 @@ class SwaggerV20(BaseOpenAPISchema):
         version = self.raw_schema.get("swagger", "2.0")
         return Specification.openapi(version=version)
 
+    @cached_property
+    def default_media_types(self) -> list[str]:
+        return self.raw_schema.get("consumes", [])
+
     def _validate(self) -> None:
         SWAGGER_20_VALIDATOR.validate(self.raw_schema)
 
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
-
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
-        # differently.
-        collected: list[OpenAPIParameter] = []
-        # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
-        # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
-        # Also, not every API has operations with payload (they might have only GET operations without payloads).
-        # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
-        # we have operations with a payload.
-        media_types = self._get_consumes_for_operation(definition)
-        # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
-        body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
-        # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
-        # We can't be 100% sure what media type is expected by the server and chose `multipart/form-data` as
-        # the default because it is broader since it allows us to upload files.
-        form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
-
-        form_parameters = []
-        for parameter in parameters:
-            if parameter["in"] == "formData":
-                # We need to gather form parameters first before creating a composite parameter for them
-                form_parameters.append(parameter)
-            elif parameter["in"] == "body":
-                # Take the original definition & extract the resource_name from there
-                resource_name = None
-                for param in definition["parameters"]:
-                    if "$ref" in param:
-                        _, param = self.resolver.resolve(param["$ref"])
-                    if param.get("in") == "body":
-                        if "$ref" in param["schema"]:
-                            resource_name = _get_resource_name(param["schema"]["$ref"])
-                # TODO: It is a corner case, but body could come from shared parameters. Fix it later
-                for media_type in body_media_types:
-                    collected.append(
-                        OpenAPI20Body(definition=parameter, media_type=media_type, resource_name=resource_name)
-                    )
-            else:
-                if parameter["in"] in ("header", "cookie"):
-                    check_header(parameter)
-                collected.append(OpenAPI20Parameter(definition=parameter))
-
-        if form_parameters:
-            for media_type in form_data_media_types:
-                collected.append(
-                    # Individual `formData` parameters are joined into a single "composite" one.
-                    OpenAPI20CompositeBody.from_parameters(*form_parameters, media_type=media_type)
-                )
-        return collected
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -797,22 +714,24 @@ class SwaggerV20(BaseOpenAPISchema):
 
 
 class OpenApi30(SwaggerV20):
-    example_field = "example"
-    examples_field = "examples"
     security = OpenAPISecurityProcessor()
-    _path_parameter_template = {"in": "path", "required": True, "schema": {"type": "string"}}
+    _path_parameter_template = {"in": "path", "required": True, "schema": {"type": "string", "minLength": 1}}
 
     def __post_init__(self) -> None:
         if self.specification.version.startswith("3.1"):
-            self.adapter = adapter.v3_0
-        else:
             self.adapter = adapter.v3_1
+        else:
+            self.adapter = adapter.v3_0
         BaseOpenAPISchema.__post_init__(self)
 
     @property
     def specification(self) -> Specification:
         version = self.raw_schema["openapi"]
         return Specification.openapi(version=version)
+
+    @cached_property
+    def default_media_types(self) -> list[str]:
+        return []
 
     def _validate(self) -> None:
         if self.specification.version.startswith("3.1"):
@@ -829,56 +748,6 @@ class OpenApi30(SwaggerV20):
             url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
             return urlsplit(url).path
         return "/"
-
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
-        collected: list[OpenAPIParameter] = []
-        operation = cast(v3.Operation, definition)
-
-        for parameter in parameters:
-            if parameter["in"] in ("header", "cookie"):
-                check_header(parameter)
-            collected.append(OpenAPI30Parameter(definition=parameter))
-
-        request_body_or_ref = operation.get("requestBody")
-        if request_body_or_ref is not None:
-            reference = request_body_or_ref.get("$ref")
-            # TODO: Use scopes here
-            if isinstance(reference, str):
-                _, resolved = self.resolver.resolve(reference)
-                request_body_or_ref = cast(v3.RequestBodyOrRef, resolved)
-            else:
-                request_body_or_ref = cast(v3.RequestBodyOrRef, request_body_or_ref)
-
-            # It could be an object inside `requestBodies`, which could be a reference itself
-            reference = request_body_or_ref.get("$ref")
-            # TODO: Use scopes here
-            if isinstance(reference, str):
-                _, resolved = self.resolver.resolve(reference)
-                request_body = cast(v3.RequestBody, resolved)
-            else:
-                request_body = cast(v3.RequestBody, request_body_or_ref)
-
-            required = request_body.get("required", False)
-            for media_type, content in request_body["content"].items():
-                resource_name = None
-                schema = content.get("schema")
-                if isinstance(schema, dict):
-                    content = cast(v3.MediaType, dict(content))
-                    if "$ref" in schema:
-                        resource_name = _get_resource_name(schema["$ref"])
-                    try:
-                        to_bundle = cast(dict[str, Any], schema)
-                        bundled = Bundler().bundle(to_bundle, self.resolver, inline_recursive=True)
-                        content["schema"] = cast(v3.Schema, bundled)
-                    except BundleError as exc:
-                        raise InvalidSchema.from_bundle_error(exc, "body") from exc
-                collected.append(
-                    OpenAPI30Body(content, media_type=media_type, required=required, resource_name=resource_name)
-                )
-        return collected
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -923,7 +792,3 @@ class OpenApi30(SwaggerV20):
                 files.append((name, (None, value)))
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
-
-
-def _get_resource_name(reference: str) -> str:
-    return reference.rsplit("/", maxsplit=1)[1]
