@@ -104,7 +104,6 @@ def get_template_fields(template: str) -> set[str]:
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
-    nullable_name: ClassVar[str] = ""
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
@@ -594,7 +593,9 @@ class BaseOpenAPISchema(BaseSchema):
 
     @contextmanager
     def _validating_response(self, scopes: list[str]) -> Generator[ConvertingResolver, None, None]:
-        resolver = ConvertingResolver(self.location or "", self.raw_schema, nullable_name=self.nullable_name)
+        resolver = ConvertingResolver(
+            self.location or "", self.raw_schema, nullable_keyword=self.adapter.nullable_keyword
+        )
         with in_scopes(resolver, scopes):
             yield resolver
 
@@ -677,7 +678,6 @@ OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 
 
 class SwaggerV20(BaseOpenAPISchema):
-    nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
     header_required_field = "x-required"
@@ -842,7 +842,6 @@ class SwaggerV20(BaseOpenAPISchema):
 
 
 class OpenApi30(SwaggerV20):
-    nullable_name = "nullable"
     example_field = "example"
     examples_field = "examples"
     header_required_field = "required"

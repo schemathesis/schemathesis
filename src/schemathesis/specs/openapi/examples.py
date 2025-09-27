@@ -21,7 +21,6 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.references import resolve_in_scope
 from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
 from ._hypothesis import get_default_format_strategies, openapi_cases
@@ -453,7 +452,12 @@ def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]
             # Check only 2xx responses
             continue
         if isinstance(response, dict) and "$ref" in response:
-            _, response = resolve_in_scope(operation.schema.resolver, response, operation.definition.scope)  # type:ignore[attr-defined]
+            resolver = operation.schema.resolver  # type:ignore[attr-defined]
+            resolver.push_scope(operation.definition.scope)
+            try:
+                _, response = resolver.resolve(response["$ref"])
+            finally:
+                resolver.pop_scope()
         for media_type, definition in response.get("content", {}).items():
             schema_ref = definition.get("schema", {}).get("$ref")
             if schema_ref:
