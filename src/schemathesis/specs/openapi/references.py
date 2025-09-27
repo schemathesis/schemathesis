@@ -10,7 +10,6 @@ import requests
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.specs.openapi.converter import to_json_schema_recursive
 
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
@@ -63,18 +62,3 @@ class ReferenceResolver(RefResolver):
             except RefResolutionError as exc:
                 exc.__notes__ = [ref]
                 raise
-
-
-class ConvertingResolver(ReferenceResolver):
-    """Convert resolved schemas to JSON Schema."""
-
-    def __init__(self, *args: Any, nullable_keyword: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
-        self.nullable_keyword = nullable_keyword
-
-    def resolve(self, ref: str) -> tuple[str, Any]:
-        url, document = super().resolve(ref)
-        document = to_json_schema_recursive(
-            document, nullable_keyword=self.nullable_keyword, is_response_schema=True, update_quantifiers=False
-        )
-        return url, document
