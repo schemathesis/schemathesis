@@ -59,6 +59,7 @@ class OpenApiResponse:
                 schema,
                 # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
                 format_checker=Draft202012Validator.FORMAT_CHECKER,
+                resolver=RefResolver.from_schema(schema),
             )
         assert not isinstance(self._validator, NotSet)
         return self._validator
