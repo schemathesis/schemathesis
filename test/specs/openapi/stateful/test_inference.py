@@ -814,13 +814,14 @@ def test_inject_links_location_normalization_returns_none():
         }
     )
     inferencer = LinkInferencer.from_schema(schema)
-    operation = {"responses": {"201": {}}}
+    operation = schema["/users"]["post"]
 
     # Empty location should be normalized to None
     entries = [LocationHeaderEntry(value="", status_code=201)]
 
-    assert inferencer.inject_links(operation, entries) == 0
-    assert "links" not in operation["responses"]["201"]
+    assert inferencer.inject_links(operation.responses, entries) == 0
+    response = operation.responses.find_by_status_code("201")
+    assert "links" not in response.definition
 
 
 def test_inject_links_no_matches():
@@ -840,13 +841,14 @@ def test_inject_links_no_matches():
         }
     )
     inferencer = LinkInferencer.from_schema(schema)
-    operation = {"responses": {"201": {}}}
+    operation = schema["/users"]["post"]
 
     # Location that doesn't match any endpoint
     entries = [LocationHeaderEntry(value="/orders/123", status_code=201)]
 
-    assert inferencer.inject_links(operation, entries) == 0
-    assert "links" not in operation["responses"]["201"]
+    assert inferencer.inject_links(operation.responses, entries) == 0
+    response = operation.responses.find_by_status_code("201")
+    assert "links" not in response.definition
 
 
 def test_inject_links_creates_response_definition():
@@ -861,12 +863,13 @@ def test_inject_links_creates_response_definition():
     )
     inferencer = LinkInferencer.from_schema(schema)
     # No 201 response defined
-    operation = {"responses": {}}
+    operation = schema["/users"]["post"]
 
     entries = [LocationHeaderEntry(value="/users/123", status_code=201)]
 
-    assert inferencer.inject_links(operation, entries) == 1
+    assert inferencer.inject_links(operation.responses, entries) == 1
     # Should create the 201 response definition
-    assert "201" in operation["responses"]
-    assert "links" in operation["responses"]["201"]
-    assert "X-Inferred-Link-0" in operation["responses"]["201"]["links"]
+    assert "201" in operation.responses.status_codes
+    response = operation.responses.find_by_status_code("201")
+    assert "links" in response.definition
+    assert "X-Inferred-Link-0" in response.definition["links"]
