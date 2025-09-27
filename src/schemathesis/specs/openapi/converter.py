@@ -12,7 +12,7 @@ from .patterns import update_quantifier
 def to_json_schema(
     schema: dict[str, Any],
     *,
-    nullable_name: str,
+    nullable_keyword: str,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
 ) -> dict[str, Any]:
@@ -21,8 +21,8 @@ def to_json_schema(
     NOTE. This function is applied to all keywords (including nested) during a schema resolving, thus it is not recursive.
     See a recursive version below.
     """
-    if schema.get(nullable_name) is True:
-        del schema[nullable_name]
+    if schema.get(nullable_keyword) is True:
+        del schema[nullable_keyword]
         bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
         schema = {"anyOf": [schema, {"type": "null"}]}
         if bundled:
@@ -110,7 +110,7 @@ def is_read_only(schema: dict[str, Any] | bool) -> bool:
 @overload
 def to_json_schema_recursive(
     schema: dict[str, Any],
-    nullable_name: str,
+    nullable_keyword: str,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     clone: bool = True,
@@ -120,7 +120,7 @@ def to_json_schema_recursive(
 @overload
 def to_json_schema_recursive(
     schema: bool,
-    nullable_name: str,
+    nullable_keyword: str,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     clone: bool = True,
@@ -129,7 +129,7 @@ def to_json_schema_recursive(
 
 def to_json_schema_recursive(
     schema: dict[str, Any] | bool,
-    nullable_name: str,
+    nullable_keyword: str,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     clone: bool = True,
@@ -141,7 +141,7 @@ def to_json_schema_recursive(
     return transform(
         schema,
         to_json_schema,
-        nullable_name=nullable_name,
+        nullable_keyword=nullable_keyword,
         is_response_schema=is_response_schema,
         update_quantifiers=update_quantifiers,
     )

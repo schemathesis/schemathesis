@@ -12,6 +12,11 @@ ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], U
 
 
 class SpecificationAdapter(Protocol):
+    """Protocol for abstracting over different API specification formats (OpenAPI 2/3, etc.)."""
+
+    # Keyword used to mark nullable fields (e.g., "x-nullable" in OpenAPI 2.0, "nullable" in 3.x)
     nullable_keyword: str
+    # Function to extract response schema from specification
     extract_response_schema: ExtractResponseSchema
+    # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[Validator]

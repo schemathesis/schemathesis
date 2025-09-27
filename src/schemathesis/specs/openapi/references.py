@@ -65,32 +65,16 @@ class ReferenceResolver(RefResolver):
                 raise
 
 
-def resolve_in_scope(
-    resolver: ReferenceResolver, definition: dict[str, Any], scope: str
-) -> tuple[list[str], dict[str, Any]]:
-    scopes = [scope]
-    # if there is `$ref` then we have a scope change that should be used during validation later to
-    # resolve nested references correctly
-    if "$ref" in definition:
-        resolver.push_scope(scope)
-        try:
-            new_scope, definition = resolver.resolve(definition["$ref"])
-        finally:
-            resolver.pop_scope()
-        scopes.append(new_scope)
-    return scopes, definition
-
-
 class ConvertingResolver(ReferenceResolver):
     """Convert resolved schemas to JSON Schema."""
 
-    def __init__(self, *args: Any, nullable_name: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, nullable_keyword: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.nullable_name = nullable_name
+        self.nullable_keyword = nullable_keyword
 
     def resolve(self, ref: str) -> tuple[str, Any]:
         url, document = super().resolve(ref)
         document = to_json_schema_recursive(
-            document, nullable_name=self.nullable_name, is_response_schema=True, update_quantifiers=False
+            document, nullable_keyword=self.nullable_keyword, is_response_schema=True, update_quantifiers=False
         )
         return url, document

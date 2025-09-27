@@ -69,7 +69,7 @@ from schemathesis.specs.openapi.converter import forbid_properties, is_read_only
     ],
 )
 def test_to_jsonschema_recursive(schema, expected):
-    assert transform(schema, converter.to_json_schema, nullable_name="x-nullable") == expected
+    assert transform(schema, converter.to_json_schema, nullable_keyword="x-nullable") == expected
 
 
 @pytest.mark.parametrize(
