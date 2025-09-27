@@ -115,10 +115,10 @@ def extract_response_schema_v3(
     response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
 ) -> JsonSchema | None:
     options = iter(response.get("content", {}).values())
-    option = next(options, None)
+    media_type = next(options, None)
     # "schema" is an optional key in the `MediaType` object
-    if option and "schema" in option:
-        return _prepare_schema(option["schema"], resolver, scope, nullable_keyword)
+    if media_type and "schema" in media_type:
+        return _prepare_schema(media_type["schema"], resolver, scope, nullable_keyword)
     return None
 
 

@@ -4,7 +4,7 @@ import requests
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config._checks import ChecksConfig
-from schemathesis.specs.openapi.checks import response_schema_conformance
+from schemathesis.specs.openapi.checks import response_headers_conformance, response_schema_conformance
 
 RESPONSE_CONFORMANCE_SCHEMA = {
     "openapi": "3.0.2",
@@ -70,6 +70,74 @@ RESPONSE_CONFORMANCE_SCHEMA = {
                                         "updated_at": {"type": "string", "format": "date-time"},
                                     },
                                     "required": ["id", "user", "address", "status", "created_at", "updated_at"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        },
+        "/simple-headers": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "headers": {
+                            "X-Request-ID": {
+                                "required": True,
+                                "schema": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",
+                                },
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"status": {"type": "string"}},
+                                    "required": ["status"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        },
+        "/complex-headers": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "headers": {
+                            "X-Request-ID": {
+                                "required": True,
+                                "schema": {
+                                    "type": "string",
+                                    "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$",
+                                },
+                            },
+                            "X-Rate-Limit-Remaining": {
+                                "required": True,
+                                "schema": {"type": "integer", "minimum": 0, "maximum": 10000},
+                            },
+                            "X-API-Version": {
+                                "required": False,
+                                "schema": {"type": "string", "enum": ["v1", "v2", "v3"]},
+                            },
+                            "X-Response-Time": {
+                                "required": False,
+                                "schema": {"type": "number", "minimum": 0, "multipleOf": 0.001},
+                            },
+                            "X-Cache-Status": {
+                                "required": False,
+                                "schema": {"type": "string", "enum": ["hit", "miss", "bypass"]},
+                            },
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"status": {"type": "string"}},
+                                    "required": ["status"],
                                 }
                             }
                         },
@@ -147,12 +215,40 @@ COMPLEX_RESPONSE = schemathesis.Response(
     elapsed=0.1,
     verify=False,
 )
+SIMPLE_HEADERS_CASE = CONFORMANCE_TEST_SCHEMA["/simple-headers"]["get"].Case()
+SIMPLE_HEADERS_RESPONSE = schemathesis.Response(
+    status_code=200,
+    headers={"Content-Type": ["application/json"], "X-Request-ID": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890"]},
+    content=b'{"status": "success"}',
+    request=requests.Request(method="GET", url="http://127.0.0.1/simple-headers").prepare(),
+    elapsed=0.1,
+    verify=False,
+)
+
+COMPLEX_HEADERS_CASE = CONFORMANCE_TEST_SCHEMA["/complex-headers"]["get"].Case()
+COMPLEX_HEADERS_RESPONSE = schemathesis.Response(
+    status_code=200,
+    headers={
+        "Content-Type": ["application/json"],
+        "X-Request-ID": ["a1b2c3d4-e5f6-7890-abcd-ef1234567890"],
+        "X-Rate-Limit-Remaining": ["9500"],
+        "X-API-Version": ["v2"],
+        "X-Response-Time": ["0.125"],
+        "X-Cache-Status": ["hit"],
+    },
+    content=b'{"status": "success"}',
+    request=requests.Request(method="GET", url="http://127.0.0.1/complex-headers").prepare(),
+    elapsed=0.1,
+    verify=False,
+)
 
 CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
 assert response_schema_conformance(CTX, SIMPLE_RESPONSE, SIMPLE_CASE) is None
 assert response_schema_conformance(CTX, MEDIUM_RESPONSE, MEDIUM_CASE) is None
 assert response_schema_conformance(CTX, COMPLEX_RESPONSE, COMPLEX_CASE) is None
+assert response_headers_conformance(CTX, SIMPLE_HEADERS_RESPONSE, SIMPLE_HEADERS_CASE) is None
+assert response_headers_conformance(CTX, COMPLEX_HEADERS_RESPONSE, COMPLEX_HEADERS_CASE) is None
 
 
 @pytest.mark.benchmark(group="simple")
@@ -168,3 +264,13 @@ def test_response_conformance_medium(benchmark):
 @pytest.mark.benchmark(group="complex")
 def test_response_conformance_complex(benchmark):
     benchmark(response_schema_conformance, CTX, COMPLEX_RESPONSE, COMPLEX_CASE)
+
+
+@pytest.mark.benchmark(group="simple-headers")
+def test_response_headers_conformance_simple(benchmark):
+    benchmark(response_headers_conformance, CTX, SIMPLE_HEADERS_RESPONSE, SIMPLE_HEADERS_CASE)
+
+
+@pytest.mark.benchmark(group="complex-headers")
+def test_response_headers_conformance_complex(benchmark):
+    benchmark(response_headers_conformance, CTX, COMPLEX_HEADERS_RESPONSE, COMPLEX_HEADERS_CASE)
