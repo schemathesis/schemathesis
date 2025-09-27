@@ -95,7 +95,7 @@ class EngineContext:
             # Generate links from collected Location headers
             inferencer = LinkInferencer.from_schema(self.schema)
             for operation, entries in self.observations.location_headers.items():
-                injected += inferencer.inject_links(operation.definition.raw, entries)
+                injected += inferencer.inject_links(operation.responses, entries)
 
         return injected
 
