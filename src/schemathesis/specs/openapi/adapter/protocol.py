@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchema
 
 ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
+ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
 
 
 class SpecificationAdapter(Protocol):
@@ -16,7 +17,11 @@ class SpecificationAdapter(Protocol):
 
     # Keyword used to mark nullable fields (e.g., "x-nullable" in OpenAPI 2.0, "nullable" in 3.x)
     nullable_keyword: str
+    # Keyword used for required / optional headers. Open API 2.0 does not expect `required` there
+    header_required_keyword: str
     # Function to extract response schema from specification
     extract_response_schema: ExtractResponseSchema
+    # Function to extract header schema from specification
+    extract_header_schema: ExtractHeaderSchema
     # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[Validator]

@@ -131,60 +131,48 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
 def response_headers_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     import jsonschema
 
-    from .parameters import OpenAPI20Parameter, OpenAPI30Parameter
-    from .schemas import BaseOpenAPISchema, OpenApi30, _maybe_raise_one_or_more
+    from .schemas import BaseOpenAPISchema, _maybe_raise_one_or_more
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    resolved = case.operation.schema.get_headers(case.operation, response)
-    if not resolved:
+
+    # Find the matching response definition
+    response_definition = case.operation.responses.find_by_status_code(response.status_code)
+    if response_definition is None:
         return None
-    scopes, defined_headers = resolved
-    if not defined_headers:
+    # Check whether the matching response definition has headers defined
+    headers = response_definition.headers
+    if not headers:
         return None
 
-    missing_headers = [
-        header
-        for header, definition in defined_headers.items()
-        if header.lower() not in response.headers and definition.get(case.operation.schema.header_required_field, False)
-    ]
     errors: list[Failure] = []
+
+    missing_headers = []
+
+    for name, header in headers.items():
+        values = response.headers.get(name.lower())
+        if values is not None:
+            value = values[0]
+            coerced = _coerce_header_value(value, header.schema)
+            try:
+                header.validator.validate(coerced)
+            except jsonschema.ValidationError as exc:
+                errors.append(
+                    JsonSchemaError.from_exception(
+                        title="Response header does not conform to the schema",
+                        operation=case.operation.label,
+                        exc=exc,
+                        config=case.operation.schema.config.output,
+                    )
+                )
+        elif header.is_required:
+            missing_headers.append(name)
+
     if missing_headers:
         formatted_headers = [f"\n- `{header}`" for header in missing_headers]
         message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
         errors.append(MissingHeaders(operation=case.operation.label, message=message, missing_headers=missing_headers))
-    for name, definition in defined_headers.items():
-        values = response.headers.get(name.lower())
-        if values is not None:
-            value = values[0]
-            with case.operation.schema._validating_response(scopes) as resolver:
-                if "$ref" in definition:
-                    _, definition = resolver.resolve(definition["$ref"])
-                parameter_definition = {"in": "header", **definition}
-                parameter: OpenAPI20Parameter | OpenAPI30Parameter
-                if isinstance(case.operation.schema, OpenApi30):
-                    parameter = OpenAPI30Parameter(parameter_definition)
-                else:
-                    parameter = OpenAPI20Parameter(parameter_definition)
-                schema = parameter.as_json_schema()
-                coerced = _coerce_header_value(value, schema)
-                try:
-                    jsonschema.validate(
-                        coerced,
-                        schema,
-                        cls=case.operation.schema.adapter.jsonschema_validator_cls,
-                        resolver=resolver,
-                        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
-                    )
-                except jsonschema.ValidationError as exc:
-                    errors.append(
-                        JsonSchemaError.from_exception(
-                            title="Response header does not conform to the schema",
-                            operation=case.operation.label,
-                            exc=exc,
-                            config=case.operation.schema.config.output,
-                        )
-                    )
+
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import itertools
 import string
 from collections import defaultdict
-from contextlib import ExitStack, contextmanager, suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from difflib import get_close_matches
 from json import JSONDecodeError
@@ -61,7 +61,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import ConvertingResolver, ReferenceResolver
+from .references import ReferenceResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -105,7 +105,6 @@ def get_template_fields(template: str) -> set[str]:
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
     links_field: ClassVar[str] = ""
-    header_required_field: ClassVar[str] = ""
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
     _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
@@ -507,15 +506,6 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def get_headers(
-        self, operation: APIOperation, response: Response
-    ) -> tuple[list[str], dict[str, dict[str, Any]] | None] | None:
-        definition = operation.responses.find_by_status_code(response.status_code)
-        if definition is None:
-            return None
-        # TODO: It should be proper scopes / resolve it eagerly
-        return [], definition.definition.get("headers")
-
     def as_state_machine(self) -> type[APIStateMachine]:
         return create_state_machine(self)
 
@@ -591,14 +581,6 @@ class BaseOpenAPISchema(BaseSchema):
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 
-    @contextmanager
-    def _validating_response(self, scopes: list[str]) -> Generator[ConvertingResolver, None, None]:
-        resolver = ConvertingResolver(
-            self.location or "", self.raw_schema, nullable_keyword=self.adapter.nullable_keyword
-        )
-        with in_scopes(resolver, scopes):
-            yield resolver
-
 
 def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
     if not failures:
@@ -615,15 +597,6 @@ def in_scope(resolver: jsonschema.RefResolver, scope: str) -> Generator[None, No
         yield
     finally:
         resolver.pop_scope()
-
-
-@contextmanager
-def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[None, None, None]:
-    """Push all available scopes into the resolver."""
-    with ExitStack() as stack:
-        for scope in scopes:
-            stack.enter_context(in_scope(resolver, scope))
-        yield
 
 
 @dataclass
@@ -680,7 +653,6 @@ OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 class SwaggerV20(BaseOpenAPISchema):
     example_field = "x-example"
     examples_field = "x-examples"
-    header_required_field = "x-required"
     security = SwaggerSecurityProcessor()
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = (("definitions",),)
     links_field = "x-links"
@@ -844,7 +816,6 @@ class SwaggerV20(BaseOpenAPISchema):
 class OpenApi30(SwaggerV20):
     example_field = "example"
     examples_field = "examples"
-    header_required_field = "required"
     security = OpenAPISecurityProcessor()
     component_locations = (("components", "schemas"),)
     links_field = "links"
