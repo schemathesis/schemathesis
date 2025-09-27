@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Protocol, Union
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Mapping, Protocol, Union
 
 if TYPE_CHECKING:
     from jsonschema.protocols import Validator
@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
     from schemathesis.core.jsonschema.types import JsonSchema
 
+IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
 
@@ -19,6 +20,8 @@ class SpecificationAdapter(Protocol):
     nullable_keyword: str
     # Keyword used for required / optional headers. Open API 2.0 does not expect `required` there
     header_required_keyword: str
+    # Function to extract examples from response definition
+    iter_response_examples: IterResponseExamples
     # Function to extract response schema from specification
     extract_response_schema: ExtractResponseSchema
     # Function to extract header schema from specification

@@ -519,7 +519,7 @@ def _iter_coverage_cases(
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
-    from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
+    from schemathesis.specs.openapi.examples import find_matching_in_responses
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
     from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
@@ -528,7 +528,7 @@ def _iter_coverage_cases(
     template = Template(serializers)
 
     instant = Instant()
-    responses = find_in_responses(operation)
+    responses = list(operation.responses.iter_examples())
     # NOTE: The HEAD method is excluded
     unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
     custom_formats = _build_custom_formats(generation_config)

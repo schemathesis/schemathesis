@@ -76,6 +76,10 @@ class OpenApiResponse:
         assert not isinstance(self._headers, NotSet)
         return self._headers
 
+    def iter_examples(self) -> Iterator[tuple[str, object]]:
+        """Iterate over examples of this response."""
+        return self.adapter.iter_response_examples(self.definition, self.status_code)
+
 
 @dataclass
 class OpenApiResponses:
@@ -98,6 +102,13 @@ class OpenApiResponses:
     def find_by_status_code(self, status_code: int) -> OpenApiResponse | None:
         """Find the most specific response definition matching the given HTTP status code."""
         return _find_by_status_code(self._inner, status_code)
+
+    def iter_examples(self) -> Iterator[tuple[str, object]]:
+        """Iterate over all examples for all responses."""
+        for response in self._inner.values():
+            # Check only 2xx responses
+            if response.status_code.startswith("2"):
+                yield from response.iter_examples()
 
 
 def _iter_resolved_responses(
@@ -253,3 +264,34 @@ def extract_header_schema_v3(
 ) -> JsonSchema:
     schema = header.get("schema", {})
     return _prepare_schema(schema, resolver, scope, nullable_keyword)
+
+
+def iter_response_examples_v2(response: Mapping[str, Any], status_code: str) -> Iterator[tuple[str, object]]:
+    # In Swagger 2.0, examples are directly in the response under "examples"
+    examples = response.get("examples", {})
+    return iter(examples.items())
+
+
+def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> Iterator[tuple[str, object]]:
+    for media_type, definition in response.get("content", {}).items():
+        # Try to get a more descriptive example name from the `$ref` value
+        schema_ref = definition.get("schema", {}).get("$ref")
+        if schema_ref:
+            name = schema_ref.split("/")[-1]
+        else:
+            name = f"{status_code}/{media_type}"
+
+        for examples_field, example_field in (
+            ("examples", "example"),
+            ("x-examples", "x-example"),
+        ):
+            examples = definition.get(examples_field, {})
+            if isinstance(examples, dict):
+                for example in examples.values():
+                    if "value" in example:
+                        yield name, example["value"]
+            elif isinstance(examples, list):
+                for example in examples:
+                    yield name, example
+            if example_field in definition:
+                yield name, definition[example_field]

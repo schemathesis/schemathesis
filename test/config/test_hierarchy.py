@@ -14,10 +14,7 @@ def operation(openapi_30):
     return APIOperation(
         "/users/{user_id}",
         "PUT",
-        OperationDefinition(
-            {"requestBody": {"content": {"application/json": {"schema": {}}}}},
-            "",
-        ),
+        OperationDefinition({"requestBody": {"content": {"application/json": {"schema": {}}}}}),
         openapi_30,
         label=LABEL,
         base_url="http://127.0.0.1:8080/api",

@@ -39,7 +39,7 @@ def operation(openapi_30):
     instance = APIOperation(
         "/users/{user_id}",
         "PUT",
-        OperationDefinition(definition, ""),
+        OperationDefinition(definition),
         openapi_30,
         responses=OpenApiResponses.from_definition({}, None, None, None),
         label="PUT /users/{user_id}",

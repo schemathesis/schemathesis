@@ -28,7 +28,7 @@ def make_operation(schema, **kwargs) -> APIOperation:
     return APIOperation(
         "/users",
         "POST",
-        definition=OperationDefinition({}, "foo"),
+        definition=OperationDefinition({}),
         schema=schema,
         responses=schema._parse_responses({}, ""),
         **kwargs,
@@ -88,7 +88,7 @@ def test_no_body_in_get(swagger_20):
     operation = APIOperation(
         path="/api/success",
         method="GET",
-        definition=OperationDefinition({}, "foo"),
+        definition=OperationDefinition({}),
         schema=swagger_20,
         responses=swagger_20._parse_responses({}, ""),
         query=ParameterSet(
@@ -250,7 +250,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
     operation = APIOperation(
         "/api/success",
         "GET",
-        definition=OperationDefinition({}, "foo"),
+        definition=OperationDefinition({}),
         schema=swagger_20,
         responses=swagger_20._parse_responses({}, ""),
         base_url=openapi2_base_url,

@@ -535,9 +535,8 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
-def test_complex_dereference(testdir, complex_schema):
+def test_complex_dereference(complex_schema):
     schema = schemathesis.openapi.from_path(complex_schema)
-    path = Path(str(testdir))
     body_definition = {
         "schema": {
             "$ref": "#/x-bundled/schema1",
@@ -577,7 +576,6 @@ def test_complex_dereference(testdir, complex_schema):
         "summary": "Test",
         "tags": ["ancillaries"],
     }
-    assert operation.definition.scope == f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath"
     assert operation.body[0].required
     assert operation.body[0].media_type == "application/json"
     assert operation.body[0].definition == body_definition
