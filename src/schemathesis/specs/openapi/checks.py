@@ -4,7 +4,7 @@ import enum
 import http.client
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
-from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
 import schemathesis
@@ -53,13 +53,13 @@ def status_code_conformance(ctx: CheckContext, response: Response, case: Case) -
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    responses = case.operation.definition.raw.get("responses", {})
+    status_codes = case.operation.responses.status_codes
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
-    if "default" in responses:
+    if "default" in status_codes:
         return None
-    allowed_status_codes = list(_expand_responses(responses))
+    allowed_status_codes = list(_expand_status_codes(status_codes))
     if response.status_code not in allowed_status_codes:
-        defined_status_codes = list(map(str, responses))
+        defined_status_codes = list(map(str, status_codes))
         responses_list = ", ".join(defined_status_codes)
         raise UndefinedStatusCode(
             operation=case.operation.label,
@@ -71,7 +71,7 @@ def status_code_conformance(ctx: CheckContext, response: Response, case: Case) -
     return None  # explicitly return None for mypy
 
 
-def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, None]:
+def _expand_status_codes(responses: tuple[str, ...]) -> Iterator[int]:
     for code in responses:
         yield from expand_status_code(code)
 

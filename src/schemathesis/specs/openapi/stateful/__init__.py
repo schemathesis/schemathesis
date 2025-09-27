@@ -118,7 +118,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
 
     # Create bundles and matchers
     for operation in operations:
-        all_status_codes = tuple(operation.definition.raw["responses"])
+        all_status_codes = operation.responses.status_codes
         bundle_matchers = []
 
         if operation.label in transitions.operations:
