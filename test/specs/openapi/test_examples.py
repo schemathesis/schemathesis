@@ -16,7 +16,6 @@ from schemathesis.specs.openapi.examples import (
     extract_from_schemas,
     extract_inner_examples,
     extract_top_level,
-    find_in_responses,
     find_matching_in_responses,
     produce_combinations,
 )
@@ -1421,80 +1420,64 @@ def content(schema, **kwargs):
 @pytest.mark.parametrize(
     ("response", "expected"),
     [
-        ({"description": "Ok"}, {}),
-        ({"$ref": "#/components/responses/NoExamples"}, {}),
+        ({"description": "Ok"}, []),
+        ({"$ref": "#/components/responses/NoExamples"}, []),
         (
             {"$ref": "#/components/responses/SingleExample"},
-            {
-                "Item": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+            ],
         ),
         (
             {"$ref": "#/components/responses/OneExample"},
-            {
-                "Item": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+            ],
         ),
         (
             {"$ref": "#/components/responses/TwoExamples"},
-            {
-                "Item": [
-                    {"id": "123456"},
-                    {"id": "456789"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+                ("Item", {"id": "456789"}),
+            ],
         ),
         (
             content({"$ref": "#/components/schemas/Item"}, examples={"Example1": {"value": {"id": "123456"}}}),
-            {
-                "Item": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+            ],
         ),
         (
             # No `value` inside
             content({"$ref": "#/components/schemas/Item"}, examples={"Example1": {"externalValue": ""}}),
-            {},
+            [],
         ),
         (
             content({"$ref": "#/components/schemas/Item"}, **{"x-examples": {"Example1": {"value": {"id": "123456"}}}}),
-            {
-                "Item": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+            ],
         ),
         (
             content({"$ref": "#/components/schemas/Item"}, **{"x-examples": [{"id": "123456"}]}),
-            {
-                "Item": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+            ],
         ),
         (
             content({"$ref": "#/components/schemas/Item"}, **{"x-example": {"id": "123456"}}),
-            {
-                "Item": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("Item", {"id": "123456"}),
+            ],
         ),
         (
             content(
                 {"properties": {"id": {"type": "string"}}},
                 examples={"Example1": {"value": {"id": "123456"}}},
             ),
-            {
-                "200/application/json": [
-                    {"id": "123456"},
-                ],
-            },
+            [
+                ("200/application/json", {"id": "123456"}),
+            ],
         ),
     ],
 )
@@ -1536,7 +1519,7 @@ def test_find_in_responses(ctx, response, expected):
     )
     schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/items/{itemId}/"]["get"]
-    assert find_in_responses(operation) == expected
+    assert list(operation.responses.iter_examples()) == expected
 
     if expected:
         strategy = strategies.combine(operation.get_strategies_from_examples())
@@ -1548,9 +1531,7 @@ def test_find_in_responses(ctx, response, expected):
 
         test()
 
-        assert collected == [
-            {"itemId": value} for group in expected.values() for values in group for value in values.values()
-        ]
+        assert collected == [{"itemId": value["id"]} for _, value in expected]
 
 
 def test_find_in_responses_only_in_2xx(ctx):
@@ -1577,83 +1558,108 @@ def test_find_in_responses_only_in_2xx(ctx):
     )
     schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/items/{id}/"]["get"]
-    assert find_in_responses(operation) == {}
+    assert list(operation.responses.iter_examples()) == []
 
 
 @pytest.mark.parametrize(
     ("examples", "name", "expected"),
     [
         (
-            {"Item": [{"id": "123"}, {"id": "456"}]},
+            [
+                ("Item", {"id": "123"}),
+                ("Item", {"id": "456"}),
+            ],
             "id",
             ["123", "456"],
         ),
         (
-            {"Item": [{"itemId": "123"}, {"itemId": "456"}]},
+            [
+                ("Item", {"itemId": "123"}),
+                ("Item", {"itemId": "456"}),
+            ],
             "itemId",
             ["123", "456"],
         ),
         (
-            {
-                "Item": [
-                    {"item": [{"itemId": "123"}, {"itemId": "789"}, {"unknown": 0}]},
-                    {"itemId": "456"},
-                    {"itemId": 789},
-                    {"item": {"itemId": "42"}},
-                    {"item": 55},
-                    {"item": [55]},
-                    {"item": [{"id": "143"}], "paginationInfo": {}},
-                ]
-            },
+            [
+                ("Item", {"item": [{"itemId": "123"}, {"itemId": "789"}, {"unknown": 0}]}),
+                ("Item", {"itemId": "456"}),
+                ("Item", {"itemId": 789}),
+                ("Item", {"item": {"itemId": "42"}}),
+                ("Item", {"item": 55}),
+                ("Item", {"item": [55]}),
+                ("Item", {"item": [{"id": "143"}], "paginationInfo": {}}),
+            ],
             "itemId",
             ["123", "789", "456", 789, "42", 55, "143"],
         ),
         (
-            {
-                "ItemResult": [
-                    {"item": [{"id": "143"}, {"id": 55}, [], {}], "paginationInfo": {}},
-                ]
-            },
+            [
+                ("ItemResult", {"item": [{"id": "143"}, {"id": 55}, [], {}], "paginationInfo": {}}),
+            ],
             "itemId",
             ["143", 55],
         ),
         (
-            {"Item": [{"id": "123"}, {"id": "456"}]},
+            [
+                ("Item", {"id": "123"}),
+                ("Item", {"id": "456"}),
+            ],
             "itemId",
             ["123", "456"],
         ),
         (
-            {"Item": [{"ItemId": "123"}, {"ITEMID": "456"}]},
+            [
+                ("Item", {"ItemId": "123"}),
+                ("Item", {"ITEMID": "456"}),
+            ],
             "itemId",
             ["123", "456"],
         ),
         (
-            {"Product": [{"productId": "123"}, {"product_id": "456"}]},
+            [
+                ("Product", {"productId": "123"}),
+                ("Product", {"product_id": "456"}),
+            ],
             "id",
             ["123", "456"],
         ),
         (
-            {"User": [{"userId": "123"}, {"user_id": "456"}], "Item": [{"itemId": "789"}]},
+            [
+                ("User", {"userId": "123"}),
+                ("User", {"user_id": "456"}),
+                ("Item", {"itemId": "789"}),
+            ],
             "userId",
             ["123", "456"],
         ),
         (
-            {"User": [{"name": "John"}, {"age": 30}]},
+            [
+                ("User", {"name": "John"}),
+                ("User", {"age": 30}),
+            ],
             "id",
             [],
         ),
         (
-            {"User": [{"name": "John"}, {"age": 30}]},
+            [
+                ("User", {"name": "John"}),
+                ("User", {"age": 30}),
+            ],
             "name",
             ["John"],
         ),
         (
-            {"User": [{"name": "John"}]},
+            [
+                ("User", {"name": "John"}),
+            ],
             "unknown",
             [],
         ),
         (
-            {"User": [None]},
+            [
+                ("User", None),
+            ],
             "unknown",
             [],
         ),
@@ -1664,7 +1670,12 @@ def test_find_matching_in_responses(examples, name, expected):
 
 
 def test_find_matching_in_responses_yields_all():
-    examples = {"Item": [{"id": "123"}, {"id": "456"}], "Product": [{"id": "789"}, {"productId": "101112"}]}
+    examples = [
+        ("Item", {"id": "123"}),
+        ("Item", {"id": "456"}),
+        ("Product", {"id": "789"}),
+        ("Product", {"productId": "101112"}),
+    ]
     result = list(find_matching_in_responses(examples, "id"))
     assert result == ["123", "456", "789", "101112"]
 

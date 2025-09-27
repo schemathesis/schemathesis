@@ -154,7 +154,7 @@ class BaseOpenAPISchema(BaseSchema):
                 method="",
                 path="",
                 label="",
-                definition=OperationDefinition(raw=None, scope=""),
+                definition=OperationDefinition(raw=None),
                 schema=None,  # type: ignore
                 responses=None,  # type: ignore
             )
@@ -400,7 +400,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation[OpenAPIParameter, OpenApiResponses] = APIOperation(
             path=path,
             method=method,
-            definition=OperationDefinition(definition, scope),
+            definition=OperationDefinition(definition),
             base_url=base_url,
             app=self.app,
             schema=self,

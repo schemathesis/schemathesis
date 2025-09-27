@@ -70,7 +70,7 @@ class GraphQLOperationDefinition(OperationDefinition):
     type_: graphql.GraphQLType
     root_type: RootType
 
-    __slots__ = ("raw", "resolved", "scope", "field_name", "type_", "root_type")
+    __slots__ = ("raw", "field_name", "type_", "root_type")
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -220,7 +220,6 @@ class GraphQLSchema(BaseSchema):
             # Parameters are not yet supported
             definition=GraphQLOperationDefinition(
                 raw=field,
-                scope="",
                 type_=operation_type,
                 field_name=field_name,
                 root_type=root_type,

@@ -604,9 +604,8 @@ class OperationDefinition(Generic[D]):
     """
 
     raw: D
-    scope: str
 
-    __slots__ = ("raw", "scope")
+    __slots__ = ("raw",)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
