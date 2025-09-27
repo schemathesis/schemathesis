@@ -8,7 +8,7 @@ import jsonschema
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
-from schemathesis.core.errors import InvalidStateMachine
+from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -20,7 +20,7 @@ from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.stateful.control import TransitionController
-from schemathesis.specs.openapi.stateful.links import OpenApiLink, get_all_links
+from schemathesis.specs.openapi.stateful.links import OpenApiLink
 from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
@@ -97,12 +97,14 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     selected_labels = {operation.label for operation in operations}
     errors = []
     for operation in operations:
-        for _, link in get_all_links(operation):
-            if isinstance(link, Ok):
-                if link.ok().target.label in selected_labels:
-                    transitions.add_outgoing(operation.label, link.ok())
-            else:
-                errors.append(link.err())
+        for status_code, response in operation.responses.items():
+            for name, link in response.iter_links():
+                try:
+                    link = OpenApiLink(name, status_code, link, operation)
+                    if link.target.label in selected_labels:
+                        transitions.add_outgoing(operation.label, link)
+                except InvalidTransition as exc:
+                    errors.append(exc)
 
     if errors:
         raise InvalidStateMachine(errors)

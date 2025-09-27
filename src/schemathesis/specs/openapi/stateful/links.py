@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Generator, Literal, cast
+from typing import Any, Callable, Literal, cast
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError
@@ -194,25 +194,3 @@ class StepOutputWrapper:
     def __eq__(self, other: object) -> bool:
         assert isinstance(other, StepOutputWrapper)
         return self.output.case.id == other.output.case.id
-
-
-def get_all_links(
-    operation: APIOperation,
-) -> Generator[tuple[str, Result[OpenApiLink, InvalidTransition]], None, None]:
-    resolver = operation.schema.resolver  # type: ignore[attr-defined]
-    for status_code, definition in operation.definition.raw["responses"].items():
-        in_scope = False
-        if "$ref" in definition:
-            scope, definition = resolver.resolve(definition["$ref"])
-            resolver.push_scope(scope)
-            in_scope = True
-        for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
-            if "$ref" in link_definition:
-                _, link_definition = resolver.resolve(link_definition["$ref"])
-            try:
-                link = OpenApiLink(name, status_code, link_definition, operation)
-                yield status_code, Ok(link)
-            except InvalidTransition as exc:
-                yield status_code, Err(exc)
-        if in_scope:
-            resolver.pop_scope()

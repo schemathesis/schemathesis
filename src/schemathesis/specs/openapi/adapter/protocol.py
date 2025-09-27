@@ -20,6 +20,8 @@ class SpecificationAdapter(Protocol):
     nullable_keyword: str
     # Keyword used for required / optional headers. Open API 2.0 does not expect `required` there
     header_required_keyword: str
+    # Keyword for Open API links
+    links_keyword: str
     # Function to extract examples from response definition
     iter_response_examples: IterResponseExamples
     # Function to extract response schema from specification

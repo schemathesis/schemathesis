@@ -80,6 +80,14 @@ class OpenApiResponse:
         """Iterate over examples of this response."""
         return self.adapter.iter_response_examples(self.definition, self.status_code)
 
+    def iter_links(self) -> Iterator[tuple[str, Mapping[str, Any]]]:
+        links = self.definition.get(self.adapter.links_keyword)
+        if links is None:
+            return
+        for name, link in links.items():
+            _, link = maybe_resolve(link, self.resolver, self.scope)
+            yield name, link
+
 
 @dataclass
 class OpenApiResponses:
@@ -98,6 +106,9 @@ class OpenApiResponses:
         return OpenApiResponses(
             dict(_iter_resolved_responses(definition=definition, resolver=resolver, scope=scope, adapter=adapter))
         )
+
+    def items(self) -> ItemsView[str, OpenApiResponse]:
+        return self._inner.items()
 
     @property
     def status_codes(self) -> tuple[str, ...]:
