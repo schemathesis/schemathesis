@@ -15,6 +15,7 @@ ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "Js
 IterParameters = Callable[
     [Mapping[str, Any], Sequence[Mapping[str, Any]], list[str], "RefResolver"], Iterator["OpenAPIParameter"]
 ]
+BuildPathParameter = Callable[[Mapping[str, Any]], "OpenAPIParameter"]
 
 
 class SpecificationAdapter(Protocol):
@@ -34,5 +35,7 @@ class SpecificationAdapter(Protocol):
     extract_header_schema: ExtractHeaderSchema
     # Function to iterate over API operation parameters
     iter_parameters: IterParameters
+    # Function to create a new path parameter
+    build_path_parameter: BuildPathParameter
     # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[Validator]

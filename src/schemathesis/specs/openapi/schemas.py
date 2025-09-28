@@ -30,7 +30,6 @@ from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
-from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
@@ -77,7 +76,6 @@ def get_template_fields(template: str) -> set[str]:
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
-    _path_parameter_template: ClassVar[dict[str, Any]] = None  # type: ignore
     adapter: SpecificationAdapter = None  # type: ignore
 
     @property
@@ -355,8 +353,6 @@ class BaseOpenAPISchema(BaseSchema):
         definition: dict[str, Any],
         scope: str,
     ) -> APIOperation:
-        from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
-
         __tracebackhide__ = True
         base_url = self.get_base_url()
         responses = self._parse_responses(definition, scope)
@@ -376,12 +372,9 @@ class BaseOpenAPISchema(BaseSchema):
             parameter.name for parameter in operation.path_parameters
         }
         for name in missing_parameter_names:
-            definition = {"name": name, INJECTED_PATH_PARAMETER_KEY: True, **deepclone(self._path_parameter_template)}
-            # TODO: fix this hack
-            if isinstance(self, OpenApi30):
-                operation.add_parameter(OpenAPI30Parameter(definition))
-            else:
-                operation.add_parameter(OpenAPI20Parameter(definition))
+            operation.add_parameter(
+                self.adapter.build_path_parameter({"name": name, INJECTED_PATH_PARAMETER_KEY: True})
+            )
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
             self.security.process_definitions(self.raw_schema, operation, self.resolver)
@@ -603,7 +596,6 @@ class MethodMap(Mapping):
 
 class SwaggerV20(BaseOpenAPISchema):
     security = SwaggerSecurityProcessor()
-    _path_parameter_template = {"in": "path", "required": True, "type": "string", "minLength": 1}
 
     def __post_init__(self) -> None:
         self.adapter = adapter.v2
@@ -715,7 +707,6 @@ class SwaggerV20(BaseOpenAPISchema):
 
 class OpenApi30(SwaggerV20):
     security = OpenAPISecurityProcessor()
-    _path_parameter_template = {"in": "path", "required": True, "schema": {"type": "string", "minLength": 1}}
 
     def __post_init__(self) -> None:
         if self.specification.version.startswith("3.1"):
