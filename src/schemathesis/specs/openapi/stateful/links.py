@@ -2,18 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Literal, cast
+from typing import Any, Callable
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import expressions
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
-ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
 
 
 @dataclass
@@ -95,7 +94,7 @@ class OpenApiLink:
             try:
                 # The parameter name is prefixed with its location. Example: `path.id`
                 _location, name = tuple(parameter.split("."))
-                location = cast(ParameterLocation, _location)
+                location = ParameterLocation(_location)
             except ValueError:
                 location = None
                 name = parameter
@@ -134,11 +133,11 @@ class OpenApiLink:
     def _get_parameter_container(self, location: ParameterLocation | None, name: str) -> str:
         """Resolve parameter container either from explicit location or by looking up in target operation."""
         if location:
-            return LOCATION_TO_CONTAINER[location]
+            return location.container_name
 
         for param in self.target.iter_parameters():
             if param.name == name:
-                return LOCATION_TO_CONTAINER[param.location]
+                return param.location.container_name
         raise TransitionValidationError(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
 
     def extract(self, output: StepOutput) -> Transition:

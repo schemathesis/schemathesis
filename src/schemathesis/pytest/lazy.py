@@ -187,7 +187,7 @@ class LazySchema:
                 def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
                     override = overrides.for_operation(config=schema.config, operation=_operation)
 
-                    return {location: entry for location, entry in override.items() if entry}
+                    return {location.container_name: entry for location, entry in override.items() if entry}
 
                 tests = list(
                     get_all_tests(

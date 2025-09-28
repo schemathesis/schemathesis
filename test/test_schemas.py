@@ -5,7 +5,6 @@ import pytest
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
 from schemathesis.core.result import Err, Ok
-from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import ReferenceResolver
 
 
@@ -83,7 +82,6 @@ def test_resolving_multiple_files():
     schema = schemathesis.openapi.from_dict(raw_schema)
     assert len(schema["/teapot"]["post"].body) == 1
     body = schema["/teapot"]["post"].body[0]
-    assert isinstance(body, OpenAPI20Body)
     assert body.media_type == "application/json"
     assert body.definition == {
         "in": "body",
@@ -141,6 +139,25 @@ def test_not_recoverable_schema_error(simple_schema):
     with pytest.raises(InvalidSchema):
         schema = schemathesis.openapi.from_dict(simple_schema)
         list(schema.get_all_operations())
+
+
+def test_invalid_parameter_schema_type(ctx):
+    # When a parameter's schema is not a dict or bool (e.g., a list)
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [{"in": "query", "name": "filter", "schema": ["invalid", "list"]}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/users"]["get"]
+    # Then getting this parameter's schema should raise InvalidSchema
+    with pytest.raises(InvalidSchema, match="Can not generate data for query parameter"):
+        _ = operation.query[0].optimized_schema
 
 
 def test_no_paths_on_openapi_3_1():

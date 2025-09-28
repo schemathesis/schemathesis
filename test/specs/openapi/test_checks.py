@@ -5,12 +5,12 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import Failure
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
-    ComponentKind,
     GenerationInfo,
     PhaseInfo,
 )
@@ -94,11 +94,11 @@ def build_metadata(
         components={
             kind: ComponentInfo(mode=value)
             for kind, value in [
-                (ComponentKind.QUERY, query),
-                (ComponentKind.PATH_PARAMETERS, path_parameters),
-                (ComponentKind.HEADERS, headers),
-                (ComponentKind.COOKIES, cookies),
-                (ComponentKind.BODY, body),
+                (ParameterLocation.QUERY, query),
+                (ParameterLocation.PATH, path_parameters),
+                (ParameterLocation.HEADER, headers),
+                (ParameterLocation.COOKIE, cookies),
+                (ParameterLocation.BODY, body),
             ]
             if value is not None
         },
@@ -119,7 +119,7 @@ def sample_schema(ctx):
                             "schema": {"type": "integer", "minimum": 5},
                         },
                         {
-                            "in": "headers",
+                            "in": "header",
                             "name": "X-Key",
                             "schema": {"type": "integer", "minimum": 5},
                         },
@@ -231,7 +231,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
                 mode=GenerationMode.NEGATIVE,
             ),
             components={
-                ComponentKind.QUERY: ComponentInfo(mode=GenerationMode.NEGATIVE),
+                ParameterLocation.QUERY: ComponentInfo(mode=GenerationMode.NEGATIVE),
             },
             phase=PhaseInfo.coverage(
                 description="Unspecified HTTP method: PUT",

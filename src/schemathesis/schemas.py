@@ -19,7 +19,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 from schemathesis import transport
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
-from schemathesis.core.adapter import ResponsesContainer
+from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
@@ -303,9 +303,6 @@ class BaseSchema(Mapping):
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         raise NotImplementedError
 
-    def get_security_requirements(self, operation: APIOperation) -> list[str]:
-        raise NotImplementedError
-
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         raise NotImplementedError
 
@@ -506,39 +503,7 @@ class APIOperationMap(Mapping):
         return strategies.combine(_strategies)
 
 
-@dataclass(eq=False)
-class Parameter:
-    """A logically separate parameter bound to a location (e.g., to "query string").
-
-    For example, if the API requires multiple headers to be present, each header is presented as a separate
-    `Parameter` instance.
-    """
-
-    # The parameter definition in the language acceptable by the API
-    definition: Any
-
-    __slots__ = ("definition",)
-
-    @property
-    def location(self) -> str:
-        """Where this parameter is located.
-
-        E.g. "query" or "body"
-        """
-        raise NotImplementedError
-
-    @property
-    def name(self) -> str:
-        """Parameter name."""
-        raise NotImplementedError
-
-    @property
-    def is_required(self) -> bool:
-        """Whether the parameter is required for a successful API call."""
-        raise NotImplementedError
-
-
-P = TypeVar("P", bound=Parameter)
+P = TypeVar("P", bound=OperationParameter)
 
 
 @dataclass
@@ -588,6 +553,7 @@ class PayloadAlternatives(ParameterSet[P]):
 
 
 R = TypeVar("R", bound=ResponsesContainer)
+S = TypeVar("S")
 D = TypeVar("D", bound=dict)
 
 
@@ -608,7 +574,7 @@ class OperationDefinition(Generic[D]):
 
 
 @dataclass()
-class APIOperation(Generic[P, R]):
+class APIOperation(Generic[P, R, S]):
     """An API operation (e.g., `GET /users`)."""
 
     # `path` does not contain `basePath`
@@ -619,6 +585,7 @@ class APIOperation(Generic[P, R]):
     definition: OperationDefinition = field(repr=False)
     schema: BaseSchema
     responses: R
+    security: S
     label: str = None  # type: ignore
     app: Any = None
     base_url: str | None = None
@@ -632,7 +599,7 @@ class APIOperation(Generic[P, R]):
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore
 
-    def __deepcopy__(self, memo: dict) -> APIOperation[P, R]:
+    def __deepcopy__(self, memo: dict) -> APIOperation[P, R, S]:
         return self
 
     def __hash__(self) -> int:
@@ -733,9 +700,6 @@ class APIOperation(Generic[P, R]):
         if hooks is not None:
             strategy = _apply_hooks(hooks, strategy)
         return strategy
-
-    def get_security_requirements(self) -> list[str]:
-        return self.schema.get_security_requirements(self)
 
     def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
         return self.schema.get_strategies_from_examples(self, **kwargs)

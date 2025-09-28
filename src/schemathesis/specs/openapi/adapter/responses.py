@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ItemsView, Iterator, Mapping, cast
-
-from jsonschema import Draft202012Validator
-from jsonschema.protocols import Validator
+from typing import TYPE_CHECKING, Any, ItemsView, Iterator, Mapping, cast
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.compat import RefResolutionError, RefResolver
@@ -16,6 +13,9 @@ from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.utils import expand_status_code
+
+if TYPE_CHECKING:
+    from jsonschema.protocols import Validator
 
 
 @dataclass
@@ -51,6 +51,8 @@ class OpenApiResponse:
     @property
     def validator(self) -> Validator | None:
         """JSON Schema validator for this response."""
+        from jsonschema import Draft202012Validator
+
         schema = self.schema
         if schema is None:
             return None
@@ -106,7 +108,7 @@ class OpenApiResponses:
     ) -> OpenApiResponses:
         """Build new collection of responses from their raw definition."""
         # TODO: Add also `v2` type
-        return OpenApiResponses(
+        return cls(
             dict(_iter_resolved_responses(definition=definition, resolver=resolver, scope=scope, adapter=adapter)),
             resolver=resolver,
             scope=scope,
@@ -257,6 +259,8 @@ class OpenApiResponseHeader:
     @property
     def validator(self) -> Validator:
         """JSON Schema validator for this header."""
+        from jsonschema import Draft202012Validator
+
         schema = self.schema
         if self._validator is NOT_SET:
             self.adapter.jsonschema_validator_cls.check_schema(schema)
@@ -309,11 +313,11 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
         else:
             name = f"{status_code}/{media_type}"
 
-        for examples_field, example_field in (
+        for examples_container_keyword, example_keyword in (
             ("examples", "example"),
             ("x-examples", "x-example"),
         ):
-            examples = definition.get(examples_field, {})
+            examples = definition.get(examples_container_keyword, {})
             if isinstance(examples, dict):
                 for example in examples.values():
                     if "value" in example:
@@ -321,5 +325,5 @@ def iter_response_examples_v3(response: Mapping[str, Any], status_code: str) -> 
             elif isinstance(examples, list):
                 for example in examples:
                     yield name, example
-            if example_field in definition:
-                yield name, definition[example_field]
+            if example_keyword in definition:
+                yield name, definition[example_keyword]

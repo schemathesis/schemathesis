@@ -2,8 +2,8 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
+from schemathesis.specs.openapi.adapter.security import extract_security_definitions_v3
 from schemathesis.specs.openapi.references import ReferenceResolver
-from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
 
 
 def test_ref_resolving():
@@ -16,7 +16,7 @@ def test_ref_resolving():
         "components": {"securitySchemes": {"$ref": "#/components/HTTPSchema"}, "HTTPSchema": http_schema},
     }
     resolver = ReferenceResolver("", schema)
-    assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == http_schema
+    assert extract_security_definitions_v3(schema, resolver) == http_schema
 
 
 def test_ref_resolving_nested():
@@ -32,7 +32,7 @@ def test_ref_resolving_nested():
         },
     }
     resolver = ReferenceResolver("", schema)
-    assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == {"basic_auth": http_schema}
+    assert extract_security_definitions_v3(schema, resolver) == {"basic_auth": http_schema}
 
 
 PARAMETER_NAME = "TestApiKey"
@@ -105,3 +105,23 @@ def test_without_security_parameters(with_security_parameters):
             assert case.headers == {}
 
     test()
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
+def test_undefined_security_scheme_is_ignored(ctx, version):
+    # When a security requirement references a scheme that is NOT defined in securitySchemes/securityDefinitions
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "get": {
+                    "security": [{"undefined_scheme": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version=version,
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/users"]["get"]
+    # Then it should be ignored
+    assert not list(operation.security.iter_parameters())

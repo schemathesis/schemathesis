@@ -17,7 +17,6 @@ from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
-from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
@@ -1054,6 +1053,8 @@ class OutputHandler(EventHandler):
             self._check_stateful_warnings(ctx, event)
 
     def _check_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+        from schemathesis.core.compat import RefResolutionError
+
         statistic = aggregate_status_codes(event.recorder.interactions.values())
 
         if statistic.total == 0:

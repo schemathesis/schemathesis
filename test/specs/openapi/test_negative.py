@@ -10,10 +10,10 @@ from jsonschema import Draft4Validator, Draft202012Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
     MutationContext,
@@ -25,7 +25,6 @@ from schemathesis.specs.openapi.negative.mutations import (
     prevent_unsatisfiable_schema,
     remove_required_property,
 )
-from schemathesis.specs.openapi.utils import is_header_location
 from test.utils import assert_requests_call
 
 MAX_EXAMPLES = 15
@@ -60,23 +59,22 @@ validate_schema = Draft4Validator.check_schema
 
 @pytest.mark.parametrize(
     ("location", "schema"),
-    [(location, OBJECT_SCHEMA) for location in sorted(LOCATION_TO_CONTAINER)]
+    [(location, OBJECT_SCHEMA) for location in sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN})]
     + [
         # These schemas are only possible for "body"
-        ("body", EMPTY_OBJECT_SCHEMA),
-        ("body", ARRAY_SCHEMA),
-        ("body", INTEGER_SCHEMA),
+        (ParameterLocation.BODY, EMPTY_OBJECT_SCHEMA),
+        (ParameterLocation.BODY, ARRAY_SCHEMA),
+        (ParameterLocation.BODY, INTEGER_SCHEMA),
     ],
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_top_level_strategy(data, location, schema):
-    if location != "body" and schema.get("type") == "object":
+    if location != ParameterLocation.BODY and schema.get("type") == "object":
         # It always comes this way from Schemathesis
         schema["additionalProperties"] = False
     validate_schema(schema)
     validator = Draft4Validator(schema)
-    schema = deepclone(schema)
     instance = data.draw(
         negative_schema(
             schema,
@@ -89,7 +87,7 @@ def test_top_level_strategy(data, location, schema):
         )
     )
     assert not validator.is_valid(instance)
-    if is_header_location(location):
+    if location.is_in_header:
         assert is_valid_header(instance)
 
 
@@ -97,31 +95,36 @@ def test_top_level_strategy(data, location, schema):
     ("mutation", "schema", "location", "validate"),
     [
         # No constraints besides `type`
-        (negate_constraints, {"type": "integer"}, "body", True),
+        (negate_constraints, {"type": "integer"}, ParameterLocation.BODY, True),
         # Missing type (i.e. all types are possible)
-        (change_type, {}, "body", True),
+        (change_type, {}, ParameterLocation.BODY, True),
         # All types explicitly
-        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}, "body", True),
+        (
+            change_type,
+            {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]},
+            ParameterLocation.BODY,
+            True,
+        ),
         # No properties to remove
-        (remove_required_property, {}, "body", True),
+        (remove_required_property, {}, ParameterLocation.BODY, True),
         # Non-"object" type
-        (remove_required_property, {"type": "array"}, "body", True),
+        (remove_required_property, {"type": "array"}, ParameterLocation.BODY, True),
         # No properties at all
-        (change_properties, {}, "body", True),
+        (change_properties, {}, ParameterLocation.BODY, True),
         # No properties that can be mutated
-        (change_properties, {"properties": {"foo": {}}}, "body", True),
+        (change_properties, {"properties": {"foo": {}}}, ParameterLocation.BODY, True),
         # No items
-        (change_items, {"type": "array"}, "body", True),
+        (change_items, {"type": "array"}, ParameterLocation.BODY, True),
         # `items` accept everything
-        (change_items, {"type": "array", "items": {}}, "body", True),
-        (change_items, {"type": "array", "items": True}, "body", False),
+        (change_items, {"type": "array", "items": {}}, ParameterLocation.BODY, True),
+        (change_items, {"type": "array", "items": True}, ParameterLocation.BODY, False),
         # `items` is equivalent to accept-everything schema
-        (change_items, {"type": "array", "items": {"uniqueItems": False}}, "body", True),
+        (change_items, {"type": "array", "items": {"uniqueItems": False}}, ParameterLocation.BODY, True),
         # The first element could be anything
-        (change_items, {"type": "array", "items": [{}]}, "body", True),
+        (change_items, {"type": "array", "items": [{}]}, ParameterLocation.BODY, True),
         # Query and path parameters are always strings
-        (change_type, {"type": "string"}, "path", True),
-        (change_type, {"type": "string"}, "query", True),
+        (change_type, {"type": "string"}, ParameterLocation.PATH, True),
+        (change_type, {"type": "string"}, ParameterLocation.QUERY, True),
     ],
 )
 @given(data=st.data())
@@ -151,7 +154,10 @@ def test_change_type_urlencoded(data):
     schema = {"type": "object"}
     original_schema = deepclone(schema)
     context = MutationContext(
-        keywords=schema, non_keywords={}, location="body", media_type="application/x-www-form-urlencoded"
+        keywords=schema,
+        non_keywords={},
+        location=ParameterLocation.BODY,
+        media_type="application/x-www-form-urlencoded",
     )
     # Then it should not be mutated
     assert change_type(context, data.draw, schema) == MutationResult.FAILURE
@@ -201,7 +207,9 @@ def test_successful_mutations(data, mutation, schema):
     # Then it returns "success"
     assert (
         mutation(
-            MutationContext(keywords=schema, non_keywords={}, location="body", media_type="application/json"),
+            MutationContext(
+                keywords=schema, non_keywords={}, location=ParameterLocation.BODY, media_type="application/json"
+            ),
             data.draw,
             schema,
         )
@@ -245,7 +253,7 @@ def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
     new_schema = deepclone(schema)
     # When path parameters are mutated
-    new_schema = data.draw(mutated(new_schema, {}, "path", None))
+    new_schema = data.draw(mutated(new_schema, {}, ParameterLocation.PATH, None))
     assert new_schema["type"] == "object"
     # Then mutated schema is a valid JSON Schema
     validate_schema(new_schema)
@@ -269,7 +277,7 @@ def test_custom_fields_are_intact(data, key):
         "additionalProperties": False,
     }
     # Then they should not be negated
-    new_schema = data.draw(mutated(schema, {key: {}}, "body", "application/json"))
+    new_schema = data.draw(mutated(schema, {key: {}}, ParameterLocation.BODY, "application/json"))
     assert key in new_schema
 
 
@@ -303,7 +311,9 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
     # When `negate_constraints` is used
     schema = deepclone(schema)
     negate_constraints(
-        MutationContext(keywords=schema, non_keywords={}, location="body", media_type="application/json"),
+        MutationContext(
+            keywords=schema, non_keywords={}, location=ParameterLocation.BODY, media_type="application/json"
+        ),
         data.draw,
         schema,
     )
@@ -316,7 +326,7 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
-    mutated_schema = data.draw(mutated(schema, {}, location="body", media_type="application/json"))
+    mutated_schema = data.draw(mutated(schema, {}, location=ParameterLocation.BODY, media_type="application/json"))
     assert canonicalish(mutated_schema) != FALSEY
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 
 
@@ -13,16 +14,6 @@ class TestPhase(str, Enum):
     COVERAGE = "coverage"
     FUZZING = "fuzzing"
     STATEFUL = "stateful"
-
-
-class ComponentKind(str, Enum):
-    """Components that can be generated."""
-
-    QUERY = "query"
-    PATH_PARAMETERS = "path_parameters"
-    HEADERS = "headers"
-    COOKIES = "cookies"
-    BODY = "body"
 
 
 @dataclass
@@ -62,7 +53,7 @@ class CoveragePhaseData:
     description: str
     location: str | None
     parameter: str | None
-    parameter_location: str | None
+    parameter_location: ParameterLocation | None
 
     __slots__ = ("description", "location", "parameter", "parameter_location")
 
@@ -82,7 +73,7 @@ class PhaseInfo:
         description: str,
         location: str | None = None,
         parameter: str | None = None,
-        parameter_location: str | None = None,
+        parameter_location: ParameterLocation | None = None,
     ) -> PhaseInfo:
         return cls(
             name=TestPhase.COVERAGE,
@@ -111,7 +102,7 @@ class CaseMetadata:
     """Complete metadata for generated cases."""
 
     generation: GenerationInfo
-    components: dict[ComponentKind, ComponentInfo]
+    components: dict[ParameterLocation, ComponentInfo]
     phase: PhaseInfo
 
     __slots__ = ("generation", "components", "phase")
@@ -119,7 +110,7 @@ class CaseMetadata:
     def __init__(
         self,
         generation: GenerationInfo,
-        components: dict[ComponentKind, ComponentInfo],
+        components: dict[ParameterLocation, ComponentInfo],
         phase: PhaseInfo,
     ) -> None:
         self.generation = generation

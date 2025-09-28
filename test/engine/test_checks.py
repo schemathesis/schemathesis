@@ -33,8 +33,14 @@ CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig()
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:
     responses = schema._parse_responses(definition, "")
+    security = schema._parse_security({})
     return APIOperation(
-        "/path", "GET", definition=OperationDefinition(definition), schema=schema, responses=responses
+        "/path",
+        "GET",
+        definition=OperationDefinition(definition),
+        schema=schema,
+        responses=responses,
+        security=security,
     ).Case()
 
 

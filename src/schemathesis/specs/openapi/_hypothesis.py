@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Optional, Union, cast
+from typing import Any, Callable, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
 
 import jsonschema.protocols
@@ -16,12 +16,13 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
+from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
-    ComponentKind,
     ExamplesPhaseData,
     FuzzingPhaseData,
     GenerationInfo,
@@ -31,11 +32,11 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, parameters_to_json_schema
 
 from ... import auths
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from .constants import LOCATION_TO_CONTAINER
 from .formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,
@@ -46,12 +47,11 @@ from .formats import (
 from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
-from .parameters import OpenAPIBody, OpenAPIParameter, parameters_to_json_schema
-from .utils import is_header_location
 
 SLASH = "/"
 StrategyFactory = Callable[
-    [Dict[str, Any], str, str, Optional[str], GenerationConfig, type[jsonschema.protocols.Validator]], st.SearchStrategy
+    [JsonSchema, str, ParameterLocation, Optional[str], GenerationConfig, type[jsonschema.protocols.Validator]],
+    st.SearchStrategy,
 ]
 
 
@@ -91,18 +91,24 @@ def openapi_cases(
     ctx = HookContext(operation=operation)
 
     path_parameters_ = generate_parameter(
-        "path", path_parameters, operation, draw, ctx, hooks, generation_mode, generation_config
+        ParameterLocation.PATH, path_parameters, operation, draw, ctx, hooks, generation_mode, generation_config
     )
-    headers_ = generate_parameter("header", headers, operation, draw, ctx, hooks, generation_mode, generation_config)
-    cookies_ = generate_parameter("cookie", cookies, operation, draw, ctx, hooks, generation_mode, generation_config)
-    query_ = generate_parameter("query", query, operation, draw, ctx, hooks, generation_mode, generation_config)
+    headers_ = generate_parameter(
+        ParameterLocation.HEADER, headers, operation, draw, ctx, hooks, generation_mode, generation_config
+    )
+    cookies_ = generate_parameter(
+        ParameterLocation.COOKIE, cookies, operation, draw, ctx, hooks, generation_mode, generation_config
+    )
+    query_ = generate_parameter(
+        ParameterLocation.QUERY, query, operation, draw, ctx, hooks, generation_mode, generation_config
+    )
 
     if body is NOT_SET:
         if operation.body:
             body_generator = generation_mode
             if generation_mode.is_negative:
                 # Consider only schemas that are possible to negate
-                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema())]
+                candidates = [item for item in operation.body.items if can_negate(item.optimized_schema)]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
@@ -112,7 +118,7 @@ def openapi_cases(
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
             strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config)
-            strategy = apply_hooks(operation, ctx, hooks, strategy, "body")
+            strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(
                 operation.schema.transport.get_matching_media_types(parameter.media_type), key=lambda x: x[0]
@@ -177,11 +183,11 @@ def openapi_cases(
             components={
                 kind: ComponentInfo(mode=value.generator)
                 for kind, value in [
-                    (ComponentKind.QUERY, query_),
-                    (ComponentKind.PATH_PARAMETERS, path_parameters_),
-                    (ComponentKind.HEADERS, headers_),
-                    (ComponentKind.COOKIES, cookies_),
-                    (ComponentKind.BODY, body_),
+                    (ParameterLocation.QUERY, query_),
+                    (ParameterLocation.PATH, path_parameters_),
+                    (ParameterLocation.HEADER, headers_),
+                    (ParameterLocation.COOKIE, cookies_),
+                    (ParameterLocation.BODY, body_),
                 ]
                 if value.generator is not None
             },
@@ -196,7 +202,7 @@ def openapi_cases(
 
 
 def _get_body_strategy(
-    parameter: OpenAPIBody,
+    parameter: OpenApiBody,
     strategy_factory: StrategyFactory,
     operation: APIOperation,
     generation_config: GenerationConfig,
@@ -205,12 +211,12 @@ def _get_body_strategy(
 
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
-    schema = parameter.as_json_schema()
+    schema = parameter.optimized_schema
     assert isinstance(operation.schema, BaseOpenAPISchema)
     strategy = strategy_factory(
         schema,
         operation.label,
-        "body",
+        ParameterLocation.BODY,
         parameter.media_type,
         generation_config,
         operation.schema.adapter.jsonschema_validator_cls,
@@ -222,7 +228,7 @@ def _get_body_strategy(
 
 def get_parameters_value(
     value: dict[str, Any] | None,
-    location: str,
+    location: ParameterLocation,
     draw: Callable,
     operation: APIOperation,
     ctx: HookContext,
@@ -271,7 +277,7 @@ def any_negated_values(values: list[ValueContainer]) -> bool:
 
 
 def generate_parameter(
-    location: str,
+    location: ParameterLocation,
     explicit: dict[str, Any] | None,
     operation: APIOperation,
     draw: Callable,
@@ -285,8 +291,8 @@ def generate_parameter(
     Fallback to positive data generator if parameter can not be negated.
     """
     if generator.is_negative and (
-        (location == "path" and not can_negate_path_parameters(operation))
-        or (is_header_location(location) and not can_negate_headers(operation, location))
+        (location == ParameterLocation.PATH and not can_negate_path_parameters(operation))
+        or (location.is_in_header and not can_negate_headers(operation, location))
     ):
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
@@ -299,7 +305,7 @@ def generate_parameter(
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
-        if value is not None and location == "path":
+        if value is not None and location == ParameterLocation.PATH:
             value = quote_all(value)
         used_generator = None
     return ValueContainer(value=value, location=location, generator=used_generator)
@@ -315,9 +321,9 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
     return any(can_negate(parameter) for parameter in parameters.values())
 
 
-def can_negate_headers(operation: APIOperation, location: str) -> bool:
+def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> bool:
     """Check if any header can be negated."""
-    parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
+    parameters = getattr(operation, location.container_name)
     schema = parameters_to_json_schema(parameters)
     # No headers to negate
     headers = schema["properties"]
@@ -326,9 +332,10 @@ def can_negate_headers(operation: APIOperation, location: str) -> bool:
     return any(header != {"type": "string"} for header in headers.values())
 
 
-def get_schema_for_location(location: str, parameters: Iterable[OpenAPIParameter]) -> dict[str, Any]:
-    schema = parameters_to_json_schema(parameters)
-    if location == "path":
+def get_schema_for_location(location: ParameterLocation, parameters: Iterable[OpenApiParameter]) -> dict[str, Any]:
+    # TODO: Avoid deepclone here - move such adjustments to the transformation process itself?
+    schema = deepclone(parameters_to_json_schema(parameters))
+    if location == ParameterLocation.PATH:
         schema["required"] = list(schema["properties"])
         for prop in schema.get("properties", {}).values():
             if prop.get("type") == "string":
@@ -339,17 +346,17 @@ def get_schema_for_location(location: str, parameters: Iterable[OpenAPIParameter
 def get_parameters_strategy(
     operation: APIOperation,
     strategy_factory: StrategyFactory,
-    location: str,
+    location: ParameterLocation,
     generation_config: GenerationConfig,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
-    parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
+    parameters = getattr(operation, location.container_name)
     if parameters:
         schema = get_schema_for_location(location, parameters)
-        if location == "header" and exclude:
+        if location == ParameterLocation.HEADER and exclude:
             # Remove excluded headers case-insensitively
             exclude_lower = {name.lower() for name in exclude}
             schema["properties"] = {
@@ -380,21 +387,21 @@ def get_parameters_strategy(
             if serialize is not None:
                 strategy = strategy.map(serialize)
             filter_func = {
-                "path": is_valid_path,
-                "header": is_valid_header,
-                "cookie": is_valid_header,
-                "query": is_valid_query,
+                ParameterLocation.PATH: is_valid_path,
+                ParameterLocation.HEADER: is_valid_header,
+                ParameterLocation.COOKIE: is_valid_header,
+                ParameterLocation.QUERY: is_valid_query,
             }[location]
             # Headers with special format do not need filtration
-            if not (is_header_location(location) and _can_skip_header_filter(schema)):
+            if not (location.is_in_header and _can_skip_header_filter(schema)):
                 strategy = strategy.filter(filter_func)
             # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
             # `True` / `False` / `None` improves chances of them passing validation in apps
             # that expect boolean / null types
             # and not aware of Python-specific representation of those types
-            if location == "path":
+            if location == ParameterLocation.PATH:
                 strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
-            elif location == "query":
+            elif location == ParameterLocation.QUERY:
                 strategy = strategy.map(jsonify_python_specific_types)
         return strategy
     # No parameters defined for this location
@@ -438,15 +445,15 @@ def _build_custom_formats(generation_config: GenerationConfig) -> dict[str, st.S
 
 
 def make_positive_strategy(
-    schema: dict[str, Any],
+    schema: JsonSchema,
     operation_name: str,
-    location: str,
+    location: ParameterLocation,
     media_type: str | None,
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema.protocols.Validator],
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
-    if is_header_location(location):
+    if location.is_in_header and isinstance(schema, dict):
         # We try to enforce the right header values via "format"
         # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
         # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
@@ -468,9 +475,9 @@ def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
 
 
 def make_negative_strategy(
-    schema: dict[str, Any],
+    schema: JsonSchema,
     operation_name: str,
-    location: str,
+    location: ParameterLocation,
     media_type: str | None,
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema.protocols.Validator],
@@ -517,8 +524,7 @@ def apply_hooks(
     ctx: HookContext,
     hooks: HookDispatcher | None,
     strategy: st.SearchStrategy,
-    location: str,
+    location: ParameterLocation,
 ) -> st.SearchStrategy:
     """Apply all hooks related to the given location."""
-    container = LOCATION_TO_CONTAINER[location]
-    return apply_to_all_dispatchers(operation, ctx, hooks, strategy, container)
+    return apply_to_all_dispatchers(operation, ctx, hooks, strategy, location.container_name)
