@@ -30,6 +30,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
@@ -123,7 +124,7 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
 class CoverageContext:
     root_schema: dict[str, Any]
     generation_modes: list[GenerationMode]
-    location: str
+    location: ParameterLocation
     is_required: bool
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
@@ -145,7 +146,7 @@ class CoverageContext:
         self,
         *,
         root_schema: dict[str, Any],
-        location: str,
+        location: ParameterLocation,
         generation_modes: list[GenerationMode] | None = None,
         is_required: bool,
         path: list[str | int] | None = None,
@@ -1289,7 +1290,7 @@ def _negative_type(
         del strategies["integer"]
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
-    if ctx.location == "query":
+    if ctx.location == ParameterLocation.QUERY:
         strategies.pop("object", None)
     if filter_func is not None:
         for ty, strategy in strategies.items():
@@ -1321,10 +1322,10 @@ def _negative_type(
     def _does_not_match_the_original_schema(value: Any) -> bool:
         return not is_valid(str(value))
 
-    if ctx.location == "path":
+    if ctx.location == ParameterLocation.PATH:
         for ty, strategy in strategies.items():
             strategies[ty] = strategy.map(jsonify).map(quote_path_parameter)
-    elif ctx.location == "query":
+    elif ctx.location == ParameterLocation.QUERY:
         for ty, strategy in strategies.items():
             strategies[ty] = strategy.map(jsonify)
 

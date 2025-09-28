@@ -14,6 +14,7 @@ from requests.models import RequestEncodingMixin
 import schemathesis
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import (
     HypothesisTestConfig,
@@ -22,7 +23,6 @@ from schemathesis.generation.hypothesis.builder import (
     create_test,
 )
 from schemathesis.generation.meta import TestPhase
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from test.utils import assert_requests_call
 
 
@@ -2309,7 +2309,7 @@ def _validate_serialized_items_are_negative(serialized_items, parameter, case):
         return
 
     # Get the JSON schema for validation
-    schema = parameter.as_json_schema()
+    schema = parameter.optimized_schema
     validator = case.operation.schema.adapter.jsonschema_validator_cls(
         schema,
         format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,

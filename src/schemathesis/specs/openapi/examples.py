@@ -21,12 +21,12 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter import OpenApiResponses
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
+from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
 from ._hypothesis import get_default_format_strategies, openapi_cases
-from .constants import LOCATION_TO_CONTAINER
 from .formats import STRING_FORMATS
-from .parameters import OpenAPIBody, OpenAPIParameter
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -73,7 +73,7 @@ def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_strategies_from_examples(
-    operation: APIOperation[OpenAPIParameter, OpenApiResponses], **kwargs: Any
+    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters], **kwargs: Any
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = get_serializers_for_operation(operation)
@@ -100,7 +100,9 @@ def get_strategies_from_examples(
     ]
 
 
-def extract_top_level(operation: APIOperation[OpenAPIParameter, OpenApiResponses]) -> Generator[Example, None, None]:
+def extract_top_level(
+    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
     from .schemas import BaseOpenAPISchema
 
@@ -121,60 +123,60 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, OpenApiResponses
             definitions = [parameter.definition]
         for definition in definitions:
             # Open API 2 also supports `example`
-            for example_field in {"example", parameter.example_field}:
-                if isinstance(definition, dict) and example_field in definition:
+            for example_keyword in {"example", parameter.adapter.example_keyword}:
+                if isinstance(definition, dict) and example_keyword in definition:
                     yield ParameterExample(
-                        container=LOCATION_TO_CONTAINER[parameter.location],
+                        container=parameter.location.container_name,
                         name=parameter.name,
-                        value=definition[example_field],
+                        value=definition[example_keyword],
                     )
-        if parameter.examples_field in parameter.definition:
-            for value in extract_inner_examples(parameter.definition[parameter.examples_field], operation.schema):
-                yield ParameterExample(
-                    container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
-                )
+        if parameter.adapter.examples_container_keyword in parameter.definition:
+            for value in extract_inner_examples(
+                parameter.definition[parameter.adapter.examples_container_keyword], operation.schema
+            ):
+                yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
         if "schema" in parameter.definition:
             schema = parameter.definition["schema"]
             resolver = RefResolver.from_schema(schema)
             seen_references.clear()
             for expanded in _expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references):
-                if isinstance(expanded, dict) and parameter.examples_field in expanded:
-                    for value in expanded[parameter.examples_field]:
+                if isinstance(expanded, dict) and parameter.adapter.examples_container_keyword in expanded:
+                    for value in expanded[parameter.adapter.examples_container_keyword]:
                         yield ParameterExample(
-                            container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+                            container=parameter.location.container_name, name=parameter.name, value=value
                         )
         for value in find_matching_in_responses(responses, parameter.name):
-            yield ParameterExample(
-                container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
-            )
+            yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
-        alternative = cast(OpenAPIBody, alternative)
-        if "schema" in alternative.definition:
-            schema = alternative.definition["schema"]
+        body = cast(OpenApiBody, alternative)
+        if "schema" in body.definition:
+            schema = body.definition["schema"]
             resolver = RefResolver.from_schema(schema)
             seen_references.clear()
             definitions = [
-                alternative.definition,
+                body.definition,
                 *_expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references),
             ]
         else:
-            definitions = [alternative.definition]
+            definitions = [body.definition]
         for definition in definitions:
             # Open API 2 also supports `example`
-            for example_field in {"example", alternative.example_field}:
-                if isinstance(definition, dict) and example_field in definition:
-                    yield BodyExample(value=definition[example_field], media_type=alternative.media_type)
-        if alternative.examples_field in alternative.definition:
-            for value in extract_inner_examples(alternative.definition[alternative.examples_field], operation.schema):
-                yield BodyExample(value=value, media_type=alternative.media_type)
-        if "schema" in alternative.definition:
-            schema = alternative.definition["schema"]
+            for example_keyword in {"example", body.adapter.example_keyword}:
+                if isinstance(definition, dict) and example_keyword in definition:
+                    yield BodyExample(value=definition[example_keyword], media_type=body.media_type)
+        if body.adapter.examples_container_keyword in body.definition:
+            for value in extract_inner_examples(
+                body.definition[body.adapter.examples_container_keyword], operation.schema
+            ):
+                yield BodyExample(value=value, media_type=body.media_type)
+        if "schema" in body.definition:
+            schema = body.definition["schema"]
             resolver = RefResolver.from_schema(schema)
             seen_references.clear()
             for expanded in _expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references):
-                if isinstance(expanded, dict) and alternative.examples_field in expanded:
-                    for value in expanded[alternative.examples_field]:
-                        yield BodyExample(value=value, media_type=alternative.media_type)
+                if isinstance(expanded, dict) and body.adapter.examples_container_keyword in expanded:
+                    for value in expanded[body.adapter.examples_container_keyword]:
+                        yield BodyExample(value=value, media_type=body.media_type)
 
 
 @overload
@@ -263,51 +265,55 @@ def load_external_example(url: str) -> bytes:
     return response.content
 
 
-def extract_from_schemas(operation: APIOperation[OpenAPIParameter, OpenApiResponses]) -> Generator[Example, None, None]:
+def extract_from_schemas(
+    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
-        schema = parameter.as_json_schema()
+        schema = parameter.optimized_schema
+        if isinstance(schema, bool):
+            continue
         resolver = RefResolver.from_schema(schema)
         seen_references.clear()
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for value in extract_from_schema(
             operation=operation,
             schema=schema,
-            example_field_name=parameter.example_field,
-            examples_field_name=parameter.examples_field,
+            example_keyword=parameter.adapter.example_keyword,
+            examples_container_keyword=parameter.adapter.examples_container_keyword,
             resolver=resolver,
             seen_references=seen_references,
             bundle_storage=bundle_storage,
         ):
-            yield ParameterExample(
-                container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
-            )
+            yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
-        alternative = cast(OpenAPIBody, alternative)
-        schema = alternative.as_json_schema()
+        body = cast(OpenApiBody, alternative)
+        schema = body.optimized_schema
+        if isinstance(schema, bool):
+            continue
         resolver = RefResolver.from_schema(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
-        for example_field, examples_field in (("example", "examples"), ("x-example", "x-examples")):
+        for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
             seen_references.clear()
             for value in extract_from_schema(
                 operation=operation,
                 schema=schema,
-                example_field_name=example_field,
-                examples_field_name=examples_field,
+                example_keyword=example_keyword,
+                examples_container_keyword=examples_container_keyword,
                 resolver=resolver,
                 seen_references=seen_references,
                 bundle_storage=bundle_storage,
             ):
-                yield BodyExample(value=value, media_type=alternative.media_type)
+                yield BodyExample(value=value, media_type=body.media_type)
 
 
 def extract_from_schema(
     *,
-    operation: APIOperation[OpenAPIParameter, OpenApiResponses],
+    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
     schema: dict[str, Any],
-    example_field_name: str,
-    examples_field_name: str,
+    example_keyword: str,
+    examples_container_keyword: str,
     resolver: RefResolver,
     seen_references: set[str],
     bundle_storage: dict[str, Any] | None,
@@ -327,18 +333,20 @@ def extract_from_schema(
                 if isinstance(subsubschema, bool):
                     to_generate[name] = subsubschema
                     continue
-                if example_field_name in subsubschema:
-                    values.append(subsubschema[example_field_name])
-                if examples_field_name in subsubschema and isinstance(subsubschema[examples_field_name], list):
+                if example_keyword in subsubschema:
+                    values.append(subsubschema[example_keyword])
+                if examples_container_keyword in subsubschema and isinstance(
+                    subsubschema[examples_container_keyword], list
+                ):
                     # These are JSON Schema examples, which is an array of values
-                    values.extend(subsubschema[examples_field_name])
+                    values.extend(subsubschema[examples_container_keyword])
                 # Check nested examples as well
                 values.extend(
                     extract_from_schema(
                         operation=operation,
                         schema=subsubschema,
-                        example_field_name=example_field_name,
-                        examples_field_name=examples_field_name,
+                        example_keyword=example_keyword,
+                        examples_container_keyword=examples_container_keyword,
                         resolver=resolver,
                         seen_references=seen_references,
                         bundle_storage=bundle_storage,
@@ -374,8 +382,8 @@ def extract_from_schema(
         for value in extract_from_schema(
             operation=operation,
             schema=schema["items"],
-            example_field_name=example_field_name,
-            examples_field_name=examples_field_name,
+            example_keyword=example_keyword,
+            examples_container_keyword=examples_container_keyword,
             resolver=resolver,
             seen_references=seen_references,
             bundle_storage=bundle_storage,

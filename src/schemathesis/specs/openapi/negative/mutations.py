@@ -10,11 +10,13 @@ from typing import Any, Callable, Sequence, TypeVar
 from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
+from hypothesis_jsonschema._canonicalise import canonicalish
 
 from schemathesis.core.jsonschema import get_type
+from schemathesis.core.jsonschema.types import JsonSchemaObject
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 
-from ..utils import is_header_location
 from .types import Draw, Schema
 from .utils import can_negate
 
@@ -71,7 +73,7 @@ class MutationContext:
     keywords: Schema  # only keywords
     non_keywords: Schema  # everything else
     # Schema location within API operation (header, query, etc)
-    location: str
+    location: ParameterLocation
     # Payload media type, if available
     media_type: str | None
 
@@ -82,7 +84,7 @@ class MutationContext:
         *,
         keywords: Schema,
         non_keywords: Schema,
-        location: str,
+        location: ParameterLocation,
         media_type: str | None,
     ) -> None:
         self.keywords = keywords
@@ -91,22 +93,18 @@ class MutationContext:
         self.media_type = media_type
 
     @property
-    def is_header_location(self) -> bool:
-        return is_header_location(self.location)
-
-    @property
     def is_path_location(self) -> bool:
-        return self.location == "path"
+        return self.location == ParameterLocation.PATH
 
     @property
     def is_query_location(self) -> bool:
-        return self.location == "query"
+        return self.location == ParameterLocation.QUERY
 
     def mutate(self, draw: Draw) -> Schema:
         # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
         # taken as-is. Therefore, we can only apply mutations that won't change the Open API semantics of the schema.
         mutations: list[Mutation]
-        if self.location in ("header", "cookie", "query"):
+        if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE, ParameterLocation.QUERY):
             # These objects follow this pattern:
             # {
             #     "properties": properties,
@@ -141,7 +139,7 @@ class MutationContext:
             # If we failed to apply anything, then reject the whole case
             reject()  # type: ignore
         new_schema.update(self.non_keywords)
-        if self.is_header_location:
+        if self.location.is_in_header:
             # All headers should have names that can be sent over network
             new_schema["propertyNames"] = {"type": "string", "format": "_header_name"}
             for sub_schema in new_schema.get("properties", {}).values():
@@ -215,7 +213,7 @@ def remove_required_property(ctx: MutationContext, draw: Draw, schema: Schema) -
     return MutationResult.SUCCESS
 
 
-def change_type(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def change_type(ctx: MutationContext, draw: Draw, schema: JsonSchemaObject) -> MutationResult:
     """Change type of values accepted by a schema."""
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
@@ -228,7 +226,7 @@ def change_type(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationRes
     # includes all possible values as those parameters will be stringified before sending,
     # therefore it can't be negated.
     types = get_type(schema)
-    if "string" in types and (ctx.is_header_location or ctx.is_path_location or ctx.is_query_location):
+    if "string" in types and (ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location):
         return MutationResult.FAILURE
     candidates = _get_type_candidates(ctx, schema)
     if not candidates:
@@ -304,7 +302,10 @@ def change_properties(ctx: MutationContext, draw: Draw, schema: Schema) -> Mutat
         return MutationResult.FAILURE
     # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
     # one property
-    ordered_properties = draw(ordered(properties, unique_by=lambda x: x[0]))
+    ordered_properties = [
+        (name, canonicalish(subschema) if isinstance(subschema, bool) else subschema)
+        for name, subschema in draw(ordered(properties, unique_by=lambda x: x[0]))
+    ]
     for property_name, property_schema in ordered_properties:
         if apply_until_success(ctx, draw, property_schema) == MutationResult.SUCCESS:
             # It is still possible to generate "positive" cases, for example, when this property is optional.
@@ -404,7 +405,8 @@ def negate_constraints(ctx: MutationContext, draw: Draw, schema: Schema) -> Muta
             # Empty path parameter will be filtered out
             return False
         return not (
-            k in ("type", "properties", "items", "minItems") or (k == "additionalProperties" and ctx.is_header_location)
+            k in ("type", "properties", "items", "minItems")
+            or (k == "additionalProperties" and ctx.location.is_in_header)
         )
 
     enabled_keywords = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
@@ -438,7 +440,7 @@ def negate_constraints(ctx: MutationContext, draw: Draw, schema: Schema) -> Muta
 DEPENDENCIES = {"exclusiveMaximum": "maximum", "exclusiveMinimum": "minimum"}
 
 
-def get_mutations(draw: Draw, schema: Schema) -> tuple[Mutation, ...]:
+def get_mutations(draw: Draw, schema: JsonSchemaObject) -> tuple[Mutation, ...]:
     """Get mutations possible for a schema."""
     types = get_type(schema)
     # On the top-level of Open API schemas, types are always strings, but inside "schema" objects, they are the same as

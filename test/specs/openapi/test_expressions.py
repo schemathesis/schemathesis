@@ -11,10 +11,10 @@ from schemathesis.core.transport import Response
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
-from schemathesis.specs.openapi.adapter.responses import OpenApiResponses
+from schemathesis.specs.openapi.adapter import v3_0
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
-from schemathesis.specs.openapi.parameters import OpenAPI30Body
 
 DOCUMENT = {
     "foo": ["bar", "baz"],
@@ -41,11 +41,16 @@ def operation(openapi_30):
         "PUT",
         OperationDefinition(definition),
         openapi_30,
-        responses=OpenApiResponses.from_definition({}, None, None, None),
+        responses=openapi_30._parse_responses({}, ""),
+        security=openapi_30._parse_security({}),
         label="PUT /users/{user_id}",
         base_url="http://127.0.0.1:8080/api",
     )
-    instance.add_parameter(OpenAPI30Body(content, media_type=media_type, required=False, resource_name=None))
+    instance.add_parameter(
+        OpenApiBody.from_definition(
+            definition=content, media_type=media_type, is_required=False, resource_name=None, adapter=v3_0
+        )
+    )
     return instance
 
 

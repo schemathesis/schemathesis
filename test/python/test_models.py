@@ -11,10 +11,10 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.meta import ComponentKind
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transport.prepare import get_default_headers
@@ -115,6 +115,7 @@ def test_case_repr(swagger_20, kwargs, expected):
         {},
         swagger_20,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
     )
     case = operation.Case(**kwargs)
     assert repr(case) == expected
@@ -130,6 +131,7 @@ def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
         {},
         swagger_20,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
     )
     case = operation.Case(cookies={"TOKEN": "secret"})
     if override:
@@ -168,6 +170,7 @@ def test_reserved_characters_in_operation_name(swagger_20):
         {},
         swagger_20,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
     )
     case = operation.Case()
     # Then it should not be truncated during API call
@@ -191,6 +194,7 @@ def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swag
         swagger_20,
         base_url=openapi2_base_url,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
     )
     original_headers = headers.copy()
     case = operation.Case(headers=headers)
@@ -252,6 +256,7 @@ def test_call(override, base_url, swagger_20):
         {},
         swagger_20,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
     )
     case = operation.Case()
     if override:
@@ -301,7 +306,7 @@ def test_metadata_has_only_relevant_components(openapi3_schema_url):
     def test(case):
         # Metadata should only contain components relevant to the API operation
         assert len(case.meta.components) == 1
-        assert ComponentKind.QUERY in case.meta.components
+        assert ParameterLocation.QUERY in case.meta.components
 
     test()
 
