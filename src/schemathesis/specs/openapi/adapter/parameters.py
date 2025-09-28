@@ -125,3 +125,15 @@ def iter_parameters_v3(
 
 def _get_resource_name(reference: str) -> str:
     return reference.rsplit("/", maxsplit=1)[1]
+
+
+def build_path_parameter_v2(kwargs: Mapping[str, Any]) -> OpenAPIParameter:
+    from schemathesis.specs.openapi.parameters import OpenAPI20Parameter
+
+    return OpenAPI20Parameter({"in": "path", "required": True, "type": "string", "minLength": 1, **kwargs})
+
+
+def build_path_parameter_v3(kwargs: Mapping[str, Any]) -> OpenAPIParameter:
+    from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
+
+    return OpenAPI30Parameter({"in": "path", "required": True, "schema": {"type": "string", "minLength": 1}, **kwargs})
