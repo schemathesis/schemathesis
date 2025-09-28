@@ -25,7 +25,15 @@ import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
+from schemathesis.core import (
+    HTTP_METHODS,
+    INJECTED_PATH_PARAMETER_KEY,
+    NOT_SET,
+    NotSet,
+    Specification,
+    deserialization,
+    media_types,
+)
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -56,9 +64,8 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthStorage
     from schemathesis.generation.stateful import APIStateMachine
 
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
+SCHEMA_PARSING_ERRORS = ()
 
 
 @lru_cache()
@@ -77,6 +84,10 @@ def get_template_fields(template: str) -> set[str]:
 class BaseOpenAPISchema(BaseSchema):
     security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
     adapter: SpecificationAdapter = None  # type: ignore
+
+    def __post_init__(self) -> None:
+        self.root = adapter.SpecificationRoot(self.raw_schema)
+        return super().__post_init__()
 
     @property
     def specification(self) -> Specification:
@@ -264,32 +275,52 @@ class BaseOpenAPISchema(BaseSchema):
         should_skip = self._should_skip
         iter_parameters = self._iter_parameters
         make_operation = self.make_operation
-        for path, path_item in paths.items():
-            method = None
-            try:
-                dispatch_hook("before_process_path", context, path, path_item)
-                scope, path_item = resolve_path_item(path_item)
-                with in_scope(self.resolver, scope):
-                    shared_parameters = path_item.get("parameters", [])
-                    for method, entry in path_item.items():
-                        if method not in HTTP_METHODS:
-                            continue
-                        try:
-                            if should_skip(path, method, entry):
-                                continue
-                            parameters = iter_parameters(entry, shared_parameters)
-                            operation = make_operation(
-                                path,
-                                method,
-                                parameters,
-                                entry,
-                                scope,
-                            )
-                            yield Ok(operation)
-                        except SCHEMA_PARSING_ERRORS as exc:
-                            yield self._into_err(exc, path, method)
-            except SCHEMA_PARSING_ERRORS as exc:
-                yield self._into_err(exc, path, method)
+        for item in self.root:
+            if isinstance(item, Ok):
+                (method, path, operation, shared_parameters, resolver) = item.ok()
+
+                try:
+                    if should_skip(path, method, operation):
+                        continue
+                    parameters = list(
+                        self.adapter.iter_parameters(operation, shared_parameters, self.default_media_types, resolver)
+                    )
+                    operation = make_operation(
+                        path,
+                        method,
+                        parameters,
+                        operation,
+                        resolver._base_uri,
+                    )
+                    yield Ok(operation)
+                except SCHEMA_PARSING_ERRORS as exc:
+                    yield self._into_err(exc, path, method)
+        # for path, path_item in paths.items():
+        #     method = None
+        #     try:
+        #         dispatch_hook("before_process_path", context, path, path_item)
+        #         scope, path_item = resolve_path_item(path_item)
+        #         with in_scope(self.resolver, scope):
+        #             shared_parameters = path_item.get("parameters", [])
+        #             for method, entry in path_item.items():
+        #                 if method not in HTTP_METHODS:
+        #                     continue
+        #                 try:
+        #                     if should_skip(path, method, entry):
+        #                         continue
+        #                     parameters = iter_parameters(entry, shared_parameters)
+        #                     operation = make_operation(
+        #                         path,
+        #                         method,
+        #                         parameters,
+        #                         entry,
+        #                         scope,
+        #                     )
+        #                     yield Ok(operation)
+        #                 except SCHEMA_PARSING_ERRORS as exc:
+        #                     yield self._into_err(exc, path, method)
+        #     except SCHEMA_PARSING_ERRORS as exc:
+        #         yield self._into_err(exc, path, method)
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
         __tracebackhide__ = True

@@ -3,7 +3,8 @@ from __future__ import annotations
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Iterator, Mapping, Sequence, TypedDict, cast
 
-from schemathesis.core.compat import RefResolver
+from referencing._core import Resolver
+
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BundleError, Bundler
 from schemathesis.core.validation import check_header_name
@@ -17,8 +18,8 @@ PathItem = Mapping[str, Any]
 Operation = TypedDict("Operation", {"responses": dict})
 
 
-def _bundle_parameter(parameter: Mapping, resolver: RefResolver, bundler: Bundler) -> dict:
-    _, definition = maybe_resolve(parameter, resolver, "")
+def _bundle_parameter(parameter: Mapping, resolver: Resolver, bundler: Bundler) -> dict:
+    definition, resolver = maybe_resolve(parameter, resolver, "")
     schema = definition.get("schema")
     if schema is not None:
         # Copy the definition and bundle the schema to make it self-contained
@@ -40,7 +41,7 @@ def iter_parameters_v2(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
-    resolver: RefResolver,
+    resolver: Resolver,
 ) -> Iterator[OpenAPIParameter]:
     from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
 
@@ -85,7 +86,7 @@ def iter_parameters_v3(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
-    resolver: RefResolver,
+    resolver: Resolver,
 ) -> Iterator[OpenAPIParameter]:
     from schemathesis.specs.openapi.parameters import OpenAPI30Body, OpenAPI30Parameter
 
@@ -102,9 +103,9 @@ def iter_parameters_v3(
 
     request_body_or_ref = operation.get("requestBody")
     if request_body_or_ref is not None:
-        scope, request_body_or_ref = maybe_resolve(request_body_or_ref, resolver, "")
+        request_body_or_ref, resolver = maybe_resolve(request_body_or_ref, resolver, "")
         # It could be an object inside `requestBodies`, which could be a reference itself
-        _, request_body = maybe_resolve(request_body_or_ref, resolver, scope)
+        request_body, resolver = maybe_resolve(request_body_or_ref, resolver, "")
 
         required = request_body.get("required", False)
         for media_type, content in request_body["content"].items():

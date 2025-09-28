@@ -1,15 +1,11 @@
 from typing import Any, Mapping
 
-from schemathesis.core.compat import RefResolver
+from referencing._core import Resolver
 
 
-def maybe_resolve(item: Mapping[str, Any], resolver: RefResolver, scope: str) -> tuple[str, Mapping[str, Any]]:
+def maybe_resolve(item: Mapping[str, Any], resolver: Resolver, scope: str) -> tuple[Mapping[str, Any], Resolver]:
     reference = item.get("$ref")
     if reference is not None:
-        resolver.push_scope(scope)
-        try:
-            return resolver.resolve(reference)
-        finally:
-            resolver.pop_scope()
-
-    return scope, item
+        resolved = resolver.lookup(reference)
+        return resolved.contents, resolved.resolver
+    return item, resolver

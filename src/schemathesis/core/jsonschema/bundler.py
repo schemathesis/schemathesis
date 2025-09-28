@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from referencing._core import Resolver
+
 from schemathesis.core.compat import RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.references import sanitize
@@ -31,7 +33,7 @@ class Bundler:
     def __init__(self) -> None:
         self.counter = 0
 
-    def bundle(self, schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> JsonSchema:
+    def bundle(self, schema: JsonSchema, resolver: Resolver, *, inline_recursive: bool) -> JsonSchema:
         """Bundle a JSON Schema by embedding all references."""
         # Inlining recursive reference is required (for now) for data generation, but is unsound for data validation
         if isinstance(schema, bool):
@@ -43,7 +45,7 @@ class Bundler:
         defs = {}
 
         has_recursive_references = False
-        resolve = resolver.resolve
+        lookup = resolver.lookup
         visit = visited.add
 
         def get_def_name(uri: str) -> str:
@@ -64,13 +66,15 @@ class Bundler:
             if isinstance(current, dict):
                 reference = current.get("$ref")
                 if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
-                    resolved_uri, resolved_schema = resolve(reference)
+                    resolved = lookup(reference)
+                    resolved_schema = resolved.contents
+                    resolver = resolved.resolver
 
                     if not isinstance(resolved_schema, (dict, bool)):
                         raise BundleError(reference, resolved_schema)
-                    def_name = get_def_name(resolved_uri)
+                    def_name = get_def_name(resolver.base_uri)
 
-                    is_recursive_reference = resolved_uri in resolver._scopes_stack
+                    is_recursive_reference = resolver.base_uri in resolver._scopes_stack
                     has_recursive_references |= is_recursive_reference
                     if inline_recursive and is_recursive_reference:
                         # This is a recursive reference! As of Sep 2025, `hypothesis-jsonschema` does not support
