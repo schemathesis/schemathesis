@@ -1,0 +1,48 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.1.0
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ✅  Coverage (in 0.00s)
+
+     ✅ 1 passed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=========================== No issues found in 1.00s ===========================

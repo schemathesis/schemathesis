@@ -11,6 +11,8 @@ from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import ALL_KEYWORDS
+from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.parameters import ParameterLocation
 
 from .mutations import MutationContext
 
@@ -27,7 +29,7 @@ class CacheKey:
 
     operation_name: str
     location: str
-    schema: Schema
+    schema: JsonSchema
     validator_cls: type[jsonschema.Validator]
 
     __slots__ = ("operation_name", "location", "schema", "validator_cls")
@@ -50,7 +52,8 @@ def split_schema(cache_key: CacheKey) -> tuple[Schema, Schema]:
     The first one contains only validation JSON Schema keywords, the second one everything else.
     """
     keywords, non_keywords = {}, {}
-    for keyword, value in cache_key.schema.items():
+    schema = {} if isinstance(cache_key.schema, bool) else cache_key.schema
+    for keyword, value in schema.items():
         if keyword in ALL_KEYWORDS:
             keywords[keyword] = value
         else:
@@ -59,9 +62,9 @@ def split_schema(cache_key: CacheKey) -> tuple[Schema, Schema]:
 
 
 def negative_schema(
-    schema: Schema,
+    schema: JsonSchema,
     operation_name: str,
-    location: str,
+    location: ParameterLocation,
     media_type: str | None,
     generation_config: GenerationConfig,
     *,
@@ -78,7 +81,7 @@ def negative_schema(
     validator = get_validator(cache_key)
     keywords, non_keywords = split_schema(cache_key)
 
-    if location == "query":
+    if location == ParameterLocation.QUERY:
 
         def filter_values(value: dict[str, Any]) -> bool:
             return is_non_empty_query(value) and not validator.is_valid(value)
@@ -113,7 +116,9 @@ def is_non_empty_query(query: dict[str, Any]) -> bool:
 
 
 @st.composite  # type: ignore
-def mutated(draw: Draw, keywords: Schema, non_keywords: Schema, location: str, media_type: str | None) -> Any:
+def mutated(
+    draw: Draw, keywords: Schema, non_keywords: Schema, location: ParameterLocation, media_type: str | None
+) -> Any:
     return MutationContext(
         keywords=keywords, non_keywords=non_keywords, location=location, media_type=media_type
     ).mutate(draw)

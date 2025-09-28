@@ -146,7 +146,7 @@ class SchemathesisCase(PyCollector):
                 if override is not None:
                     for location, entry in override.items():
                         if entry:
-                            as_strategy_kwargs[location] = entry
+                            as_strategy_kwargs[location.container_name] = entry
                 modes = []
                 phases = self.schema.config.phases_for(operation=operation)
                 if phases.examples.enabled:

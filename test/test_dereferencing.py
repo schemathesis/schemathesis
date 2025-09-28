@@ -563,7 +563,7 @@ def test_complex_dereference(complex_schema):
     assert operation.path == "/teapot"
     assert operation.method == "post"
     assert len(operation.body) == 1
-    assert operation.body[0].required
+    assert operation.body[0].is_required
     assert operation.body[0].media_type == "application/json"
     assert operation.body[0].definition == body_definition
     assert operation.definition.raw == {
@@ -576,9 +576,6 @@ def test_complex_dereference(complex_schema):
         "summary": "Test",
         "tags": ["ancillaries"],
     }
-    assert operation.body[0].required
-    assert operation.body[0].media_type == "application/json"
-    assert operation.body[0].definition == body_definition
 
 
 def test_remote_reference_to_yaml(swagger_20, schema_url):

@@ -243,7 +243,6 @@ def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any
     if isinstance(value, bytes):
         return {"data": value}
     if isinstance(value, dict):
-        value = deepclone(value)
         multipart = _prepare_form_data(value)
         files, data = ctx.case.operation.prepare_multipart(multipart)
         return {"files": files, "data": data}

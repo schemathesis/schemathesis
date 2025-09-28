@@ -7,8 +7,8 @@ Schemathesis dev
 
  ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/
-     Specification:    Open API 3.0.3
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 2.0
      Operations:       1 selected / 1 total
 
 
@@ -28,6 +28,14 @@ Schemathesis dev
 
      ✅ 1 passed
 
+=================================== WARNINGS ===================================
+
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -39,6 +47,9 @@ Test Phases:
   ✅ Coverage
   ✅ Fuzzing
   ⏭  Stateful (not applicable)
+
+Warnings:
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
 
 Test cases:
   N generated, N passed

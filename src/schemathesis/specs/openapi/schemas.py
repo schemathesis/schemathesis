@@ -11,7 +11,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    ClassVar,
     Generator,
     Iterator,
     Mapping,
@@ -26,6 +25,7 @@ from packaging import version
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
+from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
@@ -36,7 +36,9 @@ from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
+from schemathesis.specs.openapi.adapter.parameters import COMBINED_FORM_DATA_MARKER, OpenApiParameter
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
+from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -45,9 +47,7 @@ from . import serialization
 from ._hypothesis import openapi_cases
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
-from .parameters import OpenAPI20CompositeBody, OpenAPIParameter
 from .references import ReferenceResolver
-from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
 if TYPE_CHECKING:
@@ -75,7 +75,6 @@ def get_template_fields(template: str) -> set[str]:
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
-    security: ClassVar[BaseSecurityProcessor] = None  # type: ignore
     adapter: SpecificationAdapter = None  # type: ignore
 
     @property
@@ -129,6 +128,7 @@ class BaseOpenAPISchema(BaseSchema):
                 definition=OperationDefinition(raw=None),
                 schema=None,  # type: ignore
                 responses=None,  # type: ignore
+                security=None,  # type: ignore
             )
         ),
     ) -> bool:
@@ -326,15 +326,25 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _iter_parameters(
         self, definition: dict[str, Any], shared_parameters: Sequence[dict[str, Any]]
-    ) -> list[OpenAPIParameter]:
+    ) -> list[OperationParameter]:
         return list(
-            self.adapter.iter_parameters(definition, shared_parameters, self.default_media_types, self.resolver)
+            self.adapter.iter_parameters(
+                definition, shared_parameters, self.default_media_types, self.resolver, self.adapter
+            )
         )
 
     def _parse_responses(self, definition: dict[str, Any], scope: str) -> OpenApiResponses:
         responses = definition.get("responses", {})
         return OpenApiResponses.from_definition(
             definition=responses, resolver=self.resolver, scope=scope, adapter=self.adapter
+        )
+
+    def _parse_security(self, definition: dict[str, Any]) -> OpenApiSecurityParameters:
+        return OpenApiSecurityParameters.from_definition(
+            schema=self.raw_schema,
+            operation=definition,
+            resolver=self.resolver,
+            adapter=self.adapter,
         )
 
     def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -349,14 +359,15 @@ class BaseOpenAPISchema(BaseSchema):
         self,
         path: str,
         method: str,
-        parameters: list[OpenAPIParameter],
+        parameters: list[OperationParameter],
         definition: dict[str, Any],
         scope: str,
     ) -> APIOperation:
         __tracebackhide__ = True
         base_url = self.get_base_url()
         responses = self._parse_responses(definition, scope)
-        operation: APIOperation[OpenAPIParameter, OpenApiResponses] = APIOperation(
+        security = self._parse_security(definition)
+        operation: APIOperation[OperationParameter, ResponsesContainer, OpenApiSecurityParameters] = APIOperation(
             path=path,
             method=method,
             definition=OperationDefinition(definition),
@@ -364,6 +375,7 @@ class BaseOpenAPISchema(BaseSchema):
             app=self.app,
             schema=self,
             responses=responses,
+            security=security,
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
@@ -377,7 +389,16 @@ class BaseOpenAPISchema(BaseSchema):
             )
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
-            self.security.process_definitions(self.raw_schema, operation, self.resolver)
+            for param in operation.security.iter_parameters():
+                param_name = param.get("name")
+                param_location = param.get("in")
+                if (
+                    param_name is not None
+                    and param_location is not None
+                    and operation.get_parameter(name=param_name, location=param_location) is not None
+                ):
+                    continue
+                operation.add_parameter(OpenApiParameter.from_definition(definition=param, adapter=self.adapter))
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
 
@@ -394,10 +415,6 @@ class BaseOpenAPISchema(BaseSchema):
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
-
-    def get_security_requirements(self, operation: APIOperation) -> list[str]:
-        """Get applied security requirements for the given API operation."""
-        return self.security.get_security_requirements(self.raw_schema, operation)
 
     def get_operation_by_id(self, operation_id: str) -> APIOperation:
         """Get an `APIOperation` instance by its `operationId`."""
@@ -452,10 +469,7 @@ class BaseOpenAPISchema(BaseSchema):
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
-            security_parameters = self.security.get_security_definitions_as_parameters(
-                self.raw_schema, operation, self.resolver, location
-            )
-            security_parameters = [item for item in security_parameters if item["in"] == location]
+            security_parameters = [param for param in operation.security.iter_parameters() if param["in"] == location]
             if security_parameters:
                 definitions.extend(security_parameters)
         if definitions:
@@ -595,8 +609,6 @@ class MethodMap(Mapping):
 
 
 class SwaggerV20(BaseOpenAPISchema):
-    security = SwaggerSecurityProcessor()
-
     def __post_init__(self) -> None:
         self.adapter = adapter.v2
         super().__post_init__()
@@ -641,9 +653,8 @@ class SwaggerV20(BaseOpenAPISchema):
         known_fields: dict[str, dict] = {}
 
         for parameter in operation.body:
-            if isinstance(parameter, OpenAPI20CompositeBody):
-                for form_parameter in parameter.definition:
-                    known_fields[form_parameter.name] = form_parameter.definition
+            if COMBINED_FORM_DATA_MARKER in parameter.definition:
+                known_fields.update(parameter.definition["schema"].get("properties", {}))
 
         def add_file(name: str, value: Any) -> None:
             if isinstance(value, list):
@@ -706,8 +717,6 @@ class SwaggerV20(BaseOpenAPISchema):
 
 
 class OpenApi30(SwaggerV20):
-    security = OpenAPISecurityProcessor()
-
     def __post_init__(self) -> None:
         if self.specification.version.startswith("3.1"):
             self.adapter = adapter.v3_1

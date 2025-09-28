@@ -4,16 +4,17 @@ import enum
 import http.client
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
-from typing import TYPE_CHECKING, Any, Dict, Iterator, NoReturn, cast
+from typing import TYPE_CHECKING, Any, Iterator, Mapping, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import Failure
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import ComponentKind, CoveragePhaseData
+from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -29,7 +30,6 @@ from schemathesis.openapi.checks import (
     UnsupportedMethodResponse,
     UseAfterFree,
 )
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.transport.prepare import prepare_path
 
 from .utils import expand_status_code, expand_status_codes
@@ -267,7 +267,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
     data = meta.phase.data
     if (
         data.parameter
-        and data.parameter_location == "header"
+        and data.parameter_location == ParameterLocation.HEADER
         and data.description
         and data.description.startswith("Missing ")
     ):
@@ -328,20 +328,19 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     if meta is None or not isinstance(case.operation.schema, BaseOpenAPISchema):
         # Ignore manually created cases
         return False
-    if (ComponentKind.BODY in meta.components and meta.components[ComponentKind.BODY].mode.is_negative) or (
-        ComponentKind.PATH_PARAMETERS in meta.components
-        and meta.components[ComponentKind.PATH_PARAMETERS].mode.is_negative
+    if (ParameterLocation.BODY in meta.components and meta.components[ParameterLocation.BODY].mode.is_negative) or (
+        ParameterLocation.PATH in meta.components and meta.components[ParameterLocation.PATH].mode.is_negative
     ):
         # Body or path negations always imply other negations
         return False
     validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
-    for container in (ComponentKind.QUERY, ComponentKind.HEADERS, ComponentKind.COOKIES):
-        meta_for_location = meta.components.get(container)
-        value = getattr(case, container.value)
+    for location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE):
+        meta_for_location = meta.components.get(location)
+        value = getattr(case, location.container_name)
         if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
-            parameters = getattr(case.operation, container)
+            parameters = getattr(case.operation, location.container_name)
             value_without_additional_properties = {k: v for k, v in value.items() if k in parameters}
-            schema = get_schema_for_location(container, parameters)
+            schema = get_schema_for_location(location, parameters)
             if not validator_cls(schema).is_valid(value_without_additional_properties):
                 # Other types of negation found
                 return False
@@ -428,7 +427,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     overrides = case._override
     overrides_all_parameters = True
     for parameter in case.operation.iter_parameters():
-        container = LOCATION_TO_CONTAINER[parameter.location]
+        container = parameter.location.container_name
         if parameter.name not in getattr(overrides, container, {}):
             overrides_all_parameters = False
             break
@@ -484,12 +483,14 @@ class AuthKind(str, enum.Enum):
 @schemathesis.check
 def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
-    from .schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.adapter.security import has_optional_auth
+    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
+    operation = case.operation
     if (
-        not isinstance(case.operation.schema, BaseOpenAPISchema)
+        not isinstance(operation.schema, BaseOpenAPISchema)
         or is_unexpected_http_status_case(case)
-        or _has_optional_auth(case.operation)
+        or has_optional_auth(operation.schema.raw_schema, operation.definition.raw)
     ):
         return True
     security_parameters = _get_security_parameters(case.operation)
@@ -563,30 +564,19 @@ def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> 
     )
 
 
-SecurityParameter = Dict[str, Any]
-
-
-def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]:
+def _get_security_parameters(operation: APIOperation) -> list[Mapping[str, Any]]:
     """Extract security definitions that are active for the given operation and convert them into parameters."""
-    from .schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
 
-    schema = cast(BaseOpenAPISchema, operation.schema)
     return [
-        schema.security._to_parameter(parameter)
-        for parameter in schema.security._get_active_definitions(schema.raw_schema, operation, schema.resolver)
-        if parameter["type"] in ("apiKey", "basic", "http")
+        param
+        for param in operation.security.iter_parameters()
+        if param[ORIGINAL_SECURITY_TYPE_KEY] in ["apiKey", "basic", "http"]
     ]
 
 
-def _has_optional_auth(operation: APIOperation) -> bool:
-    from .schemas import BaseOpenAPISchema
-
-    schema = cast(BaseOpenAPISchema, operation.schema)
-    return schema.security.has_optional_auth(schema.raw_schema, operation)
-
-
 def _contains_auth(
-    ctx: CheckContext, case: Case, response: Response, security_parameters: list[SecurityParameter]
+    ctx: CheckContext, case: Case, response: Response, security_parameters: list[Mapping[str, Any]]
 ) -> AuthKind | None:
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
@@ -603,13 +593,13 @@ def _contains_auth(
     if raw_cookie is not None:
         header_cookies.load(raw_cookie)
 
-    def has_header(p: dict[str, Any]) -> bool:
+    def has_header(p: Mapping[str, Any]) -> bool:
         return p["in"] == "header" and p["name"] in request.headers
 
-    def has_query(p: dict[str, Any]) -> bool:
+    def has_query(p: Mapping[str, Any]) -> bool:
         return p["in"] == "query" and p["name"] in query
 
-    def has_cookie(p: dict[str, Any]) -> bool:
+    def has_cookie(p: Mapping[str, Any]) -> bool:
         cookies = cast(RequestsCookieJar, request._cookies)  # type: ignore
         return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
 
@@ -651,7 +641,7 @@ def _contains_auth(
     return None
 
 
-def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Case:
+def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Case:
     """Remove security parameters from a generated case.
 
     It mutates `case` in place.
@@ -681,14 +671,14 @@ def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Cas
     )
 
 
-def _remove_auth_from_container(container: dict, security_parameters: list[SecurityParameter], location: str) -> None:
+def _remove_auth_from_container(container: dict, security_parameters: list[Mapping[str, Any]], location: str) -> None:
     for parameter in security_parameters:
         name = parameter["name"]
         if parameter["in"] == location:
             container.pop(name, None)
 
 
-def _set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:
+def _set_auth_for_case(case: Case, parameter: Mapping[str, Any]) -> None:
     name = parameter["name"]
     for location, attr_name in (
         ("header", "headers"),

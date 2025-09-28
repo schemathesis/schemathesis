@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Dict, Generator, List
 
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
 Generated = Dict[str, Any]
 Definition = Dict[str, Any]
@@ -57,7 +57,11 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
             # Simple serialization
             style = definition.get("style")
             explode = definition.get("explode")
-            type_ = definition.get("schema", {}).get("type")
+            schema = definition.get("schema", {})
+            if isinstance(schema, dict):
+                type_ = schema.get("type")
+            else:
+                type_ = None
             if definition["in"] == "path":
                 yield from _serialize_path_openapi3(name, type_, style, explode)
             elif definition["in"] == "query":
@@ -69,7 +73,7 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
 
 
 def _serialize_path_openapi3(
-    name: str, type_: str, style: str | None, explode: bool | None
+    name: str, type_: str | None, style: str | None, explode: bool | None
 ) -> Generator[Callable | None, None, None]:
     if style == "simple":
         if type_ == "object":
@@ -96,7 +100,7 @@ def _serialize_path_openapi3(
 
 
 def _serialize_query_openapi3(
-    name: str, type_: str, style: str | None, explode: bool | None
+    name: str, type_: str | None, style: str | None, explode: bool | None
 ) -> Generator[Callable | None, None, None]:
     if type_ == "object":
         if style == "deepObject":
@@ -115,7 +119,9 @@ def _serialize_query_openapi3(
             yield delimited(name, delimiter=",")
 
 
-def _serialize_header_openapi3(name: str, type_: str, explode: bool | None) -> Generator[Callable | None, None, None]:
+def _serialize_header_openapi3(
+    name: str, type_: str | None, explode: bool | None
+) -> Generator[Callable | None, None, None]:
     # Headers should be coerced to a string so we can check it for validity later
     yield to_string(name)
     # Header parameters always use the "simple" style, that is, comma-separated values
@@ -128,7 +134,9 @@ def _serialize_header_openapi3(name: str, type_: str, explode: bool | None) -> G
             yield delimited_object(name)
 
 
-def _serialize_cookie_openapi3(name: str, type_: str, explode: bool | None) -> Generator[Callable | None, None, None]:
+def _serialize_cookie_openapi3(
+    name: str, type_: str | None, explode: bool | None
+) -> Generator[Callable | None, None, None]:
     # Cookies should be coerced to a string so we can check it for validity later
     yield to_string(name)
     # Cookie parameters always use the "form" style

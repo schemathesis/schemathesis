@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.generation.hypothesis import examples, strategies
+from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
     extract_from_schemas,
@@ -19,7 +20,6 @@ from schemathesis.specs.openapi.examples import (
     find_matching_in_responses,
     produce_combinations,
 )
-from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import assert_requests_call
 

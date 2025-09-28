@@ -27,13 +27,13 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis import auths
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
-    ComponentKind,
     ExamplesPhaseData,
     FuzzingPhaseData,
     GenerationInfo,
@@ -48,7 +48,6 @@ from schemathesis.schemas import (
     BaseSchema,
     OperationDefinition,
 )
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
@@ -85,6 +84,9 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 class GraphQLResponses:
     def find_by_status_code(self, status_code: int) -> None:
+        return None  # pragma: no cover
+
+    def add(self, status_code: str, definition: dict[str, Any]) -> None:
         return None  # pragma: no cover
 
 
@@ -164,6 +166,7 @@ class GraphQLSchema(BaseSchema):
             method="POST",
             schema=self,
             responses=GraphQLResponses(),
+            security=None,
             definition=None,  # type: ignore
         )
 
@@ -217,6 +220,7 @@ class GraphQLSchema(BaseSchema):
             app=self.app,
             schema=self,
             responses=GraphQLResponses(),
+            security=None,
             # Parameters are not yet supported
             definition=GraphQLOperationDefinition(
                 raw=field,
@@ -353,10 +357,12 @@ def graphql_cases(
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)
 
-    path_parameters_ = _generate_parameter("path", path_parameters, draw, operation, hook_context, hooks)
-    headers_ = _generate_parameter("header", headers, draw, operation, hook_context, hooks)
-    cookies_ = _generate_parameter("cookie", cookies, draw, operation, hook_context, hooks)
-    query_ = _generate_parameter("query", query, draw, operation, hook_context, hooks)
+    path_parameters_ = _generate_parameter(
+        ParameterLocation.PATH, path_parameters, draw, operation, hook_context, hooks
+    )
+    headers_ = _generate_parameter(ParameterLocation.HEADER, headers, draw, operation, hook_context, hooks)
+    cookies_ = _generate_parameter(ParameterLocation.COOKIE, cookies, draw, operation, hook_context, hooks)
+    query_ = _generate_parameter(ParameterLocation.QUERY, query, draw, operation, hook_context, hooks)
 
     _phase_data = {
         TestPhase.EXAMPLES: ExamplesPhaseData(),
@@ -378,11 +384,11 @@ def graphql_cases(
             components={
                 kind: ComponentInfo(mode=generation_mode)
                 for kind, value in [
-                    (ComponentKind.QUERY, query_),
-                    (ComponentKind.PATH_PARAMETERS, path_parameters_),
-                    (ComponentKind.HEADERS, headers_),
-                    (ComponentKind.COOKIES, cookies_),
-                    (ComponentKind.BODY, body),
+                    (ParameterLocation.QUERY, query_),
+                    (ParameterLocation.PATH, path_parameters_),
+                    (ParameterLocation.HEADER, headers_),
+                    (ParameterLocation.COOKIE, cookies_),
+                    (ParameterLocation.BODY, body),
                 ]
                 if value is not NOT_SET
             },
@@ -398,7 +404,7 @@ def graphql_cases(
 
 
 def _generate_parameter(
-    location: str,
+    location: ParameterLocation,
     explicit: NotSet | dict[str, Any],
     draw: Callable,
     operation: APIOperation,
@@ -406,7 +412,7 @@ def _generate_parameter(
     hooks: HookDispatcher | None,
 ) -> Any:
     # Schemathesis does not generate anything but `body` for GraphQL, hence use `None`
-    container = LOCATION_TO_CONTAINER[location]
+    container = location.container_name
     if isinstance(explicit, NotSet):
         strategy = apply_to_all_dispatchers(operation, context, hooks, st.none(), container)
     else:

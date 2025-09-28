@@ -8,6 +8,7 @@ from jsonschema import Draft4Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
@@ -147,7 +148,7 @@ def test_valid_headers(keywords):
             "additionalProperties": False,
         },
         "GET /users/",
-        "header",
+        ParameterLocation.HEADER,
         None,
         GenerationConfig(),
         Draft4Validator,
@@ -170,7 +171,7 @@ def test_configure_headers():
             "additionalProperties": False,
         },
         "GET /users/",
-        "header",
+        ParameterLocation.HEADER,
         None,
         GenerationConfig(exclude_header_characters="".join({chr(i) for i in range(256)} - {"A", "B", "C"})),
         Draft4Validator,
@@ -197,7 +198,7 @@ def test_no_much_filtering_in_headers():
             "additionalProperties": False,
         },
         "GET /users/",
-        "header",
+        ParameterLocation.HEADER,
         None,
         GenerationConfig(),
         Draft4Validator,

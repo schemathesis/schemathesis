@@ -507,6 +507,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
         swagger_20,
         base_url=base_url,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
     )
     original = operation.Case().call
     counter = 0

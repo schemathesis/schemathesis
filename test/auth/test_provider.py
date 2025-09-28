@@ -186,7 +186,9 @@ def test_auth_cache_with_scopes(openapi3_base_url):
         security = context.operation.definition.raw.get("security", [])
         if not security:
             return None
-        scopes = security[0][context.operation.get_security_requirements()[0]]
+
+        requirements = context.operation.definition.raw.get("security", schema.raw_schema.get("security", []))
+        scopes = security[0][next(key for requirement in requirements for key in requirement)]
         if not scopes:
             return None
         return frozenset(scopes)

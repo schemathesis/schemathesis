@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
@@ -18,8 +19,8 @@ from schemathesis.specs.openapi._hypothesis import (
     make_positive_strategy,
     quote_all,
 )
-from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
-from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
+from schemathesis.specs.openapi.adapter import v2
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, form_data_to_json_schema
 from schemathesis.transport.serialization import Binary
 from test.utils import assert_requests_call
 
@@ -31,21 +32,22 @@ def make_operation(schema, **kwargs) -> APIOperation:
         definition=OperationDefinition({}),
         schema=schema,
         responses=schema._parse_responses({}, ""),
+        security=schema._parse_security({}),
         **kwargs,
     )
 
 
-@pytest.mark.parametrize("location", sorted(LOCATION_TO_CONTAINER))
+@pytest.mark.parametrize("location", sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN}))
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_get_examples(location, swagger_20):
-    if location == "body":
+    if location == ParameterLocation.BODY:
         # In Open API 2.0, the `body` parameter has a name, which is ignored
         # But we'd like to use this object as a payload; therefore, we put one extra level of nesting
         example = expected = {"name": "John"}
         media_type = "application/json"
         cls = PayloadAlternatives
-        parameter_cls = OpenAPI20Body
-        kwargs = {"media_type": media_type, "resource_name": None}
+        parameter_cls = OpenApiBody
+        kwargs = {"media_type": media_type, "resource_name": None, "is_required": True}
         definition = {
             "in": location,
             "name": "name",
@@ -58,7 +60,7 @@ def test_get_examples(location, swagger_20):
         expected = {"name": example}
         media_type = None  # there is no payload
         cls = ParameterSet
-        parameter_cls = OpenAPI20Parameter
+        parameter_cls = OpenApiParameter
         kwargs = {}
         definition = {
             "in": location,
@@ -67,10 +69,10 @@ def test_get_examples(location, swagger_20):
             "type": "string",
             "x-example": example,
         }
-    container = LOCATION_TO_CONTAINER[location]
+    container = location.container_name
     operation = make_operation(
         swagger_20,
-        **{container: cls([parameter_cls(definition, **kwargs)])},
+        **{container: cls([parameter_cls.from_definition(definition=definition, adapter=v2, **kwargs)])},
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -91,16 +93,18 @@ def test_no_body_in_get(swagger_20):
         definition=OperationDefinition({}),
         schema=swagger_20,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
         query=ParameterSet(
             [
-                OpenAPI20Parameter(
-                    {
+                OpenApiParameter.from_definition(
+                    definition={
                         "required": True,
                         "in": "query",
                         "type": "string",
                         "name": "key",
                         "x-example": "John",
-                    }
+                    },
+                    adapter=v2,
                 )
             ]
         ),
@@ -117,8 +121,15 @@ def test_custom_strategies(swagger_20):
         swagger_20,
         query=ParameterSet(
             [
-                OpenAPI20Parameter(
-                    {"name": "id", "in": "query", "required": True, "type": "string", "format": "even_4_digits"}
+                OpenApiParameter.from_definition(
+                    definition={
+                        "name": "id",
+                        "in": "query",
+                        "required": True,
+                        "type": "string",
+                        "format": "even_4_digits",
+                    },
+                    adapter=v2,
                 )
             ]
         ),
@@ -129,21 +140,26 @@ def test_custom_strategies(swagger_20):
 
 
 def test_default_strategies_binary(swagger_20):
-    body = OpenAPI20CompositeBody.from_parameters(
-        {
-            "name": "upfile",
-            "in": "formData",
-            "type": "file",
-            "required": True,
-        },
+    body = OpenApiBody.from_form_parameters(
+        definition=form_data_to_json_schema(
+            [
+                {
+                    "name": "upfile",
+                    "in": "formData",
+                    "type": "file",
+                    "required": True,
+                }
+            ]
+        ),
         media_type="multipart/form-data",
+        adapter=v2,
     )
     operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
     swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
     case = examples.generate_one(operation.as_strategy())
     assert isinstance(case.body["upfile"], Binary)
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
-    assert kwargs["files"] == [("upfile", case.body["upfile"].data)]
+    assert kwargs["files"] == [("upfile", case.body["upfile"])]
 
 
 def test_merge_length_into_pattern(ctx):
@@ -216,10 +232,17 @@ def test_default_strategies_bytes(swagger_20):
         swagger_20,
         body=PayloadAlternatives(
             [
-                OpenAPI20Body(
-                    {"in": "body", "name": "byte", "required": True, "schema": {"type": "string", "format": "byte"}},
+                OpenApiBody.from_definition(
+                    definition={
+                        "in": "body",
+                        "name": "byte",
+                        "required": True,
+                        "schema": {"type": "string", "format": "byte"},
+                    },
+                    is_required=True,
                     media_type="text/plain",
                     resource_name=None,
+                    adapter=v2,
                 )
             ]
         ),
@@ -253,8 +276,9 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         definition=OperationDefinition({}),
         schema=swagger_20,
         responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
         base_url=openapi2_base_url,
-        headers=ParameterSet([OpenAPI20Parameter(definition)]),
+        headers=ParameterSet([OpenApiParameter.from_definition(definition=definition, adapter=v2)]),
     )
 
     @given(case=operation.as_strategy())

@@ -2,12 +2,14 @@ import datetime
 
 import pytest
 from hypothesis import HealthCheck, assume, find, given, settings
-from hypothesis.errors import NoSuchExample
+from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 
 import schemathesis
+from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
+from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
 
 from .utils import as_param
 
@@ -197,7 +199,6 @@ def test_security_definitions_api_key(testdir, schema, location):
 @schema.parametrize()
 @settings(max_examples=1, deadline=None)
 def test_(case):
-    assert case.operation.get_security_requirements() == ["api_key"]
     assert_str(case.{location}["api_key"])
     assert_requests_call(case)
         """,
@@ -242,18 +243,32 @@ def _assert_parameter(schema, schema_spec, location, expected=None):
         expected = (
             expected
             if expected is not None
-            else [{"in": location, "name": "api_key", "type": "string", "required": True}]
+            else [
+                {
+                    "in": location,
+                    "name": "api_key",
+                    "type": "string",
+                    "required": True,
+                    ORIGINAL_SECURITY_TYPE_KEY: "apiKey",
+                }
+            ]
         )
     else:
         operation = schema["/query"]["get"]
         expected = (
             expected
             if expected is not None
-            else [{"in": location, "name": "api_key", "schema": {"type": "string"}, "required": True}]
+            else [
+                {
+                    "in": location,
+                    "name": "api_key",
+                    "schema": {"type": "string"},
+                    "required": True,
+                    ORIGINAL_SECURITY_TYPE_KEY: "apiKey",
+                }
+            ]
         )
-    parameters = schema.security.get_security_definitions_as_parameters(
-        schema.raw_schema, operation, schema.resolver, location
-    )
+    parameters = [param for param in operation.security.iter_parameters() if param["in"] == location]
     # Then it should be presented as a "string" parameter
     assert parameters == expected
 
@@ -638,3 +653,138 @@ def test_exclude_chars_and_no_x00_for_headers(openapi3_schema_url):
         assert all(ch not in case.headers["X-Token"] for ch in schema.config.generation.exclude_header_characters)
 
     test()
+
+
+@pytest.mark.filterwarnings("error")
+def test_parameter_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapshot_cli):
+    # When a parameter has a boolean true schema (accepts anything in OpenAPI 3.1)
+    paths = {
+        "/success": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "h",
+                        "in": "header",
+                        "schema": True,
+                        "required": True,
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": True,
+                        "required": True,
+                    },
+                ],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    raw_schema = ctx.openapi.build_schema(paths, version="3.1.0")
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/success"]["GET"]
+
+    # Then the optimized schema should handle boolean true correctly
+    # Header parameters should default to string type for practical generation
+    assert operation.headers[0].optimized_schema == {"type": "string"}
+    assert operation.query[0].optimized_schema is True
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5)
+    def test_positive(case):
+        assert "h" in case.headers
+        assert isinstance(case.headers["h"], str)
+        assert "q" in case.query
+
+    test_positive()
+
+    @given(case=operation.as_strategy(GenerationMode.NEGATIVE))
+    @settings(max_examples=1, suppress_health_check=list(HealthCheck))
+    def test_negative(case):
+        pass
+
+    test_negative()
+
+    schema_path = ctx.openapi.write_schema(paths, version="3.1.0")
+
+    assert (
+        cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--checks=not_a_server_error")
+        == snapshot_cli
+    )
+
+
+def test_parameter_with_boolean_false_schema(ctx):
+    # When a parameter has a boolean false schema (accepts nothing - unusual but valid)
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "impossible",
+                            "in": "query",
+                            "schema": False,  # Boolean false - accepts nothing
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    # Then it should load without crashing
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["GET"]
+    parameter = operation.query[0]
+    # The optimized schema should be preserved or handled
+    assert parameter.optimized_schema is False
+
+
+@pytest.mark.filterwarnings("error")
+def test_request_body_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapshot_cli):
+    # When a request body has a boolean true schema
+    paths = {
+        "/payload": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": True,
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    raw_schema = ctx.openapi.build_schema(paths, version="3.1.0")
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/payload"]["POST"]
+
+    # Then the optimized schema should handle boolean true correctly
+    assert operation.body[0].optimized_schema is True
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=5)
+    def test_positive(case):
+        assert case.body is not NOT_SET
+
+    test_positive()
+
+    @given(case=operation.as_strategy(GenerationMode.NEGATIVE))
+    @settings(max_examples=1)
+    def test_negative(case):
+        pass
+
+    # It is not possible to generate data for a schema that accepts everything
+    with pytest.raises((Unsatisfiable, FailedHealthCheck)):
+        test_negative()
+
+    schema_path = ctx.openapi.write_schema(paths, version="3.1.0")
+
+    assert (
+        cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--checks=not_a_server_error")
+        == snapshot_cli
+    )

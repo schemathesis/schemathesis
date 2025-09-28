@@ -12,6 +12,8 @@
 - Properly close HAR files.
 - Avoid excessive memory consumption in resolved schemas. [#1697](https://github.com/schemathesis/schemathesis/issues/1697)
 - Properly search for `examples` in Open API 2.0 responses.
+- Coverage phase missing some examples for request bodies.
+- Accept booleans for parameter schemas in Open API 3.1.
 
 ### :wrench: Changed
 

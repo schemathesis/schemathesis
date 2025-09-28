@@ -6,11 +6,11 @@ from io import StringIO
 from typing import TYPE_CHECKING, Any, Dict, List, Union
 from unicodedata import normalize
 
-from schemathesis.core.compat import RefResolver
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.transforms import deepclone, transform
 
 if TYPE_CHECKING:
+    from schemathesis.core.compat import RefResolver
     from schemathesis.generation.case import Case
 
 
@@ -89,7 +89,7 @@ def serialize_xml(case: Case, value: Any) -> dict[str, Any]:
     resource_name = None
 
     for body in case.operation.get_bodies_for_media_type(media_type):
-        schema = body.as_json_schema()
+        schema = body.optimized_schema
         resource_name = body.resource_name
         break
     assert schema is not None, (case.operation.body, media_type)
@@ -102,6 +102,8 @@ def _serialize_xml(value: Any, schema: dict[str, Any], resource_name: str | None
 
     Schemas may contain additional information for fine-tuned XML serialization.
     """
+    from schemathesis.core.compat import RefResolver
+
     if isinstance(value, (bytes, str)):
         return {"data": value}
     resolver = RefResolver.from_schema(schema)
@@ -241,7 +243,10 @@ def _write_array(
             _write_namespace(buffer, options)
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
-    items = deepclone((schema or {}).get("items", {}))
+    if schema:
+        items = deepclone(schema).get("items", {})
+    else:
+        items = {}
     if "$ref" in items:
         _, items = resolver.resolve(items["$ref"])
     child_options = items.get("xml", {})

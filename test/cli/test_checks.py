@@ -124,12 +124,25 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
     )
 
 
-def test_optional_auth_should_not_trigger_ignored_auth_check(app_runner, cli, snapshot_cli):
+@pytest.mark.parametrize(
+    ["version", "kwargs"],
+    [
+        pytest.param(
+            "2.0",
+            {"securityDefinitions": {"basic_auth": {"type": "basic"}}},
+            id="openapi2",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"components": {"securitySchemes": {"basic_auth": {"type": "http", "scheme": "basic"}}}},
+            id="openapi3",
+        ),
+    ],
+)
+def test_optional_auth_should_not_trigger_ignored_auth_check(ctx, app_runner, cli, snapshot_cli, version, kwargs):
     # See GH-3052
-    raw_schema = {
-        "openapi": "3.0.3",
-        "info": {"title": "example", "version": "1.0.0"},
-        "paths": {
+    raw_schema = ctx.openapi.build_schema(
+        {
             "/": {
                 "get": {
                     "security": [
@@ -138,12 +151,11 @@ def test_optional_auth_should_not_trigger_ignored_auth_check(app_runner, cli, sn
                     ],
                     "responses": {"200": {"description": "200 OK"}},
                 }
-            },
+            }
         },
-        "components": {
-            "securitySchemes": {"basic_auth": {"type": "http", "scheme": "basic"}},
-        },
-    }
+        version=version,
+        **kwargs,
+    )
     app = Flask(__name__)
 
     @app.route("/openapi.json")
@@ -162,11 +174,24 @@ def test_optional_auth_should_not_trigger_ignored_auth_check(app_runner, cli, sn
     )
 
 
-def test_optional_auth_should_not_trigger_missing_required_header(app_runner, cli, snapshot_cli):
-    raw_schema = {
-        "openapi": "3.0.3",
-        "info": {"title": "example", "version": "1.0.0"},
-        "paths": {
+@pytest.mark.parametrize(
+    ["version", "kwargs"],
+    [
+        pytest.param(
+            "2.0",
+            {"securityDefinitions": {"basic_auth": {"type": "basic"}}},
+            id="openapi2",
+        ),
+        pytest.param(
+            "3.0.2",
+            {"components": {"securitySchemes": {"basic_auth": {"type": "http", "scheme": "basic"}}}},
+            id="openapi3",
+        ),
+    ],
+)
+def test_optional_auth_should_not_trigger_missing_required_header(ctx, app_runner, cli, snapshot_cli, version, kwargs):
+    raw_schema = ctx.openapi.build_schema(
+        {
             "/": {
                 "get": {
                     "security": [
@@ -177,10 +202,9 @@ def test_optional_auth_should_not_trigger_missing_required_header(app_runner, cl
                 }
             },
         },
-        "components": {
-            "securitySchemes": {"basic_auth": {"type": "http", "scheme": "basic"}},
-        },
-    }
+        version=version,
+        **kwargs,
+    )
     app = Flask(__name__)
 
     @app.route("/openapi.json")
@@ -193,12 +217,7 @@ def test_optional_auth_should_not_trigger_missing_required_header(app_runner, cl
 
     port = app_runner.run_flask_app(app)
 
-    assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
-        )
-        == snapshot_cli
-    )
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "-c missing_required_header") == snapshot_cli
 
 
 def test_format_parameter_csv_response(app_runner, cli, snapshot_cli):

@@ -7,6 +7,7 @@ import requests
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine import from_schema
@@ -199,21 +200,26 @@ def test_get_operation_by_reference_repeatedly(schema, key):
     _ = schema.get_operation_by_reference(key)
 
 
-def _as_jsonschema(operations):
+def _optimized_schema(operations):
     for operation in operations:
         for parameter in operation.ok().iter_parameters():
-            _ = parameter.as_json_schema()
+            _ = parameter.optimized_schema
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize("operations", [BBCI_OPERATIONS, VMWARE_OPERATIONS], ids=("bbci", "vmware"))
 def test_as_json_schema(operations, benchmark):
-    benchmark(_as_jsonschema, operations)
+    benchmark(_optimized_schema, operations)
 
 
 def _get_parameters_strategy(operations, config):
     for operation in operations:
-        for location in ["header", "cookie", "path", "query"]:
+        for location in [
+            ParameterLocation.HEADER,
+            ParameterLocation.COOKIE,
+            ParameterLocation.PATH,
+            ParameterLocation.QUERY,
+        ]:
             get_parameters_strategy(operation.ok(), make_positive_strategy, location, config)
 
 

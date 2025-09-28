@@ -13,8 +13,3 @@ def expand_status_code(status_code: str | int) -> Generator[int, None, None]:
 
 def expand_status_codes(status_codes: list[str]) -> set[int]:
     return set(chain.from_iterable(expand_status_code(code) for code in status_codes))
-
-
-def is_header_location(location: str) -> bool:
-    """Whether this location affects HTTP headers."""
-    return location in ("header", "cookie")

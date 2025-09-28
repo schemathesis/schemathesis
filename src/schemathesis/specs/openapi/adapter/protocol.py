@@ -1,21 +1,27 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Mapping, Protocol, Sequence, Union
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Union
 
 if TYPE_CHECKING:
     from jsonschema.protocols import Validator
 
+    from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.compat import RefResolver
     from schemathesis.core.jsonschema.types import JsonSchema
-    from schemathesis.specs.openapi.parameters import OpenAPIParameter
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
-IterParameters = Callable[
-    [Mapping[str, Any], Sequence[Mapping[str, Any]], list[str], "RefResolver"], Iterator["OpenAPIParameter"]
+ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
+ExtractSecurityParameters = Callable[
+    [Mapping[str, Any], Mapping[str, Any], "RefResolver"],
+    Iterator[Mapping[str, Any]],
 ]
-BuildPathParameter = Callable[[Mapping[str, Any]], "OpenAPIParameter"]
+IterParameters = Callable[
+    [Mapping[str, Any], Sequence[Mapping[str, Any]], list[str], "RefResolver", "SpecificationAdapter"],
+    Iterable["OperationParameter"],
+]
+BuildPathParameter = Callable[[Mapping[str, Any]], "OperationParameter"]
 
 
 class SpecificationAdapter(Protocol):
@@ -27,8 +33,13 @@ class SpecificationAdapter(Protocol):
     header_required_keyword: str
     # Keyword for Open API links
     links_keyword: str
-    # Function to extract examples from response definition
-    iter_response_examples: IterResponseExamples
+    # Keyword for a single example
+    example_keyword: str
+    # Keyword for examples container
+    examples_container_keyword: str
+
+    # Function to extract schema from parameter definition
+    extract_parameter_schema: ExtractParameterSchema
     # Function to extract response schema from specification
     extract_response_schema: ExtractResponseSchema
     # Function to extract header schema from specification
@@ -37,5 +48,10 @@ class SpecificationAdapter(Protocol):
     iter_parameters: IterParameters
     # Function to create a new path parameter
     build_path_parameter: BuildPathParameter
+    # Function to extract examples from response definition
+    iter_response_examples: IterResponseExamples
+    # Function to extract security parameters for an API operation
+    extract_security_parameters: ExtractSecurityParameters
+
     # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[Validator]

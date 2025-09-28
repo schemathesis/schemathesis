@@ -5,12 +5,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Iterator
 
 from schemathesis.config import ProjectConfig
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import diff
-from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-    from schemathesis.schemas import APIOperation, Parameter
+    from schemathesis.schemas import APIOperation, OperationParameter
 
 
 @dataclass
@@ -24,21 +24,21 @@ class Override:
 
     __slots__ = ("query", "headers", "cookies", "path_parameters")
 
-    def items(self) -> Iterator[tuple[str, dict[str, str]]]:
+    def items(self) -> Iterator[tuple[ParameterLocation, dict[str, str]]]:
         for key, value in (
-            ("query", self.query),
-            ("headers", self.headers),
-            ("cookies", self.cookies),
-            ("path_parameters", self.path_parameters),
+            (ParameterLocation.QUERY, self.query),
+            (ParameterLocation.HEADER, self.headers),
+            (ParameterLocation.COOKIE, self.cookies),
+            (ParameterLocation.PATH, self.path_parameters),
         ):
             if value:
                 yield key, value
 
     @classmethod
-    def from_components(cls, components: dict[ComponentKind, StoredValue], case: Case) -> Override:
+    def from_components(cls, components: dict[ParameterLocation, StoredValue], case: Case) -> Override:
         return Override(
             **{
-                kind.value: get_component_diff(stored=stored, current=getattr(case, kind.value))
+                kind.container_name: get_component_diff(stored=stored, current=getattr(case, kind.container_name))
                 for kind, stored in components.items()
             }
         )
@@ -69,9 +69,9 @@ def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override
     return output
 
 
-def _get_override_value(param: Parameter, parameters: dict[str, Any]) -> Any:
+def _get_override_value(param: OperationParameter, parameters: dict[str, Any]) -> Any:
     key = param.name
-    full_key = f"{param.location}.{param.name}"
+    full_key = f"{param.location.value}.{param.name}"
     if key in parameters:
         return parameters[key]
     elif full_key in parameters:
@@ -102,17 +102,17 @@ def get_component_diff(stored: StoredValue, current: dict[str, Any] | None) -> d
     return current
 
 
-def store_components(case: Case) -> dict[ComponentKind, StoredValue]:
+def store_components(case: Case) -> dict[ParameterLocation, StoredValue]:
     """Store original component states for a test case."""
     return {
         kind: StoredValue(
-            value=store_original_state(getattr(case, kind.value)),
+            value=store_original_state(getattr(case, kind.container_name)),
             is_generated=bool(case.meta and kind in case.meta.components),
         )
         for kind in [
-            ComponentKind.QUERY,
-            ComponentKind.HEADERS,
-            ComponentKind.COOKIES,
-            ComponentKind.PATH_PARAMETERS,
+            ParameterLocation.QUERY,
+            ParameterLocation.HEADER,
+            ParameterLocation.COOKIE,
+            ParameterLocation.PATH,
         ]
     }

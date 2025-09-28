@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from schemathesis.core.compat import RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.references import sanitize
 from schemathesis.core.jsonschema.types import JsonSchema, to_json_type_name
 from schemathesis.core.transforms import deepclone
+
+if TYPE_CHECKING:
+    from schemathesis.core.compat import RefResolver
+
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
@@ -34,7 +37,7 @@ class Bundler:
     def bundle(self, schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> JsonSchema:
         """Bundle a JSON Schema by embedding all references."""
         # Inlining recursive reference is required (for now) for data generation, but is unsound for data validation
-        if isinstance(schema, bool):
+        if not isinstance(schema, dict):
             return schema
 
         # Track visited URIs and their local definition names

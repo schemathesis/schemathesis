@@ -2,7 +2,6 @@ import pytest
 
 import schemathesis
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
 
 
 @pytest.mark.operations("get_user", "update_user")
@@ -15,10 +14,8 @@ def test_get_operation_via_remote_reference(openapi_version, schema_url):
     assert len(resolved.query) == 1
     # Via common parameters for all methods
     if openapi_version.is_openapi_2:
-        assert isinstance(resolved.query[0], OpenAPI20Parameter)
         assert resolved.query[0].definition == {"in": "query", "name": "common", "required": True, "type": "integer"}
     if openapi_version.is_openapi_3:
-        assert isinstance(resolved.query[0], OpenAPI30Parameter)
         assert resolved.query[0].definition == {
             "in": "query",
             "name": "common",
