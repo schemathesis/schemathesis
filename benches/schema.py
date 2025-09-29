@@ -10,6 +10,7 @@ from schemathesis.config import SchemathesisConfig
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine import from_schema
+from schemathesis.specs.openapi._hypothesis import get_parameters_strategy, make_positive_strategy
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -208,6 +209,25 @@ def _as_jsonschema(operations):
 @pytest.mark.parametrize("operations", [BBCI_OPERATIONS, VMWARE_OPERATIONS], ids=("bbci", "vmware"))
 def test_as_json_schema(operations, benchmark):
     benchmark(_as_jsonschema, operations)
+
+
+def _get_parameters_strategy(operations, config):
+    for operation in operations:
+        for location in ["header", "cookie", "path", "query"]:
+            get_parameters_strategy(operation.ok(), make_positive_strategy, location, config)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "operations, config",
+    [
+        (BBCI_OPERATIONS, BBCI_SCHEMA.config.generation),
+        (VMWARE_OPERATIONS, VMWARE_SCHEMA.config.generation),
+    ],
+    ids=("bbci", "vmware"),
+)
+def test_get_parameters_strategy(benchmark, operations, config):
+    benchmark(_get_parameters_strategy, operations, config)
 
 
 @pytest.mark.benchmark
