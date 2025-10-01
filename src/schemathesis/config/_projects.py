@@ -367,7 +367,8 @@ class ProjectConfig(DiffBase):
         if phase is not None:
             phases = self.phases_for(operation=operation)
             phase_config = phases.get_by_name(name=phase)
-            configs.append(phase_config.generation)
+            if not phase_config._is_default:
+                configs.append(phase_config.generation)
         configs.append(self.generation)
         return GenerationConfig.from_hierarchy(configs)
 
@@ -388,7 +389,8 @@ class ProjectConfig(DiffBase):
         if phase is not None:
             phases = self.phases_for(operation=operation)
             phase_config = phases.get_by_name(name=phase)
-            configs.append(phase_config.checks)
+            if not phase_config._is_default:
+                configs.append(phase_config.checks)
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
 
