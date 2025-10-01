@@ -70,6 +70,8 @@ class DiffBase:
     def from_hierarchy(cls, configs: list[T]) -> T:
         # This config will accumulate "merged" config options
         output = cls()
+        if not configs:
+            return output  # type: ignore
         for option in cls.__slots__:  # type: ignore
             if option.startswith("_"):
                 continue
