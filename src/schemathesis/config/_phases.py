@@ -17,7 +17,7 @@ class PhaseConfig(DiffBase):
     generation: GenerationConfig
     checks: ChecksConfig
 
-    __slots__ = ("enabled", "generation", "checks")
+    __slots__ = ("enabled", "generation", "checks", "_is_default")
 
     def __init__(
         self,
@@ -29,6 +29,7 @@ class PhaseConfig(DiffBase):
         self.enabled = enabled
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
+        self._is_default = enabled and generation is None and checks is None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PhaseConfig:
@@ -46,7 +47,7 @@ class ExamplesPhaseConfig(DiffBase):
     generation: GenerationConfig
     checks: ChecksConfig
 
-    __slots__ = ("enabled", "fill_missing", "generation", "checks")
+    __slots__ = ("enabled", "fill_missing", "generation", "checks", "_is_default")
 
     def __init__(
         self,
@@ -60,6 +61,7 @@ class ExamplesPhaseConfig(DiffBase):
         self.fill_missing = fill_missing
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
+        self._is_default = enabled and not fill_missing and generation is None and checks is None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ExamplesPhaseConfig:
@@ -79,7 +81,14 @@ class CoveragePhaseConfig(DiffBase):
     checks: ChecksConfig
     unexpected_methods: set[str]
 
-    __slots__ = ("enabled", "generate_duplicate_query_parameters", "generation", "checks", "unexpected_methods")
+    __slots__ = (
+        "enabled",
+        "generate_duplicate_query_parameters",
+        "generation",
+        "checks",
+        "unexpected_methods",
+        "_is_default",
+    )
 
     def __init__(
         self,
@@ -95,6 +104,13 @@ class CoveragePhaseConfig(DiffBase):
         self.unexpected_methods = unexpected_methods or DEFAULT_UNEXPECTED_METHODS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
+        self._is_default = (
+            enabled
+            and not generate_duplicate_query_parameters
+            and generation is None
+            and checks is None
+            and unexpected_methods is None
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CoveragePhaseConfig:
@@ -142,7 +158,7 @@ class StatefulPhaseConfig(DiffBase):
     max_steps: int
     inference: InferenceConfig
 
-    __slots__ = ("enabled", "generation", "checks", "max_steps", "inference")
+    __slots__ = ("enabled", "generation", "checks", "max_steps", "inference", "_is_default")
 
     def __init__(
         self,
@@ -158,6 +174,7 @@ class StatefulPhaseConfig(DiffBase):
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
         self.inference = inference or InferenceConfig()
+        self._is_default = enabled and generation is None and checks is None and max_steps is None and inference is None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StatefulPhaseConfig:
