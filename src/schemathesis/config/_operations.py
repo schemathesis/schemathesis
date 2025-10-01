@@ -68,6 +68,8 @@ class OperationsConfig(DiffBase):
 
     def get_for_operation(self, operation: APIOperation) -> OperationConfig:
         configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
+        if not configs:
+            return OperationConfig()
         return OperationConfig.from_hierarchy(configs)
 
     def create_filter_set(

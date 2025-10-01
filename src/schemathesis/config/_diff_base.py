@@ -69,9 +69,7 @@ class DiffBase:
     @classmethod
     def from_hierarchy(cls, configs: list[T]) -> T:
         # This config will accumulate "merged" config options
-        if not configs:
-            return cls()  # type: ignore
-        elif len(configs) == 1:
+        if len(configs) == 1:
             return configs[0]
         output = cls()
         for option in cls.__slots__:  # type: ignore
