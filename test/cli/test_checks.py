@@ -577,3 +577,102 @@ def test_use_after_free_does_not_trigger_on_error(app_runner, cli, snapshot_cli,
         )
         == snapshot_cli
     )
+
+
+def test_negative_data_rejection_array_min_items_zero_no_false_positive(app_runner, cli, snapshot_cli):
+    # See GH-3056
+    raw_schema = {
+        "openapi": "3.1.1",
+        "info": {"title": "Test API", "version": "0.1.0"},
+        "paths": {
+            "/no-param": {
+                "get": {
+                    "operationId": "noParam",
+                    "responses": {
+                        "200": {
+                            "description": "Simple example",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "foo": {
+                                                "type": "string",
+                                                "example": "bar",
+                                            }
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/with-param": {
+                "get": {
+                    "operationId": "withParam",
+                    "parameters": [
+                        {
+                            "name": "ids",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                # Explicitly allows empty array
+                                "minItems": 0,
+                            },
+                            "style": "form",
+                            # Comma-separated format
+                            "explode": False,
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Simple example",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"foo": {"type": "string", "example": "bar"}},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        },
+    }
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/no-param", methods=["GET"])
+    def no_param():
+        return jsonify({"foo": "bar"}), 200
+
+    @app.route("/with-param", methods=["GET"])
+    def with_param():
+        # Check if 'ids' parameter is present in the URL
+        if "ids" not in request.args:
+            # Required parameter is missing - this is truly invalid
+            return jsonify({"error": "Missing required parameter: ids"}), 400
+        return jsonify({"foo": "bar"}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--phases=fuzzing",
+            "--suppress-health-check=all",
+            "--max-examples=20",
+        )
+        == snapshot_cli
+    )
