@@ -328,6 +328,9 @@ class CoverageContext:
             if isinstance(schema, dict) and "allOf" not in schema:
                 return self.generate_from_schema(schema)
 
+        if isinstance(schema, dict) and "examples" in schema:
+            # Examples may contain binary data which will fail the canonicalisation process in `hypothesis-jsonschema`
+            schema = {key: value for key, value in schema.items() if key != "examples"}
         return self.generate_from(from_schema(schema, custom_formats=self.custom_formats))
 
 

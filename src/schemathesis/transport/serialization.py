@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Union
 from unicodedata import normalize
 
 from schemathesis.core.errors import UnboundPrefix
-from schemathesis.core.transforms import deepclone, transform
+from schemathesis.core.transforms import transform
 
 if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
@@ -244,7 +244,7 @@ def _write_array(
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
     if schema:
-        items = deepclone(schema).get("items", {})
+        items = dict(schema.get("items", {}))
     else:
         items = {}
     if "$ref" in items:

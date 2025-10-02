@@ -306,6 +306,29 @@ def test_unknown_multipart_fields_openapi2(ctx):
     ]
 
 
+@pytest.mark.filterwarnings("error")
+def test_multipart_examples_serialization(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "example": {"key": {}},
+                                "schema": {"title": "Test"},
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=response_schema_conformance") == snapshot_cli
+    )
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires a more complex test setup")
 def test_multipart_with_references(ctx):
     # See GH-2776

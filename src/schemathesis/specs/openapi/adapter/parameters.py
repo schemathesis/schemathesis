@@ -102,11 +102,6 @@ class OpenApiComponent(ABC):
         if isinstance(schema, dict):
             if default_type is not None:
                 schema.setdefault("type", default_type)
-
-            # Collect examples into a JSON Schema compatible field
-            examples = self.examples
-            if examples:
-                schema["examples"] = examples
         elif schema is True and default_type is not None:
             # Restrict such cases too
             schema = {"type": default_type}
