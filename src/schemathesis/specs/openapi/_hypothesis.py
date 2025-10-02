@@ -17,6 +17,7 @@ from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -329,9 +330,8 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
 
 
 def get_schema_for_location(location: ParameterLocation, parameters: OpenApiParameterSet) -> dict[str, Any]:
-    schema = parameters.schema
+    schema = deepclone(parameters.schema)
     if location == ParameterLocation.PATH:
-        schema = dict(schema)
         schema["required"] = list(schema["properties"])
         # Shallow copy properties dict itself and each modified property
         properties = schema.get("properties", {})
@@ -360,7 +360,6 @@ def get_parameters_strategy(
         schema = get_schema_for_location(location, container)
         if location == ParameterLocation.HEADER and exclude:
             # Remove excluded headers case-insensitively
-            schema = dict(schema)
             exclude_lower = {name.lower() for name in exclude}
             schema["properties"] = {
                 key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
