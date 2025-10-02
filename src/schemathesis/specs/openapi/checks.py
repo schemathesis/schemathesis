@@ -338,9 +338,9 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         meta_for_location = meta.components.get(location)
         value = getattr(case, location.container_name)
         if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
-            parameters = getattr(case.operation, location.container_name)
-            value_without_additional_properties = {k: v for k, v in value.items() if k in parameters}
-            schema = get_schema_for_location(location, parameters)
+            container = getattr(case.operation, location.container_name)
+            value_without_additional_properties = {k: v for k, v in value.items() if k in container}
+            schema = get_schema_for_location(location, container)
             if not validator_cls(schema).is_valid(value_without_additional_properties):
                 # Other types of negation found
                 return False

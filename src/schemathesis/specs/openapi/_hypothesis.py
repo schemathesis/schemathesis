@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
@@ -18,7 +17,6 @@ from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -32,7 +30,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, parameters_to_json_schema
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 
 from ... import auths
 from ...generation import GenerationMode
@@ -249,7 +247,7 @@ def get_parameters_value(
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
-        copied = deepclone(value)
+        copied = dict(value)
         copied.update(new)
         return copied
     return value
@@ -313,9 +311,8 @@ def generate_parameter(
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
     """Check if any path parameter can be negated."""
-    schema = parameters_to_json_schema(operation.path_parameters)
     # No path parameters to negate
-    parameters = schema["properties"]
+    parameters = cast(OpenApiParameterSet, operation.path_parameters).schema["properties"]
     if not parameters:
         return True
     return any(can_negate(parameter) for parameter in parameters.values())
@@ -323,23 +320,28 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
 
 def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> bool:
     """Check if any header can be negated."""
-    parameters = getattr(operation, location.container_name)
-    schema = parameters_to_json_schema(parameters)
+    container = getattr(operation, location.container_name)
     # No headers to negate
-    headers = schema["properties"]
+    headers = container.schema["properties"]
     if not headers:
         return True
     return any(header != {"type": "string"} for header in headers.values())
 
 
-def get_schema_for_location(location: ParameterLocation, parameters: Iterable[OpenApiParameter]) -> dict[str, Any]:
-    # TODO: Avoid deepclone here - move such adjustments to the transformation process itself?
-    schema = deepclone(parameters_to_json_schema(parameters))
+def get_schema_for_location(location: ParameterLocation, parameters: OpenApiParameterSet) -> dict[str, Any]:
+    schema = parameters.schema
     if location == ParameterLocation.PATH:
+        schema = dict(schema)
         schema["required"] = list(schema["properties"])
-        for prop in schema.get("properties", {}).values():
-            if prop.get("type") == "string":
-                prop.setdefault("minLength", 1)
+        # Shallow copy properties dict itself and each modified property
+        properties = schema.get("properties", {})
+        if properties:
+            schema["properties"] = {
+                key: {**value, "minLength": value.get("minLength", 1)}
+                if value.get("type") == "string" and "minLength" not in value
+                else value
+                for key, value in properties.items()
+            }
     return schema
 
 
@@ -353,11 +355,12 @@ def get_parameters_strategy(
     """Create a new strategy for the case's component from the API operation parameters."""
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
-    parameters = getattr(operation, location.container_name)
-    if parameters:
-        schema = get_schema_for_location(location, parameters)
+    container = getattr(operation, location.container_name)
+    if container:
+        schema = get_schema_for_location(location, container)
         if location == ParameterLocation.HEADER and exclude:
             # Remove excluded headers case-insensitively
+            schema = dict(schema)
             exclude_lower = {name.lower() for name in exclude}
             schema["properties"] = {
                 key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
@@ -366,10 +369,10 @@ def get_parameters_strategy(
                 schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
         elif exclude:
             # Non-header locations: remove by exact name
-            for name in exclude:
-                schema["properties"].pop(name, None)
-                with suppress(ValueError):
-                    schema["required"].remove(name)
+            schema = dict(schema)
+            schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude}
+            if "required" in schema:
+                schema["required"] = [key for key in schema["required"] if key not in exclude]
         if not schema["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()
