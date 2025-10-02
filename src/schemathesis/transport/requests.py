@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from schemathesis.core import NotSet
 from schemathesis.core.rate_limit import ratelimit
-from schemathesis.core.transforms import deepclone, merge_at
+from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
 from schemathesis.generation.overrides import Override
 from schemathesis.transport import BaseTransport, SerializationContext
@@ -61,7 +61,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         # Replace empty dictionaries with empty strings, so the parameters actually present in the query string
         if any(value == {} for value in (params or {}).values()):
-            params = deepclone(params)
+            params = dict(params)
             for key, value in params.items():
                 if value == {}:
                     params[key] = ""
