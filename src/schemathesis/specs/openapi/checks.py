@@ -36,6 +36,7 @@ from .utils import expand_status_code, expand_status_codes
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
 
 
 def is_unexpected_http_status_case(case: Case) -> bool:
@@ -339,13 +340,42 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         value = getattr(case, location.container_name)
         if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
             container = getattr(case.operation, location.container_name)
-            value_without_additional_properties = {k: v for k, v in value.items() if k in container}
             schema = get_schema_for_location(location, container)
+
+            if _has_serialization_sensitive_types(schema, container):
+                # Can't reliably determine if only additional properties were added
+                continue
+
+            value_without_additional_properties = {k: v for k, v in value.items() if k in container}
             if not validator_cls(schema).is_valid(value_without_additional_properties):
                 # Other types of negation found
                 return False
     # Only additional properties are added
     return True
+
+
+def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameterSet) -> bool:
+    """Check if schema contains array or object types in defined parameters.
+
+    In query/header/cookie parameters, arrays and objects are serialized to strings.
+    This makes post-serialization validation against the original schema unreliable:
+
+    - Generated: ["foo", "bar"] (array)
+    - Serialized: "foo,bar" (string)
+
+    Validation of string against array schema fails incorrectly.
+    A better approach would be to apply serialization later on in the process.
+
+    """
+    from schemathesis.core.jsonschema import get_type
+
+    properties = schema.get("properties", {})
+    for prop_name, prop_schema in properties.items():
+        if prop_name in container:
+            types = get_type(prop_schema)
+            if "array" in types or "object" in types:
+                return True
+    return False
 
 
 @schemathesis.check

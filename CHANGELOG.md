@@ -14,6 +14,7 @@
 - Properly search for `examples` in Open API 2.0 responses.
 - Coverage phase missing some examples for request bodies.
 - Accept booleans for parameter schemas in Open API 3.1.
+- Fixed false positives in `negative_data_rejection` check for array of strings query parameters. [#3056](https://github.com/schemathesis/schemathesis/issues/3056)
 
 ### :wrench: Changed
 
