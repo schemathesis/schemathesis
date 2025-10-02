@@ -36,7 +36,11 @@ from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.adapter.parameters import COMBINED_FORM_DATA_MARKER, OpenApiParameter
+from schemathesis.specs.openapi.adapter.parameters import (
+    COMBINED_FORM_DATA_MARKER,
+    OpenApiParameter,
+    OpenApiParameterSet,
+)
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 
@@ -376,6 +380,10 @@ class BaseOpenAPISchema(BaseSchema):
             schema=self,
             responses=responses,
             security=security,
+            path_parameters=OpenApiParameterSet(),
+            query=OpenApiParameterSet(),
+            headers=OpenApiParameterSet(),
+            cookies=OpenApiParameterSet(),
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
