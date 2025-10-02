@@ -221,7 +221,7 @@ def to_json(item: Generated, name: str) -> None:
 
 @conversion
 def delimited(item: Generated, name: str, delimiter: str) -> None:
-    item[name] = delimiter.join(map(str, force_iterable(item[name] or ())))
+    item[name] = delimiter.join(map(str, force_iterable(item[name] if item[name] is not None else ())))
 
 
 @conversion

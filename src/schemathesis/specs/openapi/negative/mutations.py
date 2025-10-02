@@ -354,6 +354,14 @@ def change_items(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationRe
     if not items:
         # No items to mutate
         return MutationResult.FAILURE
+    # For query/path/header/cookie, string items cannot be meaningfully mutated
+    # because all types serialize to strings anyway
+    if ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location:
+        items = schema.get("items", {})
+        if isinstance(items, dict):
+            items_types = get_type(items)
+            if "string" in items_types:
+                return MutationResult.FAILURE
     if isinstance(items, dict):
         return _change_items_object(ctx, draw, schema, items)
     if isinstance(items, list):
