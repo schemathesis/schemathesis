@@ -541,6 +541,10 @@ def _iter_coverage_cases(
         location = parameter.location
         name = parameter.name
         schema = parameter.unoptimized_schema
+        examples = parameter.examples
+        if examples:
+            schema = dict(schema)
+            schema["examples"] = examples
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
@@ -564,12 +568,14 @@ def _iter_coverage_cases(
         for body in operation.body:
             instant = Instant()
             schema = body.unoptimized_schema
-            # User-registered media types should only handle text / binary data
-            if isinstance(schema, dict):
-                examples = schema.get("examples")
-                if isinstance(examples, list) and body.media_type in MEDIA_TYPES:
-                    schema = {key: value for key, value in schema.items() if key != "examples"}
+            examples = body.examples
+            if examples:
+                schema = dict(schema)
+                # User-registered media types should only handle text / binary data
+                if body.media_type in MEDIA_TYPES:
                     schema["examples"] = [example for example in examples if isinstance(example, (str, bytes))]
+                else:
+                    schema["examples"] = examples
             gen = coverage.cover_schema_iter(
                 coverage.CoverageContext(
                     root_schema=schema,
