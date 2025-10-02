@@ -12,7 +12,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.schemas import APIOperation, OperationDefinition, ParameterSet, PayloadAlternatives
+from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
     jsonify_python_specific_types,
@@ -20,7 +20,12 @@ from schemathesis.specs.openapi._hypothesis import (
     quote_all,
 )
 from schemathesis.specs.openapi.adapter import v2
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, form_data_to_json_schema
+from schemathesis.specs.openapi.adapter.parameters import (
+    OpenApiBody,
+    OpenApiParameter,
+    OpenApiParameterSet,
+    form_data_to_json_schema,
+)
 from schemathesis.transport.serialization import Binary
 from test.utils import assert_requests_call
 
@@ -59,7 +64,7 @@ def test_get_examples(location, swagger_20):
         example = "John"
         expected = {"name": example}
         media_type = None  # there is no payload
-        cls = ParameterSet
+        cls = OpenApiParameterSet
         parameter_cls = OpenApiParameter
         kwargs = {}
         definition = {
@@ -94,7 +99,7 @@ def test_no_body_in_get(swagger_20):
         schema=swagger_20,
         responses=swagger_20._parse_responses({}, ""),
         security=swagger_20._parse_security({}),
-        query=ParameterSet(
+        query=OpenApiParameterSet(
             [
                 OpenApiParameter.from_definition(
                     definition={
@@ -119,7 +124,7 @@ def test_custom_strategies(swagger_20):
     schemathesis.openapi.format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     operation = make_operation(
         swagger_20,
-        query=ParameterSet(
+        query=OpenApiParameterSet(
             [
                 OpenApiParameter.from_definition(
                     definition={
@@ -278,7 +283,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         responses=swagger_20._parse_responses({}, ""),
         security=swagger_20._parse_security({}),
         base_url=openapi2_base_url,
-        headers=ParameterSet([OpenApiParameter.from_definition(definition=definition, adapter=v2)]),
+        headers=OpenApiParameterSet([OpenApiParameter.from_definition(definition=definition, adapter=v2)]),
     )
 
     @given(case=operation.as_strategy())

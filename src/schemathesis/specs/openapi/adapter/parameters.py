@@ -13,6 +13,7 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.validation import check_header_name
+from schemathesis.schemas import ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
@@ -429,6 +430,24 @@ def build_path_parameter_v3_1(kwargs: Mapping[str, Any]) -> OpenApiParameter:
         },
         adapter=v3_1,
     )
+
+
+@dataclass
+class OpenApiParameterSet(ParameterSet):
+    items: list[OpenApiParameter]
+
+    __slots__ = ("items", "_schema")
+
+    def __init__(self, items: list[OpenApiParameter] | None = None) -> None:
+        self.items = items or []
+        self._schema: dict | NotSet = NOT_SET
+
+    @property
+    def schema(self) -> dict[str, Any]:
+        if self._schema is NOT_SET:
+            self._schema = parameters_to_json_schema(self.items)
+        assert not isinstance(self._schema, NotSet)
+        return self._schema
 
 
 COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"

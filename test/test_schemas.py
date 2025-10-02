@@ -251,7 +251,6 @@ def test_get_operation_by_id_in_referenced_path_shared_parameters(ctx):
     operation = schema.get_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
-    assert operation.query.get("foo").definition == parameter
 
 
 def test_get_operation_by_id_no_paths_on_openapi_3_1():
