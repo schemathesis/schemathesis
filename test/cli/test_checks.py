@@ -124,6 +124,80 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
     )
 
 
+def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_runner, cli, snapshot_cli):
+    # See GH-2913
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/example/v1/page": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "names",
+                            "schema": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "example": ["TEST"],
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"data": {"type": "array"}},
+                                    }
+                                }
+                            },
+                        },
+                        "400": {
+                            "description": "Bad Request",
+                        },
+                    },
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/api/example/v1/page", methods=["GET"])
+    def get_page():
+        names_value = request.args.get("names")
+        if names_value is None:
+            # Parameter not provided at all
+            names = []
+        elif names_value == "":
+            # Empty value (?names=)
+            names = []
+        else:
+            # Comma-separated values for array (style: form, explode: false)
+            names = names_value.split(",")
+
+        return jsonify({"data": names}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--phases=fuzzing",
+            "--max-examples=50",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.parametrize(
     ["version", "kwargs"],
     [
