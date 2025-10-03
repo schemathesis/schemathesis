@@ -2,26 +2,25 @@ from __future__ import annotations
 
 import platform
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Iterable
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
-from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, open_text_output
 from schemathesis.core.failures import format_failures
 from schemathesis.engine import Status, events
 
 
 @dataclass
 class JunitXMLHandler(EventHandler):
-    path: Path
+    output: TextOutput
     test_cases: dict
 
     __slots__ = ("path", "test_cases")
 
-    def __init__(self, path: Path, test_cases: dict | None = None) -> None:
-        self.path = path
+    def __init__(self, output: TextOutput, test_cases: dict | None = None) -> None:
+        self.output = output
         self.test_cases = test_cases or {}
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
@@ -40,7 +39,7 @@ class JunitXMLHandler(EventHandler):
             test_suites = [
                 TestSuite("schemathesis", test_cases=list(self.test_cases.values()), hostname=platform.node())
             ]
-            with open(self.path, "w", encoding="utf-8") as fd:
+            with open_text_output(self.output) as fd:
                 to_xml_report_file(file_descriptor=fd, test_suites=test_suites, prettyprint=True, encoding="utf-8")
 
     def get_or_create_test_case(self, label: str) -> TestCase:

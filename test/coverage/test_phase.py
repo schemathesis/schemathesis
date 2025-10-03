@@ -1046,6 +1046,10 @@ def test_path_parameter_dots(ctx):
                 {"path_parameters": {"name": "null%2Cnull"}},
                 {"path_parameters": {"name": ANY}},
             ],
+            [
+                {"path_parameters": {"name": "null%2Cnull"}},
+                {"path_parameters": {"name": "null"}},
+            ],
         ),
     )
 
