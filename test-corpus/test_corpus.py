@@ -1,5 +1,6 @@
 import pathlib
 import sys
+from io import StringIO
 from typing import NoReturn
 from unittest.mock import patch
 
@@ -360,7 +361,7 @@ def combined_check(ctx, response, case):
             pass
 
 
-def test_default(corpus, filename, tmp_path):
+def test_default(corpus, filename):
     schema = _load_schema(corpus, filename)
     try:
         schema.as_state_machine()()
@@ -373,9 +374,9 @@ def test_default(corpus, filename, tmp_path):
     schema.config.checks.update(included_check_names=[combined_check.__name__])
 
     handlers = [
-        JunitXMLHandler(path=tmp_path / "junit.xml"),
-        CassetteWriter(format=ReportFormat.VCR, path=tmp_path / "vcr.yaml", config=schema.config),
-        CassetteWriter(format=ReportFormat.HAR, path=tmp_path / "har.json", config=schema.config),
+        JunitXMLHandler(output=StringIO()),
+        CassetteWriter(format=ReportFormat.VCR, output=StringIO(), config=schema.config),
+        CassetteWriter(format=ReportFormat.HAR, output=StringIO(), config=schema.config),
     ]
     ctx = ExecutionContext(schema.config)
 

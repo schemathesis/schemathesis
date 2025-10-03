@@ -6,7 +6,6 @@ import sys
 import threading
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
-from pathlib import Path
 from queue import Queue
 from typing import IO, Callable, Iterator
 from urllib.parse import parse_qsl, urlparse
@@ -14,7 +13,7 @@ from urllib.parse import parse_qsl, urlparse
 import harfile
 
 from schemathesis.cli.commands.run.context import ExecutionContext
-from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, open_text_output
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
@@ -33,27 +32,27 @@ class CassetteWriter(EventHandler):
     """Write network interactions to a cassette."""
 
     format: ReportFormat
-    path: Path
+    output: TextOutput
     config: ProjectConfig
     queue: Queue
     worker: threading.Thread
 
-    __slots__ = ("format", "path", "config", "queue", "worker")
+    __slots__ = ("format", "output", "config", "queue", "worker")
 
     def __init__(
         self,
         format: ReportFormat,
-        path: Path,
+        output: TextOutput,
         config: ProjectConfig,
         queue: Queue | None = None,
     ) -> None:
         self.format = format
-        self.path = path
+        self.output = output
         self.config = config
         self.queue = queue or Queue()
 
         kwargs = {
-            "path": self.path,
+            "output": self.output,
             "config": self.config,
             "queue": self.queue,
         }
@@ -119,7 +118,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def vcr_writer(path: Path, config: ProjectConfig, queue: Queue) -> None:
+def vcr_writer(output: TextOutput, config: ProjectConfig, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -203,7 +202,7 @@ def vcr_writer(path: Path, config: ProjectConfig, queue: Queue) -> None:
                 )
                 write_double_quoted(output, string)
 
-    with open(path, "w", encoding="utf-8") as stream:
+    with open_text_output(output) as stream:
         while True:
             item = queue.get()
             if isinstance(item, Initialize):
@@ -367,8 +366,8 @@ def write_double_quoted(stream: IO, text: str | None) -> None:
     stream.write('"')
 
 
-def har_writer(path: Path, config: SchemathesisConfig, queue: Queue) -> None:
-    with harfile.open(path) as har:
+def har_writer(output: TextOutput, config: SchemathesisConfig, queue: Queue) -> None:
+    with harfile.open(output) as har:
         while True:
             item = queue.get()
             if isinstance(item, Process):

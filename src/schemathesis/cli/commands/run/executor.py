@@ -105,7 +105,7 @@ def initialize_handlers(
         if report.enabled:
             path = config.reports.get_path(format)
             open_file(path)
-            handlers.append(CassetteWriter(format=format, path=path, config=config))
+            handlers.append(CassetteWriter(format=format, output=path, config=config))
 
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))
