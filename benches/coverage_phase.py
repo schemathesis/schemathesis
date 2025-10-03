@@ -3,6 +3,7 @@
 import pytest
 from jsonschema import Draft202012Validator
 
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.coverage import CoverageContext, cover_schema_iter
 from schemathesis.generation.hypothesis import setup
 
@@ -10,10 +11,20 @@ setup()
 
 CONTEXTS = [
     CoverageContext(
-        root_schema={}, location="body", is_required=True, custom_formats={}, validator_cls=Draft202012Validator
+        root_schema={},
+        location=ParameterLocation.BODY,
+        media_type=("application", "json"),
+        is_required=True,
+        custom_formats={},
+        validator_cls=Draft202012Validator,
     ).with_positive(),
     CoverageContext(
-        root_schema={}, location="body", is_required=True, custom_formats={}, validator_cls=Draft202012Validator
+        root_schema={},
+        location=ParameterLocation.BODY,
+        media_type=("application", "json"),
+        is_required=True,
+        custom_formats={},
+        validator_cls=Draft202012Validator,
     ).with_negative(),
 ]
 CONTEXT_NAMES = [",".join([m.value for m in ctx.generation_modes]) for ctx in CONTEXTS]

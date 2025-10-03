@@ -551,6 +551,7 @@ def _iter_coverage_cases(
             coverage.CoverageContext(
                 root_schema=schema,
                 location=location,
+                media_type=None,
                 generation_modes=generation_modes,
                 is_required=parameter.is_required,
                 custom_formats=custom_formats,
@@ -566,6 +567,7 @@ def _iter_coverage_cases(
                     coverage.CoverageContext(
                         root_schema=schema,
                         location=location,
+                        media_type=None,
                         generation_modes=[GenerationMode.POSITIVE],
                         is_required=parameter.is_required,
                         custom_formats=custom_formats,
@@ -597,6 +599,7 @@ def _iter_coverage_cases(
                 coverage.CoverageContext(
                     root_schema=schema,
                     location=ParameterLocation.BODY,
+                    media_type=media_types.parse(body.media_type),
                     generation_modes=generation_modes,
                     is_required=body.is_required,
                     custom_formats=custom_formats,
@@ -829,6 +832,7 @@ def _iter_coverage_cases(
                     coverage.CoverageContext(
                         root_schema=subschema,
                         location=_location,
+                        media_type=None,
                         generation_modes=[GenerationMode.NEGATIVE],
                         is_required=is_required,
                         custom_formats=custom_formats,

@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from functools import lru_cache
-from typing import Generator, Tuple
+from typing import Generator
 
 from schemathesis.core.errors import MalformedMediaType
 
 
-def _parseparam(s: str) -> Generator[str, None, None]:
+def _parseparam(s: str) -> Generator[str]:
     while s[:1] == ";":
         s = s[1:]
         end = s.find(";")
@@ -17,7 +19,7 @@ def _parseparam(s: str) -> Generator[str, None, None]:
         s = s[end:]
 
 
-def _parse_header(line: str) -> Tuple[str, dict]:
+def _parse_header(line: str) -> tuple[str, dict]:
     parts = _parseparam(";" + line)
     key = parts.__next__()
     pdict = {}
@@ -34,7 +36,7 @@ def _parse_header(line: str) -> Tuple[str, dict]:
 
 
 @lru_cache
-def parse(media_type: str) -> Tuple[str, str]:
+def parse(media_type: str) -> tuple[str, str]:
     """Parse Content Type and return main type and subtype."""
     try:
         media_type, _ = _parse_header(media_type)

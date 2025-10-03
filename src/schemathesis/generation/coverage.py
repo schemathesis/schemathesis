@@ -125,6 +125,7 @@ class CoverageContext:
     root_schema: dict[str, Any]
     generation_modes: list[GenerationMode]
     location: ParameterLocation
+    media_type: tuple[str, str] | None
     is_required: bool
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
@@ -134,6 +135,7 @@ class CoverageContext:
     __slots__ = (
         "root_schema",
         "location",
+        "media_type",
         "generation_modes",
         "is_required",
         "path",
@@ -147,6 +149,7 @@ class CoverageContext:
         *,
         root_schema: dict[str, Any],
         location: ParameterLocation,
+        media_type: tuple[str, str] | None,
         generation_modes: list[GenerationMode] | None = None,
         is_required: bool,
         path: list[str | int] | None = None,
@@ -156,6 +159,7 @@ class CoverageContext:
     ) -> None:
         self.root_schema = root_schema
         self.location = location
+        self.media_type = media_type
         self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
         self.is_required = is_required
         self.path = path or []
@@ -191,6 +195,7 @@ class CoverageContext:
         return CoverageContext(
             root_schema=self.root_schema,
             location=self.location,
+            media_type=self.media_type,
             generation_modes=[GenerationMode.POSITIVE],
             is_required=self.is_required,
             path=self.path,
@@ -203,6 +208,7 @@ class CoverageContext:
         return CoverageContext(
             root_schema=self.root_schema,
             location=self.location,
+            media_type=self.media_type,
             generation_modes=[GenerationMode.NEGATIVE],
             is_required=self.is_required,
             path=self.path,
@@ -227,7 +233,16 @@ class CoverageContext:
         return True
 
     def will_be_serialized_to_string(self) -> bool:
-        return self.location in ("query", "path", "header", "cookie")
+        return self.location in ("query", "path", "header", "cookie") or (
+            self.location == "body"
+            and self.media_type
+            in frozenset(
+                [
+                    ("multipart", "form-data"),
+                    ("application", "x-www-form-urlencoded"),
+                ]
+            )
+        )
 
     def can_be_negated(self, schema: dict[str, Any]) -> bool:
         # Path, query, header, and cookie parameters will be stringified anyway
