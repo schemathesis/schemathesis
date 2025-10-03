@@ -750,3 +750,62 @@ def test_negative_data_rejection_array_min_items_zero_no_false_positive(app_runn
         )
         == snapshot_cli
     )
+
+
+def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, app_runner, cli, snapshot_cli):
+    # Empty string in form data should not be treated as None/null for required string fields
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/suggest": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["text"],
+                                    "properties": {
+                                        "text": {
+                                            "type": "string",
+                                            "description": "input text",
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/suggest", methods=["POST"])
+    def suggest():
+        text = request.form.get("text")
+        # Empty string is valid for a required string field
+        if text is None:
+            return jsonify({"error": "Missing required field"}), 400
+        return jsonify({"results": []}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--max-examples=20",
+        )
+        == snapshot_cli
+    )

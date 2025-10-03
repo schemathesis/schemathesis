@@ -4,6 +4,7 @@ from unittest.mock import ANY
 import jsonschema.validators
 import pytest
 
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.coverage import (
     CoverageContext,
@@ -68,7 +69,8 @@ def assert_not_conform(values: list, schema: dict):
 def ctx():
     return CoverageContext(
         root_schema={},
-        location="query",
+        location=ParameterLocation.QUERY,
+        media_type=None,
         is_required=True,
         custom_formats=get_default_format_strategies(),
         validator_cls=jsonschema.validators.Draft202012Validator,
@@ -79,7 +81,8 @@ def ctx():
 def pctx():
     return CoverageContext(
         root_schema={},
-        location="query",
+        location=ParameterLocation.QUERY,
+        media_type=None,
         generation_modes=[GenerationMode.POSITIVE],
         is_required=True,
         custom_formats=get_default_format_strategies(),
@@ -91,7 +94,8 @@ def pctx():
 def nctx():
     return CoverageContext(
         root_schema={},
-        location="query",
+        location=ParameterLocation.QUERY,
+        media_type=None,
         generation_modes=[GenerationMode.NEGATIVE],
         is_required=True,
         custom_formats=get_default_format_strategies(),
@@ -1220,7 +1224,8 @@ def test_negative_one_of(schema, expected):
     # See GH-2975
     nctx = CoverageContext(
         root_schema=schema,
-        location="body",
+        location=ParameterLocation.BODY,
+        media_type=("application", "json"),
         generation_modes=[GenerationMode.NEGATIVE],
         is_required=True,
         custom_formats=get_default_format_strategies(),

@@ -15,6 +15,7 @@
 - Coverage phase missing some examples for request bodies.
 - Accept booleans for parameter schemas in Open API 3.1.
 - False positives in `negative_data_rejection` check for array of strings query parameters. [#3056](https://github.com/schemathesis/schemathesis/issues/3056)
+- False positives in `negative_data_rejection` check for `application/x-www-form-urlencoded` media type.
 - False positive report about missing path parameter during the coverage phase with `--mode=negative`.
 
 ### :wrench: Changed
