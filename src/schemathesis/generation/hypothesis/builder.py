@@ -560,6 +560,23 @@ def _iter_coverage_cases(
         )
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
+            if location == ParameterLocation.PATH:
+                # Can't skip path parameters - they should be filled
+                gen = coverage.cover_schema_iter(
+                    coverage.CoverageContext(
+                        root_schema=schema,
+                        location=location,
+                        generation_modes=[GenerationMode.POSITIVE],
+                        is_required=parameter.is_required,
+                        custom_formats=custom_formats,
+                        validator_cls=validator_cls,
+                    ),
+                    schema,
+                )
+                value = next(gen, NOT_SET)
+                assert not isinstance(value, NotSet), "It should always be possible"
+                template.add_parameter(location, name, value)
+                continue
             continue
         template.add_parameter(location, name, value)
         generators[(location, name)] = gen
