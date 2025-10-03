@@ -14,6 +14,7 @@ from requests.models import RequestEncodingMixin
 import schemathesis
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
+from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import (
@@ -1033,6 +1034,36 @@ def test_path_parameters_arent_missing(ctx, cli, snapshot_cli, openapi3_base_url
         cli.run(
             str(schema_path),
             f"--url={openapi3_base_url}",
+            "--checks=not_a_server_error",
+            "--phases=coverage",
+            "--mode=negative",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.filterwarnings("error")
+def test_path_parameters_without_schema(ctx, cli, snapshot_cli, openapi2_base_url):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/{param}": {
+                "put": {
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "param",
+                            "x-custom": 0,
+                        }
+                    ],
+                }
+            }
+        },
+        version="2.0",
+    )
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={openapi2_base_url}",
             "--checks=not_a_server_error",
             "--phases=coverage",
             "--mode=negative",
@@ -2192,6 +2223,31 @@ def test_urlencoded_payloads_are_valid(ctx):
         assert_requests_call(case)
 
     run_test(operation, test)
+
+
+def test_malformed_content_type(ctx):
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "invalid": {
+                    "schema": {"type": "object"},
+                }
+            },
+        },
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+
+    operation = schema["/foo"]["post"]
+
+    def test(case):
+        if case.meta.phase != TestPhase.COVERAGE:
+            return
+        assert_requests_call(case)
+
+    with pytest.raises(MalformedMediaType):
+        run_test(operation, test)
 
 
 def test_no_missing_header_duplication(ctx):
