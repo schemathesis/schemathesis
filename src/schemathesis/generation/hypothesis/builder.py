@@ -24,6 +24,7 @@ from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Spec
 from schemathesis.core.errors import (
     InfiniteRecursiveReference,
     InvalidSchema,
+    MalformedMediaType,
     SerializationNotPossible,
     UnresolvableReference,
 )
@@ -563,6 +564,9 @@ def _iter_coverage_cases(
         if isinstance(value, NotSet):
             if location == ParameterLocation.PATH:
                 # Can't skip path parameters - they should be filled
+                schema = dict(schema)
+                schema.setdefault("type", "string")
+                schema.setdefault("minLength", 1)
                 gen = coverage.cover_schema_iter(
                     coverage.CoverageContext(
                         root_schema=schema,
@@ -576,7 +580,7 @@ def _iter_coverage_cases(
                     schema,
                 )
                 value = next(gen, NOT_SET)
-                assert not isinstance(value, NotSet), "It should always be possible"
+                assert not isinstance(value, NotSet), f"It should always be possible: {schema!r}"
                 template.add_parameter(location, name, value)
                 continue
             continue
@@ -595,11 +599,15 @@ def _iter_coverage_cases(
                     schema["examples"] = [example for example in examples if isinstance(example, (str, bytes))]
                 else:
                     schema["examples"] = examples
+            try:
+                media_type = media_types.parse(body.media_type)
+            except MalformedMediaType:
+                media_type = None
             gen = coverage.cover_schema_iter(
                 coverage.CoverageContext(
                     root_schema=schema,
                     location=ParameterLocation.BODY,
-                    media_type=media_types.parse(body.media_type),
+                    media_type=media_type,
                     generation_modes=generation_modes,
                     is_required=body.is_required,
                     custom_formats=custom_formats,
