@@ -5,6 +5,7 @@
 ### :racing_car: Performance
 
 - Up to ~20% faster VCR cassettes recording.
+- Switched to `orjson` on CPython, improving schema deserialization performance by up to 50%.
 
 ## [4.2.0](https://github.com/schemathesis/schemathesis/compare/v4.1.4...v4.2.0) - 2025-10-03
 
