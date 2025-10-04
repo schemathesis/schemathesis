@@ -7,26 +7,13 @@ import re
 import tarfile
 from typing import Any, Dict, Generator
 
+import orjson
 import yaml
 
 try:
     from yaml import CSafeLoader as SafeLoader
 except ImportError:
     from yaml import SafeLoader  # type: ignore
-
-try:
-    import orjson
-    from orjson import loads as json_loads
-
-    def json_dumps(obj: Any) -> bytes:
-        return orjson.dumps(obj)
-
-except ImportError:
-    import json
-    from json import loads as json_loads
-
-    def json_dumps(obj: Any) -> bytes:
-        return json.dumps(obj, separators=(",", ":")).encode("utf-8")
 
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -83,7 +70,7 @@ def create_tar_gz(schemas: Dict[str, Dict[str, Any]], output_dir: pathlib.Path) 
         with tarfile.open(output_path, "w:gz") as tar_gz:
             for schema_name, schema in version_schemas.items():
                 json_path = f"{schema_name}.json"
-                json_data = json_dumps(schema)
+                json_data = orjson.dumps(schema)
                 info = tarfile.TarInfo(name=json_path)
                 info.size = len(json_data)
                 tar_gz.addfile(info, io.BytesIO(json_data))
@@ -130,7 +117,7 @@ def load_from_corpus(file_name: str, corpus: tarfile.TarFile | str) -> dict[str,
         corpus = read_corpus_file(corpus)
     extracted = corpus.extractfile(file_name)
     if extracted is not None:
-        return json_loads(extracted.read())
+        return orjson.loads(extracted.read())
     raise FileNotFoundError(file_name)
 
 
@@ -144,7 +131,7 @@ def iter_corpus_file(name: str) -> Generator[tuple[str, dict[str, Any]], None, N
         for member in tar.getmembers():
             extracted = tar.extractfile(member)
             if extracted is not None:
-                yield member.name, json_loads(extracted.read())
+                yield member.name, orjson.loads(extracted.read())
 
 
 def iter_all_corpus_files() -> Generator[tuple[str, str, dict[str, Any]], None, None]:

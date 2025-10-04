@@ -84,7 +84,7 @@ def test_unsupported_type():
 if platform.python_implementation() == "PyPy":
     JSON_ERROR = ["Key name must be string at char: line 1 column 2 (char 1)"]
 else:
-    JSON_ERROR = ["Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"]
+    JSON_ERROR = ["unexpected character: line 1 column 2 (char 1)"]
 YAML_ERROR = [
     "unacceptable character #x0080: control characters are not allowed",
     '  in "<unicode string>", position 2',
