@@ -6,6 +6,8 @@
 
 - Up to ~20% faster VCR cassettes recording.
 - Switched to `orjson` on CPython, improving schema deserialization performance by up to 50%.
+- Up to 2x performance improvement for the coverage phase.
+- Up to ~25% performance improvement for the fuzzing phase.
 
 ## [4.2.0](https://github.com/schemathesis/schemathesis/compare/v4.1.4...v4.2.0) - 2025-10-03
 
