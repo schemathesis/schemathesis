@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.2.0...HEAD) - TBD
 
+### :racing_car: Performance
+
+- Up to ~20% faster VCR cassettes recording.
+
 ## [4.2.0](https://github.com/schemathesis/schemathesis/compare/v4.1.4...v4.2.0) - 2025-10-03
 
 ### :bug: Fixed
