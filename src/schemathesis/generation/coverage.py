@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
 
+from schemathesis.core.jsonschema.validation import Validator
+
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
 except ImportError:
@@ -1323,10 +1325,7 @@ def _negative_type(
             del schema["pattern"]
             return
 
-    validator = ctx.validator_cls(
-        schema,
-        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
-    )
+    validator = Validator(schema, ctx.validator_cls)
     is_valid = validator.is_valid
     try:
         is_valid(None)

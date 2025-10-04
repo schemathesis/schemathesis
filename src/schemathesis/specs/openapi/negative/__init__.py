@@ -12,6 +12,7 @@ from hypothesis_jsonschema import from_schema
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.jsonschema.validation import Validator
 from schemathesis.core.parameters import ParameterLocation
 
 from .mutations import MutationContext
@@ -39,10 +40,10 @@ class CacheKey:
 
 
 @lru_cache
-def get_validator(cache_key: CacheKey) -> jsonschema.Validator:
+def get_validator(cache_key: CacheKey) -> Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
-    return cache_key.validator_cls(cache_key.schema)
+    return Validator(cache_key.schema, cache_key.validator_cls)
 
 
 @lru_cache
