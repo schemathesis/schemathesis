@@ -137,7 +137,7 @@ def test_evaluate(output, expr, expected):
         ({"key": "$response.body#/a~1b"}, {"key": 1}),
         ({"$response.body#/": "value"}, {"0": "value"}),
         ({"$response.body#/unknown": "value"}, UNRESOLVABLE),
-        ({"$response.body#/foo": "value"}, {'["bar", "baz"]': "value"}),
+        ({"$response.body#/foo": "value"}, {'["bar","baz"]': "value"}),
         ({"$response.body#/foo/unknown": "value"}, UNRESOLVABLE),
         ({"$response.body#/a~1b": "value"}, {"1": "value"}),
         ({"$response.body#/bool-value": "value"}, {"true": "value"}),
