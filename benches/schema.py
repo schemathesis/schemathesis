@@ -48,6 +48,14 @@ OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWAGGER_20)
 
+VMWARE_SCHEMA.config.generation.update(max_examples=1)
+VMWARE_SCHEMA.config.seed = 42
+VMWARE_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
+
+BBCI_SCHEMA.config.generation.update(max_examples=1)
+BBCI_SCHEMA.config.seed = 42
+BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
+
 RESPONSE = Response(
     status_code=200,
     headers={},
@@ -74,11 +82,14 @@ patch("schemathesis.Case.call", return_value=RESPONSE).start()
     ],
     ids=("bbci", "vmware", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
-def test_iter_operations(raw_schema, loader):
+def test_iter_operations(benchmark, raw_schema, loader):
     schema = loader(raw_schema, config=CONFIG)
 
-    for _ in schema.get_all_operations():
-        pass
+    def _iter_operations():
+        for _ in schema.get_all_operations():
+            pass
+
+    benchmark(_iter_operations)
 
 
 @pytest.mark.benchmark
@@ -97,115 +108,54 @@ def test_iter_operations(raw_schema, loader):
     ],
     ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
-def test_length(raw_schema, loader):
+def test_measure_statistic(benchmark, raw_schema, loader):
     schema = loader(raw_schema, config=CONFIG)
-    _ = len(schema)
-
-
-# Schemas with pre-populated cache
-BBCI_OPERATION_ID = "Get_Categories_"
-BBCI_OPERATION_KEY = ("/categories", "get")
-BBCI_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.openapi.from_dict(BBCI)
-BBCI_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(BBCI_OPERATION_ID)
-VMWARE_OPERATION_ID = "listProblemEvents"
-VMWARE_OPERATION_KEY = ("/entities/problems", "get")
-VMWARE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.openapi.from_dict(VMWARE)
-VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(VMWARE_OPERATION_ID)
-UNIVERSE_OPERATION_KEY = ("Query", "manageTickets")
-UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.graphql.from_dict(UNIVERSE)
-UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE[UNIVERSE_OPERATION_KEY[0]][UNIVERSE_OPERATION_KEY[1]]
-
-
-VMWARE_SCHEMA.config.generation.update(max_examples=1)
-VMWARE_SCHEMA.config.seed = 42
-
-BBCI_SCHEMA.config.generation.update(max_examples=1)
-BBCI_SCHEMA.config.seed = 42
-BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
+    benchmark(schema._measure_statistic)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
-    "raw_schema, key, loader",
+    "schema, key",
     [
-        (BBCI, BBCI_OPERATION_KEY, schemathesis.openapi.from_dict),
-        (VMWARE, VMWARE_OPERATION_KEY, schemathesis.openapi.from_dict),
-        (UNIVERSE, UNIVERSE_OPERATION_KEY, schemathesis.graphql.from_dict),
+        (BBCI_SCHEMA, ("/categories", "get")),
+        (VMWARE_SCHEMA, ("/entities/problems", "get")),
+        (UNIVERSE_SCHEMA, ("Query", "manageTickets")),
     ],
     ids=("bbci", "vmware", "universe"),
 )
-def test_get_operation_single(raw_schema, key, loader):
-    schema = loader(raw_schema, config=CONFIG)
-    current = schema
-    for segment in key:
-        current = current[segment]
+def test_get_operation(benchmark, schema, key):
+    def _get():
+        current = schema
+        for segment in key:
+            current = current[segment]
+
+    benchmark(_get)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
     "schema, key",
     [
-        (BBCI_SCHEMA_WITH_OPERATIONS_CACHE, BBCI_OPERATION_KEY),
-        (VMWARE_SCHEMA_WITH_OPERATIONS_CACHE, VMWARE_OPERATION_KEY),
-        (UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE, UNIVERSE_OPERATION_KEY),
+        (BBCI_SCHEMA, "Get_Categories_"),
+        (VMWARE_SCHEMA, "listProblemEvents"),
     ],
-    ids=("bbci", "vmware", "universe"),
-)
-def test_get_operation_repeatedly(schema, key):
-    current = schema
-    for segment in key:
-        current = current[segment]
-
-
-@pytest.mark.benchmark
-@pytest.mark.parametrize(
-    "raw_schema, key",
-    [(BBCI, BBCI_OPERATION_ID), (VMWARE, VMWARE_OPERATION_ID)],
     ids=("bbci", "vmware"),
 )
-def test_get_operation_by_id_single(raw_schema, key):
-    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
-    _ = schema.get_operation_by_id(key)
+def test_get_operation_by_id(benchmark, schema, key):
+    benchmark(schema.get_operation_by_id, key)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
     "schema, key",
     [
-        (BBCI_SCHEMA_WITH_OPERATIONS_CACHE, BBCI_OPERATION_ID),
-        (VMWARE_SCHEMA_WITH_OPERATIONS_CACHE, VMWARE_OPERATION_ID),
+        (BBCI_SCHEMA, "#/paths/~1categories/get"),
+        (VMWARE_SCHEMA, "#/paths/~1entities~1problems/get"),
     ],
     ids=("bbci", "vmware"),
 )
-def test_get_operation_by_id_repeatedly(schema, key):
-    _ = schema.get_operation_by_id(key)
-
-
-@pytest.mark.benchmark
-@pytest.mark.parametrize(
-    "raw_schema, key",
-    [
-        (BBCI, "#/paths/~1categories/get"),
-        (VMWARE, "#/paths/~1entities~1problems/get"),
-    ],
-    ids=("bbci", "vmware"),
-)
-def test_get_operation_by_reference_single(raw_schema, key):
-    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
-    _ = schema.get_operation_by_reference(key)
-
-
-@pytest.mark.benchmark
-@pytest.mark.parametrize(
-    "schema, key",
-    [
-        (BBCI_SCHEMA_WITH_OPERATIONS_CACHE, "#/paths/~1categories/get"),
-        (VMWARE_SCHEMA_WITH_OPERATIONS_CACHE, "#/paths/~1entities~1problems/get"),
-    ],
-    ids=("bbci", "vmware"),
-)
-def test_get_operation_by_reference_repeatedly(schema, key):
-    _ = schema.get_operation_by_reference(key)
+def test_get_operation_by_reference(benchmark, schema, key):
+    benchmark(schema.get_operation_by_reference, key)
 
 
 def _optimized_schema(operations):
@@ -245,10 +195,13 @@ def test_get_parameters_strategy(benchmark, operations, config):
 
 
 @pytest.mark.benchmark
-def test_events():
-    engine = from_schema(BBCI_SCHEMA)
-    for _ in engine.execute():
-        pass
+def test_events(benchmark):
+    def _events_run():
+        engine = from_schema(BBCI_SCHEMA)
+        for _ in engine.execute():
+            pass
+
+    benchmark(_events_run)
 
 
 def _write_vcr(entries, config):
@@ -269,14 +222,6 @@ def test_vcr(benchmark, schema):
         + [Finalize()]
     )
     benchmark(_write_vcr, entries, schema.config)
-
-
-@pytest.mark.benchmark
-@pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
-def test_links_count(raw_schema):
-    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
-
-    _ = schema.statistic.links.total
 
 
 @pytest.mark.benchmark
