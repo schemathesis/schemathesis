@@ -1,3 +1,4 @@
+import json
 import pathlib
 import sys
 from io import StringIO
@@ -296,3 +297,28 @@ def test_links_count(raw_schema):
 )
 def test_deepclone(benchmark, schema):
     benchmark(deepclone, schema)
+
+
+def _load_from_file(loader, json_string):
+    return loader(json_string, config=CONFIG)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "raw_schema, loader",
+    [
+        (BBCI, schemathesis.openapi.from_file),
+        (VMWARE, schemathesis.openapi.from_file),
+        (STRIPE, schemathesis.openapi.from_file),
+        (UNIVERSE, schemathesis.graphql.from_file),
+        (APPVEYOR, schemathesis.openapi.from_file),
+        (EVETECH, schemathesis.openapi.from_file),
+        (OSISOFT, schemathesis.openapi.from_file),
+        (ML_WEBSERVICES, schemathesis.openapi.from_file),
+        (AZURE_NETWORK, schemathesis.openapi.from_file),
+    ],
+    ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
+)
+def test_load_from_file(benchmark, raw_schema, loader):
+    serialized = json.dumps(raw_schema)
+    benchmark(_load_from_file, loader, serialized)
