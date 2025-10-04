@@ -1,16 +1,19 @@
 import pathlib
 import sys
+from io import StringIO
+from queue import Queue
 from unittest.mock import patch
 
 import pytest
 import requests
 
 import schemathesis
+from schemathesis.cli.commands.run.handlers.cassettes import Finalize, Initialize, Process, vcr_writer
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
-from schemathesis.engine import from_schema
+from schemathesis.engine import events, from_schema
 from schemathesis.specs.openapi._hypothesis import get_parameters_strategy, make_positive_strategy
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -112,7 +115,11 @@ UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.graphql.from_dict(UNIVERSE)
 UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE[UNIVERSE_OPERATION_KEY[0]][UNIVERSE_OPERATION_KEY[1]]
 
 
+VMWARE_SCHEMA.config.generation.update(max_examples=1)
+VMWARE_SCHEMA.config.seed = 42
+
 BBCI_SCHEMA.config.generation.update(max_examples=1)
+BBCI_SCHEMA.config.seed = 42
 BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
 
 
@@ -241,6 +248,26 @@ def test_events():
     engine = from_schema(BBCI_SCHEMA)
     for _ in engine.execute():
         pass
+
+
+def _write_vcr(entries, config):
+    queue = Queue()
+    for entry in entries:
+        queue.put(entry)
+
+    vcr_writer(StringIO(), config, queue)
+
+
+@pytest.mark.parametrize("schema", [BBCI_SCHEMA, VMWARE_SCHEMA], ids=("bbci", "vmware"))
+@pytest.mark.benchmark
+def test_vcr(benchmark, schema):
+    engine = from_schema(schema)
+    entries = (
+        [Initialize(seed=42)]
+        + [Process(recorder=ev.recorder) for ev in engine.execute() if isinstance(ev, events.ScenarioFinished)]
+        + [Finalize()]
+    )
+    benchmark(_write_vcr, entries, schema.config)
 
 
 @pytest.mark.benchmark
