@@ -11,4 +11,4 @@ Schemathesis dev
 
  API schema does not appear syntactically valid
 
-     Expecting value: line 1 column 1 (char 0)
+     Input is a zero-length, empty document: line 1 column 1 (char 0)

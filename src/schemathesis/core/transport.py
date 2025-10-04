@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import base64
-import json
 from typing import TYPE_CHECKING, Any, Mapping
 
+from schemathesis.core import json
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 if TYPE_CHECKING:

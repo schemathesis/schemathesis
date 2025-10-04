@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
 from functools import lru_cache
 from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, TypeVar, cast
 
 from schemathesis.config import SchemathesisConfig
+from schemathesis.core import json
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.hooks import HookContext, dispatch

@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable, List, Protocol, Union
 
+from schemathesis.core import json
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transforms import resolve_pointer
 
