@@ -119,102 +119,84 @@ def get_command_representation() -> str:
 
 
 def vcr_writer(output: TextOutput, config: ProjectConfig, queue: Queue) -> None:
-    """Write YAML to a file in an incremental manner.
-
-    This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
-      - It is much faster. The string-based approach gives only ~2.5% time overhead when `yaml.CDumper` has ~11.2%;
-      - Implementation complexity. We have a quite simple format where almost all values are strings, and it is much
-        simpler to implement it with string composition rather than with adjusting `yaml.Serializer` to emit explicit
-        types. Another point is that with `pyyaml` we need to emit events and handle some low-level details like
-        providing tags, anchors to have incremental writing, with primitive types it is much simpler.
-    """
+    """Write YAML to a file in an incremental manner."""
     current_id = 1
 
-    def format_header_values(values: list[str]) -> str:
-        return "\n".join(f"      - {json.dumps(v)}" for v in values)
+    def write_header_values(stream: IO, values: list[str]) -> None:
+        for v in values:
+            stream.write(f"      - {json.dumps(v)}\n")
 
     if config.output.sanitization.enabled:
+        sanitization_keys = config.output.sanitization.keys_to_sanitize
+        sensitive_markers = config.output.sanitization.sensitive_markers
+        replacement = config.output.sanitization.replacement
 
-        def format_headers(headers: dict[str, list[str]]) -> str:
-            headers = deepclone(headers)
-            sanitize_value(headers, config=config.output.sanitization)
-            return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
+        def write_headers(stream: IO, headers: dict[str, list[str]]) -> None:
+            for name, values in headers.items():
+                lower_name = name.lower()
+                stream.write(f'      "{name}":\n')
 
+                # Sanitize inline if needed
+                if lower_name in sanitization_keys or any(marker in lower_name for marker in sensitive_markers):
+                    stream.write(f"      - {json.dumps(replacement)}\n")
+                else:
+                    write_header_values(stream, values)
     else:
 
-        def format_headers(headers: dict[str, list[str]]) -> str:
-            return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
+        def write_headers(stream: IO, headers: dict[str, list[str]]) -> None:
+            for name, values in headers.items():
+                stream.write(f'      "{name}":\n')
+                write_header_values(stream, values)
 
-    def format_check_message(message: str | None) -> str:
-        return "~" if message is None else f"{message!r}"
-
-    def format_checks(checks: list[CheckNode]) -> str:
+    def write_checks(stream: IO, checks: list[CheckNode]) -> None:
         if not checks:
-            return "\n  checks: []"
-        items = "\n".join(
-            f"    - name: '{check.name}'\n      status: '{check.status.name.upper()}'\n      message: {format_check_message(check.failure_info.failure.title if check.failure_info else None)}"
-            for check in checks
-        )
-        return f"""
-  checks:
-{items}"""
+            stream.write("\n  checks: []")
+            return
+
+        stream.write("\n  checks:\n")
+        for check in checks:
+            message = check.failure_info.failure.title if check.failure_info else None
+            message_str = "~" if message is None else repr(message)
+            stream.write(
+                f"    - name: '{check.name}'\n"
+                f"      status: '{check.status.name.upper()}'\n"
+                f"      message: {message_str}\n"
+            )
 
     if config.reports.preserve_bytes:
 
-        def format_request_body(output: IO, request: Request) -> None:
+        def write_request_body(stream: IO, request: Request) -> None:
             if request.encoded_body is not None:
-                output.write(
-                    f"""
-    body:
-      encoding: 'utf-8'
-      base64_string: '{request.encoded_body}'"""
-                )
+                stream.write(f"\n    body:\n      encoding: 'utf-8'\n      base64_string: '{request.encoded_body}'")
 
-        def format_response_body(output: IO, response: Response) -> None:
+        def write_response_body(stream: IO, response: Response) -> None:
             if response.encoded_body is not None:
-                output.write(
-                    f"""    body:
-      encoding: '{response.encoding}'
-      base64_string: '{response.encoded_body}'"""
+                stream.write(
+                    f"    body:\n      encoding: '{response.encoding}'\n      base64_string: '{response.encoded_body}'"
                 )
-
     else:
 
-        def format_request_body(output: IO, request: Request) -> None:
+        def write_request_body(stream: IO, request: Request) -> None:
             if request.body is not None:
                 string = request.body.decode("utf8", "replace")
-                output.write(
-                    """
-    body:
-      encoding: 'utf-8'
-      string: """
-                )
-                write_double_quoted(output, string)
+                stream.write("\n    body:\n      encoding: 'utf-8'\n      string: ")
+                write_double_quoted(stream, string)
 
-        def format_response_body(output: IO, response: Response) -> None:
+        def write_response_body(stream: IO, response: Response) -> None:
             if response.content is not None:
                 encoding = response.encoding or "utf8"
                 string = response.content.decode(encoding, "replace")
-                output.write(
-                    f"""    body:
-      encoding: '{encoding}'
-      string: """
-                )
-                write_double_quoted(output, string)
+                stream.write(f"    body:\n      encoding: '{encoding}'\n      string: ")
+                write_double_quoted(stream, string)
 
     with open_text_output(output) as stream:
         while True:
             item = queue.get()
-            if isinstance(item, Initialize):
-                stream.write(
-                    f"""command: '{get_command_representation()}'
-recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'
-seed: {item.seed}
-http_interactions:"""
-                )
-            elif isinstance(item, Process):
+            if isinstance(item, Process):
                 for case_id, interaction in item.recorder.interactions.items():
                     case = item.recorder.cases[case_id]
+
+                    # Determine status and checks
                     if interaction.response is not None:
                         if case_id in item.recorder.checks:
                             checks = item.recorder.checks[case_id]
@@ -224,101 +206,93 @@ http_interactions:"""
                                     status = check.status
                                     break
                         else:
-                            # NOTE: Checks recording could be skipped if Schemathesis start skipping just
-                            # discovered failures in order to get past them and potentially discover more failures
                             checks = []
                             status = Status.SKIP
                     else:
                         checks = []
                         status = Status.ERROR
-                    # Body payloads are handled via separate `stream.write` calls to avoid some allocations
-                    stream.write(
-                        f"""\n- id: '{case_id}'
-  status: '{status.name}'"""
-                    )
+
+                    # Write interaction header
+                    stream.write(f"\n- id: '{case_id}'\n  status: '{status.name}'")
+
+                    # Write metadata if present
                     meta = case.value.meta
                     if meta is not None:
-                        # Start metadata block
-                        stream.write(f"""
-  generation:
-    time: {meta.generation.time}
-    mode: {meta.generation.mode.value}
-  components:""")
+                        stream.write(
+                            f"\n  generation:\n"
+                            f"    time: {meta.generation.time}\n"
+                            f"    mode: {meta.generation.mode.value}\n"
+                            f"  components:"
+                        )
 
-                        # Write components
                         for kind, info in meta.components.items():
-                            stream.write(f"""
-    {kind.value}:
-      mode: '{info.mode.value}'""")
-                        # Write phase info
-                        stream.write("\n  phase:")
-                        stream.write(f"\n    name: '{meta.phase.name.value}'")
-                        stream.write("\n    data: ")
+                            stream.write(f"\n    {kind.value}:\n      mode: '{info.mode.value}'")
 
-                        # Write phase-specific data
+                        stream.write(f"\n  phase:\n    name: '{meta.phase.name.value}'\n    data: ")
+
                         if isinstance(meta.phase.data, CoveragePhaseData):
-                            stream.write("""
-      description: """)
+                            stream.write("\n      description: ")
                             write_double_quoted(stream, meta.phase.data.description)
-                            stream.write("""
-      location: """)
+                            stream.write("\n      location: ")
                             write_double_quoted(stream, meta.phase.data.location)
-                            stream.write("""
-      parameter: """)
+                            stream.write("\n      parameter: ")
                             if meta.phase.data.parameter is not None:
                                 write_double_quoted(stream, meta.phase.data.parameter)
                             else:
                                 stream.write("null")
-                            stream.write("""
-      parameter_location: """)
+                            stream.write("\n      parameter_location: ")
                             if meta.phase.data.parameter_location is not None:
                                 write_double_quoted(stream, meta.phase.data.parameter_location)
                             else:
                                 stream.write("null")
                         else:
-                            # Empty objects for these phases
                             stream.write("{}")
                     else:
-                        stream.write("null")
+                        stream.write("\n  metadata: null")
 
+                    # Sanitize URL if needed
                     if config.output.sanitization.enabled:
                         uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
                     else:
                         uri = interaction.request.uri
+
                     recorded_at = datetime.datetime.fromtimestamp(
                         interaction.timestamp, datetime.timezone.utc
                     ).isoformat()
+
+                    stream.write(f"\n  recorded_at: '{recorded_at}'")
+                    write_checks(stream, checks)
                     stream.write(
-                        f"""
-  recorded_at: '{recorded_at}'{format_checks(checks)}
-  request:
-    uri: '{uri}'
-    method: '{interaction.request.method}'
-    headers:
-{format_headers(interaction.request.headers)}"""
+                        f"\n  request:\n    uri: '{uri}'\n    method: '{interaction.request.method}'\n    headers:\n"
                     )
-                    format_request_body(stream, interaction.request)
+                    write_headers(stream, interaction.request.headers)
+                    write_request_body(stream, interaction.request)
+
+                    # Write response
                     if interaction.response is not None:
                         stream.write(
-                            f"""
-  response:
-    status:
-      code: '{interaction.response.status_code}'
-      message: {json.dumps(interaction.response.message)}
-    elapsed: '{interaction.response.elapsed}'
-    headers:
-{format_headers(interaction.response.headers)}
-"""
+                            f"\n  response:\n"
+                            f"    status:\n"
+                            f"      code: '{interaction.response.status_code}'\n"
+                            f"      message: {json.dumps(interaction.response.message)}\n"
+                            f"    elapsed: '{interaction.response.elapsed}'\n"
+                            f"    headers:\n"
                         )
-                        format_response_body(stream, interaction.response)
-                        stream.write(
-                            f"""
-    http_version: '{interaction.response.http_version}'"""
-                        )
+                        write_headers(stream, interaction.response.headers)
+                        stream.write("\n")
+                        write_response_body(stream, interaction.response)
+                        stream.write(f"\n    http_version: '{interaction.response.http_version}'")
                     else:
-                        stream.write("""
-  response: null""")
+                        stream.write("\n  response: null")
+
                     current_id += 1
+            elif isinstance(item, Initialize):
+                stream.write(
+                    f"command: '{get_command_representation()}'\n"
+                    f"recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'\n"
+                    f"seed: {item.seed}\n"
+                    f"http_interactions:"
+                )
             else:
                 break
 
