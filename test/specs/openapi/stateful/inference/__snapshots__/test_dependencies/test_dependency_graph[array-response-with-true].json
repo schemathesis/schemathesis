@@ -1,0 +1,9 @@
+{
+  "operations": {
+    "GET /channels/": {
+      "inputs": [],
+      "outputs": []
+    }
+  },
+  "resources": {}
+}

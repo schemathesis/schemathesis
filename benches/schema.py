@@ -15,7 +15,9 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine import events, from_schema
+from schemathesis.generation.hypothesis import setup
 from schemathesis.specs.openapi._hypothesis import get_parameters_strategy, make_positive_strategy
+from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -23,6 +25,7 @@ CATALOG_DIR = CURRENT_DIR / "data"
 
 from corpus.tools import load_from_corpus, read_corpus_file  # noqa: E402
 
+setup()
 CONFIG = SchemathesisConfig()
 
 CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
@@ -55,6 +58,7 @@ VMWARE_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
 BBCI_SCHEMA.config.generation.update(max_examples=1)
 BBCI_SCHEMA.config.seed = 42
 BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
+
 
 RESPONSE = Response(
     status_code=200,
@@ -242,6 +246,35 @@ def test_vcr(benchmark, schema):
 )
 def test_deepclone(benchmark, schema):
     benchmark(deepclone, schema)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "schema",
+    [
+        BBCI_SCHEMA,
+        VMWARE_SCHEMA,
+        STRIPE_SCHEMA,
+    ],
+    ids=("bbci", "vmware", "stripe"),
+)
+def test_dependency_analysis(benchmark, schema):
+    benchmark(dependencies.analyze, schema)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "schema",
+    [
+        BBCI_SCHEMA,
+        VMWARE_SCHEMA,
+        STRIPE_SCHEMA,
+    ],
+    ids=("bbci", "vmware", "stripe"),
+)
+def test_link_generation(benchmark, schema):
+    graph = dependencies.analyze(schema)
+    benchmark(lambda: list(graph.iter_links()))
 
 
 def _load_from_file(loader, json_string):

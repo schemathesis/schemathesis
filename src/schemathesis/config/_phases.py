@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from schemathesis.config._checks import ChecksConfig
@@ -125,9 +126,14 @@ class CoveragePhaseConfig(DiffBase):
         )
 
 
+class InferenceAlgorithm(str, Enum):
+    LOCATION_HEADERS = "location-headers"
+    DEPENDENCY_ANALYSIS = "dependency-analysis"
+
+
 @dataclass(repr=False)
 class InferenceConfig(DiffBase):
-    algorithms: list[str]
+    algorithms: list[InferenceAlgorithm]
 
     __slots__ = ("algorithms",)
 
@@ -136,18 +142,23 @@ class InferenceConfig(DiffBase):
         *,
         algorithms: list[str] | None = None,
     ) -> None:
-        self.algorithms = algorithms if algorithms is not None else ["location-headers"]
+        self.algorithms = (
+            [InferenceAlgorithm(a) for a in algorithms] if algorithms is not None else list(InferenceAlgorithm)
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> InferenceConfig:
         return cls(
-            algorithms=data.get("algorithms", ["location-headers"]),
+            algorithms=data.get("algorithms", list(InferenceAlgorithm)),
         )
 
     @property
     def is_enabled(self) -> bool:
         """Inference is enabled if any algorithms are configured."""
         return bool(self.algorithms)
+
+    def is_algorithm_enabled(self, algorithm: InferenceAlgorithm) -> bool:
+        return algorithm in self.algorithms
 
 
 @dataclass(repr=False)

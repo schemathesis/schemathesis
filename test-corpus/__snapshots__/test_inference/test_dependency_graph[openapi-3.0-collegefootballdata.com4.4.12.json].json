@@ -1,0 +1,1238 @@
+{
+  "operations": {
+    "GET /calendar": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Week",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /coaches": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Coach",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /conferences": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Conference",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /draft/picks": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "DraftPick",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /draft/positions": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "DraftPosition",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /draft/teams": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "DraftTeam",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /drives": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Drive",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /game/box/advanced": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "BoxScore",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /games": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Game",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /games/media": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "GameMedia",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /games/players": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayerGame",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /games/teams": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamGame",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /games/weather": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "GameWeather",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /lines": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "GameLines",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /live/plays": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "LivePlayByPlay",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /metrics/wp": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayWP",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /metrics/wp/pregame": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PregameWP",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /play/stat/types": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayStatType",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /play/stats": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayStat",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /play/types": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayType",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /player/portal": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PortalPlayer",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /player/returning": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "ReturningProduction",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /player/search": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayerSearchResult",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /player/usage": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayerUsage",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /plays": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Play",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ppa/games": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "GamePPA",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ppa/players/games": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayerGamePPA",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ppa/players/season": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayerSeasonPPA",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ppa/predicted": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PredictedPoints",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ppa/teams": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamPPA",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /rankings": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "RankingWeek",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ratings/elo": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamEloRating",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ratings/sp": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamSPRating",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ratings/sp/conferences": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "ConferenceSPRating",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /ratings/srs": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamSRSRating",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /records": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamRecord",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /recruiting/groups": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PositionGroupRecruitingRating",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /recruiting/players": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Recruit",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /recruiting/teams": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamRecruitingRank",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /roster": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Player",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /scoreboard": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "ScoreboardGame",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /stats/categories": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Category",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /stats/game/advanced": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "AdvancedGameStat",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /stats/player/season": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PlayerSeasonStat",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /stats/season": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamSeasonStat",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /stats/season/advanced": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "AdvancedSeasonStat",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /talent": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "TeamTalent",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /teams": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Team",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /teams/fbs": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Team",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /teams/matchup": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "TeamMatchup",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /venues": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Venue",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "AdvancedGameStat": {
+      "fields": [
+        "defense",
+        "gameId",
+        "offense",
+        "opponent",
+        "season",
+        "team",
+        "week"
+      ]
+    },
+    "AdvancedSeasonStat": {
+      "fields": [
+        "conference",
+        "defense",
+        "offense",
+        "season",
+        "team"
+      ]
+    },
+    "BoxScore": {
+      "fields": [
+        "players",
+        "teams"
+      ]
+    },
+    "Category": {
+      "fields": []
+    },
+    "Coach": {
+      "fields": [
+        "first_name",
+        "hire_date",
+        "last_name",
+        "seasons"
+      ]
+    },
+    "Conference": {
+      "fields": [
+        "abbreviation",
+        "classification",
+        "id",
+        "name",
+        "short_name"
+      ]
+    },
+    "ConferenceSPRating": {
+      "fields": [
+        "conference",
+        "defense",
+        "offense",
+        "rating",
+        "secondOrderWins",
+        "sos",
+        "specialTeams",
+        "year"
+      ]
+    },
+    "DraftPick": {
+      "fields": [
+        "collegeAthleteId",
+        "collegeConference",
+        "collegeId",
+        "collegeTeam",
+        "height",
+        "hometownInfo",
+        "name",
+        "nflAthleteId",
+        "nflTeam",
+        "overall",
+        "pick",
+        "position",
+        "preDraftGrade",
+        "preDraftPositionRanking",
+        "preDraftRanking",
+        "round",
+        "weight",
+        "year"
+      ]
+    },
+    "DraftPosition": {
+      "fields": [
+        "abbreviation",
+        "name"
+      ]
+    },
+    "DraftTeam": {
+      "fields": [
+        "displayName",
+        "location",
+        "logo",
+        "nickname"
+      ]
+    },
+    "Drive": {
+      "fields": [
+        "defense",
+        "defense_conference",
+        "drive_number",
+        "drive_result",
+        "end_defense_score",
+        "end_offense_score",
+        "end_period",
+        "end_time",
+        "end_yardline",
+        "end_yards_to_goal",
+        "game_id",
+        "id",
+        "is_home_offense",
+        "offense",
+        "offense_conference",
+        "plays",
+        "scoring",
+        "start_defense_score",
+        "start_offense_score",
+        "start_period",
+        "start_time",
+        "start_yardline",
+        "start_yards_to_goal",
+        "yards"
+      ]
+    },
+    "Game": {
+      "fields": [
+        "attendance",
+        "away_conference",
+        "away_division",
+        "away_id",
+        "away_line_scores",
+        "away_points",
+        "away_post_win_prob",
+        "away_postgame_elo",
+        "away_pregame_elo",
+        "away_team",
+        "completed",
+        "conference_game",
+        "excitement_index",
+        "highlights",
+        "home_conference",
+        "home_division",
+        "home_id",
+        "home_line_scores",
+        "home_points",
+        "home_post_win_prob",
+        "home_postgame_elo",
+        "home_pregame_elo",
+        "home_team",
+        "id",
+        "neutral_site",
+        "notes",
+        "season",
+        "season_type",
+        "start_date",
+        "start_time_tbd",
+        "venue",
+        "venue_id",
+        "week"
+      ]
+    },
+    "GameLines": {
+      "fields": [
+        "awayConference",
+        "awayScore",
+        "awayTeam",
+        "homeConference",
+        "homeScore",
+        "homeTeam",
+        "id",
+        "lines",
+        "season",
+        "seasonType",
+        "startDate",
+        "week"
+      ]
+    },
+    "GameMedia": {
+      "fields": [
+        "awayConference",
+        "awayTeam",
+        "homeConference",
+        "homeTeam",
+        "id",
+        "isStartTimeTBD",
+        "mediaType",
+        "outlet",
+        "season",
+        "seasonType",
+        "startTime",
+        "week"
+      ]
+    },
+    "GamePPA": {
+      "fields": [
+        "conference",
+        "defense",
+        "gameId",
+        "offense",
+        "opponent",
+        "season",
+        "team",
+        "week"
+      ]
+    },
+    "GameWeather": {
+      "fields": [
+        "awayConference",
+        "awayTeam",
+        "dewPoint",
+        "gameIndoors",
+        "homeConference",
+        "homeTeam",
+        "humidity",
+        "id",
+        "precipitation",
+        "pressure",
+        "season",
+        "seasonType",
+        "snowfall",
+        "startTime",
+        "temperature",
+        "venue",
+        "venueId",
+        "weatherCondition",
+        "weatherConditionCode",
+        "week",
+        "windDirection",
+        "windSpeed"
+      ]
+    },
+    "LivePlayByPlay": {
+      "fields": [
+        "clock",
+        "distance",
+        "down",
+        "drives",
+        "id",
+        "period",
+        "possession",
+        "status",
+        "teams",
+        "yardsToGoal"
+      ]
+    },
+    "Play": {
+      "fields": [
+        "away",
+        "clock",
+        "defense",
+        "defense_conference",
+        "defense_score",
+        "defense_timeouts",
+        "distance",
+        "down",
+        "drive_id",
+        "drive_number",
+        "game_id",
+        "home",
+        "id",
+        "offense",
+        "offense_conference",
+        "offense_score",
+        "offense_timeouts",
+        "period",
+        "play_number",
+        "play_text",
+        "play_type",
+        "ppa",
+        "scoring",
+        "wallclock",
+        "yard_line",
+        "yards_gained",
+        "yards_to_goal"
+      ]
+    },
+    "PlayStat": {
+      "fields": [
+        "athleteId",
+        "athleteName",
+        "clock",
+        "conference",
+        "distance",
+        "down",
+        "driveId",
+        "gameId",
+        "opponent",
+        "opponentScore",
+        "period",
+        "playId",
+        "season",
+        "stat",
+        "statType",
+        "team",
+        "teamScore",
+        "week",
+        "yardsToGoal"
+      ]
+    },
+    "PlayStatType": {
+      "fields": [
+        "id",
+        "name"
+      ]
+    },
+    "PlayType": {
+      "fields": [
+        "abbreviation",
+        "id",
+        "text"
+      ]
+    },
+    "PlayWP": {
+      "fields": [
+        "away",
+        "awayId",
+        "awayScore",
+        "distance",
+        "down",
+        "gamesId",
+        "home",
+        "homeBall",
+        "homeId",
+        "homeScore",
+        "homeWinProb",
+        "playId",
+        "playNumber",
+        "playText",
+        "spread",
+        "timeRemaining",
+        "yardLine"
+      ]
+    },
+    "Player": {
+      "fields": [
+        "first_name",
+        "height",
+        "home_city",
+        "home_country",
+        "home_county_fips",
+        "home_latitude",
+        "home_longitude",
+        "home_state",
+        "id",
+        "jersey",
+        "last_name",
+        "position",
+        "recruit_ids",
+        "team",
+        "weight",
+        "year"
+      ]
+    },
+    "PlayerGame": {
+      "fields": [
+        "id",
+        "teams"
+      ]
+    },
+    "PlayerGamePPA": {
+      "fields": [
+        "averagePPA",
+        "name",
+        "opponent",
+        "position",
+        "season",
+        "team",
+        "week"
+      ]
+    },
+    "PlayerSearchResult": {
+      "fields": [
+        "firstName",
+        "height",
+        "hometown",
+        "id",
+        "jersey",
+        "lastName",
+        "name",
+        "position",
+        "team",
+        "teamColor",
+        "teamColorSecondary",
+        "weight"
+      ]
+    },
+    "PlayerSeasonPPA": {
+      "fields": [
+        "averagePPA",
+        "conference",
+        "id",
+        "name",
+        "position",
+        "season",
+        "team",
+        "totalPPA"
+      ]
+    },
+    "PlayerSeasonStat": {
+      "fields": [
+        "category",
+        "conference",
+        "player",
+        "playerId",
+        "season",
+        "stat",
+        "statType",
+        "team"
+      ]
+    },
+    "PlayerUsage": {
+      "fields": [
+        "conference",
+        "id",
+        "name",
+        "position",
+        "season",
+        "team",
+        "usage"
+      ]
+    },
+    "PortalPlayer": {
+      "fields": [
+        "destination",
+        "eligibility",
+        "firstName",
+        "lastName",
+        "origin",
+        "position",
+        "rating",
+        "season",
+        "stars",
+        "transferDate"
+      ]
+    },
+    "PositionGroupRecruitingRating": {
+      "fields": [
+        "averageRating",
+        "averageStars",
+        "commits",
+        "conference",
+        "positionGroup",
+        "team",
+        "totalRating"
+      ]
+    },
+    "PredictedPoints": {
+      "fields": [
+        "predictedPoints",
+        "yardLine"
+      ]
+    },
+    "PregameWP": {
+      "fields": [
+        "awayTeam",
+        "gameId",
+        "homeTeam",
+        "homeWinProb",
+        "season",
+        "seasonType",
+        "spread",
+        "week"
+      ]
+    },
+    "RankingWeek": {
+      "fields": [
+        "polls",
+        "season",
+        "seasonType",
+        "week"
+      ]
+    },
+    "Recruit": {
+      "fields": [
+        "athleteId",
+        "city",
+        "committedTo",
+        "country",
+        "height",
+        "hometownInfo",
+        "id",
+        "name",
+        "position",
+        "ranking",
+        "rating",
+        "recruitType",
+        "school",
+        "stars",
+        "stateProvince",
+        "weight",
+        "year"
+      ]
+    },
+    "ReturningProduction": {
+      "fields": [
+        "conference",
+        "passingUsage",
+        "percentPPA",
+        "percentPassingPPA",
+        "percentReceivingPPA",
+        "percentRushingPPA",
+        "receivingUsage",
+        "rushingUsage",
+        "season",
+        "team",
+        "totalPPA",
+        "totalPassingPPA",
+        "totalReceivingPPA",
+        "totalRushingPPA",
+        "usage"
+      ]
+    },
+    "ScoreboardGame": {
+      "fields": [
+        "awayTeam",
+        "betting",
+        "clock",
+        "conferenceGame",
+        "homeTeam",
+        "id",
+        "neutralSite",
+        "period",
+        "possession",
+        "situation",
+        "startDate",
+        "startTimeTBD",
+        "status",
+        "tv",
+        "venue",
+        "weather"
+      ]
+    },
+    "Team": {
+      "fields": [
+        "abbreviation",
+        "alt_color",
+        "alt_name_1",
+        "alt_name_2",
+        "alt_name_3",
+        "classification",
+        "color",
+        "conference",
+        "division",
+        "id",
+        "location",
+        "logos",
+        "mascot",
+        "school",
+        "twitter"
+      ]
+    },
+    "TeamEloRating": {
+      "fields": [
+        "conference",
+        "elo",
+        "team",
+        "year"
+      ]
+    },
+    "TeamGame": {
+      "fields": [
+        "id",
+        "teams"
+      ]
+    },
+    "TeamMatchup": {
+      "fields": [
+        "endYear",
+        "games",
+        "startYear",
+        "team1",
+        "team1Wins",
+        "team2",
+        "team2Wins",
+        "ties"
+      ]
+    },
+    "TeamPPA": {
+      "fields": [
+        "conference",
+        "defense",
+        "offense",
+        "season",
+        "team"
+      ]
+    },
+    "TeamRecord": {
+      "fields": [
+        "awayGames",
+        "conference",
+        "conferenceGames",
+        "division",
+        "expectedWins",
+        "homeGames",
+        "team",
+        "total",
+        "year"
+      ]
+    },
+    "TeamRecruitingRank": {
+      "fields": [
+        "points",
+        "rank",
+        "team",
+        "year"
+      ]
+    },
+    "TeamSPRating": {
+      "fields": [
+        "conference",
+        "defense",
+        "offense",
+        "ranking",
+        "rating",
+        "secondOrderWins",
+        "sos",
+        "specialTeams",
+        "team",
+        "year"
+      ]
+    },
+    "TeamSRSRating": {
+      "fields": [
+        "conference",
+        "division",
+        "ranking",
+        "rating",
+        "team",
+        "year"
+      ]
+    },
+    "TeamSeasonStat": {
+      "fields": [
+        "conference",
+        "season",
+        "statName",
+        "statValue",
+        "team"
+      ]
+    },
+    "TeamTalent": {
+      "fields": [
+        "school",
+        "talent",
+        "year"
+      ]
+    },
+    "Venue": {
+      "fields": [
+        "capacity",
+        "city",
+        "country_code",
+        "dome",
+        "elevation",
+        "grass",
+        "id",
+        "location",
+        "name",
+        "state",
+        "timezone",
+        "year_constructed",
+        "zip"
+      ]
+    },
+    "Week": {
+      "fields": [
+        "firstGameStart",
+        "lastGameStart",
+        "season",
+        "seasonType",
+        "week"
+      ]
+    }
+  }
+}

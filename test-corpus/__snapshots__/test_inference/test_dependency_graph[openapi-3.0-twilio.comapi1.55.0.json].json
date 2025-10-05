@@ -1,0 +1,3450 @@
+{
+  "operations": {
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessageSubscriptions/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Transcriptions/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
+      "inputs": [],
+      "outputs": []
+    },
+    "GET /2010-04-01/Accounts.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Accounts.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Addresses.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Addresses.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Addresses/{AddressSid}/DependentPhoneNumbers.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Dependentphonenumbers.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.address",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Applications.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Applications.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.application",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AuthorizedConnectApps.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Authorizedconnectapps.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AuthorizedConnectApps/{ConnectAppSid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.authorized_connect_app",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Availablephonenumbers.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.available_phone_number_country",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Local.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Local.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/MachineToMachine.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Machinetomachine.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Mobile.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Mobile.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/National.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "National.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/SharedCost.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Sharedcost.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/TollFree.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Tollfree.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Voip.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Voip.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Balance.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.balance",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Calls.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Events.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Events.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Notifications.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Notifications.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Notifications/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.call_notification-instance",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Recordings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.call_recording",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Conferences.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Conferences.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Participants.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference.participant",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Recordings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference.conference_recording",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/ConnectApps.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Connectapps.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.connect_app",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Incomingphonenumbers.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Local.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Local.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Mobile.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Mobile.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/TollFree.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Tollfree.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Assignedaddons.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{AssignedAddOnSid}/Extensions.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Extensions.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{AssignedAddOnSid}/Extensions/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Keys.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Keys.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.key",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Messages.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Messages.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Media.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.message.media",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.message",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Notifications.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Notifications.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Notifications/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.notification-instance",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Outgoingcallerids.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.outgoing_caller_id",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Queues.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Queues.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Members.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members/{CallSid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.queue.member",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.queue",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Recordings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Transcriptions.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.recording.recording_transcription",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Addonresults.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Payloads.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.recording.recording_add_on_result",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.recording",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Credentiallists.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Credentials.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_credential_list",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Domains.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Credentiallistmappings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Ipaccesscontrollistmappings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Credentiallistmappings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Credentiallistmappings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Ipaccesscontrollistmappings.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Ipaccesscontrollists.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Ipaddresses.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Shortcodes.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.short_code",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SigningKeys.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Signingkeys.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.signing_key",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Transcriptions.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Transcriptions.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Transcriptions/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.transcription",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Records.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/AllTime.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Alltime.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Daily.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Daily.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/LastMonth.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Lastmonth.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Monthly.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Monthly.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/ThisMonth.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Thismonth.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Today.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Today.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Yearly.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Yearly.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Yesterday.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Yesterday.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Triggers.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Triggers.json",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.usage.usage_trigger",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /2010-04-01/Accounts/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /healthcheck": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Healthcheck",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Addresses.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.address",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.address",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Applications.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.application",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.application",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Payments.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.payments",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Payments/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.payments",
+          "status_code": "202"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.call_recording",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.call_recording",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Siprec.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.siprec",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Siprec/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.siprec",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Streams.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.stream",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Streams/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.stream",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessageSubscriptions.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.user_defined_message_subscription",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessages.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call.user_defined_message",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.call",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference.participant",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference.participant",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference.conference_recording",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.conference",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.connect_app",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Local.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_local",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Mobile.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/TollFree.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.incoming_phone_number",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Keys.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.new_key",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.key",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Messages.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.message",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Feedback.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.message.message_feedback",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.message",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.validation_request",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.outgoing_caller_id",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Queues.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.queue",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members/{CallSid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.queue.member",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.queue",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_credential_list",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_credential_list",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_domain",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.short_code",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SigningKeys.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.new_signing_key",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.signing_key",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Tokens.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.token",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Usage/Triggers.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.usage.usage_trigger",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account.usage.usage_trigger",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /2010-04-01/Accounts/{Sid}.json": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "api.v2010.account",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Accounts.json": {
+      "fields": [
+        "accounts",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Addonresults.json": {
+      "fields": [
+        "add_on_results",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Addresses.json": {
+      "fields": [
+        "addresses",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Alltime.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Applications.json": {
+      "fields": [
+        "applications",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Assignedaddons.json": {
+      "fields": [
+        "assigned_add_ons",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Authorizedconnectapps.json": {
+      "fields": [
+        "authorized_connect_apps",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Availablephonenumbers.json": {
+      "fields": [
+        "countries",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Calls.json": {
+      "fields": [
+        "calls",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Conferences.json": {
+      "fields": [
+        "conferences",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Connectapps.json": {
+      "fields": [
+        "connect_apps",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Credentiallistmappings.json": {
+      "fields": [
+        "contents",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Credentiallists.json": {
+      "fields": [
+        "credential_lists",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Credentials.json": {
+      "fields": [
+        "credentials",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Daily.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Dependentphonenumbers.json": {
+      "fields": [
+        "dependent_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Domains.json": {
+      "fields": [
+        "domains",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Events.json": {
+      "fields": [
+        "end",
+        "events",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Extensions.json": {
+      "fields": [
+        "end",
+        "extensions",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Healthcheck": {
+      "fields": [
+        "status"
+      ]
+    },
+    "Incomingphonenumbers.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "incoming_phone_numbers",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Ipaccesscontrollistmappings.json": {
+      "fields": [
+        "contents",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Ipaccesscontrollists.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "ip_access_control_lists",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Ipaddresses.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "ip_addresses",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Keys.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "keys",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Lastmonth.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Local.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Machinetomachine.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Media.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "media_list",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Members.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "queue_members",
+        "start",
+        "uri"
+      ]
+    },
+    "Messages.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "messages",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Mobile.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Monthly.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "National.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Notifications.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "notifications",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Outgoingcallerids.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "outgoing_caller_ids",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Participants.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "participants",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Payloads.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "payloads",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Queues.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "queues",
+        "start",
+        "uri"
+      ]
+    },
+    "Recordings.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "recordings",
+        "start",
+        "uri"
+      ]
+    },
+    "Records.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Sharedcost.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Shortcodes.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "short_codes",
+        "start",
+        "uri"
+      ]
+    },
+    "Signingkeys.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "signing_keys",
+        "start",
+        "uri"
+      ]
+    },
+    "Thismonth.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Today.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Tollfree.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Transcriptions.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "transcriptions",
+        "uri"
+      ]
+    },
+    "Triggers.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_triggers"
+      ]
+    },
+    "Voip.json": {
+      "fields": [
+        "available_phone_numbers",
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri"
+      ]
+    },
+    "Yearly.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "Yesterday.json": {
+      "fields": [
+        "end",
+        "first_page_uri",
+        "next_page_uri",
+        "page",
+        "page_size",
+        "previous_page_uri",
+        "start",
+        "uri",
+        "usage_records"
+      ]
+    },
+    "api.v2010.account": {
+      "fields": [
+        "auth_token",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "owner_account_sid",
+        "sid",
+        "status",
+        "subresource_uris",
+        "type",
+        "uri"
+      ]
+    },
+    "api.v2010.account.address": {
+      "fields": [
+        "account_sid",
+        "city",
+        "customer_name",
+        "date_created",
+        "date_updated",
+        "emergency_enabled",
+        "friendly_name",
+        "iso_country",
+        "postal_code",
+        "region",
+        "sid",
+        "street",
+        "street_secondary",
+        "uri",
+        "validated",
+        "verified"
+      ]
+    },
+    "api.v2010.account.application": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "message_status_callback",
+        "public_application_connect_enabled",
+        "sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_status_callback",
+        "sms_url",
+        "status_callback",
+        "status_callback_method",
+        "uri",
+        "voice_caller_id_lookup",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_url"
+      ]
+    },
+    "api.v2010.account.authorized_connect_app": {
+      "fields": [
+        "account_sid",
+        "connect_app_company_name",
+        "connect_app_description",
+        "connect_app_friendly_name",
+        "connect_app_homepage_url",
+        "connect_app_sid",
+        "permissions",
+        "uri"
+      ]
+    },
+    "api.v2010.account.available_phone_number_country": {
+      "fields": [
+        "beta",
+        "country",
+        "country_code",
+        "subresource_uris",
+        "uri"
+      ]
+    },
+    "api.v2010.account.balance": {
+      "fields": [
+        "account_sid",
+        "balance",
+        "currency"
+      ]
+    },
+    "api.v2010.account.call": {
+      "fields": [
+        "account_sid",
+        "answered_by",
+        "api_version",
+        "caller_name",
+        "date_created",
+        "date_updated",
+        "direction",
+        "duration",
+        "end_time",
+        "forwarded_from",
+        "from",
+        "from_formatted",
+        "group_sid",
+        "parent_call_sid",
+        "phone_number_sid",
+        "price",
+        "price_unit",
+        "queue_time",
+        "sid",
+        "start_time",
+        "status",
+        "subresource_uris",
+        "to",
+        "to_formatted",
+        "trunk_sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.call.call_notification-instance": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "date_created",
+        "date_updated",
+        "error_code",
+        "log",
+        "message_date",
+        "message_text",
+        "more_info",
+        "request_method",
+        "request_url",
+        "request_variables",
+        "response_body",
+        "response_headers",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.call.call_recording": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "channels",
+        "conference_sid",
+        "date_created",
+        "date_updated",
+        "duration",
+        "encryption_details",
+        "error_code",
+        "price",
+        "price_unit",
+        "sid",
+        "source",
+        "start_time",
+        "status",
+        "track",
+        "uri"
+      ]
+    },
+    "api.v2010.account.call.payments": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "date_created",
+        "date_updated",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.call.siprec": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "date_updated",
+        "name",
+        "sid",
+        "status",
+        "uri"
+      ]
+    },
+    "api.v2010.account.call.stream": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "date_updated",
+        "name",
+        "sid",
+        "status",
+        "uri"
+      ]
+    },
+    "api.v2010.account.call.user_defined_message": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "date_created",
+        "sid"
+      ]
+    },
+    "api.v2010.account.call.user_defined_message_subscription": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "date_created",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.conference": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid_ending_conference",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "reason_conference_ended",
+        "region",
+        "sid",
+        "status",
+        "subresource_uris",
+        "uri"
+      ]
+    },
+    "api.v2010.account.conference.conference_recording": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "channels",
+        "conference_sid",
+        "date_created",
+        "date_updated",
+        "duration",
+        "encryption_details",
+        "error_code",
+        "price",
+        "price_unit",
+        "sid",
+        "source",
+        "start_time",
+        "status",
+        "uri"
+      ]
+    },
+    "api.v2010.account.conference.participant": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "call_sid_to_coach",
+        "coaching",
+        "conference_sid",
+        "date_created",
+        "date_updated",
+        "end_conference_on_exit",
+        "hold",
+        "label",
+        "muted",
+        "start_conference_on_enter",
+        "status",
+        "uri"
+      ]
+    },
+    "api.v2010.account.connect_app": {
+      "fields": [
+        "account_sid",
+        "authorize_redirect_url",
+        "company_name",
+        "deauthorize_callback_method",
+        "deauthorize_callback_url",
+        "description",
+        "friendly_name",
+        "homepage_url",
+        "permissions",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.incoming_phone_number": {
+      "fields": [
+        "account_sid",
+        "address_requirements",
+        "address_sid",
+        "api_version",
+        "beta",
+        "bundle_sid",
+        "capabilities",
+        "date_created",
+        "date_updated",
+        "emergency_address_sid",
+        "emergency_address_status",
+        "emergency_status",
+        "friendly_name",
+        "identity_sid",
+        "origin",
+        "phone_number",
+        "sid",
+        "sms_application_sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_url",
+        "status",
+        "status_callback",
+        "status_callback_method",
+        "trunk_sid",
+        "uri",
+        "voice_application_sid",
+        "voice_caller_id_lookup",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_receive_mode",
+        "voice_url"
+      ]
+    },
+    "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on": {
+      "fields": [
+        "account_sid",
+        "configuration",
+        "date_created",
+        "date_updated",
+        "description",
+        "friendly_name",
+        "resource_sid",
+        "sid",
+        "subresource_uris",
+        "unique_name",
+        "uri"
+      ]
+    },
+    "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension": {
+      "fields": [
+        "account_sid",
+        "assigned_add_on_sid",
+        "enabled",
+        "friendly_name",
+        "product_name",
+        "resource_sid",
+        "sid",
+        "unique_name",
+        "uri"
+      ]
+    },
+    "api.v2010.account.incoming_phone_number.incoming_phone_number_local": {
+      "fields": [
+        "account_sid",
+        "address_requirements",
+        "address_sid",
+        "api_version",
+        "beta",
+        "bundle_sid",
+        "capabilities",
+        "date_created",
+        "date_updated",
+        "emergency_address_sid",
+        "emergency_address_status",
+        "emergency_status",
+        "friendly_name",
+        "identity_sid",
+        "origin",
+        "phone_number",
+        "sid",
+        "sms_application_sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_url",
+        "status",
+        "status_callback",
+        "status_callback_method",
+        "trunk_sid",
+        "uri",
+        "voice_application_sid",
+        "voice_caller_id_lookup",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_receive_mode",
+        "voice_url"
+      ]
+    },
+    "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile": {
+      "fields": [
+        "account_sid",
+        "address_requirements",
+        "address_sid",
+        "api_version",
+        "beta",
+        "bundle_sid",
+        "capabilities",
+        "date_created",
+        "date_updated",
+        "emergency_address_sid",
+        "emergency_address_status",
+        "emergency_status",
+        "friendly_name",
+        "identity_sid",
+        "origin",
+        "phone_number",
+        "sid",
+        "sms_application_sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_url",
+        "status",
+        "status_callback",
+        "status_callback_method",
+        "trunk_sid",
+        "uri",
+        "voice_application_sid",
+        "voice_caller_id_lookup",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_receive_mode",
+        "voice_url"
+      ]
+    },
+    "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free": {
+      "fields": [
+        "account_sid",
+        "address_requirements",
+        "address_sid",
+        "api_version",
+        "beta",
+        "bundle_sid",
+        "capabilities",
+        "date_created",
+        "date_updated",
+        "emergency_address_sid",
+        "emergency_address_status",
+        "emergency_status",
+        "friendly_name",
+        "identity_sid",
+        "origin",
+        "phone_number",
+        "sid",
+        "sms_application_sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_url",
+        "status",
+        "status_callback",
+        "status_callback_method",
+        "trunk_sid",
+        "uri",
+        "voice_application_sid",
+        "voice_caller_id_lookup",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_receive_mode",
+        "voice_url"
+      ]
+    },
+    "api.v2010.account.key": {
+      "fields": [
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid"
+      ]
+    },
+    "api.v2010.account.message": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "body",
+        "date_created",
+        "date_sent",
+        "date_updated",
+        "direction",
+        "error_code",
+        "error_message",
+        "from",
+        "messaging_service_sid",
+        "num_media",
+        "num_segments",
+        "price",
+        "price_unit",
+        "sid",
+        "status",
+        "subresource_uris",
+        "to",
+        "uri"
+      ]
+    },
+    "api.v2010.account.message.media": {
+      "fields": [
+        "account_sid",
+        "content_type",
+        "date_created",
+        "date_updated",
+        "parent_sid",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.message.message_feedback": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "message_sid",
+        "outcome",
+        "uri"
+      ]
+    },
+    "api.v2010.account.new_key": {
+      "fields": [
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "secret",
+        "sid"
+      ]
+    },
+    "api.v2010.account.new_signing_key": {
+      "fields": [
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "secret",
+        "sid"
+      ]
+    },
+    "api.v2010.account.notification-instance": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "date_created",
+        "date_updated",
+        "error_code",
+        "log",
+        "message_date",
+        "message_text",
+        "more_info",
+        "request_method",
+        "request_url",
+        "request_variables",
+        "response_body",
+        "response_headers",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.outgoing_caller_id": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "phone_number",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.queue": {
+      "fields": [
+        "account_sid",
+        "average_wait_time",
+        "current_size",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "max_size",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.queue.member": {
+      "fields": [
+        "call_sid",
+        "date_enqueued",
+        "position",
+        "queue_sid",
+        "uri",
+        "wait_time"
+      ]
+    },
+    "api.v2010.account.recording": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "channels",
+        "conference_sid",
+        "date_created",
+        "date_updated",
+        "duration",
+        "encryption_details",
+        "error_code",
+        "media_url",
+        "price",
+        "price_unit",
+        "sid",
+        "source",
+        "start_time",
+        "status",
+        "subresource_uris",
+        "uri"
+      ]
+    },
+    "api.v2010.account.recording.recording_add_on_result": {
+      "fields": [
+        "account_sid",
+        "add_on_configuration_sid",
+        "add_on_sid",
+        "date_completed",
+        "date_created",
+        "date_updated",
+        "reference_sid",
+        "sid",
+        "status",
+        "subresource_uris"
+      ]
+    },
+    "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload": {
+      "fields": [
+        "account_sid",
+        "add_on_configuration_sid",
+        "add_on_result_sid",
+        "add_on_sid",
+        "content_type",
+        "date_created",
+        "date_updated",
+        "label",
+        "reference_sid",
+        "sid",
+        "subresource_uris"
+      ]
+    },
+    "api.v2010.account.recording.recording_transcription": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "date_created",
+        "date_updated",
+        "duration",
+        "price",
+        "price_unit",
+        "recording_sid",
+        "sid",
+        "status",
+        "transcription_text",
+        "type",
+        "uri"
+      ]
+    },
+    "api.v2010.account.short_code": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "short_code",
+        "sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_url",
+        "uri"
+      ]
+    },
+    "api.v2010.account.signing_key": {
+      "fields": [
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid"
+      ]
+    },
+    "api.v2010.account.sip.sip_credential_list": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid",
+        "subresource_uris",
+        "uri"
+      ]
+    },
+    "api.v2010.account.sip.sip_credential_list.sip_credential": {
+      "fields": [
+        "account_sid",
+        "credential_list_sid",
+        "date_created",
+        "date_updated",
+        "sid",
+        "uri",
+        "username"
+      ]
+    },
+    "api.v2010.account.sip.sip_domain": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "auth_type",
+        "byoc_trunk_sid",
+        "date_created",
+        "date_updated",
+        "domain_name",
+        "emergency_caller_sid",
+        "emergency_calling_enabled",
+        "friendly_name",
+        "secure",
+        "sid",
+        "sip_registration",
+        "subresource_uris",
+        "uri",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_status_callback_method",
+        "voice_status_callback_url",
+        "voice_url"
+      ]
+    },
+    "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid"
+      ]
+    },
+    "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid"
+      ]
+    },
+    "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid"
+      ]
+    },
+    "api.v2010.account.sip.sip_domain.sip_credential_list_mapping": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "domain_sid",
+        "friendly_name",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "domain_sid",
+        "friendly_name",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.sip.sip_ip_access_control_list": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid",
+        "subresource_uris",
+        "uri"
+      ]
+    },
+    "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address": {
+      "fields": [
+        "account_sid",
+        "cidr_prefix_length",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "ip_access_control_list_sid",
+        "ip_address",
+        "sid",
+        "uri"
+      ]
+    },
+    "api.v2010.account.token": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "ice_servers",
+        "password",
+        "ttl",
+        "username"
+      ]
+    },
+    "api.v2010.account.transcription": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "date_created",
+        "date_updated",
+        "duration",
+        "price",
+        "price_unit",
+        "recording_sid",
+        "sid",
+        "status",
+        "transcription_text",
+        "type",
+        "uri"
+      ]
+    },
+    "api.v2010.account.usage.usage_trigger": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "callback_method",
+        "callback_url",
+        "current_value",
+        "date_created",
+        "date_fired",
+        "date_updated",
+        "friendly_name",
+        "recurring",
+        "sid",
+        "trigger_by",
+        "trigger_value",
+        "uri",
+        "usage_category",
+        "usage_record_uri"
+      ]
+    },
+    "api.v2010.account.validation_request": {
+      "fields": [
+        "account_sid",
+        "call_sid",
+        "friendly_name",
+        "phone_number",
+        "validation_code"
+      ]
+    }
+  }
+}

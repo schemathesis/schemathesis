@@ -1,0 +1,23 @@
+{
+  "operations": {
+    "GET /groups": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Group",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Group": {
+      "fields": [
+        "nextLink",
+        "random-field-with_items"
+      ]
+    }
+  }
+}

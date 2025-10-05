@@ -1,0 +1,14 @@
+[
+  [
+    "200",
+    "#/paths/~1items~1runner-groups/get",
+    {
+      "DeleteRunnerGroup": {
+        "operationRef": "#/paths/~1items~1{runner_group_id}/delete",
+        "parameters": {
+          "path.runner_group_id": "$response.body#/runner_groups/0/id"
+        }
+      }
+    }
+  ]
+]

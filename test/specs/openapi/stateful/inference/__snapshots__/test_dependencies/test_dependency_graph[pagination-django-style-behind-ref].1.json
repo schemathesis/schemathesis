@@ -1,0 +1,14 @@
+[
+  [
+    "201",
+    "#/paths/~1channels/post",
+    {
+      "GetChannel": {
+        "operationRef": "#/paths/~1channels~1{channel_id}~1messages/get",
+        "parameters": {
+          "path.channel_id": "$response.body#/id"
+        }
+      }
+    }
+  ]
+]

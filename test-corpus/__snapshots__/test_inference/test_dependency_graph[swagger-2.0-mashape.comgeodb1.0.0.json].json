@@ -1,0 +1,552 @@
+{
+  "operations": {
+    "GET /geo/adminDivisions": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/adminDivisions/{divisionId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "divisionId",
+          "resource": "Division",
+          "resource_field": "divisionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "PopulatedPlaceResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/adminDivisions/{divisionId}/nearbyCities": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "divisionId",
+          "resource": "Division",
+          "resource_field": "divisionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/adminDivisions/{divisionId}/nearbyDivisions": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "divisionId",
+          "resource": "Division",
+          "resource_field": "divisionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities/{cityId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "cityId",
+          "resource": "City",
+          "resource_field": "cityId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "PopulatedPlaceResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities/{cityId}/dateTime": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "cityId",
+          "resource": "City",
+          "resource_field": "cityId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DateTimeResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities/{cityId}/distance": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "cityId",
+          "resource": "City",
+          "resource_field": "cityId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DistanceResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities/{cityId}/locatedIn": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "cityId",
+          "resource": "City",
+          "resource_field": "cityId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "PopulatedPlaceResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities/{cityId}/nearbyCities": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "cityId",
+          "resource": "City",
+          "resource_field": "cityId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/cities/{cityId}/time": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "cityId",
+          "resource": "City",
+          "resource_field": "cityId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "TimeResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/countries": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "CountrySummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/countries/{countryId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "countryId",
+          "resource": "Country",
+          "resource_field": "countryId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "CountryResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/countries/{countryId}/regions": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "countryId",
+          "resource": "Country",
+          "resource_field": "countryId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "RegionSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/countries/{countryId}/regions/{regionCode}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "countryId",
+          "resource": "Country",
+          "resource_field": "countryId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "RegionResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/countries/{countryId}/regions/{regionCode}/adminDivisions": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "countryId",
+          "resource": "Country",
+          "resource_field": "countryId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/countries/{countryId}/regions/{regionCode}/cities": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "countryId",
+          "resource": "Country",
+          "resource_field": "countryId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/locations/{locationId}/nearbyCities": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "locationId",
+          "resource": "Location",
+          "resource_field": "locationId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /geo/locations/{locationId}/nearbyDivisions": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "locationId",
+          "resource": "Location",
+          "resource_field": "locationId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/currencies": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "Currency",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/languages": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "LanguageDescriptor",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/locales": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "Locale",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/timezones": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "TimeZoneDescriptor",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/timezones/{zoneId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "zoneId",
+          "resource": "Zone",
+          "resource_field": "zoneId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "TimeZoneResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/timezones/{zoneId}/dateTime": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "zoneId",
+          "resource": "Zone",
+          "resource_field": "zoneId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DateTimeResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /locale/timezones/{zoneId}/time": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "zoneId",
+          "resource": "Zone",
+          "resource_field": "zoneId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "TimeResponse",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "City": {
+      "fields": [
+        "cityId"
+      ]
+    },
+    "Country": {
+      "fields": [
+        "countryId"
+      ]
+    },
+    "CountryResponse": {
+      "fields": [
+        "data",
+        "errors"
+      ]
+    },
+    "CountrySummary": {
+      "fields": [
+        "code",
+        "currencyCodes",
+        "name",
+        "wikiDataId"
+      ]
+    },
+    "Currency": {
+      "fields": [
+        "code",
+        "countryCodes",
+        "symbol"
+      ]
+    },
+    "DateTimeResponse": {
+      "fields": [
+        "data",
+        "errors"
+      ]
+    },
+    "DistanceResponse": {
+      "fields": [
+        "data",
+        "errors"
+      ]
+    },
+    "Division": {
+      "fields": [
+        "divisionId"
+      ]
+    },
+    "LanguageDescriptor": {
+      "fields": [
+        "code",
+        "name"
+      ]
+    },
+    "Locale": {
+      "fields": [
+        "code"
+      ]
+    },
+    "Location": {
+      "fields": [
+        "locationId"
+      ]
+    },
+    "PopulatedPlaceResponse": {
+      "fields": [
+        "data",
+        "errors"
+      ]
+    },
+    "PopulatedPlaceSummary": {
+      "fields": [
+        "country",
+        "countryCode",
+        "distance",
+        "id",
+        "latitude",
+        "longitude",
+        "name",
+        "population",
+        "region",
+        "regionCode",
+        "type",
+        "wikiDataId"
+      ]
+    },
+    "RegionResponse": {
+      "fields": [
+        "data",
+        "errors"
+      ]
+    },
+    "RegionSummary": {
+      "fields": [
+        "countryCode",
+        "fipsCode",
+        "isoCode",
+        "name",
+        "wikiDataId"
+      ]
+    },
+    "TimeResponse": {
+      "fields": [
+        "data",
+        "errors"
+      ]
+    },
+    "TimeZoneDescriptor": {
+      "fields": [
+        "id",
+        "name",
+        "rawUtcOffsetHours"
+      ]
+    },
+    "TimeZoneResponse": {
+      "fields": [
+        "errors",
+        "id",
+        "name",
+        "rawUtcOffsetHours"
+      ]
+    },
+    "Zone": {
+      "fields": [
+        "zoneId"
+      ]
+    }
+  }
+}

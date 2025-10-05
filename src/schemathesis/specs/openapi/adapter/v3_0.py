@@ -5,6 +5,7 @@ from schemathesis.specs.openapi.adapter.protocol import (
     BuildPathParameter,
     ExtractHeaderSchema,
     ExtractParameterSchema,
+    ExtractRawResponseSchema,
     ExtractResponseSchema,
     ExtractSecurityParameters,
     IterParameters,
@@ -18,6 +19,7 @@ example_keyword = "example"
 examples_container_keyword = "examples"
 
 extract_parameter_schema: ExtractParameterSchema = parameters.extract_parameter_schema_v3
+extract_raw_response_schema: ExtractRawResponseSchema = responses.extract_raw_response_schema_v3
 extract_response_schema: ExtractResponseSchema = responses.extract_response_schema_v3
 extract_header_schema: ExtractHeaderSchema = responses.extract_header_schema_v3
 iter_parameters: IterParameters = parameters.iter_parameters_v3

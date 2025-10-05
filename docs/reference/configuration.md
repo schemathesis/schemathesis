@@ -468,7 +468,7 @@ These settings can only be applied at the project level.
     **Type**: `Array[String]`  
     **Default**: `[]`  
 
-    Lists the HTTP methods to use when generating test cases with methods not specified in the API during the **coverage** phase.  
+    Lists the HTTP methods to use when generating test cases with methods not specified in the API during the **coverage** phase.
     Schemathesis will limit negative testing of unexpected methods to those in the array; if omitted, all HTTP methods not specified in the spec are applied.
 
     ```toml
@@ -483,7 +483,7 @@ These settings can only be applied at the project level.
     **Type**: `Integer (≥2)`  
     **Default**: `null`  
 
-    Specifies the maximum number of stateful steps (i.e., transitions between states) to perform in the **stateful** phase. When set, Schemathesis will stop exploring new state transitions once this limit is reached, even if additional valid transitions are available.  
+    Specifies the maximum number of stateful steps (i.e., transitions between states) to perform in the **stateful** phase. When set, Schemathesis will stop exploring new state transitions once this limit is reached, even if additional valid transitions are available.
 
     ```toml
     [phases.stateful]
@@ -495,12 +495,14 @@ These settings can only be applied at the project level.
 !!! note ""
 
     **Type**: `Array[String]`  
-    **Default**: `["location-headers"]`  
+    **Default**: `["location-headers", "dependency-analysis"]`  
 
     Specifies which inference algorithms to use during the **stateful** phase. Schemathesis will use the specified algorithms to automatically analyze API responses and generate OpenAPI links for stateful testing.
 
     Available algorithms:
-    - `location-headers` - Analyzes `Location` headers to infer parameter extraction rules between operations
+
+    - `location-headers` - Analyzes `Location` headers to infer parameter extraction rules between operations.  
+    - `dependency-analysis` - Analyzes your OpenAPI schema to detect resource dependencies between operations.  
 
     Set to an empty array to disable automatic link inference entirely.
 

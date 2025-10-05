@@ -1,0 +1,373 @@
+{
+  "operations": {
+    "GET /oauth2/1/authorize": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Authorize",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/file/{uri}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "File",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/files/": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/items",
+          "resource": "File",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/files/issued": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Issued",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/files/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "File",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "File",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/user": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/xml/{uri}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "XMLFormatSchema",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/2/files/issued": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/items",
+          "resource": "Issued",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/2/xml/eaadhaar": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "EaadharXamlSchema",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /account/1/pushuri": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Pushuri",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /account/2/verify": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "VerifyAccountResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/code": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceAuthorizationCodeResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/file/upload": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "FileUploadResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/pull/doctype": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DocTypeResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/pull/issuers": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/issuers",
+          "resource": "IssuerResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/pull/parameters": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "SearchParametersResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/pull/pulldocument": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Pulldocument",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /oauth2/1/revoke": {
+      "inputs": [],
+      "outputs": []
+    },
+    "POST /oauth2/1/token": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "AccessResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /signup/1/demoauthverify": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DemoAuthVerifyResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /signup/2/demoauth": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DemoAuthResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /statistics/1/counts": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "GetStatisticsResponse",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "AccessResponse": {
+      "fields": [
+        "access_token",
+        "digilocker_id",
+        "dob",
+        "eaadhar",
+        "expires_in",
+        "gender",
+        "name",
+        "reference_key",
+        "refresh_token",
+        "scope",
+        "token_type"
+      ]
+    },
+    "Authorize": {
+      "fields": [
+        "details"
+      ]
+    },
+    "DemoAuthResponse": {
+      "fields": [
+        "details"
+      ]
+    },
+    "DemoAuthVerifyResponse": {
+      "fields": [
+        "details"
+      ]
+    },
+    "DeviceAuthorizationCodeResponse": {
+      "fields": [
+        "device_code",
+        "dl_masked_email",
+        "dl_masked_mobile",
+        "expires_in"
+      ]
+    },
+    "DocTypeResponse": {
+      "fields": [
+        "documents"
+      ]
+    },
+    "EaadharXamlSchema": {
+      "fields": [
+        "KycRes"
+      ]
+    },
+    "File": {
+      "fields": [
+        "date",
+        "description",
+        "id",
+        "issuer",
+        "mime",
+        "name",
+        "parent",
+        "size",
+        "type",
+        "uri"
+      ]
+    },
+    "FileUploadResponse": {
+      "fields": [
+        "details"
+      ]
+    },
+    "GetStatisticsResponse": {
+      "fields": [
+        "authentic_documents",
+        "count_as_on",
+        "issuers",
+        "monthwise_registations",
+        "requestors",
+        "users",
+        "yearwise_authentic_documents"
+      ]
+    },
+    "Issued": {
+      "fields": [
+        "details"
+      ]
+    },
+    "IssuerResponse": {
+      "fields": [
+        "categories",
+        "description",
+        "issuerid",
+        "name",
+        "orgid"
+      ]
+    },
+    "Pulldocument": {
+      "fields": [
+        "details"
+      ]
+    },
+    "Pushuri": {
+      "fields": []
+    },
+    "SearchParametersResponse": {
+      "fields": [
+        "example",
+        "label",
+        "paramname",
+        "valuelist"
+      ]
+    },
+    "User": {
+      "fields": [
+        "details"
+      ]
+    },
+    "VerifyAccountResponse": {
+      "fields": [
+        "digilockerid",
+        "registered"
+      ]
+    },
+    "XMLFormatSchema": {
+      "fields": [
+        "CertificateData",
+        "Signature"
+      ]
+    }
+  }
+}

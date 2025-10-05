@@ -1,0 +1,26 @@
+{
+  "operations": {
+    "GET /geo/adminDivisions": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "PopulatedPlaceSummary",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "PopulatedPlaceSummary": {
+      "fields": [
+        "country",
+        "id",
+        "latitude",
+        "longitude",
+        "name"
+      ]
+    }
+  }
+}

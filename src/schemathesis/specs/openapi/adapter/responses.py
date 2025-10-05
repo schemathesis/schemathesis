@@ -48,6 +48,10 @@ class OpenApiResponse:
         assert not isinstance(self._schema, NotSet)
         return self._schema
 
+    def get_raw_schema(self) -> JsonSchema | None:
+        """Raw and unresolved response schema."""
+        return self.adapter.extract_raw_response_schema(self.definition)
+
     @property
     def validator(self) -> Validator | None:
         """JSON Schema validator for this response."""
@@ -118,6 +122,9 @@ class OpenApiResponses:
     def items(self) -> ItemsView[str, OpenApiResponse]:
         return self._inner.items()
 
+    def get(self, key: str) -> OpenApiResponse | None:
+        return self._inner.get(key)
+
     def add(self, status_code: str, definition: dict[str, Any]) -> OpenApiResponse:
         instance = OpenApiResponse(
             status_code=status_code,
@@ -153,12 +160,16 @@ class OpenApiResponses:
         # The default response has the lowest priority
         return responses.get("default")
 
+    def iter_successful_responses(self) -> Iterator[OpenApiResponse]:
+        """Iterate over all response definitions for successful responses."""
+        for response in self._inner.values():
+            if response.status_code.startswith("2"):
+                yield response
+
     def iter_examples(self) -> Iterator[tuple[str, object]]:
         """Iterate over all examples for all responses."""
-        for response in self._inner.values():
-            # Check only 2xx responses
-            if response.status_code.startswith("2"):
-                yield from response.iter_examples()
+        for response in self.iter_successful_responses():
+            yield from response.iter_examples()
 
 
 def _iter_resolved_responses(
@@ -178,20 +189,31 @@ def _iter_resolved_responses(
 def extract_response_schema_v2(
     response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
 ) -> JsonSchema | None:
-    schema = response.get("schema")
+    schema = extract_raw_response_schema_v2(response)
     if schema is not None:
         return _prepare_schema(schema, resolver, scope, nullable_keyword)
     return None
 
 
+def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | None:
+    return response.get("schema")
+
+
 def extract_response_schema_v3(
     response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
 ) -> JsonSchema | None:
+    schema = extract_raw_response_schema_v3(response)
+    if schema is not None:
+        return _prepare_schema(schema, resolver, scope, nullable_keyword)
+    return None
+
+
+def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | None:
     options = iter(response.get("content", {}).values())
     media_type = next(options, None)
     # "schema" is an optional key in the `MediaType` object
-    if media_type and "schema" in media_type:
-        return _prepare_schema(media_type["schema"], resolver, scope, nullable_keyword)
+    if media_type is not None:
+        return media_type.get("schema")
     return None
 
 

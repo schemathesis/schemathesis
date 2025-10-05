@@ -1,0 +1,158 @@
+{
+  "operations": {
+    "DELETE /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups/{containerGroupName}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "subscriptionId",
+          "resource": "Subscription",
+          "resource_field": "subscriptionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ContainerGroup",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /providers/Microsoft.ContainerInstance/operations": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/value",
+          "resource": "Operation",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /subscriptions/{subscriptionId}/providers/Microsoft.ContainerInstance/containerGroups": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "subscriptionId",
+          "resource": "Subscription",
+          "resource_field": "subscriptionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/value",
+          "resource": "ContainerGroup",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "subscriptionId",
+          "resource": "Subscription",
+          "resource_field": "subscriptionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/value",
+          "resource": "ContainerGroup",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups/{containerGroupName}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "subscriptionId",
+          "resource": "Subscription",
+          "resource_field": "subscriptionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ContainerGroup",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups/{containerGroupName}/containers/{containerName}/logs": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "subscriptionId",
+          "resource": "Subscription",
+          "resource_field": "subscriptionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Logs",
+          "status_code": "200"
+        }
+      ]
+    },
+    "PUT /subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.ContainerInstance/containerGroups/{containerGroupName}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "subscriptionId",
+          "resource": "Subscription",
+          "resource_field": "subscriptionId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ContainerGroup",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ContainerGroup",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "ContainerGroup": {
+      "fields": [
+        "id",
+        "location",
+        "name",
+        "properties",
+        "tags",
+        "type"
+      ]
+    },
+    "Logs": {
+      "fields": [
+        "content"
+      ]
+    },
+    "Operation": {
+      "fields": [
+        "display",
+        "name",
+        "origin"
+      ]
+    },
+    "Subscription": {
+      "fields": [
+        "subscriptionId"
+      ]
+    }
+  }
+}

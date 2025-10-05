@@ -1,0 +1,46 @@
+{
+  "operations": {
+    "GET /channels/{channel_id}/messages": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "channel_id",
+          "resource": "Channel",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Message",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /channels": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Channel",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Channel": {
+      "fields": [
+        "id"
+      ]
+    },
+    "Message": {
+      "fields": [
+        "id",
+        "text"
+      ]
+    }
+  }
+}

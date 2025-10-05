@@ -19,7 +19,7 @@ Schemathesis dev
  ✅  Stateful (in 0.00s)
 
      Scenarios:    N
-     API Links:    N covered / 2 selected / 2 total
+     API Links:    N covered / 4 selected / 4 total (2 inferred)
 
      ✅ N passed
 

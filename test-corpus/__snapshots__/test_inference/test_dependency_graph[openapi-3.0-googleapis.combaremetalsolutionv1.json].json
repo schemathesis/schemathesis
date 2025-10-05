@@ -1,0 +1,51 @@
+{
+  "operations": {
+    "DELETE /v1/{name}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Empty",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /v1/{name}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/operations",
+          "resource": "Operation",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /v1/{name}:cancel": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Empty",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Empty": {
+      "fields": []
+    },
+    "Operation": {
+      "fields": [
+        "done",
+        "error",
+        "metadata",
+        "name",
+        "response"
+      ]
+    }
+  }
+}

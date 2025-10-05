@@ -1,0 +1,44 @@
+{
+  "operations": {
+    "GET /users/{userId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "userId",
+          "resource": "User",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "User": {
+      "fields": [
+        "createdAt",
+        "email",
+        "id",
+        "name",
+        "updatedAt"
+      ]
+    }
+  }
+}
