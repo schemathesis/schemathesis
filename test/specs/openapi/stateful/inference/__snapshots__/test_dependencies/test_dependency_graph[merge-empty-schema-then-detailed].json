@@ -1,0 +1,49 @@
+{
+  "operations": {
+    "GET /files/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "File",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "File",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /oauth2/1/files/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "File",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "File",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "File": {
+      "fields": [
+        "id",
+        "details",
+        "metadata"
+      ]
+    }
+  }
+}

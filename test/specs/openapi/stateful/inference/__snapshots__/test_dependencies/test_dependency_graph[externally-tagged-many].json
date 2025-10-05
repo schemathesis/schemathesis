@@ -1,0 +1,24 @@
+{
+  "operations": {
+    "GET /merchants": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/Merchants",
+          "resource": "Merchant",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Merchant": {
+      "fields": [
+        "id",
+        "name",
+        "category"
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "operations": {
+    "GET /items": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Product",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Product": {
+      "fields": [
+        "id",
+        "price"
+      ]
+    }
+  }
+}

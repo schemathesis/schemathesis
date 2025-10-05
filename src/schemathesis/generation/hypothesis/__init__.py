@@ -90,7 +90,9 @@ def setup() -> None:
             url, resolved = resolver.resolve(ref)
             resolver.push_scope(url)
             try:
-                return merged([s, _resolve_all_refs(deepclone(resolved), resolver=resolver)])  # type: ignore
+                return merged(
+                    [_resolve_all_refs(s, resolver=resolver), _resolve_all_refs(deepclone(resolved), resolver=resolver)]
+                )  # type: ignore
             finally:
                 resolver.pop_scope()
 
