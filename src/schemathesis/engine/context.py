@@ -4,12 +4,13 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import ProjectConfig
+from schemathesis.config import InferenceAlgorithm, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.observations import Observations
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
+from schemathesis.specs.openapi.stateful import dependencies
 
 if TYPE_CHECKING:
     import threading
@@ -85,9 +86,10 @@ class EngineContext:
 
     def inject_links(self) -> int:
         """Inject inferred OpenAPI links into API operations based on collected observations."""
+        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
         injected = 0
         if self.observations is not None and self.observations.location_headers:
-            from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
             from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 
             assert isinstance(self.schema, BaseOpenAPISchema)
@@ -96,6 +98,24 @@ class EngineContext:
             inferencer = LinkInferencer.from_schema(self.schema)
             for operation, entries in self.observations.location_headers.items():
                 injected += inferencer.inject_links(operation.responses, entries)
+        if (
+            isinstance(self.schema, BaseOpenAPISchema)
+            and self.schema.config.phases.stateful.enabled
+            and self.schema.config.phases.stateful.inference.is_algorithm_enabled(
+                InferenceAlgorithm.DEPENDENCY_ANALYSIS
+            )
+        ):
+            graph = dependencies.analyze(self.schema)
+            for response_links in graph.iter_links():
+                operation = self.schema.get_operation_by_reference(response_links.producer_operation_ref)
+                response = operation.responses.get(response_links.status_code)
+                links = response.definition.setdefault(self.schema.adapter.links_keyword, {})
+
+                for link_name, definition in response_links.links.items():
+                    # Find unique name if collision exists
+                    final_name = _resolve_link_name_collision(link_name, links)
+                    links[final_name] = definition.to_openapi()
+                    injected += 1
 
         return injected
 
@@ -151,3 +171,16 @@ class EngineContext:
             kwargs["proxies"] = {"all": proxy}
         self._transport_kwargs_cache[key] = kwargs
         return kwargs
+
+
+def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, Any]) -> str:
+    if proposed_name not in existing_links:
+        return proposed_name
+
+    # Name collision - find next available suffix
+    suffix = 0
+    while True:
+        candidate = f"{proposed_name}_{suffix}"
+        if candidate not in existing_links:
+            return candidate
+        suffix += 1

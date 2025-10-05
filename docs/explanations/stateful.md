@@ -4,50 +4,90 @@ Learn how Schemathesis's stateful testing works, when to use it, and how it fits
 
 ## What is Stateful Testing?
 
-Stateful testing chains real API calls, passing data from response to request, rather than testing operations in isolation.
+Stateful testing chains API calls together using real data from responses, rather than testing each operation independently.
 
-**Isolated testing:**
+**Without stateful testing:**
+
 ```
-POST /users → Random data → Validate response ✓
-GET /users/123 → Random ID → 404 Not Found ✗
-PUT /users/456 → Random ID → 404 Not Found ✗
+POST /users → Creates user → Test passes ✓
+GET /users/123 → Uses random ID → 404 Not Found ✗
+DELETE /users/456 → Uses random ID → 404 Not Found ✗
 ```
 
-**Stateful testing:**
+Each operation tested alone. Random data doesn't match real resources.
+
+**With stateful testing:**
+
 ```
-POST /users → Random data → Returns user ID: 789
-GET /users/789 → Use ID from step 1 → 200 OK ✓ 
-PUT /users/789 → Use ID from step 1 → 200 OK ✓
+POST /users → Creates user → Returns ID: 789 ✓
+GET /users/789 → Uses actual ID from POST → 200 OK ✓
+DELETE /users/789 → Uses actual ID from POST → 200 OK ✓
 ```
+
+Operations chained together. Real IDs from real responses.
+
+**Why this matters:**
+
+- Tests realistic workflows (create -> read -> update -> delete)
+- Finds bugs that only appear when operations interact
+- Validates your API works as a whole, not just individual endpoints
 
 ## How It Works
 
-Schemathesis models your API as a state machine:
+Schemathesis analyzes your OpenAPI schema to understand how operations connect.
 
-- **States** track what data is available from previous calls
-- **Transitions** are your API operations  
-- **Links** define how data flows between operations
+**Step 1: Find resources**
 
-**Process:**
+Identifies what your API produces:
 
-1. Parse OpenAPI links from schema
-2. Generate state machine with bundles for each operation
-3. Run scenarios: choose operation -> use linked data -> execute -> store response
+```yaml
+POST /users → Creates "User" resource
+POST /orders → Creates "Order" resource
+```
 
-**Example:** User management API
+**Step 2: Match parameters**
 
-- Empty state -> `POST /users` -> User state (has user ID)
-- User state -> `POST /orders` -> User+Order state (has both IDs)
+Links parameters to resources:
 
-!!! tip "Under the Hood: Swarm Testing"
+```yaml
+GET /users/{userId} → Needs "userId" from User resource
+GET /orders/{orderId} → Needs "orderId" from Order resource
+```
 
-    Schemathesis's stateful testing implements [Swarm testing](https://www.cs.utah.edu/~regehr/papers/swarm12.pdf), which makes defect discovery much more effective.
+**Step 3: Connect operations**
 
-## OpenAPI Links: The Connection Challenge
+Chains operations that share resources:
+```
+POST /users (creates User with id=123)
+  ↓ pass id as userId
+GET /users/{userId} (needs User)
+  ↓ pass id as userId
+PUT /users/{userId} (needs User)
+  ↓ pass id as userId
+DELETE /users/{userId} (needs User)
+```
 
-Stateful testing requires [OpenAPI links](https://swagger.io/docs/specification/links/) to connect operations, but maintaining these links is the biggest implementation challenge.
+**Step 4: Generate test scenarios**
 
-### What Links Look Like
+Runs random workflows:
+
+- Create user -> Get user -> Update user -> Delete user
+- Create user -> Create order for that user -> Get order
+- Create user -> Delete user -> Get user
+
+**This happens automatically** when you enable stateful testing.
+
+## Connecting Operations
+
+Stateful testing needs to know how operations relate. For example, `POST /users` creates a user, and `GET /users/{userId}` needs that user's ID.
+
+Schemathesis discovers these connections in three ways:
+
+### 1. Automatic Schema Analysis
+
+Analyzes your OpenAPI schema to detect connections.
+
+**Example:** Your schema has:
 
 ```yaml
 paths:
@@ -55,64 +95,79 @@ paths:
     post:
       responses:
         '201':
-          # ... response definition
-          links:
-            GetUserByUserId:
-              operationId: getUser
-              parameters:
-                userId: '$response.body#/id'  # Use response ID as parameter
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: {type: string}
+                  email: {type: string}
   
   /users/{userId}:
     get:
-      operationId: getUser
       parameters:
         - name: userId
           in: path
-          required: true
 ```
 
-**Common link patterns:**
+Schemathesis detects the following relationships:
 
-- Create resource → Get resource → Update resource → Delete resource
-- Create user → Create user's orders → Get order details
-- Create parent → Create children → Get parent with children
+- `POST /users` creates a `User` resource with fields `id` and `email`.
+- `GET /users/{userId}` requires a `userId` path parameter.
+- It infers that `userId` corresponds to the `id` field returned by the POST response.
+- Therefore, it can build a sequence: `POST /users` -> `GET /users/{userId}`.
 
-### Automatic Link Inference
+**Works for:**
 
-Writing OpenAPI links manually for every operation relationship can be time-consuming and error-prone. Schemathesis can automatically infer many of these connections by analyzing `Location` headers from API responses during testing.
+- Path parameters: `userId`, `user_id`, `{id}` in `/users/{id}`
+- Nested resources: `/users/{userId}/posts`
+- Pagination: `{"data": [...]}`, `{"items": [...]}`
+- Schema composition: `allOf`, `oneOf`, `anyOf`
 
-**How it works:**
+!!! warning "Current limitation"
+    Only path parameters are supported as inputs to API operations; query, header, and body are coming soon.
 
-1. **Data collection**: During earlier test phases, Schemathesis collects `Location` headers from API responses
-2. **Pattern analysis**: It analyzes these headers to understand how your API structures resource locations
-3. **Connection mapping**: Creates connections between operations - it learns how to extract parameters from `Location` headers and use them to call related operations
-4. **Stateful testing**: Uses this knowledge to chain operations together with real parameter values
+### 2. Location Header Learning
 
-**Example:**
+While running tests, Schemathesis can also learn new connections dynamically by observing `Location` headers in responses.
 
-**Phase 1 - Learning**: During fuzzing, Schemathesis observes:
+If your API returns a `Location` header when creating resources, Schemathesis automatically discovers follow-up operations for that resource.
 
 ```http
 POST /users → 201 Created
 Location: /users/123
+
+# Learns: GET /users/123, PUT /users/123, DELETE /users/123
 ```
 
-From this, it learns these connections:
+This mechanism requires your API to return a valid `Location` header in `201 Created` responses.
 
-- `GET /users/{userId}` - can be called using `userId` extracted from `Location`
-- `PUT /users/{userId}` - can be called using `userId` extracted from `Location`
-- `GET /users/{userId}/posts` - can be called using `userId` extracted from `Location`
+### 3. Manual OpenAPI Links
 
-**Phase 2 - Application**: During stateful testing, it uses this knowledge:
+When you want full control or need to specify non-path relationships, you can define explicit connections using [OpenAPI Links](https://spec.openapis.org/oas/v3.1.0#link-object).
 
-```http
-POST /users → Location: /users/456 → automatically calls GET /users/456, PUT /users/456, etc.
+```yaml
+paths:
+  /users:
+    post:
+      responses:
+        '201':
+          links:
+            GetUser:
+              operationId: getUser
+              parameters:
+                userId: '$response.body#/id'
 ```
 
-This happens automatically when stateful testing is enabled - no additional configuration required.
+This explicitly tells Schemathesis that the `userId` parameter in the `getUser` operation should be populated from the `id` field in the response body of the `POST /users` operation.
 
-!!! note "Location Headers Required"
-    This feature requires your API to return `Location` headers pointing to created or updated resources.
+**Use manual links when**:
+
+- Automatic schema analysis misses a connection
+- You need to map query, header, or body parameters
+- You want precise, explicit control over operation relationships
+
+!!! note "All Three Work Together"
+    Schema analysis runs first, manual links override when present, and `Location` learning adds runtime discoveries.
 
 ## How Schemathesis Extends OpenAPI Links
 

@@ -1,0 +1,22 @@
+{
+  "operations": {
+    "GET /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/_embedded/users",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "User": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

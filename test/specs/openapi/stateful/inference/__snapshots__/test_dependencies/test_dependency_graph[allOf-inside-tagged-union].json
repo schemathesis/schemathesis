@@ -1,0 +1,22 @@
+{
+  "operations": {
+    "GET /tags/{resourceArn}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/tags",
+          "resource": "TagMap",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "TagMap": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

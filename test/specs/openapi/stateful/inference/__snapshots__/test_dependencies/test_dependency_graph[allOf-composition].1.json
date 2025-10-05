@@ -1,0 +1,14 @@
+[
+  [
+    "201",
+    "#/paths/~1users/post",
+    {
+      "GetUser": {
+        "operationRef": "#/paths/~1users~1{userId}/get",
+        "parameters": {
+          "path.userId": "$response.body#/id"
+        }
+      }
+    }
+  ]
+]

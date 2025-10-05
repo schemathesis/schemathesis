@@ -1,0 +1,14 @@
+[
+  [
+    "201",
+    "#/paths/~1brands/post",
+    {
+      "GetBrand": {
+        "operationRef": "#/paths/~1brands~1{brandId}/get",
+        "parameters": {
+          "path.brandId": "$response.body#/BrandId"
+        }
+      }
+    }
+  ]
+]

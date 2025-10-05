@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.2.2...HEAD) - TBD
 
+### :rocket: Added
+
+- **Automatic API Operation Dependency Detection**: Schemathesis now automatically discovers dependencies between operations (e.g., `POST /users` -> `GET /users/{userId}`), enabling stateful testing without manual configuration. Currently detects path parameter dependencies; `query` / `body` parameter support coming in next release.
+
 ## [4.2.2](https://github.com/schemathesis/schemathesis/compare/v4.2.1...v4.2.2) - 2025-10-11
 
 ### :bug: Fixed

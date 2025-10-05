@@ -1,0 +1,14 @@
+[
+  [
+    "200",
+    "#/paths/~1groups/get",
+    {
+      "GetGroup": {
+        "operationRef": "#/paths/~1groups~1{groupId}~1users/get",
+        "parameters": {
+          "path.groupId": "$response.body#/value/0/id"
+        }
+      }
+    }
+  ]
+]

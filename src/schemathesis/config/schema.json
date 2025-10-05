@@ -325,7 +325,8 @@
               "items": {
                 "type": "string",
                 "enum": [
-                  "location-headers"
+                  "location-headers",
+                  "dependency-analysis"
                 ]
               },
               "uniqueItems": true

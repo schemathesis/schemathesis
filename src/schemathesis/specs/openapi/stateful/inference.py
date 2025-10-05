@@ -21,6 +21,7 @@ from werkzeug.exceptions import MethodNotAllowed, NotFound
 from werkzeug.routing import Map, MapAdapter, Rule
 
 from schemathesis.core.adapter import ResponsesContainer
+from schemathesis.core.transforms import encode_pointer
 
 if TYPE_CHECKING:
     from schemathesis.engine.observations import LocationHeaderEntry
@@ -95,7 +96,7 @@ class LinkInferencer:
             if operation_id:
                 operation = OperationById(operation_id, method=method, path=path)
             else:
-                encoded_path = path.replace("~", "~0").replace("/", "~1")
+                encoded_path = encode_pointer(path)
                 operation = OperationByRef(f"#/paths/{encoded_path}/{method}", method=method, path=path)
 
             operations.append(operation)

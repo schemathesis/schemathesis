@@ -1,2 +1,5 @@
 [default]
 extend-ignore-re = ["DELET", "RESTFul", "parametrized", "worke", "secon"]
+
+[files]
+extend-exclude = ["test-corpus/__snapshots__/*/*.json"]

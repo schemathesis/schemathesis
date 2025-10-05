@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from schemathesis.core.jsonschema.types import JsonSchema
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
+ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
 ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
@@ -41,6 +42,7 @@ class SpecificationAdapter(Protocol):
     # Function to extract schema from parameter definition
     extract_parameter_schema: ExtractParameterSchema
     # Function to extract response schema from specification
+    extract_raw_response_schema: ExtractRawResponseSchema
     extract_response_schema: ExtractResponseSchema
     # Function to extract header schema from specification
     extract_header_schema: ExtractHeaderSchema

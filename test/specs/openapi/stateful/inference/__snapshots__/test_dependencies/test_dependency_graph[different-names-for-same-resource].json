@@ -1,0 +1,33 @@
+{
+  "operations": {
+    "DELETE /spaces/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Space",
+          "resource_field": "spaceId"
+        }
+      ],
+      "outputs": []
+    },
+    "POST /spaces/{spaceId}/topic": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "spaceId",
+          "resource": "Space",
+          "resource_field": "spaceId"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Space": {
+      "fields": [
+        "spaceId"
+      ]
+    }
+  }
+}

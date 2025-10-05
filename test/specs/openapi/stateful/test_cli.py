@@ -250,6 +250,7 @@ def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
             "-n 30",
             "-c not_a_server_error",
             "--mode=positive",
+            config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
         )
         == snapshot_cli
     )
@@ -268,6 +269,7 @@ def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
             "--generation-database=none",
             "-c not_a_server_error",
             "--mode=positive",
+            config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
         )
         == snapshot_cli
     )

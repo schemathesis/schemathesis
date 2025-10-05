@@ -1,0 +1,20 @@
+{
+  "operations": {
+    "GET /data": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Data",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Data": {
+      "fields": []
+    }
+  }
+}

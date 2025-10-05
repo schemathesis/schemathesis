@@ -30,6 +30,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
+from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -372,6 +373,8 @@ def test_default(corpus, filename):
     schema.config.phases.update(phases=["examples", "fuzzing"])
     schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])
+
+    dependencies.analyze(schema)
 
     handlers = [
         JunitXMLHandler(output=StringIO()),

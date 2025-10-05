@@ -324,7 +324,7 @@ def iter_parameters_v2(
                 _, param = maybe_resolve(param, resolver, "")
                 if param.get("in") == ParameterLocation.BODY:
                     if "$ref" in param["schema"]:
-                        resource_name = _get_resource_name(param["schema"]["$ref"])
+                        resource_name = resource_name_from_ref(param["schema"]["$ref"])
             for media_type in body_media_types:
                 yield OpenApiBody.from_definition(
                     definition=parameter,
@@ -375,7 +375,7 @@ def iter_parameters_v3(
             if isinstance(schema, dict):
                 content = dict(content)
                 if "$ref" in schema:
-                    resource_name = _get_resource_name(schema["$ref"])
+                    resource_name = resource_name_from_ref(schema["$ref"])
                 try:
                     to_bundle = cast(dict[str, Any], schema)
                     bundled = bundler.bundle(to_bundle, resolver, inline_recursive=True)
@@ -391,7 +391,7 @@ def iter_parameters_v3(
             )
 
 
-def _get_resource_name(reference: str) -> str:
+def resource_name_from_ref(reference: str) -> str:
     return reference.rsplit("/", maxsplit=1)[1]
 
 

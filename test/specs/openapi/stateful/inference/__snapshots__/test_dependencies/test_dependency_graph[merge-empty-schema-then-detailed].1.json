@@ -1,0 +1,26 @@
+[
+  [
+    "200",
+    "#/paths/~1files~1{id}/get",
+    {
+      "GetFile": {
+        "operationRef": "#/paths/~1oauth2~11~1files~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/id"
+        }
+      }
+    }
+  ],
+  [
+    "200",
+    "#/paths/~1oauth2~11~1files~1{id}/get",
+    {
+      "GetFile": {
+        "operationRef": "#/paths/~1files~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/id"
+        }
+      }
+    }
+  ]
+]
