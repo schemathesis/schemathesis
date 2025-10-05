@@ -1,0 +1,45 @@
+{
+  "operations": {
+    "GET /groups": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/value",
+          "resource": "Group",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /groups/{groupId}/users": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "groupId",
+          "resource": "Group",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/value",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Group": {
+      "fields": [
+        "id"
+      ]
+    },
+    "User": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

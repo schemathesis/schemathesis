@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Mapping, TypeVar, Union, overload
+from typing import Any, Callable, Dict, Iterator, List, Mapping, TypeVar, Union, overload
 
 T = TypeVar("T")
 
@@ -106,6 +106,18 @@ class Unresolvable: ...
 UNRESOLVABLE = Unresolvable()
 
 
+def encode_pointer(pointer: str) -> str:
+    return pointer.replace("~", "~0").replace("/", "~1")
+
+
+def decode_pointer(value: str) -> str:
+    return value.replace("~1", "/").replace("~0", "~")
+
+
+def iter_decoded_pointer_segments(pointer: str) -> Iterator[str]:
+    return map(decode_pointer, pointer.split("/")[1:])
+
+
 def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None | Unresolvable:
     """Implementation is adapted from Rust's `serde-json` crate.
 
@@ -116,12 +128,8 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     if not pointer.startswith("/"):
         return UNRESOLVABLE
 
-    def replace(value: str) -> str:
-        return value.replace("~1", "/").replace("~0", "~")
-
-    tokens = map(replace, pointer.split("/")[1:])
     target = document
-    for token in tokens:
+    for token in iter_decoded_pointer_segments(pointer):
         if isinstance(target, dict):
             target = target.get(token, UNRESOLVABLE)
             if target is UNRESOLVABLE:

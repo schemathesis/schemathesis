@@ -1,0 +1,20 @@
+{
+  "operations": {
+    "GET /test": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "EmployeesResponse",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "EmployeesResponse": {
+      "fields": []
+    }
+  }
+}

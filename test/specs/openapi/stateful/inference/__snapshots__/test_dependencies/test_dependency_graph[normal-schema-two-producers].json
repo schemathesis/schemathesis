@@ -1,0 +1,33 @@
+{
+  "operations": {
+    "POST /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /users-2": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "User": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

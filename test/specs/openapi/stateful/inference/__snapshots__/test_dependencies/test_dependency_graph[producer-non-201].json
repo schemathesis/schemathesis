@@ -1,0 +1,33 @@
+{
+  "operations": {
+    "GET /users/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "User",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    },
+    "POST /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "User": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

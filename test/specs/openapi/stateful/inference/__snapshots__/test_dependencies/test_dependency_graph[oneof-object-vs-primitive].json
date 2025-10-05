@@ -1,0 +1,24 @@
+{
+  "operations": {
+    "GET /status": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DetailedStatus",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "DetailedStatus": {
+      "fields": [
+        "id",
+        "state",
+        "message"
+      ]
+    }
+  }
+}

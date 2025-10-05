@@ -714,6 +714,7 @@ def test_link_inference_discovers_corruption_bug(cli, app_runner, snapshot_cli, 
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
+            config={"phases": {"stateful": {"inference": {"algorithms": ["location-headers"]}}}},
         )
         == snapshot_cli
     )

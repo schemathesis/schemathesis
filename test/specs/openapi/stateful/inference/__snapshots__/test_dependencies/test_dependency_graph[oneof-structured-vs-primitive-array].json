@@ -1,0 +1,24 @@
+{
+  "operations": {
+    "GET /channels": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "ChannelDetails",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "ChannelDetails": {
+      "fields": [
+        "id",
+        "name",
+        "memberCount"
+      ]
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "operations": {
+    "GET /users/{userId}/posts/{postId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "userId",
+          "resource": "User",
+          "resource_field": "id"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "postId",
+          "resource": "Post",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    },
+    "POST /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /users/{userId}/posts": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "userId",
+          "resource": "User",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Post",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Post": {
+      "fields": [
+        "id"
+      ]
+    },
+    "User": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

@@ -1,0 +1,439 @@
+{
+  "operations": {
+    "DELETE /api/patch/v1/systems/{inventory_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "inventory_id",
+          "resource": "Inventory",
+          "resource_field": "inventory_id"
+        }
+      ],
+      "outputs": []
+    },
+    "GET /api/patch/v1/advisories": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.AdvisoryItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/advisories/{advisory_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "advisory_id",
+          "resource": "Advisory",
+          "resource_field": "advisory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "controllers.AdvisoryDetailResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/advisories/{advisory_id}/systems": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "advisory_id",
+          "resource": "Advisory",
+          "resource_field": "advisory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.SystemItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/advisories": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.AdvisoryInlineItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/advisories/{advisory_id}/systems": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "advisory_id",
+          "resource": "Advisory",
+          "resource_field": "advisory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.SystemInlineItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/packages": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.PackageItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/packages/{package_name}/systems": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.PackageSystemItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/systems": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.SystemInlineItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/systems/{inventory_id}/advisories": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "inventory_id",
+          "resource": "Inventory",
+          "resource_field": "inventory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.SystemAdvisoriesDBLookup",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/export/systems/{inventory_id}/packages": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "inventory_id",
+          "resource": "Inventory",
+          "resource_field": "inventory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "controllers.SystemPackageInline",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/packages/": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.PackageItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/packages/{package_name}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "controllers.PackageDetailResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/packages/{package_name}/systems": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.PackageSystemItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/packages/{package_name}/versions": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.PackageVersionItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/systems": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.SystemItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/systems/{inventory_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "inventory_id",
+          "resource": "Inventory",
+          "resource_field": "inventory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "controllers.SystemDetailResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/systems/{inventory_id}/advisories": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "inventory_id",
+          "resource": "Inventory",
+          "resource_field": "inventory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.SystemAdvisoryItem",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /api/patch/v1/systems/{inventory_id}/packages": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "inventory_id",
+          "resource": "Inventory",
+          "resource_field": "inventory_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "controllers.SystemPackageData",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /api/patch/v1/views/advisories/systems": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "controllers.AdvisoriesSystemsResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /api/patch/v1/views/systems/advisories": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "controllers.SystemsAdvisoriesResponse",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Advisory": {
+      "fields": [
+        "advisory_id"
+      ]
+    },
+    "Inventory": {
+      "fields": [
+        "inventory_id"
+      ]
+    },
+    "controllers.AdvisoriesSystemsResponse": {
+      "fields": [
+        "data"
+      ]
+    },
+    "controllers.AdvisoryDetailResponse": {
+      "fields": [
+        "data"
+      ]
+    },
+    "controllers.AdvisoryInlineItem": {
+      "fields": [
+        "advisory_type",
+        "applicable_systems",
+        "cve_count",
+        "description",
+        "id",
+        "public_date",
+        "severity",
+        "synopsis"
+      ]
+    },
+    "controllers.AdvisoryItem": {
+      "fields": [
+        "attributes",
+        "id",
+        "type"
+      ]
+    },
+    "controllers.PackageDetailResponse": {
+      "fields": [
+        "data"
+      ]
+    },
+    "controllers.PackageItem": {
+      "fields": [
+        "name",
+        "summary",
+        "systems_installed",
+        "systems_updatable"
+      ]
+    },
+    "controllers.PackageSystemItem": {
+      "fields": [
+        "available_evra",
+        "display_name",
+        "id",
+        "installed_evra",
+        "updatable"
+      ]
+    },
+    "controllers.PackageVersionItem": {
+      "fields": [
+        "evra"
+      ]
+    },
+    "controllers.SystemAdvisoriesDBLookup": {
+      "fields": [
+        "advisory_type",
+        "cve_count",
+        "description",
+        "id",
+        "public_date",
+        "severity",
+        "synopsis"
+      ]
+    },
+    "controllers.SystemAdvisoryItem": {
+      "fields": [
+        "attributes",
+        "id",
+        "type"
+      ]
+    },
+    "controllers.SystemDetailResponse": {
+      "fields": [
+        "data"
+      ]
+    },
+    "controllers.SystemInlineItem": {
+      "fields": [
+        "created",
+        "culled_timestamp",
+        "display_name",
+        "id",
+        "insights_id",
+        "last_evaluation",
+        "last_upload",
+        "os_major",
+        "os_minor",
+        "os_name",
+        "other_count",
+        "packages_installed",
+        "packages_updatable",
+        "rhba_count",
+        "rhea_count",
+        "rhsa_count",
+        "rhsm",
+        "stale",
+        "stale_timestamp",
+        "stale_warning_timestamp",
+        "third_party"
+      ]
+    },
+    "controllers.SystemItem": {
+      "fields": [
+        "attributes",
+        "id",
+        "type"
+      ]
+    },
+    "controllers.SystemPackageData": {
+      "fields": [
+        "description",
+        "evra",
+        "name",
+        "summary",
+        "updatable",
+        "updates"
+      ]
+    },
+    "controllers.SystemPackageInline": {
+      "fields": [
+        "description",
+        "evra",
+        "latest_evra",
+        "name",
+        "summary",
+        "updatable"
+      ]
+    },
+    "controllers.SystemsAdvisoriesResponse": {
+      "fields": [
+        "data"
+      ]
+    }
+  }
+}

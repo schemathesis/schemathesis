@@ -1,0 +1,22 @@
+{
+  "operations": {
+    "PUT /test": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "WebService",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "WebService": {
+      "fields": [
+        "key1"
+      ]
+    }
+  }
+}

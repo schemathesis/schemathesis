@@ -1,0 +1,35 @@
+{
+  "operations": {
+    "GET /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/data",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "User": {
+      "fields": [
+        "email",
+        "id",
+        "name"
+      ]
+    }
+  }
+}
