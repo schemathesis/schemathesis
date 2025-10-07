@@ -58,11 +58,8 @@ async def binary(request: web.Request) -> web.Response:
     )
 
 
-LONG_RESPONSE_PAYLOAD = json.dumps(["A"] * MAX_PAYLOAD_SIZE)
-
-
 async def long(request: web.Request) -> web.Response:
-    return web.Response(body=LONG_RESPONSE_PAYLOAD, content_type="application/json", status=500)
+    return web.Response(body=json.dumps(["A"] * MAX_PAYLOAD_SIZE), content_type="application/json", status=500)
 
 
 async def payload(request: web.Request) -> web.Response:

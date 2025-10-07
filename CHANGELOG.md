@@ -5,7 +5,6 @@
 ### :racing_car: Performance
 
 - Up to ~20% faster VCR cassettes recording.
-- Switched to `orjson` on CPython, improving schema deserialization performance by up to 50%.
 - Up to 2x performance improvement for the coverage phase.
 - Up to ~25% performance improvement for the fuzzing phase.
 

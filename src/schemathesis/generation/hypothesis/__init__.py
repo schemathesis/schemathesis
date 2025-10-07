@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from typing import Any, Literal
 
@@ -15,7 +16,7 @@ def setup() -> None:
     from hypothesis_jsonschema._canonicalise import SCHEMA_KEYS, SCHEMA_OBJECT_KEYS, merged
     from hypothesis_jsonschema._resolve import LocalResolver
 
-    from schemathesis.core import INTERNAL_BUFFER_SIZE, json
+    from schemathesis.core import INTERNAL_BUFFER_SIZE
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
 
@@ -113,7 +114,6 @@ def setup() -> None:
     _from_schema.resolve_all_refs = resolve_all_refs  # type: ignore
     _canonicalise.get_type = _get_type  # type: ignore
     _canonicalise.CacheableSchema = CacheableSchema  # type: ignore
-    _canonicalise.json = json  # type: ignore
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore

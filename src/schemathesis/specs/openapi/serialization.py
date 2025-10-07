@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Callable, Dict, Generator, List
 
-from schemathesis.core import json
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.schemas import APIOperation
 
