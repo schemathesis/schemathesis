@@ -4,7 +4,6 @@ from io import StringIO
 from typing import NoReturn
 from unittest.mock import patch
 
-import orjson
 import pytest
 import requests
 from jsonschema.exceptions import SchemaError
@@ -35,7 +34,7 @@ from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
-from corpus.tools import read_corpus_file  # noqa: E402
+from corpus.tools import json_loads, read_corpus_file  # noqa: E402
 
 CORPUS_FILE_NAMES = (
     "swagger-2.0",
@@ -414,7 +413,7 @@ def _load_schema(corpus, filename):
     if filename in SLOW_DEFAULT:
         pytest.skip("Data generation is extremely slow for this schema")
     raw_content = CORPUS_FILES[corpus].extractfile(filename).read()
-    raw_schema = orjson.loads(raw_content)
+    raw_schema = json_loads(raw_content)
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
         schema.config.update(base_url="http://127.0.0.1:8080/")

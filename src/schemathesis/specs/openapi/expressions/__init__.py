@@ -5,9 +5,9 @@ https://swagger.io/docs/specification/links/#runtime-expressions
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
-from schemathesis.core import json
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable
 from schemathesis.generation.stateful.state_machine import StepOutput
 

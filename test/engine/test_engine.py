@@ -437,7 +437,7 @@ def test_response_conformance_malformed_json(real_app_schema):
     if IS_PYPY:
         expected = "Key name must be string at char"
     else:
-        expected = "unexpected character"
+        expected = "Expecting property name enclosed in double quotes"
     assert check.failure_info.failure.validation_message == expected
     assert check.failure_info.failure.position == 1
 

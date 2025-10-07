@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
 from schemathesis.config import ChecksConfig
-from schemathesis.core import json
 from schemathesis.core.failures import (
     CustomFailure,
     Failure,
