@@ -1,3 +1,4 @@
+import json
 import pathlib
 import sys
 from io import StringIO
@@ -10,7 +11,6 @@ import requests
 import schemathesis
 from schemathesis.cli.commands.run.handlers.cassettes import Finalize, Initialize, Process, vcr_writer
 from schemathesis.config import SchemathesisConfig
-from schemathesis.core import json
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
