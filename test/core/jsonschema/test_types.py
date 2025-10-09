@@ -10,7 +10,8 @@ from schemathesis.core.jsonschema.types import ANY_TYPE, get_type, to_json_type_
         (False, ANY_TYPE),
         ({}, ANY_TYPE),
         ({"type": "string"}, ["string"]),
-        ({"type": ["string", "null"]}, ["string", "null"]),
+        ({"type": ["string", "null"]}, ["null", "string"]),
+        ({"type": ["integer", "integer"]}, ["integer"]),
     ],
 )
 def test_get_type(schema, expected):
