@@ -17,7 +17,7 @@ def get_type(schema: JsonSchema, *, _check_type: bool = False) -> list[str]:
         return [ty]
     if ty is ANY_TYPE:
         return list(ty)
-    return list(ty)
+    return [t for t in ALL_TYPES if t in ty]
 
 
 def _get_type(schema: JsonSchema) -> list[str]:
