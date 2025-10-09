@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.2.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive schema error message due to incorrect schema type detection. [#3149](https://github.com/schemathesis/schemathesis/issues/3149)
+
 ### :racing_car: Performance
 
 - Up to ~20% faster VCR cassettes recording.

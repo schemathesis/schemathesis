@@ -788,3 +788,28 @@ def test_request_body_with_boolean_true_schema(ctx, cli, openapi3_base_url, snap
         cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--checks=not_a_server_error")
         == snapshot_cli
     )
+
+
+def test_parameter_type_detection(ctx, cli, openapi3_base_url, snapshot_cli):
+    # See GH-3149
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "longitude",
+                            "in": "query",
+                            "schema": {
+                                "maximum": 180,
+                            },
+                        }
+                    ]
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=not_a_server_error", "--max-examples=5")
+        == snapshot_cli
+    )
