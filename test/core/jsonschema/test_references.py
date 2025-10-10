@@ -44,10 +44,9 @@ def array_schema(items: Any, **kwargs) -> dict[str, Any]:
         (array_schema(ref_schema("#/ref1"), minItems=1), {"#/ref1"}),
         # Additional properties - should be disabled
         ({"type": "object", "additionalProperties": ref_schema("#/ref1")}, set()),
-        # Single-item combinators - should be removed
-        ({"allOf": [ref_schema("#/ref1")]}, set()),
-        ({"oneOf": [ref_schema("#/ref1")]}, set()),
-        ({"anyOf": [ref_schema("#/ref1")]}, set()),
+        ({"allOf": [{}]}, set()),
+        ({"oneOf": [ref_schema("#/ref1"), {"type": "string"}]}, set()),
+        ({"anyOf": [ref_schema("#/ref1"), {"type": "string"}]}, set()),
         # Multi-item combinators - should remain
         ({"allOf": [ref_schema("#/ref1"), {"type": "string"}]}, {"#/ref1"}),
         # Nested structures
@@ -66,11 +65,94 @@ def array_schema(items: Any, **kwargs) -> dict[str, Any]:
         (object_schema({"$ref": ref_schema("#/ref1")}, required=["$ref"]), {"#/ref1"}),
         (object_schema({"key": True}), set()),
         (object_schema(additionalProperties=True), set()),
+        (object_schema(additionalProperties=False), set()),
+        (object_schema(additionalProperties={"$ref": "#/ref1"}), set()),
+        (object_schema(additionalItems={"$ref": "#/ref1"}), set()),
+        (object_schema(additionalItems=False), set()),
         (object_schema({"key": {"anyOf": [True]}}), set()),
         (object_schema(anyOf=[True]), set()),
+        (object_schema(anyOf=[True, {}]), set()),
+        (object_schema(anyOf=[]), set()),
         (object_schema(anyOf=[{"type": "object"}]), set()),
         # Incorrect but should not fail
         (object_schema({"key": []}), set()),
+        ({"type": "object", "properties": []}, set()),
+        ({"type": "object", "properties": "invalid"}, set()),
+        ({"type": "array", "items": 123}, set()),
+        (
+            {
+                "anyOf": [
+                    {
+                        "anyOf": [
+                            ref_schema("#/ref1"),
+                            {"type": "string"},
+                        ]
+                    },
+                    {"type": "number"},
+                ]
+            },
+            set(),
+        ),
+        # prefixItems with implicit minItems=0 - should convert to empty array
+        (
+            {
+                "type": "array",
+                "prefixItems": [
+                    ref_schema("#/ref1"),
+                    ref_schema("#/ref2"),
+                ],
+            },
+            set(),
+        ),
+        # prefixItems with minItems>0 - should preserve refs
+        (
+            {
+                "type": "array",
+                "prefixItems": [
+                    ref_schema("#/ref1"),
+                ],
+                "minItems": 1,
+            },
+            {"#/ref1"},
+        ),
+        (
+            {
+                "type": "array",
+                "prefixItems": [
+                    {"type": "integer"},
+                ],
+                "minItems": 1,
+            },
+            set(),
+        ),
+        (
+            {"prefixItems": 42, "minItems": 1},
+            set(),
+        ),
+        # additionalItems with ref - should be set to false
+        (
+            {
+                "type": "array",
+                "items": [{"type": "string"}],
+                "additionalItems": ref_schema("#/ref1"),
+            },
+            set(),
+        ),
+        # anyOf with all refs
+        (
+            {
+                "anyOf": [
+                    ref_schema("#/ref1"),
+                    ref_schema("#/ref2"),
+                ]
+            },
+            {"#/ref1", "#/ref2"},
+        ),
+        ({"anyOf": [True, {}]}, set()),
+        ({"oneOf": [{}, {"title": "annotation only"}]}, set()),
+        ({"allOf": [{}, {"title": "annotation only"}, {"$comment": "metadata only"}]}, set()),
+        ({"allOf": [{}, {"type": "string"}, {"title": "annotation"}]}, set()),
+        ({"allOf": [{}, False, True]}, set()),
         ([], set()),
     ],
 )

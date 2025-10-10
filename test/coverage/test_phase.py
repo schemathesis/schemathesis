@@ -16,6 +16,7 @@ from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
+from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import (
     HypothesisTestConfig,
@@ -2184,14 +2185,17 @@ def test_references(ctx, operation, components):
     raw_schema = ctx.openapi.build_schema({"/test": {"post": operation}}, components=components)
     schema = schemathesis.openapi.from_dict(raw_schema)
     for operation in schema.get_all_operations():
-        for _ in _iter_coverage_cases(
-            operation=operation.ok(),
-            generation_modes=list(GenerationMode),
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        ):
-            pass
+        if isinstance(operation, Ok):
+            for _ in _iter_coverage_cases(
+                operation=operation.ok(),
+                generation_modes=list(GenerationMode),
+                generate_duplicate_query_parameters=False,
+                unexpected_methods=set(),
+                generation_config=schema.config.generation,
+            ):
+                pass
+        else:
+            assert str(operation.err()) == "Required reference `` creates a cycle"
 
 
 def test_urlencoded_payloads_are_valid(ctx):
