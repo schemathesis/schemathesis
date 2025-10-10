@@ -109,15 +109,19 @@ def extract_top_level(
     assert isinstance(operation.schema, BaseOpenAPISchema)
 
     responses = list(operation.responses.iter_examples())
-    seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
             schema = parameter.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            seen_references.clear()
+            reference_path: tuple[str, ...] = ()
             definitions = [
                 parameter.definition,
-                *_expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references),
+                *[
+                    expanded_schema
+                    for expanded_schema, _ in _expand_subschemas(
+                        schema=schema, resolver=resolver, reference_path=reference_path
+                    )
+                ],
             ]
         else:
             definitions = [parameter.definition]
@@ -138,10 +142,15 @@ def extract_top_level(
         if "schema" in parameter.definition:
             schema = parameter.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            seen_references.clear()
-            for expanded in _expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references):
-                if isinstance(expanded, dict) and parameter.adapter.examples_container_keyword in expanded:
-                    for value in expanded[parameter.adapter.examples_container_keyword]:
+            reference_path = ()
+            for expanded_schema, _ in _expand_subschemas(
+                schema=schema, resolver=resolver, reference_path=reference_path
+            ):
+                if (
+                    isinstance(expanded_schema, dict)
+                    and parameter.adapter.examples_container_keyword in expanded_schema
+                ):
+                    for value in expanded_schema[parameter.adapter.examples_container_keyword]:
                         yield ParameterExample(
                             container=parameter.location.container_name, name=parameter.name, value=value
                         )
@@ -152,10 +161,15 @@ def extract_top_level(
         if "schema" in body.definition:
             schema = body.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            seen_references.clear()
+            reference_path = ()
             definitions = [
                 body.definition,
-                *_expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references),
+                *[
+                    expanded_schema
+                    for expanded_schema, _ in _expand_subschemas(
+                        schema=schema, resolver=resolver, reference_path=reference_path
+                    )
+                ],
             ]
         else:
             definitions = [body.definition]
@@ -172,58 +186,76 @@ def extract_top_level(
         if "schema" in body.definition:
             schema = body.definition["schema"]
             resolver = RefResolver.from_schema(schema)
-            seen_references.clear()
-            for expanded in _expand_subschemas(schema=schema, resolver=resolver, seen_references=seen_references):
-                if isinstance(expanded, dict) and body.adapter.examples_container_keyword in expanded:
-                    for value in expanded[body.adapter.examples_container_keyword]:
+            reference_path = ()
+            for expanded_schema, _ in _expand_subschemas(
+                schema=schema, resolver=resolver, reference_path=reference_path
+            ):
+                if isinstance(expanded_schema, dict) and body.adapter.examples_container_keyword in expanded_schema:
+                    for value in expanded_schema[body.adapter.examples_container_keyword]:
                         yield BodyExample(value=value, media_type=body.media_type)
 
 
 @overload
 def _resolve_bundled(
-    schema: dict[str, Any], resolver: RefResolver, seen_references: set[str]
-) -> dict[str, Any]: ...  # pragma: no cover
+    schema: dict[str, Any], resolver: RefResolver, reference_path: tuple[str, ...]
+) -> tuple[dict[str, Any], tuple[str, ...]]: ...
 
 
 @overload
-def _resolve_bundled(schema: bool, resolver: RefResolver, seen_references: set[str]) -> bool: ...  # pragma: no cover
+def _resolve_bundled(
+    schema: bool, resolver: RefResolver, reference_path: tuple[str, ...]
+) -> tuple[bool, tuple[str, ...]]: ...
 
 
 def _resolve_bundled(
-    schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str]
-) -> dict[str, Any] | bool:
+    schema: dict[str, Any] | bool, resolver: RefResolver, reference_path: tuple[str, ...]
+) -> tuple[dict[str, Any] | bool, tuple[str, ...]]:
+    """Resolve $ref if present."""
     if isinstance(schema, dict):
         reference = schema.get("$ref")
         if isinstance(reference, str):
-            if reference in seen_references:
+            # Check if this reference is already in the current path
+            if reference in reference_path:
                 # Try to remove recursive references to avoid infinite recursion
                 remaining_references = references.sanitize(schema)
                 if reference in remaining_references:
                     raise InfiniteRecursiveReference(reference)
-            seen_references.add(reference)
+
+            new_path = reference_path + (reference,)
+
             try:
-                _, schema = resolver.resolve(schema["$ref"])
+                _, resolved_schema = resolver.resolve(reference)
             except RefResolutionError as exc:
                 raise UnresolvableReference(reference) from exc
-    return schema
+
+            return resolved_schema, new_path
+
+    return schema, reference_path
 
 
 def _expand_subschemas(
-    *, schema: dict[str, Any] | bool, resolver: RefResolver, seen_references: set[str]
-) -> Generator[dict[str, Any] | bool, None, None]:
-    schema = _resolve_bundled(schema, resolver, seen_references)
-    yield schema
+    *, schema: dict[str, Any] | bool, resolver: RefResolver, reference_path: tuple[str, ...]
+) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...]], None, None]:
+    """Expand schema and all its subschemas."""
+    schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+    yield (schema, current_path)
+
     if isinstance(schema, dict):
+        # For anyOf/oneOf, yield each alternative with the same path
         for key in ("anyOf", "oneOf"):
             if key in schema:
                 for subschema in schema[key]:
-                    yield subschema
+                    # Each alternative starts with the current path
+                    yield (subschema, current_path)
+
+        # For allOf, merge all alternatives
         if "allOf" in schema:
             subschema = deepclone(schema["allOf"][0])
-            subschema = _resolve_bundled(subschema, resolver, seen_references)
+            subschema, _ = _resolve_bundled(subschema, resolver, current_path)
+
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
-                    sub = _resolve_bundled(sub, resolver, seen_references)
+                    sub, _ = _resolve_bundled(sub, resolver, current_path)
                     for key, value in sub.items():
                         if key == "properties":
                             subschema.setdefault("properties", {}).update(value)
@@ -235,7 +267,8 @@ def _expand_subschemas(
                             subschema.setdefault("examples", []).append(value)
                         else:
                             subschema[key] = value
-            yield subschema
+
+            yield (subschema, current_path)
 
 
 def extract_inner_examples(examples: dict[str, Any] | list, schema: BaseOpenAPISchema) -> Generator[Any, None, None]:
@@ -269,13 +302,12 @@ def extract_from_schemas(
     operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
 ) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
-    seen_references: set[str] = set()
     for parameter in operation.iter_parameters():
         schema = parameter.optimized_schema
         if isinstance(schema, bool):
             continue
         resolver = RefResolver.from_schema(schema)
-        seen_references.clear()
+        reference_path: tuple[str, ...] = ()
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for value in extract_from_schema(
             operation=operation,
@@ -283,7 +315,7 @@ def extract_from_schemas(
             example_keyword=parameter.adapter.example_keyword,
             examples_container_keyword=parameter.adapter.examples_container_keyword,
             resolver=resolver,
-            seen_references=seen_references,
+            reference_path=reference_path,
             bundle_storage=bundle_storage,
         ):
             yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
@@ -295,14 +327,14 @@ def extract_from_schemas(
         resolver = RefResolver.from_schema(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
-            seen_references.clear()
+            reference_path = ()
             for value in extract_from_schema(
                 operation=operation,
                 schema=schema,
                 example_keyword=example_keyword,
                 examples_container_keyword=examples_container_keyword,
                 resolver=resolver,
-                seen_references=seen_references,
+                reference_path=reference_path,
                 bundle_storage=bundle_storage,
             ):
                 yield BodyExample(value=value, media_type=body.media_type)
@@ -315,49 +347,57 @@ def extract_from_schema(
     example_keyword: str,
     examples_container_keyword: str,
     resolver: RefResolver,
-    seen_references: set[str],
+    reference_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties` and `items`
-    schema = _resolve_bundled(schema, resolver, seen_references)
+    schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+
     if "properties" in schema:
         variants = {}
         required = schema.get("required", [])
         to_generate: dict[str, Any] = {}
+
         for name, subschema in schema["properties"].items():
             values = []
-            for subsubschema in _expand_subschemas(
-                schema=subschema, resolver=resolver, seen_references=seen_references
+            for expanded_schema, expanded_path in _expand_subschemas(
+                schema=subschema, resolver=resolver, reference_path=current_path
             ):
-                if isinstance(subsubschema, bool):
-                    to_generate[name] = subsubschema
+                if isinstance(expanded_schema, bool):
+                    to_generate[name] = expanded_schema
                     continue
-                if example_keyword in subsubschema:
-                    values.append(subsubschema[example_keyword])
-                if examples_container_keyword in subsubschema and isinstance(
-                    subsubschema[examples_container_keyword], list
+
+                if example_keyword in expanded_schema:
+                    values.append(expanded_schema[example_keyword])
+
+                if examples_container_keyword in expanded_schema and isinstance(
+                    expanded_schema[examples_container_keyword], list
                 ):
                     # These are JSON Schema examples, which is an array of values
-                    values.extend(subsubschema[examples_container_keyword])
+                    values.extend(expanded_schema[examples_container_keyword])
+
                 # Check nested examples as well
                 values.extend(
                     extract_from_schema(
                         operation=operation,
-                        schema=subsubschema,
+                        schema=expanded_schema,
                         example_keyword=example_keyword,
                         examples_container_keyword=examples_container_keyword,
                         resolver=resolver,
-                        seen_references=seen_references,
+                        reference_path=expanded_path,
                         bundle_storage=bundle_storage,
                     )
                 )
+
                 if not values:
                     if name in required:
                         # Defer generation to only generate these variants if at least one property has examples
-                        to_generate[name] = subsubschema
+                        to_generate[name] = expanded_schema
                     continue
+
                 variants[name] = values
+
         if variants:
             config = operation.schema.config.generation_for(operation=operation, phase="examples")
             for name, subschema in to_generate.items():
@@ -369,6 +409,7 @@ def extract_from_schema(
                     subschema[BUNDLE_STORAGE_KEY] = bundle_storage
                 generated = _generate_single_example(subschema, config)
                 variants[name] = [generated]
+
             # Calculate the maximum number of examples any property has
             total_combos = max(len(examples) for examples in variants.values())
             # Evenly distribute examples by cycling through them
@@ -377,6 +418,7 @@ def extract_from_schema(
                     name: next(islice(cycle(property_variants), idx, None))
                     for name, property_variants in variants.items()
                 }
+
     elif "items" in schema and isinstance(schema["items"], dict):
         # Each inner value should be wrapped in an array
         for value in extract_from_schema(
@@ -385,7 +427,7 @@ def extract_from_schema(
             example_keyword=example_keyword,
             examples_container_keyword=examples_container_keyword,
             resolver=resolver,
-            seen_references=seen_references,
+            reference_path=current_path,
             bundle_storage=bundle_storage,
         ):
             yield [value]

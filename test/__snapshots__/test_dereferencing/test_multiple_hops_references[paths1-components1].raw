@@ -24,7 +24,7 @@ Schemathesis dev
 ________________________________ POST /changes _________________________________
 Runtime Error
 
-Required reference `#/x-bundled/schema3` creates a cycle
+Required reference `#/x-bundled/schema4` creates a cycle
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

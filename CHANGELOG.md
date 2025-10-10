@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive error about recursive references when there are non-recursive and non-removable ones are present in the same schema.
+- False positive error about recursive references in the examples phase.
 
 ### :wrench: Changed
 

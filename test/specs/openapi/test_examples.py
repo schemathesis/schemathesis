@@ -1762,3 +1762,44 @@ def test_path_parameters_example_escaping(ctx, cli, snapshot_cli, openapi3_base_
     )
 
     assert result == snapshot_cli
+
+
+def test_non_recursive_duplicate_refs_unit(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "put": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Container"}}}
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {"type": "object", "properties": {"value": {"type": "string", "example": "test-value"}}},
+                "Container": {
+                    "type": "object",
+                    "properties": {
+                        "first": {"$ref": "#/components/schemas/Item"},
+                        "second": {"$ref": "#/components/schemas/Item"},
+                        "third": {"$ref": "#/components/schemas/Item"},
+                    },
+                },
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["PUT"]
+
+    extracted = list(extract_from_schemas(operation))
+
+    assert len(extracted) == 1
+    example = extracted[0]
+    assert example.value == {
+        "first": {"value": "test-value"},
+        "second": {"value": "test-value"},
+        "third": {"value": "test-value"},
+    }
