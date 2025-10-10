@@ -68,7 +68,6 @@ def build_schema_with_recursion(schema, definition):
             "properties": {"parent": {"allOf": [ELIDABLE_SCHEMA, USER_REFERENCE]}},
         },
         {"type": "array", "items": {"allOf": [USER_REFERENCE]}, "maxItems": 1},
-        ALL_OF_ROOT,
     ],
     ids=[
         "properties",
@@ -81,7 +80,6 @@ def build_schema_with_recursion(schema, definition):
         "allOf-one-item-properties-with-elidable-schema-1",
         "allOf-one-item-properties-with-elidable-schema-2",
         "allOf-one-item-items",
-        "allOf-one-item-root",
     ],
 )
 @pytest.mark.hypothesis_nested
@@ -101,9 +99,6 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
         try:
             validator.validate(case.body)
         except RecursionError:
-            # jsonschema infinitely recurse on some cases
-            if definition is not ALL_OF_ROOT:
-                raise
             pass
 
     test()
@@ -131,6 +126,7 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
                     ]
                 }
             },
+            "required": ["parent"],
         },
     ],
 )

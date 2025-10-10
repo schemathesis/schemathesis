@@ -90,7 +90,7 @@ class Bundler:
                         # In the future, it **should** be handled by `hypothesis-jsonschema` instead.
                         cloned = deepclone(resolved_schema)
                         remaining_references = sanitize(cloned)
-                        if remaining_references:
+                        if reference in remaining_references:
                             # This schema is either infinitely recursive or the sanitization logic misses it, in any
                             # event, we git up here
                             raise InfiniteRecursiveReference(reference)

@@ -3,6 +3,8 @@ import pytest
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle
 from schemathesis.core.jsonschema.bundler import BundleError
+from schemathesis.core.transforms import deepclone
+from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 
 USER = {"type": "string"}
 COMPANY = {"type": "object"}
@@ -206,6 +208,125 @@ DEFINITIONS = {
                 },
             },
         ),
+        (
+            {
+                "definitions": {
+                    "schema": {
+                        "properties": {
+                            "key": {
+                                "anyOf": [
+                                    {"$ref": "#/definitions/schema"},
+                                    {
+                                        "items": {},
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "definitions": {
+                    "schema": {
+                        "properties": {
+                            "key": {
+                                "anyOf": [
+                                    {"$ref": "#/definitions/schema"},
+                                    {
+                                        "items": {},
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "definitions": {
+                    "schema": {
+                        "properties": {
+                            "key": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/x-bundled/schema1",
+                                    },
+                                    {
+                                        "items": {},
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+                "x-bundled": {
+                    "schema1": {
+                        "properties": {
+                            "key": {
+                                "anyOf": [
+                                    {
+                                        "properties": {},
+                                    },
+                                    {
+                                        "items": {},
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            },
+        ),
+        (
+            {
+                "definitions": {
+                    "vendorExtension": {},
+                    "schema": {
+                        "patternProperties": {"$ref": "#/definitions/vendorExtension"},
+                        "properties": {"schema": {"$ref": "#/definitions/schema"}},
+                    },
+                }
+            },
+            {
+                "definitions": {
+                    "vendorExtension": {},
+                    "schema": {
+                        "patternProperties": {"$ref": "#/definitions/vendorExtension"},
+                        "properties": {"schema": {"$ref": "#/definitions/schema"}},
+                    },
+                }
+            },
+            {
+                "definitions": {
+                    "schema": {
+                        "patternProperties": {
+                            "$ref": "#/x-bundled/schema1",
+                        },
+                        "properties": {
+                            "schema": {
+                                "$ref": "#/x-bundled/schema2",
+                            },
+                        },
+                    },
+                    "vendorExtension": {},
+                },
+                "x-bundled": {
+                    "schema1": {},
+                    "schema2": {
+                        "patternProperties": {
+                            "$ref": "#/x-bundled/schema1",
+                        },
+                        "properties": {
+                            "schema": {
+                                "patternProperties": {
+                                    "$ref": "#/definitions/vendorExtension",
+                                },
+                                "properties": {},
+                            },
+                        },
+                    },
+                },
+            },
+        ),
     ],
 )
 def test_bundle(schema, store, expected):
@@ -267,3 +388,10 @@ def test_bundle_non_recursive_inlined():
     resolver = RefResolver.from_schema(store)
 
     assert bundle(schema, resolver, inline_recursive=False) == {"type": "object"}
+
+
+@pytest.mark.parametrize("schema", [SWAGGER_20, OPENAPI_30, OPENAPI_31])
+def test_bundles_open_api_schemas(schema):
+    # This is a smoke test, they should be bundled without errors
+    resolver = RefResolver.from_schema(deepclone(schema))
+    bundle(deepclone(schema), resolver, inline_recursive=True)
