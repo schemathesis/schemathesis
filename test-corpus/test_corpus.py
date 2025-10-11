@@ -1,3 +1,5 @@
+import difflib
+import json
 import pathlib
 import sys
 from io import StringIO
@@ -7,6 +9,7 @@ from unittest.mock import patch
 import pytest
 import requests
 from jsonschema.exceptions import SchemaError
+from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -30,6 +33,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
+from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -55,6 +59,8 @@ patch("schemathesis.Case.call", return_value=RESPONSE).start()
 
 
 def pytest_generate_tests(metafunc):
+    if metafunc.function.__name__ == "test_dependency_graph":
+        return
     filenames = [(filename, member.name) for filename, corpus in CORPUS_FILES.items() for member in corpus.getmembers()]
     metafunc.parametrize("corpus, filename", filenames)
 
@@ -373,6 +379,8 @@ def test_default(corpus, filename):
     schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])
 
+    dependencies.analyze(schema)
+
     handlers = [
         JunitXMLHandler(output=StringIO()),
         CassetteWriter(format=ReportFormat.VCR, output=StringIO(), config=schema.config),
@@ -407,6 +415,135 @@ def test_coverage_phase(corpus, filename):
                 generation_config=schema.config.generation,
             ):
                 pass
+
+
+@pytest.fixture
+def snapshot_json(snapshot):
+    return snapshot.with_defaults(extension_class=JSONSnapshotExtension)
+
+
+def clean_schema(obj):
+    # A helper to display schemas without fields that make too much noise and are irrelevant to dependency analysis
+    if isinstance(obj, dict):
+        return {k: clean_schema(v) for k, v in obj.items() if k not in ("description", "title", "summary", "examples")}
+    elif isinstance(obj, list):
+        return [clean_schema(item) for item in obj]
+    else:
+        return obj
+
+
+def save_schema(schema, filename="schema.json"):
+    with open(filename, "w") as fd:
+        json.dump(clean_schema(schema), fd, indent=4)
+
+
+KNOWN_FIELDLESS_RESOURCES = {
+    "pandascore.co/2.23.1.json": frozenset(
+        [
+            # Not supported yet: contain multiple resources behind `oneOf`
+            "NonDeletionIncident",
+            "Incident",
+            "Standing",
+            "Videogame",
+        ]
+    ),
+    "ably.io/platform/1.1.0.json": frozenset(
+        [
+            # This one has an empty schema
+            "Stat",
+            # This is an array of numbers
+            "Time",
+        ]
+    ),
+    "amazonaws.com/entityresolution/2018-05-10.json": frozenset(
+        [
+            # Empty objects
+            "TagMap",
+            "TagResourceOutput",
+            "UntagResourceOutput",
+        ]
+    ),
+    "collegefootballdata.com/4.4.12.json": frozenset(
+        [
+            # A simple string
+            "Category",
+        ]
+    ),
+    "digitallocker.gov.in/authpartner/1.0.0.json": frozenset(
+        [
+            # BUG: Response is empty, it is ok. But requestBody has the full definition
+            "Pushuri",
+        ]
+    ),
+    "googleapis.com/baremetalsolution/v1.json": frozenset(
+        [
+            # Indeed an empty schema
+            "Empty",
+        ]
+    ),
+}
+
+KNOWN_INCORRECT_FIELD_MAPPINGS = {
+    "digitallocker.gov.in/authpartner/1.0.0.json": frozenset(
+        [
+            # BUG: The resource is not unwrapped correctly - it is inside `items`.
+            "File",
+        ]
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ["corpus", "filename"],
+    [
+        ("openapi-3.0", "ably.io/platform/1.1.0.json"),
+        ("openapi-3.0", "amazonaws.com/entityresolution/2018-05-10.json"),
+        ("swagger-2.0", "azure.com/containerinstance-containerInstance/2017-10-01-preview.json"),
+        ("openapi-3.0", "collegefootballdata.com/4.4.12.json"),
+        ("openapi-3.0", "digitallocker.gov.in/authpartner/1.0.0.json"),
+        ("openapi-3.0", "googleapis.com/baremetalsolution/v1.json"),
+        ("swagger-2.0", "mashape.com/geodb/1.0.0.json"),
+        ("swagger-2.0", "mastercard.com/Locations/1.0.0.json"),
+        ("openapi-3.0", "pandascore.co/2.23.1.json"),
+        ("openapi-3.0", "redhat.local/patchman-engine/v1.15.3.json"),
+        ("openapi-3.0", "twilio.com/twilio_routes_v2/1.55.0.json"),
+        ("openapi-3.0", "wealthreader.com/1.0.0.json"),
+        ("openapi-3.0", "twilio.com/api/1.55.0.json"),
+    ],
+)
+def test_dependency_graph(corpus, filename, snapshot_json):
+    # Corpus is sampled due to its size
+    raw_content = CORPUS_FILES[corpus].extractfile(filename).read()
+    raw_schema = json_loads(raw_content)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    graph = dependencies.analyze(schema)
+    serialized = graph.serialize()
+
+    assert_dependencies(graph, serialized, filename)
+
+    assert serialized == snapshot_json
+
+
+def assert_dependencies(graph, serialized, filename):
+    # Fieldless resources are generally rare and could be a result of a bug
+    known_fieldless_resources = KNOWN_FIELDLESS_RESOURCES.get(filename, frozenset())
+    for name, resource in serialized["resources"].items():
+        if not resource["fields"] and name not in known_fieldless_resources:
+            raise AssertionError(f"Resource {name} has no fields")
+
+    # Inputs should correctly extract fields from resources
+    known_incorrect_field_mapping = KNOWN_INCORRECT_FIELD_MAPPINGS.get(filename, frozenset())
+    for operation in graph.operations.values():
+        for input in operation.inputs:
+            resource = graph.resources[input.resource.name]
+            if input.resource_field not in resource.fields and resource.name not in known_incorrect_field_mapping:
+                message = f"Resource `{resource.name}` has no field `{input.resource_field}`"
+                matches = difflib.get_close_matches(input.resource_field, resource.fields, n=1, cutoff=0.6)
+                if matches:
+                    message += f". Closest field - `{matches[0]}`"
+                else:
+                    message += f". Available fields - {', '.join(resource.fields)}"
+                raise AssertionError(message)
 
 
 def _load_schema(corpus, filename):

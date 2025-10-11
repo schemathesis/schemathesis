@@ -1,0 +1,40 @@
+{
+  "operations": {
+    "GET /brands/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Brand",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Brand",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /brands": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Brand",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Brand": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

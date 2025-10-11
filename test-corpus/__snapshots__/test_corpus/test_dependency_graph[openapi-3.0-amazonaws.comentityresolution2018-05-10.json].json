@@ -1,0 +1,310 @@
+{
+  "operations": {
+    "DELETE /matchingworkflows/{workflowName}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeleteMatchingWorkflowOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "DELETE /schemas/{schemaName}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeleteSchemaMappingOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "DELETE /tags/{resourceArn}#tagKeys": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "UntagResourceOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /matchingworkflows": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ListMatchingWorkflowsOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /matchingworkflows/{workflowName}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "GetMatchingWorkflowOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /matchingworkflows/{workflowName}/jobs": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/jobs",
+          "resource": "JobSummary",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /matchingworkflows/{workflowName}/jobs/{jobId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "jobId",
+          "resource": "Job",
+          "resource_field": "jobId"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "GetMatchingJobOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /schemas": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ListSchemaMappingsOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /schemas/{schemaName}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "GetSchemaMappingOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /tags/{resourceArn}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/tags",
+          "resource": "TagMap",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /matchingworkflows": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "CreateMatchingWorkflowOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /matchingworkflows/{workflowName}/jobs": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "StartMatchingJobOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /matchingworkflows/{workflowName}/matches": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "GetMatchIdOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /schemas": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "CreateSchemaMappingOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /tags/{resourceArn}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "TagResourceOutput",
+          "status_code": "200"
+        }
+      ]
+    },
+    "PUT /matchingworkflows/{workflowName}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "UpdateMatchingWorkflowOutput",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "CreateMatchingWorkflowOutput": {
+      "fields": [
+        "description",
+        "incrementalRunConfig",
+        "inputSourceConfig",
+        "outputSourceConfig",
+        "resolutionTechniques",
+        "roleArn",
+        "workflowArn",
+        "workflowName"
+      ]
+    },
+    "CreateSchemaMappingOutput": {
+      "fields": [
+        "description",
+        "mappedInputFields",
+        "schemaArn",
+        "schemaName"
+      ]
+    },
+    "DeleteMatchingWorkflowOutput": {
+      "fields": [
+        "message"
+      ]
+    },
+    "DeleteSchemaMappingOutput": {
+      "fields": [
+        "message"
+      ]
+    },
+    "GetMatchIdOutput": {
+      "fields": [
+        "matchId"
+      ]
+    },
+    "GetMatchingJobOutput": {
+      "fields": [
+        "endTime",
+        "errorDetails",
+        "jobId",
+        "metrics",
+        "startTime",
+        "status"
+      ]
+    },
+    "GetMatchingWorkflowOutput": {
+      "fields": [
+        "createdAt",
+        "description",
+        "incrementalRunConfig",
+        "inputSourceConfig",
+        "outputSourceConfig",
+        "resolutionTechniques",
+        "roleArn",
+        "tags",
+        "updatedAt",
+        "workflowArn",
+        "workflowName"
+      ]
+    },
+    "GetSchemaMappingOutput": {
+      "fields": [
+        "createdAt",
+        "description",
+        "mappedInputFields",
+        "schemaArn",
+        "schemaName",
+        "tags",
+        "updatedAt"
+      ]
+    },
+    "Job": {
+      "fields": [
+        "jobId"
+      ]
+    },
+    "JobSummary": {
+      "fields": [
+        "endTime",
+        "jobId",
+        "startTime",
+        "status"
+      ]
+    },
+    "ListMatchingWorkflowsOutput": {
+      "fields": [
+        "nextToken",
+        "workflowSummaries"
+      ]
+    },
+    "ListSchemaMappingsOutput": {
+      "fields": [
+        "nextToken",
+        "schemaList"
+      ]
+    },
+    "StartMatchingJobOutput": {
+      "fields": [
+        "jobId"
+      ]
+    },
+    "TagMap": {
+      "fields": []
+    },
+    "TagResourceOutput": {
+      "fields": []
+    },
+    "UntagResourceOutput": {
+      "fields": []
+    },
+    "UpdateMatchingWorkflowOutput": {
+      "fields": [
+        "description",
+        "incrementalRunConfig",
+        "inputSourceConfig",
+        "outputSourceConfig",
+        "resolutionTechniques",
+        "roleArn",
+        "workflowName"
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "operations": {
+    "GET /data": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DataRecord",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "DataRecord": {
+      "fields": [
+        "id",
+        "value"
+      ]
+    }
+  }
+}

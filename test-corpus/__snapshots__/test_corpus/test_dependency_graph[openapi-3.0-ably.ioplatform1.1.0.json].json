@@ -1,0 +1,352 @@
+{
+  "operations": {
+    "DELETE /push/channelSubscriptions": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /push/deviceRegistrations": {
+      "inputs": [],
+      "outputs": []
+    },
+    "DELETE /push/deviceRegistrations/{device_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "device_id",
+          "resource": "Device",
+          "resource_field": "device_id"
+        }
+      ],
+      "outputs": []
+    },
+    "GET /channels": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "ChannelDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /channels/{channel_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "channel_id",
+          "resource": "Channel",
+          "resource_field": "channel_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "ChannelDetails",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /channels/{channel_id}/messages": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "channel_id",
+          "resource": "Channel",
+          "resource_field": "channel_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Message",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /channels/{channel_id}/presence": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "channel_id",
+          "resource": "Channel",
+          "resource_field": "channel_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PresenceMessage",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /channels/{channel_id}/presence/history": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "channel_id",
+          "resource": "Channel",
+          "resource_field": "channel_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "PresenceMessage",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /push/channelSubscriptions": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /push/channels": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Channel",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /push/deviceRegistrations": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /push/deviceRegistrations/{device_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "device_id",
+          "resource": "Device",
+          "resource_field": "device_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /push/deviceRegistrations/{device_id}/resetUpdateToken": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "device_id",
+          "resource": "Device",
+          "resource_field": "device_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /stats": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Stat",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "GET /time": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Time",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "PATCH /push/deviceRegistrations/{device_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "device_id",
+          "resource": "Device",
+          "resource_field": "device_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "POST /channels/{channel_id}/messages": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "channel_id",
+          "resource": "Channel",
+          "resource_field": "channel_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Message",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "POST /keys/{keyName}/requestToken": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "TokenDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "POST /push/channelSubscriptions": {
+      "inputs": [],
+      "outputs": []
+    },
+    "POST /push/deviceRegistrations": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    },
+    "POST /push/publish": {
+      "inputs": [],
+      "outputs": []
+    },
+    "PUT /push/deviceRegistrations/{device_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "device_id",
+          "resource": "Device",
+          "resource_field": "device_id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "DeviceDetails",
+          "status_code": "2XX"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Channel": {
+      "fields": [
+        "channel_id"
+      ]
+    },
+    "ChannelDetails": {
+      "fields": [
+        "channelId",
+        "isGlobalMaster",
+        "region",
+        "status"
+      ]
+    },
+    "Device": {
+      "fields": [
+        "device_id"
+      ]
+    },
+    "DeviceDetails": {
+      "fields": [
+        "clientId",
+        "deviceSecret",
+        "formFactor",
+        "id",
+        "metadata",
+        "platform",
+        "push.recipient",
+        "push.state"
+      ]
+    },
+    "Message": {
+      "fields": [
+        "clientId",
+        "connectionId",
+        "data",
+        "encoding",
+        "extras",
+        "id",
+        "name",
+        "timestamp"
+      ]
+    },
+    "PresenceMessage": {
+      "fields": [
+        "action",
+        "clientId",
+        "connectionId",
+        "data",
+        "encoding",
+        "extras",
+        "id",
+        "timestamp"
+      ]
+    },
+    "Stat": {
+      "fields": []
+    },
+    "Time": {
+      "fields": []
+    },
+    "TokenDetails": {
+      "fields": [
+        "capability",
+        "expires",
+        "issued",
+        "keyName",
+        "token"
+      ]
+    }
+  }
+}

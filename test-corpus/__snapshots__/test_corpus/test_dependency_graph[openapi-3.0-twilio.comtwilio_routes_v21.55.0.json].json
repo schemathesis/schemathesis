@@ -1,0 +1,108 @@
+{
+  "operations": {
+    "GET /v2/PhoneNumbers/{PhoneNumber}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "routes.v2.phone_number",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /v2/SipDomains/{SipDomain}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "routes.v2.sip_domain",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /v2/Trunks/{SipTrunkDomain}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "routes.v2.trunks",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /v2/PhoneNumbers/{PhoneNumber}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "routes.v2.phone_number",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /v2/SipDomains/{SipDomain}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "routes.v2.sip_domain",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /v2/Trunks/{SipTrunkDomain}": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "routes.v2.trunks",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "routes.v2.phone_number": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "phone_number",
+        "sid",
+        "url",
+        "voice_region"
+      ]
+    },
+    "routes.v2.sip_domain": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid",
+        "sip_domain",
+        "url",
+        "voice_region"
+      ]
+    },
+    "routes.v2.trunks": {
+      "fields": [
+        "account_sid",
+        "date_created",
+        "date_updated",
+        "friendly_name",
+        "sid",
+        "sip_trunk_domain",
+        "url",
+        "voice_region"
+      ]
+    }
+  }
+}

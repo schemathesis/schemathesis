@@ -1,0 +1,38 @@
+[
+  [
+    "201",
+    "#/paths/~1users/post",
+    {
+      "post /users -> 201 -> post /users/{userId}/posts": {
+        "operationRef": "#/paths/~1users~1{userId}~1posts/post",
+        "parameters": {
+          "path.userId": "$response.body#/id"
+        }
+      }
+    }
+  ],
+  [
+    "201",
+    "#/paths/~1users/post",
+    {
+      "post /users -> 201 -> get /users/{userId}/posts/{postId}": {
+        "operationRef": "#/paths/~1users~1{userId}~1posts~1{postId}/get",
+        "parameters": {
+          "path.userId": "$response.body#/id"
+        }
+      }
+    }
+  ],
+  [
+    "201",
+    "#/paths/~1users~1{userId}~1posts/post",
+    {
+      "post /users/{userId}/posts -> 201 -> get /users/{userId}/posts/{postId}": {
+        "operationRef": "#/paths/~1users~1{userId}~1posts~1{postId}/get",
+        "parameters": {
+          "path.postId": "$response.body#/id"
+        }
+      }
+    }
+  ]
+]

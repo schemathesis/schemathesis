@@ -1,0 +1,112 @@
+{
+  "operations": {
+    "GET /atms/v1/atm": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/Atms",
+          "resource": "Atms",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /atms/v1/country": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/Countries",
+          "resource": "Countries",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /atms/v1/countrysubdivision": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/CountrySubdivisions",
+          "resource": "CountrySubdivisions",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /merchants/v1/category": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/Categories",
+          "resource": "Categories",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /merchants/v1/country": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/Countries",
+          "resource": "Countries",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /merchants/v1/countrysubdivision": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/CountrySubdivisions",
+          "resource": "CountrySubdivisions",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /merchants/v1/merchant": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/Merchants",
+          "resource": "Merchants",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Atms": {
+      "fields": [
+        "Atm",
+        "PageOffset",
+        "TotalCount"
+      ]
+    },
+    "Categories": {
+      "fields": [
+        "Category"
+      ]
+    },
+    "Countries": {
+      "fields": [
+        "Country"
+      ]
+    },
+    "CountrySubdivisions": {
+      "fields": [
+        "CountrySubdivision"
+      ]
+    },
+    "Merchants": {
+      "fields": [
+        "Merchant",
+        "PageOffset",
+        "TotalCount"
+      ]
+    }
+  }
+}
