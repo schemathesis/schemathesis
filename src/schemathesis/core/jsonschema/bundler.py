@@ -97,8 +97,9 @@ class Bundler:
 
                         result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
                         # Recursive references need `$ref` to be in them, which is only possible with `dict`
-                        assert isinstance(cloned, dict)
-                        result.update(cloned)
+                        bundled_clone = _bundle_recursive(cloned)
+                        assert isinstance(bundled_clone, dict)
+                        result.update(bundled_clone)
                         return result
                     elif resolved_uri not in visited:
                         # Bundle only new schemas
