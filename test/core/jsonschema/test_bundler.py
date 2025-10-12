@@ -318,9 +318,65 @@ DEFINITIONS = {
                         "properties": {
                             "schema": {
                                 "patternProperties": {
-                                    "$ref": "#/definitions/vendorExtension",
+                                    "$ref": "#/x-bundled/schema1",
                                 },
                                 "properties": {},
+                            },
+                        },
+                    },
+                },
+            },
+        ),
+        (
+            {"$ref": "#/components/schemas/Query"},
+            {
+                "components": {
+                    "schemas": {
+                        "ArrayExpression": {},
+                        "Expression": {
+                            "oneOf": [
+                                {"$ref": "#/components/schemas/ArrayExpression"},
+                                {"$ref": "#/components/schemas/MemberExpression"},
+                            ]
+                        },
+                        "MemberExpression": {
+                            "properties": {
+                                "key": {"$ref": "#/components/schemas/Expression"},
+                            }
+                        },
+                        "Query": {"$ref": "#/components/schemas/Expression"},
+                    }
+                }
+            },
+            {
+                "$ref": "#/x-bundled/schema1",
+                "x-bundled": {
+                    "schema1": {
+                        "$ref": "#/x-bundled/schema2",
+                    },
+                    "schema2": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/x-bundled/schema3",
+                            },
+                            {
+                                "$ref": "#/x-bundled/schema4",
+                            },
+                        ],
+                    },
+                    "schema3": {},
+                    "schema4": {
+                        "properties": {
+                            "key": {
+                                # Inlined recursive reference
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/x-bundled/schema3",
+                                    },
+                                    {
+                                        "properties": {},
+                                    },
+                                ],
                             },
                         },
                     },

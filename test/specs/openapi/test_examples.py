@@ -1803,3 +1803,48 @@ def test_non_recursive_duplicate_refs_unit(ctx):
         "second": {"value": "test-value"},
         "third": {"value": "test-value"},
     }
+
+
+@pytest.mark.filterwarnings("error")
+def test_multiple_hops_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_file = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [{"$ref": "#/components/parameters/TraceSpan"}],
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Query"}}}
+                    },
+                }
+            }
+        },
+        components={
+            "parameters": {"TraceSpan": {"example": {}, "in": "header", "name": "Zan", "schema": {}}},
+            "schemas": {
+                "ArrayExpression": {},
+                "Expression": {
+                    "oneOf": [
+                        {"$ref": "#/components/schemas/ArrayExpression"},
+                        {"$ref": "#/components/schemas/MemberExpression"},
+                    ]
+                },
+                "MemberExpression": {
+                    "properties": {
+                        "key": {"$ref": "#/components/schemas/Expression"},
+                    }
+                },
+                "Query": {"$ref": "#/components/schemas/Expression"},
+            },
+        },
+    )
+
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "--phases=examples",
+            "--checks=not_a_server_error",
+            f"--url={openapi3_base_url}",
+        )
+        == snapshot_cli
+    )
