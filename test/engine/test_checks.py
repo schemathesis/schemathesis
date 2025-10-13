@@ -327,6 +327,59 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
     assert case.operation.is_valid_response(response)
 
 
+def test_response_schema_conformance_type_after_large_required(openapi_30, response_factory):
+    # Schema with a large 'required' array followed by 'type' keyword
+    many_fields = [f"field_{i}" for i in range(100)]
+    schema = {
+        "required": many_fields,
+        "type": "object",
+        "properties": {field: {"type": "string"} for field in many_fields},
+    }
+
+    # Response is a string, not an object - will fail on 'type' validation
+    response = Response.from_requests(response_factory.requests(content=b'"not an object"'), True)
+    case = make_case(
+        openapi_30, {"responses": {"200": {"description": "text", "content": {"application/json": {"schema": schema}}}}}
+    )
+
+    with pytest.raises(JsonSchemaError) as exc:
+        response_schema_conformance(CTX, response, case)
+    assert (
+        str(exc.value)
+        == """Response violates schema
+
+'not an object' is not of type 'object'
+
+Schema:
+
+    {
+        "type": "object",
+        "required": [
+            "field_0",
+            "field_1",
+            "field_2",
+            "field_3",
+            "field_4",
+            "field_5",
+            "field_6",
+            "field_7",
+            "field_8",
+            "field_9",
+            "field_10",
+            "field_11",
+            "field_12",
+            "field_13",
+            "field_14",
+            "field_15",
+        // Output truncated...
+    }
+
+Value:
+
+    "not an object\""""
+    )
+
+
 @pytest.mark.parametrize(
     ("content", "definition"),
     [
@@ -580,15 +633,15 @@ The following media types are documented in the schema:
 Schema:
 
     {
+        "required": [
+            "success"
+        ],
         "type": "object",
         "properties": {
             "success": {
                 "type": "boolean"
             }
-        },
-        "required": [
-            "success"
-        ]
+        }
     }
 
 Value:
@@ -1005,8 +1058,8 @@ def test_header_conformance_multiple_invalid_headers(ctx, response_factory):
 Schema:
 
     {
-        "type": "integer",
-        "maximum": 100
+        "maximum": 100,
+        "type": "integer"
     }
 
 Value:
@@ -1022,8 +1075,8 @@ Value:
 Schema:
 
     {
-        "type": "string",
-        "format": "date-time"
+        "format": "date-time",
+        "type": "string"
     }
 
 Value:
@@ -1048,8 +1101,8 @@ def test_header_conformance_missing_and_invalid(ctx, response_factory):
 Schema:
 
     {
-        "type": "integer",
-        "maximum": 100
+        "maximum": 100,
+        "type": "integer"
     }
 
 Value:
