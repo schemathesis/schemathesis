@@ -1,4 +1,6 @@
+import concurrent.futures
 import json
+import multiprocessing
 import pathlib
 import sys
 
@@ -42,8 +44,38 @@ def save_schema(schema, filename="schema.json"):
 
 
 SLOW = {
+    "azure.com/devtestlabs-DTL/2016-05-15.json",
+    "azure.com/network-applicationGateway/2015-06-15.json",
+    "azure.com/network-applicationGateway/2016-09-01.json",
+    "azure.com/network-applicationGateway/2016-12-01.json",
+    "azure.com/network-applicationGateway/2017-03-01.json",
+    "azure.com/network-applicationGateway/2017-06-01.json",
+    "azure.com/network-applicationGateway/2017-08-01.json",
+    "azure.com/network-applicationGateway/2017-09-01.json",
+    "azure.com/network-applicationGateway/2017-10-01.json",
+    "azure.com/network-applicationGateway/2017-11-01.json",
+    "azure.com/network-applicationGateway/2018-01-01.json",
+    "azure.com/network-applicationGateway/2018-02-01.json",
+    "azure.com/network-applicationGateway/2018-04-01.json",
+    "azure.com/network-applicationGateway/2018-06-01.json",
+    "azure.com/network-applicationGateway/2018-07-01.json",
+    "azure.com/network-applicationGateway/2018-08-01.json",
+    "azure.com/network-applicationGateway/2018-10-01.json",
+    "azure.com/network-applicationGateway/2018-11-01.json",
+    "azure.com/network-applicationGateway/2018-12-01.json",
+    "azure.com/network-applicationGateway/2019-02-01.json",
+    "azure.com/network-applicationGateway/2019-04-01.json",
+    "azure.com/network-applicationGateway/2019-06-01.json",
+    "azure.com/network-applicationGateway/2019-07-01.json",
+    "azure.com/network-applicationGateway/2019-08-01.json",
+    "bungie.net/2.18.0.json",
+    "kubernetes.io/unversioned.json",
+    "kubernetes.io/v1.10.0.json",
     "microsoft.com/graph-beta/1.0.1.json",
     "microsoft.com/graph/1.0.1.json",
+    "presalytics.io/ooxml/0.1.0.json",
+    "stripe.com/2020-08-27.json",
+    "stripe.com/2022-11-15.json",
 }
 
 KNOWN_FIELDLESS_RESOURCES = {
@@ -127,25 +159,43 @@ def test_dependency_graph(corpus, filename, snapshot_json):
     assert serialized == snapshot_json
 
 
+def _process_member(raw_content):
+    raw_schema = json_loads(raw_content)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    graph = dependencies.analyze(schema)
+
+    resources = len(graph.resources)
+    inputs = 0
+    outputs = 0
+    links = 0
+
+    for operation in graph.operations.values():
+        inputs += len(operation.inputs)
+        outputs += len(operation.outputs)
+    for response_links in graph.iter_links():
+        links += len(response_links.links)
+
+    return resources, inputs, outputs, links
+
+
 def test_overall_metrics(snapshot_json):
-    total_resources = 0
-    total_inputs = 0
-    total_outputs = 0
-    total_links = 0
+    work_items = []
     for corpus in CORPUS_FILES.values():
         for member in corpus.getmembers():
             if member.name in SLOW:
                 continue
             raw_content = corpus.extractfile(member).read()
-            raw_schema = json_loads(raw_content)
-            schema = schemathesis.openapi.from_dict(raw_schema)
-            graph = dependencies.analyze(schema)
-            total_resources += len(graph.resources)
-            for operation in graph.operations.values():
-                total_inputs += len(operation.inputs)
-                total_outputs += len(operation.outputs)
-            for response_links in graph.iter_links():
-                total_links += len(response_links.links)
+            work_items.append(raw_content)
+
+    max_workers = multiprocessing.cpu_count()
+    total_resources = total_inputs = total_outputs = total_links = 0
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as exe:
+        for resources, inputs, outputs, links in exe.map(_process_member, work_items, chunksize=16):
+            total_resources += resources
+            total_inputs += inputs
+            total_outputs += outputs
+            total_links += links
+
     assert {
         "total_resources": total_resources,
         "total_inputs": total_inputs,
