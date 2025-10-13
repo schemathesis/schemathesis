@@ -39,14 +39,14 @@ _________________________________ GET /success _________________________________
     Schema:
 
         {
+            "required": [
+                "success"
+            ],
             "properties": {
                 "success": {
                     "type": "boolean"
                 }
             },
-            "required": [
-                "success"
-            ],
             "type": "object"
         }
 

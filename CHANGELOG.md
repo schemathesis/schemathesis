@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- Response schema validation errors now display the failing keyword first to prevent truncation.
+
 ## [4.3.0](https://github.com/schemathesis/schemathesis/compare/v4.2.2...v4.3.0) - 2025-10-13
 
 ### :rocket: Added

@@ -125,8 +125,20 @@ class JsonSchemaError(Failure):
         exc: ValidationError,
         config: OutputConfig | None = None,
     ) -> JsonSchemaError:
+        schema_path = list(exc.absolute_schema_path)
+
+        # Reorder schema to prioritize the failing keyword in the output
+        schema_to_display = exc.schema
+        if isinstance(schema_to_display, dict) and schema_path:
+            failing_keyword = schema_path[-1]
+            if isinstance(failing_keyword, str) and failing_keyword in schema_to_display:
+                # Create a new dict with the failing keyword first
+                schema_to_display = {
+                    failing_keyword: schema_to_display[failing_keyword],
+                    **{k: v for k, v in schema_to_display.items() if k != failing_keyword},
+                }
         schema = textwrap.indent(
-            truncate_json(exc.schema, config=config or OutputConfig(), max_lines=20), prefix="    "
+            truncate_json(schema_to_display, config=config or OutputConfig(), max_lines=20), prefix="    "
         )
         value = textwrap.indent(
             truncate_json(exc.instance, config=config or OutputConfig(), max_lines=20), prefix="    "
