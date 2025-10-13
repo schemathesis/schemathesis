@@ -1,5 +1,4 @@
 import concurrent.futures
-import json
 import multiprocessing
 import pathlib
 import sys
@@ -26,21 +25,6 @@ CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
 @pytest.fixture
 def snapshot_json(snapshot):
     return snapshot.with_defaults(extension_class=JSONSnapshotExtension)
-
-
-def clean_schema(obj):
-    # A helper to display schemas without fields that make too much noise and are irrelevant to dependency analysis
-    if isinstance(obj, dict):
-        return {k: clean_schema(v) for k, v in obj.items() if k not in ("description", "title", "summary")}
-    elif isinstance(obj, list):
-        return [clean_schema(item) for item in obj]
-    else:
-        return obj
-
-
-def save_schema(schema, filename="schema.json"):
-    with open(filename, "w") as fd:
-        json.dump(clean_schema(schema), fd, indent=4)
 
 
 SLOW = {
@@ -120,6 +104,13 @@ KNOWN_FIELDLESS_RESOURCES = {
         [
             # Indeed an empty schema
             "Empty",
+        ]
+    ),
+    "redhat.local/patchman-engine/v1.15.3.json": frozenset(
+        [
+            # Only custom additional fields
+            "controllers.AdvisoriesSystemsResponse",
+            "controllers.SystemsAdvisoriesResponse",
         ]
     ),
 }

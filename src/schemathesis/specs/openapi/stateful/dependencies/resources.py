@@ -91,6 +91,13 @@ def iter_resources_from_response(
     parent_ref = schema.get("$ref")
     _, resolved = maybe_resolve(schema, resolver, "")
 
+    # Sometimes data is wrapped in `data` field
+    pointer = None
+    properties = resolved.get("properties", {})
+    if properties and list(properties) == ["data"]:
+        pointer = "/data"
+        resolved = properties["data"]
+
     resolved = try_unwrap_composition(resolved, resolver)
 
     if "allOf" in resolved:
@@ -130,7 +137,12 @@ def iter_resources_from_response(
 
     if result is not None:
         resource, cardinality = result
-        yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=unwrapped.pointer)
+        if pointer:
+            if unwrapped.pointer != ROOT_POINTER:
+                pointer += unwrapped.pointer
+        else:
+            pointer = unwrapped.pointer
+        yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
 
 
 def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: RefResolver) -> str | None:
