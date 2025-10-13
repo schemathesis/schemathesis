@@ -1,0 +1,14 @@
+[
+  [
+    "200",
+    "#/paths/~1{source}~1datasets/get",
+    {
+      "GetDataset": {
+        "operationRef": "#/paths/~1{source}~1datasets~1{dataset_id}~1exports~1json/get",
+        "parameters": {
+          "path.dataset_id": "$response.body#/datasets/dataset/id"
+        }
+      }
+    }
+  ]
+]

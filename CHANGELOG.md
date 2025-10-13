@@ -9,6 +9,7 @@
 ### :wrench: Changed
 
 - Response schema validation errors now display the failing keyword first to prevent truncation.
+- Support more scenarios for dependency inference.
 
 ### :racing_car: Performance
 

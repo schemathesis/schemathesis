@@ -992,6 +992,90 @@ def snapshot_json(snapshot):
             },
             id="id-direct-match",
         ),
+        pytest.param(
+            {
+                "/data_requests/{data_request_id}": {
+                    "get": {},
+                    "put": json_response(
+                        "200",
+                        {
+                            "properties": {
+                                "data_request": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    ),
+                },
+            },
+            None,
+            id="same-name-wrapper",
+        ),
+        pytest.param(
+            {
+                "/{source}/datasets": {
+                    "get": json_response(
+                        "200",
+                        {
+                            "properties": {
+                                "datasets": {
+                                    "items": {
+                                        "properties": {
+                                            "dataset": {"$ref": "#/components/schemas/dataset"},
+                                            "links": {},
+                                        },
+                                        "type": "object",
+                                    },
+                                    "type": "array",
+                                },
+                                "links": {},
+                                "total_count": {"type": "integer"},
+                            }
+                        },
+                    )
+                },
+                "/{source}/datasets/{dataset_id}/exports/json": {"get": {}},
+            },
+            {
+                "schemas": {
+                    "dataset": SCHEMA_WITH_ID,
+                }
+            },
+            id="wrapper-with-items",
+        ),
+        pytest.param(
+            {
+                "/comments/{id}/read": {
+                    "patch": {
+                        "responses": {
+                            "200": {"$ref": "#/components/responses/ReadCommentResponse"},
+                        },
+                    }
+                }
+            },
+            {
+                "responses": {
+                    "ReadCommentResponse": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {"data": {"allOf": [{"$ref": "#/components/schemas/ReadComment"}]}}
+                                }
+                            }
+                        }
+                    }
+                },
+                "schemas": {
+                    "Comment": {"properties": {"id": {}}},
+                    "ReadComment": {"allOf": [{"$ref": "#/components/schemas/Comment"}]},
+                },
+            },
+            id="multiple-all-of-layers",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

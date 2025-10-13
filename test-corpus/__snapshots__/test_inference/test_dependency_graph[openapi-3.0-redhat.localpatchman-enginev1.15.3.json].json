@@ -34,8 +34,8 @@
       "outputs": [
         {
           "cardinality": "ONE",
-          "pointer": "/",
-          "resource": "controllers.AdvisoryDetailResponse",
+          "pointer": "/data",
+          "resource": "controllers.AdvisoryDetailItem",
           "status_code": "200"
         }
       ]
@@ -172,8 +172,8 @@
       "outputs": [
         {
           "cardinality": "ONE",
-          "pointer": "/",
-          "resource": "controllers.PackageDetailResponse",
+          "pointer": "/data",
+          "resource": "controllers.PackageDetailItem",
           "status_code": "200"
         }
       ]
@@ -223,8 +223,8 @@
       "outputs": [
         {
           "cardinality": "ONE",
-          "pointer": "/",
-          "resource": "controllers.SystemDetailResponse",
+          "pointer": "/data",
+          "resource": "controllers.SystemItem",
           "status_code": "200"
         }
       ]
@@ -270,7 +270,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
-          "pointer": "/",
+          "pointer": "/data",
           "resource": "controllers.AdvisoriesSystemsResponse",
           "status_code": "200"
         }
@@ -281,7 +281,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
-          "pointer": "/",
+          "pointer": "/data",
           "resource": "controllers.SystemsAdvisoriesResponse",
           "status_code": "200"
         }
@@ -300,13 +300,13 @@
       ]
     },
     "controllers.AdvisoriesSystemsResponse": {
-      "fields": [
-        "data"
-      ]
+      "fields": []
     },
-    "controllers.AdvisoryDetailResponse": {
+    "controllers.AdvisoryDetailItem": {
       "fields": [
-        "data"
+        "attributes",
+        "id",
+        "type"
       ]
     },
     "controllers.AdvisoryInlineItem": {
@@ -328,9 +328,11 @@
         "type"
       ]
     },
-    "controllers.PackageDetailResponse": {
+    "controllers.PackageDetailItem": {
       "fields": [
-        "data"
+        "attributes",
+        "id",
+        "type"
       ]
     },
     "controllers.PackageItem": {
@@ -371,11 +373,6 @@
         "attributes",
         "id",
         "type"
-      ]
-    },
-    "controllers.SystemDetailResponse": {
-      "fields": [
-        "data"
       ]
     },
     "controllers.SystemInlineItem": {
@@ -431,9 +428,7 @@
       ]
     },
     "controllers.SystemsAdvisoriesResponse": {
-      "fields": [
-        "data"
-      ]
+      "fields": []
     }
   }
 }

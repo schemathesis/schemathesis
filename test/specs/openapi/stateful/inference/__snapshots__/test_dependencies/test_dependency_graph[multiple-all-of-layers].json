@@ -1,0 +1,29 @@
+{
+  "operations": {
+    "PATCH /comments/{id}/read": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Read",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/data",
+          "resource": "Read",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Read": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "operations": {
+    "GET /{source}/datasets": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/datasets/dataset",
+          "resource": "Dataset",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /{source}/datasets/{dataset_id}/exports/json": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "dataset_id",
+          "resource": "Dataset",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Dataset": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}
