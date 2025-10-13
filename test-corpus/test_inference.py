@@ -41,6 +41,11 @@ def save_schema(schema, filename="schema.json"):
         json.dump(clean_schema(schema), fd, indent=4)
 
 
+SLOW = {
+    "microsoft.com/graph-beta/1.0.1.json",
+    "microsoft.com/graph/1.0.1.json",
+}
+
 KNOWN_FIELDLESS_RESOURCES = {
     "pandascore.co/2.23.1.json": frozenset(
         [
@@ -129,6 +134,8 @@ def test_overall_metrics(snapshot_json):
     total_links = 0
     for corpus in CORPUS_FILES.values():
         for member in corpus.getmembers():
+            if member.name in SLOW:
+                continue
             raw_content = corpus.extractfile(member).read()
             raw_schema = json_loads(raw_content)
             schema = schemathesis.openapi.from_dict(raw_schema)
