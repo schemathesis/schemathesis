@@ -46,14 +46,14 @@ Reproduce with:
     Schema:
 
         {
+            "required": [
+                "message"
+            ],
             "properties": {
                 "message": {
                     "type": "string"
                 }
             },
-            "required": [
-                "message"
-            ],
             "type": "object"
         }
 

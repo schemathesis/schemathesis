@@ -353,14 +353,14 @@ def test_response_conformance_invalid(real_app_schema):
 Schema:
 
     {
+        "required": [
+            "success"
+        ],
         "properties": {
             "success": {
                 "type": "boolean"
             }
         },
-        "required": [
-            "success"
-        ],
         "type": "object"
     }
 
