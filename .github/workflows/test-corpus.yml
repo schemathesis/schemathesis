@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
 
       - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -n auto -k test_default --durations=20 --dist=worksteal
 
@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
 
       - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -n auto -k test_coverage_phase --durations=20 --dist=worksteal
 
@@ -55,6 +55,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
 
       - run: uvx --from=".[tests]" pytest test-corpus/test_inference.py -n auto --durations=20 --dist=worksteal
