@@ -26,12 +26,184 @@ def from_path(path: str) -> str | None:
     return to_pascal_case(singular)
 
 
+IRREGULAR_TO_PLURAL = {
+    "echo": "echoes",
+    "dingo": "dingoes",
+    "volcano": "volcanoes",
+    "tornado": "tornadoes",
+    "torpedo": "torpedoes",
+    "genus": "genera",
+    "viscus": "viscera",
+    "stigma": "stigmata",
+    "stoma": "stomata",
+    "dogma": "dogmata",
+    "lemma": "lemmata",
+    "anathema": "anathemata",
+    "ox": "oxen",
+    "axe": "axes",
+    "die": "dice",
+    "yes": "yeses",
+    "foot": "feet",
+    "eave": "eaves",
+    "goose": "geese",
+    "tooth": "teeth",
+    "quiz": "quizzes",
+    "human": "humans",
+    "proof": "proofs",
+    "carve": "carves",
+    "valve": "valves",
+    "looey": "looies",
+    "thief": "thieves",
+    "groove": "grooves",
+    "pickaxe": "pickaxes",
+    "passerby": "passersby",
+    "canvas": "canvases",
+    "use": "uses",
+    "case": "cases",
+    "vase": "vases",
+    "house": "houses",
+    "mouse": "mice",
+    "reuse": "reuses",
+    "abuse": "abuses",
+    "excuse": "excuses",
+    "cause": "causes",
+    "pause": "pauses",
+    "base": "bases",
+    "phase": "phases",
+    "rose": "roses",
+    "dose": "doses",
+    "nose": "noses",
+    "horse": "horses",
+    "course": "courses",
+    "purpose": "purposes",
+    "response": "responses",
+    "sense": "senses",
+    "tense": "tenses",
+    "expense": "expenses",
+    "license": "licenses",
+    "defense": "defenses",
+}
+IRREGULAR_TO_SINGULAR = {v: k for k, v in IRREGULAR_TO_PLURAL.items()}
+UNCOUNTABLE = frozenset(
+    [
+        "adulthood",
+        "advice",
+        "agenda",
+        "aid",
+        "aircraft",
+        "alcohol",
+        "ammo",
+        "analytics",
+        "anime",
+        "athletics",
+        "audio",
+        "bison",
+        "blood",
+        "bream",
+        "buffalo",
+        "butter",
+        "carp",
+        "cash",
+        "chassis",
+        "chess",
+        "clothing",
+        "cod",
+        "commerce",
+        "cooperation",
+        "corps",
+        "debris",
+        "diabetes",
+        "digestion",
+        "elk",
+        "energy",
+        "equipment",
+        "excretion",
+        "expertise",
+        "firmware",
+        "flounder",
+        "fun",
+        "gallows",
+        "garbage",
+        "graffiti",
+        "hardware",
+        "headquarters",
+        "health",
+        "herpes",
+        "highjinks",
+        "homework",
+        "housework",
+        "information",
+        "jeans",
+        "justice",
+        "kudos",
+        "labour",
+        "literature",
+        "machinery",
+        "mackerel",
+        "mail",
+        "media",
+        "mews",
+        "moose",
+        "music",
+        "mud",
+        "manga",
+        "news",
+        "only",
+        "personnel",
+        "pike",
+        "plankton",
+        "pliers",
+        "police",
+        "pollution",
+        "premises",
+        "rain",
+        "research",
+        "rice",
+        "salmon",
+        "scissors",
+        "series",
+        "sewage",
+        "shambles",
+        "shrimp",
+        "software",
+        "staff",
+        "swine",
+        "tennis",
+        "traffic",
+        "transportation",
+        "trout",
+        "tuna",
+        "wealth",
+        "welfare",
+        "whiting",
+        "wildebeest",
+        "wildlife",
+        "you",
+        "sheep",
+        "deer",
+        "species",
+        "series",
+        "means",
+    ]
+)
+
+
 def to_singular(word: str) -> str:
-    if word.endswith("ies"):
+    if word in UNCOUNTABLE:
+        return word
+    known = IRREGULAR_TO_SINGULAR.get(word)
+    if known is not None:
+        return known
+    if word.endswith("ies") and len(word) > 3 and word[-4] not in "aeiou":
         return word[:-3] + "y"
     if word.endswith("sses"):
         return word[:-2]
-    if word.endswith(("ses", "xes", "zes", "ches", "shes")):
+    if word.endswith(("xes", "zes", "ches", "shes")):
+        return word[:-2]
+    # Handle "ses" ending: check if it was "se" + "s" or "s" + "es"
+    if word.endswith("ses") and len(word) > 3:
+        # "gases" has 's' at position -3, formed from "gas" + "es"
+        # "statuses" has 's' at position -3, formed from "status" + "es"
         return word[:-2]
     if word.endswith("s"):
         return word[:-1]
@@ -39,8 +211,13 @@ def to_singular(word: str) -> str:
 
 
 def to_plural(word: str) -> str:
-    # party -> parties (inverse of ies -> y)
-    if word.endswith("y"):
+    if word in UNCOUNTABLE:
+        return word
+    known = IRREGULAR_TO_PLURAL.get(word)
+    if known is not None:
+        return known
+    # Only change y -> ies after consonants (party -> parties, not day -> days)
+    if word.endswith("y") and len(word) > 1 and word[-2] not in "aeiou":
         return word[:-1] + "ies"
     # class -> classes
     if word.endswith("ss"):
