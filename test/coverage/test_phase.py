@@ -1812,6 +1812,26 @@ def test_path_parameters_without_constraints_negative(ctx):
     )
 
 
+def test_path_parameters_with_unsupported_regex_pattern(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "foo_id",
+                "in": "path",
+                "required": True,
+                "schema": {"pattern": "'^[-._\\p{L}\\p{N}]+$'"},
+            },
+        ],
+        path="/foo/{foo_id}",
+    )
+    assert_negative_coverage(
+        schema,
+        [],
+        ("/foo/{foo_id}", "post"),
+    )
+
+
 def test_query_without_constraints_negative(ctx):
     # When there are no constraints, then we can't generate negative values as everything will match the previous schema, only missing parameter
     schema = build_schema(

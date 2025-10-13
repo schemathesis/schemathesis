@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Path parameters with unsupported regex patterns now use sample values instead of failing generation during the coverage phase.
+
 ### :wrench: Changed
 
 - Response schema validation errors now display the failing keyword first to prevent truncation.

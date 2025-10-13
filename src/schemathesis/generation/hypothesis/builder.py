@@ -579,8 +579,16 @@ def _iter_coverage_cases(
                     ),
                     schema,
                 )
-                value = next(gen, NOT_SET)
-                assert not isinstance(value, NotSet), f"It should always be possible: {schema!r}"
+                value = next(
+                    gen,
+                    coverage.GeneratedValue(
+                        "value",
+                        generation_mode=GenerationMode.NEGATIVE,
+                        description="Sample value for unsupported path parameter pattern",
+                        parameter=name,
+                        location="/",
+                    ),
+                )
                 template.add_parameter(location, name, value)
                 continue
             continue
