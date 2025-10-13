@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Callable, Mapping
+
+from hypothesis_jsonschema._canonicalise import (
+    SCHEMA_KEYS as SCHEMA_KEYS_TUPLE,
+)
+from hypothesis_jsonschema._canonicalise import (
+    SCHEMA_OBJECT_KEYS as SCHEMA_OBJECT_KEYS_TUPLE,
+)
+from hypothesis_jsonschema._canonicalise import canonicalish, merged
 
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -13,13 +22,63 @@ if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
 
 ROOT_POINTER = "/"
+SCHEMA_KEYS = frozenset(SCHEMA_KEYS_TUPLE)
+SCHEMA_OBJECT_KEYS = frozenset(SCHEMA_OBJECT_KEYS_TUPLE)
+
+
+def resolve_all_refs(schema: JsonSchemaObject) -> dict[str, Any]:
+    if not schema:
+        return schema
+    bundled = schema.get(BUNDLE_STORAGE_KEY, {})
+
+    resolved_cache: dict[str, dict[str, Any]] = {}
+
+    def resolve(ref: str) -> dict[str, Any]:
+        # All references here are bundled, therefore it is safe to avoid full reference resolving
+        if ref in resolved_cache:
+            return resolved_cache[ref]
+        key = ref.split("/")[-1]
+        # No clone needed, as it will be cloned inside `merged`
+        result = resolve_all_refs_inner(bundled[key], resolve=resolve)
+        resolved_cache[ref] = result
+        return result
+
+    return resolve_all_refs_inner(schema, resolve=resolve)
+
+
+def resolve_all_refs_inner(schema: JsonSchema, *, resolve: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
+    if schema is True:
+        return {}
+    if schema is False:
+        return {"not": {}}
+    if not schema:
+        return schema
+
+    reference = schema.get("$ref")
+    if reference is not None:
+        resolved = resolve(reference)
+        if len(schema) == 1 or (len(schema) == 2 and BUNDLE_STORAGE_KEY in schema):
+            return resolved
+        del schema["$ref"]
+        schema.pop(BUNDLE_STORAGE_KEY, None)
+        schema.pop("example", None)
+        return merged([resolve_all_refs_inner(schema, resolve=resolve), resolved])  # type: ignore
+
+    for key, value in schema.items():
+        if key in SCHEMA_KEYS:
+            if isinstance(value, list):
+                schema[key] = [resolve_all_refs_inner(v, resolve=resolve) if isinstance(v, dict) else v for v in value]
+            elif isinstance(value, dict):
+                schema[key] = resolve_all_refs_inner(value, resolve=resolve)
+        if key in SCHEMA_OBJECT_KEYS:
+            schema[key] = {
+                k: resolve_all_refs_inner(v, resolve=resolve) if isinstance(v, dict) else v for k, v in value.items()
+            }
+    return schema
 
 
 def canonicalize(schema: dict[str, Any], resolver: RefResolver) -> Mapping[str, Any]:
     """Transform the input schema into its canonical-ish form."""
-    from hypothesis_jsonschema._canonicalise import canonicalish
-    from hypothesis_jsonschema._resolve import resolve_all_refs
-
     # Canonicalisation in `hypothesis_jsonschema` requires all references to be resovable and non-recursive
     # On the Schemathesis side bundling solves this problem
     bundled = bundle(schema, resolver, inline_recursive=True)
