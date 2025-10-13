@@ -14,6 +14,7 @@ from hypothesis_jsonschema._canonicalise import canonicalish, merged
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -85,6 +86,8 @@ def canonicalize(schema: dict[str, Any], resolver: RefResolver) -> Mapping[str, 
     canonicalized = canonicalish(bundled)
     resolved = resolve_all_refs(canonicalized)
     resolved.pop(BUNDLE_STORAGE_KEY, None)
+    if "allOf" in resolved or "anyOf" in resolved or "oneOf" in resolved:
+        return canonicalish(resolved)
     return resolved
 
 
@@ -208,16 +211,28 @@ def unwrap_schema(
         _, resolved_resource = maybe_resolve(resource_schema, resolver, "")
 
         return UnwrappedSchema(
-            pointer=f"/_embedded/{hal_field}", schema=resolved_resource, ref=resource_schema.get("$ref")
+            pointer=f"/_embedded/{encode_pointer(hal_field)}", schema=resolved_resource, ref=resource_schema.get("$ref")
         )
 
     # Pagination wrapper
     array_field = _is_pagination_wrapper(schema=schema, path=path, parent_ref=parent_ref, resolver=resolver)
     if array_field:
         array_schema = properties[array_field]
-        _, resolved_array = maybe_resolve(array_schema, resolver, "")
+        _, resolved = maybe_resolve(array_schema, resolver, "")
+        pointer = f"/{encode_pointer(array_field)}"
 
-        return UnwrappedSchema(pointer=f"/{array_field}", schema=resolved_array, ref=array_schema.get("$ref"))
+        # Try to unwrap one more time
+        if resolved.get("type") == "array" or "items" in resolved:
+            nested_items = resolved.get("items")
+            if isinstance(nested_items, dict):
+                _, resolved_items = maybe_resolve(nested_items, resolver, "")
+                external_tag = _detect_externally_tagged_pattern(resolved_items, path)
+                if external_tag:
+                    nested_properties = resolved_items["properties"][external_tag]
+                    _, resolved = maybe_resolve(nested_properties, resolver, "")
+                    pointer += f"/{encode_pointer(external_tag)}"
+
+        return UnwrappedSchema(pointer=pointer, schema=resolved, ref=array_schema.get("$ref"))
 
     # External tag
     external_tag = _detect_externally_tagged_pattern(schema, path)
@@ -229,7 +244,7 @@ def unwrap_schema(
         ref = resolved.get("$ref") or resolved_tagged.get("$ref") or tagged_schema.get("$ref")
 
         _, resolved = maybe_resolve(resolved, resolver, "")
-        return UnwrappedSchema(pointer=f"/{external_tag}", schema=resolved, ref=ref)
+        return UnwrappedSchema(pointer=f"/{encode_pointer(external_tag)}", schema=resolved, ref=ref)
 
     # No wrapper - single object at root
     return UnwrappedSchema(pointer="/", schema=schema, ref=schema.get("$ref"))
@@ -385,11 +400,14 @@ def _detect_externally_tagged_pattern(schema: Mapping[str, Any], path: str) -> s
     if not resource_name:
         return None
 
+    # For example, for `DataRequest`:
     possible_names = {
-        # "merchant"
+        # `datarequest`
         resource_name.lower(),
-        # "merchants"
+        # `datarequests`
         naming.to_plural(resource_name.lower()),
+        # `data_request`
+        naming.to_snake_case(resource_name),
     }
 
     for name, subschema in properties.items():

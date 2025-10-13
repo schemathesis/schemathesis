@@ -1,0 +1,14 @@
+[
+  [
+    "200",
+    "#/paths/~1data_requests~1{data_request_id}/put",
+    {
+      "GetDataRequest": {
+        "operationRef": "#/paths/~1data_requests~1{data_request_id}/get",
+        "parameters": {
+          "path.data_request_id": "$response.body#/data_request/id"
+        }
+      }
+    }
+  ]
+]

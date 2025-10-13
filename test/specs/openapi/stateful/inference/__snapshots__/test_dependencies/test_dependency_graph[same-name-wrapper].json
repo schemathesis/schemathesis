@@ -1,0 +1,40 @@
+{
+  "operations": {
+    "GET /data_requests/{data_request_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "data_request_id",
+          "resource": "DataRequest",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    },
+    "PUT /data_requests/{data_request_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "data_request_id",
+          "resource": "DataRequest",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/data_request",
+          "resource": "DataRequest",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "DataRequest": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}
