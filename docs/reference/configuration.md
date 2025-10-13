@@ -822,6 +822,8 @@ The following settings control how Schemathesis generates test data for your API
 
     Maximum number of test cases generated per API operation. Must be greater than or equal to 1.
 
+    Schemathesis generates diverse examples based on your API schema, distributed across enabled generation modes (e.g., positive and negative test cases). See [Data Generation](../explanations/data-generation.md) for details.
+
     This setting has different effects depending on the test phase:
 
     - In **fuzzing** phase: Controls the maximum number of examples generated per API operation
