@@ -73,7 +73,9 @@ class Bundler:
                         raise BundleError(reference, resolved_schema)
                     def_name = get_def_name(resolved_uri)
 
-                    is_recursive_reference = resolved_uri in resolver._scopes_stack
+                    scopes = resolver._scopes_stack
+
+                    is_recursive_reference = resolved_uri in scopes
                     has_recursive_references |= is_recursive_reference
                     if inline_recursive and is_recursive_reference:
                         # This is a recursive reference! As of Sep 2025, `hypothesis-jsonschema` does not support
@@ -91,9 +93,9 @@ class Bundler:
                         cloned = deepclone(resolved_schema)
                         remaining_references = sanitize(cloned)
                         if reference in remaining_references:
-                            # This schema is either infinitely recursive or the sanitization logic misses it, in any
-                            # event, we git up here
-                            raise InfiniteRecursiveReference(reference)
+                            # This schema is either infinitely recursive or the sanitization logic misses it
+                            cycle = scopes[scopes.index(resolved_uri) :]
+                            raise InfiniteRecursiveReference(reference, cycle)
 
                         result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
                         # Recursive references need `$ref` to be in them, which is only possible with `dict`

@@ -219,7 +219,8 @@ def _resolve_bundled(
                 # Try to remove recursive references to avoid infinite recursion
                 remaining_references = references.sanitize(schema)
                 if reference in remaining_references:
-                    raise InfiniteRecursiveReference(reference)
+                    cycle = list(reference_path[reference_path.index(reference) :])
+                    raise InfiniteRecursiveReference(reference, cycle)
 
             new_path = reference_path + (reference,)
 
