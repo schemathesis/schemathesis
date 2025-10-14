@@ -27,76 +27,122 @@ def from_path(path: str) -> str | None:
 
 
 IRREGULAR_TO_PLURAL = {
-    "echo": "echoes",
+    "abuse": "abuses",
+    "alias": "aliases",
+    "analysis": "analyses",
+    "anathema": "anathemata",
+    "axe": "axes",
+    "base": "bases",
+    "bookshelf": "bookshelves",
+    "cache": "caches",
+    "canvas": "canvases",
+    "carve": "carves",
+    "case": "cases",
+    "cause": "causes",
+    "child": "children",
+    "course": "courses",
+    "criterion": "criteria",
+    "database": "databases",
+    "defense": "defenses",
+    "diagnosis": "diagnoses",
+    "die": "dice",
     "dingo": "dingoes",
-    "volcano": "volcanoes",
-    "tornado": "tornadoes",
-    "torpedo": "torpedoes",
+    "disease": "diseases",
+    "dogma": "dogmata",
+    "dose": "doses",
+    "eave": "eaves",
+    "echo": "echoes",
+    "enterprise": "enterprises",
+    "ephemeris": "ephemerides",
+    "excuse": "excuses",
+    "expense": "expenses",
+    "foot": "feet",
+    "franchise": "franchises",
     "genus": "genera",
-    "viscus": "viscera",
+    "goose": "geese",
+    "groove": "grooves",
+    "half": "halves",
+    "horse": "horses",
+    "house": "houses",
+    "human": "humans",
+    "hypothesis": "hypotheses",
+    "index": "indices",
+    "knife": "knives",
+    "lemma": "lemmata",
+    "license": "licenses",
+    "life": "lives",
+    "loaf": "loaves",
+    "looey": "looies",
+    "man": "men",
+    "matrix": "matrices",
+    "mouse": "mice",
+    "movie": "movies",
+    "nose": "noses",
+    "oasis": "oases",
+    "ox": "oxen",
+    "passerby": "passersby",
+    "pause": "pauses",
+    "person": "people",
+    "phase": "phases",
+    "phenomenon": "phenomena",
+    "pickaxe": "pickaxes",
+    "proof": "proofs",
+    "purchase": "purchases",
+    "purpose": "purposes",
+    "quiz": "quizzes",
+    "radius": "radii",
+    "release": "releases",
+    "response": "responses",
+    "reuse": "reuses",
+    "rose": "roses",
+    "scarf": "scarves",
+    "self": "selves",
+    "sense": "senses",
+    "shelf": "shelves",
+    "size": "sizes",
+    "snooze": "snoozes",
     "stigma": "stigmata",
     "stoma": "stomata",
-    "dogma": "dogmata",
-    "lemma": "lemmata",
-    "anathema": "anathemata",
-    "ox": "oxen",
-    "axe": "axes",
-    "die": "dice",
-    "yes": "yeses",
-    "foot": "feet",
-    "eave": "eaves",
-    "goose": "geese",
-    "tooth": "teeth",
-    "quiz": "quizzes",
-    "human": "humans",
-    "proof": "proofs",
-    "carve": "carves",
-    "valve": "valves",
-    "looey": "looies",
-    "thief": "thieves",
-    "groove": "grooves",
-    "pickaxe": "pickaxes",
-    "passerby": "passersby",
-    "canvas": "canvases",
-    "use": "uses",
-    "case": "cases",
-    "vase": "vases",
-    "house": "houses",
-    "mouse": "mice",
-    "reuse": "reuses",
-    "abuse": "abuses",
-    "excuse": "excuses",
-    "cause": "causes",
-    "pause": "pauses",
-    "base": "bases",
-    "phase": "phases",
-    "rose": "roses",
-    "dose": "doses",
-    "nose": "noses",
-    "horse": "horses",
-    "course": "courses",
-    "purpose": "purposes",
-    "response": "responses",
-    "sense": "senses",
+    "synopsis": "synopses",
     "tense": "tenses",
-    "expense": "expenses",
-    "license": "licenses",
-    "defense": "defenses",
+    "thief": "thieves",
+    "tooth": "teeth",
+    "tornado": "tornadoes",
+    "torpedo": "torpedoes",
+    "use": "uses",
+    "valve": "valves",
+    "vase": "vases",
+    "verse": "verses",
+    "viscus": "viscera",
+    "volcano": "volcanoes",
+    "warehouse": "warehouses",
+    "wave": "waves",
+    "wife": "wives",
+    "wolf": "wolves",
+    "woman": "women",
+    "yes": "yeses",
+    "vie": "vies",
 }
 IRREGULAR_TO_SINGULAR = {v: k for k, v in IRREGULAR_TO_PLURAL.items()}
 UNCOUNTABLE = frozenset(
     [
+        "access",
+        "address",
         "adulthood",
         "advice",
         "agenda",
         "aid",
         "aircraft",
         "alcohol",
+        "alias",
         "ammo",
+        "analysis",
         "analytics",
         "anime",
+        "anonymous",
         "athletics",
         "audio",
+        "bias",
         "bison",
         "blood",
         "bream",
@@ -104,22 +150,31 @@ UNCOUNTABLE = frozenset(
         "butter",
         "carp",
         "cash",
+        "chaos",
         "chassis",
         "chess",
         "clothing",
         "cod",
         "commerce",
+        "compass",
+        "consensus",
         "cooperation",
         "corps",
+        "data",
         "debris",
+        "deer",
         "diabetes",
+        "diagnosis",
         "digestion",
         "elk",
         "energy",
+        "ephemeris",
         "equipment",
+        "eries",
         "excretion",
         "expertise",
         "firmware",
+        "fish",
         "flounder",
         "fun",
         "gallows",
@@ -141,12 +196,15 @@ UNCOUNTABLE = frozenset(
         "machinery",
         "mackerel",
         "mail",
-        "media",
-        "mews",
-        "moose",
-        "music",
-        "mud",
         "manga",
+        "means",
+        "media",
+        "metadata",
+        "mews",
+        "money",
+        "moose",
+        "mud",
+        "music",
         "news",
         "only",
         "personnel",
@@ -156,6 +214,9 @@ UNCOUNTABLE = frozenset(
         "police",
         "pollution",
         "premises",
+        "progress",
+        "prometheus",
+        "radius",
         "rain",
         "research",
         "rice",
@@ -164,10 +225,13 @@ UNCOUNTABLE = frozenset(
         "series",
         "sewage",
         "shambles",
+        "sheep",
         "shrimp",
         "software",
+        "species",
         "staff",
         "swine",
+        "synopsis",
         "tennis",
         "traffic",
         "transportation",
@@ -178,22 +242,37 @@ UNCOUNTABLE = frozenset(
         "whiting",
         "wildebeest",
         "wildlife",
+        "wireless",
         "you",
-        "sheep",
-        "deer",
-        "species",
-        "series",
-        "means",
     ]
 )
 
 
+def _is_word_like(s: str) -> bool:
+    """Check if string looks like a word (not a path, technical term, etc)."""
+    # Skip empty or very short
+    if not s or len(s) < 2:
+        return False
+    # Skip if contains non-word characters (except underscore and hyphen)
+    if not all(c.isalpha() or c in ("_", "-") for c in s):
+        return False
+    # Skip if has numbers
+    return not any(c.isdigit() for c in s)
+
+
 def to_singular(word: str) -> str:
-    if word in UNCOUNTABLE:
+    if not _is_word_like(word):
         return word
-    known = IRREGULAR_TO_SINGULAR.get(word)
-    if known is not None:
-        return known
+    if word.lower() in UNCOUNTABLE:
+        return word
+    known_lower = IRREGULAR_TO_SINGULAR.get(word.lower())
+    if known_lower is not None:
+        # Preserve case: if input was capitalized, capitalize result
+        if word[0].isupper():
+            return known_lower.capitalize()
+        return known_lower
+    if word.endswith(("ss", "us")):
+        return word
     if word.endswith("ies") and len(word) > 3 and word[-4] not in "aeiou":
         return word[:-3] + "y"
     if word.endswith("sses"):
@@ -211,11 +290,18 @@ def to_singular(word: str) -> str:
 
 
 def to_plural(word: str) -> str:
-    if word in UNCOUNTABLE:
+    if not _is_word_like(word):
+        return word
+    if word.lower() in UNCOUNTABLE:
         return word
     known = IRREGULAR_TO_PLURAL.get(word)
     if known is not None:
         return known
+    known_lower = IRREGULAR_TO_PLURAL.get(word.lower())
+    if known_lower is not None:
+        if word[0].isupper():
+            return known_lower.capitalize()
+        return known_lower
     # Only change y -> ies after consonants (party -> parties, not day -> days)
     if word.endswith("y") and len(word) > 1 and word[-2] not in "aeiou":
         return word[:-1] + "ies"
