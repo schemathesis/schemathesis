@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.2...HEAD) - TBD
 
+### :rocket: Added
+
+- Use `requestBody` to infer producer -> producer dependencies.
+
 ## [4.3.2](https://github.com/schemathesis/schemathesis/compare/v4.3.1...v4.3.2) - 2025-10-14
 
 ### :bug: Fixed
