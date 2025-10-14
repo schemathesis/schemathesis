@@ -61,11 +61,21 @@ class Context:
     def _testdir(self):
         return self.request.getfixturevalue("testdir")
 
-    def makefile(self, schema: dict[str, Any], *, format: str = "json", filename: str = "schema"):
+    def makefile(
+        self, schema: dict[str, Any], *, format: str = "json", filename: str = "schema", parent: str | None = None
+    ):
+        if parent is not None:
+            directory = self._testdir.mkdir(parent)
+        else:
+            directory = self._testdir.tmpdir
         if format == "json":
-            return self._testdir.makefile(".json", **{filename: json.dumps(schema)})
+            path = directory / f"{filename}.json"
+            path.write_text(json.dumps(schema), "utf8")
+            return path
         if format == "yaml":
-            return self._testdir.makefile(".yaml", **{filename: yaml.dump(schema)})
+            path = directory / f"{filename}.yaml"
+            path.write_text(yaml.dump(schema), "utf8")
+            return path
         raise ValueError(f"Unknown format: {format}")
 
     def write_pymodule(self, content: str, *, filename: str = "module"):

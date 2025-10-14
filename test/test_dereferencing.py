@@ -838,6 +838,34 @@ def test_multiple_hops_references(ctx, cli, openapi3_base_url, snapshot_cli, pat
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
 
 
+@pytest.mark.filterwarnings("error")
+def test_responses_in_another_file(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/api/v1/items": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "ОК"},
+                        "400": {"$ref": "./schemas/responses.json#/BadRequest"},
+                        "500": {"$ref": "./schemas/responses.json#/InternalServerError"},
+                    }
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    ctx.makefile(
+        {
+            "BadRequest": {"content": {"application/json": {"schema": {"$ref": "#/Error"}}}},
+            "InternalServerError": {"content": {"application/json": {"schema": {"$ref": "#/Error"}}}},
+            "Error": {"type": "object", "properties": {"message": {"type": "string"}}},
+        },
+        filename="responses",
+        parent="schemas",
+    )
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+
+
 def test_iter_when_ref_resolves_to_none_in_body(ctx):
     # Key0 -> Key1 -> Key2 -> Key3 (None)
     schema = ctx.openapi.build_schema(

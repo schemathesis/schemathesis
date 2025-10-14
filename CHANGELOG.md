@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Incorrect reference resolution scope change when resolving responses. [#1184](https://github.com/schemathesis/schemathesis/issues/1184)
+
 ## [4.3.1](https://github.com/schemathesis/schemathesis/compare/v4.3.0...v4.3.1) - 2025-10-14
 
 ### :bug: Fixed
