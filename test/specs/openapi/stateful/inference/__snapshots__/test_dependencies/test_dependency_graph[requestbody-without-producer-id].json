@@ -1,0 +1,40 @@
+{
+  "operations": {
+    "POST /customers": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Customer",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /products": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Product",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Customer": {
+      "fields": [
+        "id"
+      ]
+    },
+    "Product": {
+      "fields": [
+        "id",
+        "name",
+        "price"
+      ]
+    }
+  }
+}

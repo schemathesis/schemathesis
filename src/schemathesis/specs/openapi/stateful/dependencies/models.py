@@ -9,6 +9,7 @@ from typing_extensions import TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer
+from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 
 @dataclass
@@ -61,12 +62,21 @@ class DependencyGraph:
                                 output_slot.pointer, input_slot.resource_field, output_slot.cardinality
                             )
                             link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
+                            parameters = {}
+                            request_body = {}
+                            # Data is extracted from response body
+                            if input_slot.parameter_location == ParameterLocation.BODY:
+                                request_body = {
+                                    input_slot.parameter_name: f"$response.body#{body_pointer}",
+                                }
+                            else:
+                                parameters = {
+                                    f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
+                                }
                             links[link_name] = LinkDefinition(
                                 operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
-                                parameters={
-                                    # Data is extracted from response body
-                                    f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
-                                },
+                                parameters=parameters,
+                                request_body=request_body,
                             )
                     if links:
                         yield ResponseLinks(
@@ -136,14 +146,22 @@ class LinkDefinition:
     parameters: dict[str, str]
     """Parameter mappings (e.g., {'path.id': '$response.body#/id'})"""
 
-    __slots__ = ("operation_ref", "parameters")
+    request_body: dict[str, str]
+    """Request body (e.g., {'path.id': '$response.body#/id'})"""
+
+    __slots__ = ("operation_ref", "parameters", "request_body")
 
     def to_openapi(self) -> dict[str, Any]:
         """Convert to OpenAPI Links format."""
-        return {
+        links: dict[str, Any] = {
             "operationRef": self.operation_ref,
-            "parameters": self.parameters,
         }
+        if self.parameters:
+            links["parameters"] = self.parameters
+        if self.request_body:
+            links["requestBody"] = self.request_body
+            links[SCHEMATHESIS_LINK_EXTENSION] = {"merge_body": True}
+        return links
 
 
 @dataclass

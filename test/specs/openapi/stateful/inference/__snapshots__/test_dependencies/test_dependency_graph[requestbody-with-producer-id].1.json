@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1customers/post",
+    {
+      "PostCustomer": {
+        "operationRef": "#/paths/~1orders/post",
+        "requestBody": {
+          "customer_id": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "merge_body": true
+        }
+      }
+    }
+  ]
+]
