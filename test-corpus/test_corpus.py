@@ -494,7 +494,7 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Cannot bundle" in formatted:
         return True
-    if "creates a cycle" in formatted:
+    if "required references forming a cycle" in formatted or "required reference to itself" in formatted:
         return True
     if "cannot be resolved" in formatted:
         return True
