@@ -298,13 +298,17 @@ class UnresolvableReference(SchemathesisError):
 
 
 class InfiniteRecursiveReference(SchemathesisError):
-    """Required recursive reference creates a cycle."""
+    """A schema has required references forming an infinite cycle."""
 
-    def __init__(self, reference: str) -> None:
+    def __init__(self, reference: str, cycle: list[str]) -> None:
         self.reference = reference
+        self.cycle = cycle
 
     def __str__(self) -> str:
-        return f"Required reference `{self.reference}` creates a cycle"
+        if len(self.cycle) == 1:
+            return f"Schema `{self.reference}` has a required reference to itself"
+        cycle_str = " ->\n  ".join(self.cycle + [self.cycle[0]])
+        return f"Schema `{self.reference}` has required references forming a cycle:\n\n  {cycle_str}"
 
 
 class SerializationNotPossible(SerializationError):

@@ -620,7 +620,7 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     stream = EventStream(schema).execute()
     # Then it causes an error with a proper error message
     stream.assert_after_execution_status(Status.ERROR)
-    assert "Required reference `#/components/schemas/Node` creates a cycle" in str(
+    assert "Schema `#/components/schemas/Node` has a required reference to itself" in str(
         stream.find(events.NonFatalError).info
     )
 

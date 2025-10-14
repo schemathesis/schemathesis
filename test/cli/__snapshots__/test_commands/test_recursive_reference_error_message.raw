@@ -32,7 +32,7 @@ Schemathesis dev
 __________________________________ POST /foo ___________________________________
 Schema Error
 
-Required reference `#/components/schemas/Node` creates a cycle
+Schema `#/components/schemas/Node` has a required reference to itself
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

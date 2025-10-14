@@ -341,7 +341,7 @@ def test(case):
     result = testdir.runpytest("-rs")
     # Then this test should be failed with a proper error message
     result.assert_outcomes(failed=1)
-    assert "Required reference `#/components/schemas/Node` creates a cycle" in result.stdout.str()
+    assert "Schema `#/components/schemas/Node` has a required reference to itself" in result.stdout.str()
 
 
 def test_checks_as_a_list(testdir, openapi3_base_url):
