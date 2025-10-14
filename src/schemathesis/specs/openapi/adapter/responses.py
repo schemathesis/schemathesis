@@ -177,11 +177,11 @@ def _iter_resolved_responses(
 ) -> Iterator[tuple[str, OpenApiResponse]]:
     for key, response in definition.items():
         status_code = str(key)
-        scope, resolved = maybe_resolve(response, resolver, scope)
+        new_scope, resolved = maybe_resolve(response, resolver, scope)
         yield (
             status_code,
             OpenApiResponse(
-                status_code=status_code, definition=resolved, resolver=resolver, scope=scope, adapter=adapter
+                status_code=status_code, definition=resolved, resolver=resolver, scope=new_scope, adapter=adapter
             ),
         )
 
@@ -300,10 +300,10 @@ def _iter_resolved_headers(
     definition: types.v3.Headers, resolver: RefResolver, scope: str, adapter: SpecificationAdapter
 ) -> Iterator[tuple[str, OpenApiResponseHeader]]:
     for name, header in definition.items():
-        scope, resolved = maybe_resolve(header, resolver, scope)
+        new_scope, resolved = maybe_resolve(header, resolver, scope)
         yield (
             name,
-            OpenApiResponseHeader(name=name, definition=resolved, resolver=resolver, scope=scope, adapter=adapter),
+            OpenApiResponseHeader(name=name, definition=resolved, resolver=resolver, scope=new_scope, adapter=adapter),
         )
 
 
