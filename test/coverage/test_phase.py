@@ -2215,7 +2215,7 @@ def test_references(ctx, operation, components):
             ):
                 pass
         else:
-            assert str(operation.err()) == "Required reference `` creates a cycle"
+            assert str(operation.err()) == "Schema `` has a required reference to itself"
 
 
 def test_urlencoded_payloads_are_valid(ctx):
