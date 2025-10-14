@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1recipients/post",
+    {
+      "PostRecipient": {
+        "operationRef": "#/paths/~1devices/post",
+        "requestBody": {
+          "recipient_id": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "merge_body": true
+        }
+      }
+    }
+  ]
+]

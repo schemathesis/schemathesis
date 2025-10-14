@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterator
 
+from schemathesis.core import media_types
+from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
@@ -48,7 +51,11 @@ def extract_inputs(
             yield input_slot
 
     for body in operation.body:
-        yield from _resolve_body_dependencies(body=body, operation=operation, resources=resources)
+        try:
+            if media_types.is_json(body.media_type):
+                yield from _resolve_body_dependencies(body=body, operation=operation, resources=resources)
+        except MalformedMediaType:
+            continue
 
 
 def _resolve_parameter_dependency(
@@ -163,8 +170,15 @@ def _resolve_body_dependencies(
     if not isinstance(schema, dict):
         return
 
+    # Right now, the body schema comes bundled to dependency analysis
+    if BUNDLE_STORAGE_KEY in schema and "$ref" in schema:
+        schema_key = schema["$ref"].split("/")[-1]
+        resolved = schema[BUNDLE_STORAGE_KEY][schema_key]
+    else:
+        resolved = schema
+
     # Inspect each property that could be a part of some other resource
-    properties = schema.get("properties", {})
+    properties = resolved.get("properties", {})
     path = operation.path
     for property_name in properties:
         resource_name = naming.from_parameter(property_name, path)
