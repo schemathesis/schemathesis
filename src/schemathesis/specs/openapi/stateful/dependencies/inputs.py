@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.stateful.dependencies.resources import extract_r
 
 if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
     from schemathesis.specs.openapi.schemas import APIOperation
 
 
@@ -45,6 +46,9 @@ def extract_inputs(
         )
         if input_slot is not None:
             yield input_slot
+
+    for body in operation.body:
+        yield from _resolve_body_dependencies(body=body, operation=operation, resources=resources)
 
 
 def _resolve_parameter_dependency(
@@ -150,6 +154,40 @@ def _find_resource_in_responses(
             return extracted.resource
 
     return None
+
+
+def _resolve_body_dependencies(
+    *, body: OpenApiBody, operation: APIOperation, resources: ResourceMap
+) -> Iterator[InputSlot]:
+    schema = body.raw_schema
+    if not isinstance(schema, dict):
+        return
+
+    # Inspect each property that could be a part of some other resource
+    properties = schema.get("properties", {})
+    path = operation.path
+    for property_name in properties:
+        resource_name = naming.from_parameter(property_name, path)
+        if resource_name is None:
+            continue
+        resource = resources.get(resource_name)
+        if resource is None:
+            continue
+
+        field = (
+            naming.find_matching_field(
+                parameter=property_name,
+                resource=resource_name,
+                fields=resource.fields,
+            )
+            or "id"
+        )
+        yield InputSlot(
+            resource=resource,
+            resource_field=field,
+            parameter_name=property_name,
+            parameter_location=ParameterLocation.BODY,
+        )
 
 
 def update_input_field_bindings(resource_name: str, operations: OperationMap) -> None:
