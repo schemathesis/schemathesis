@@ -1,0 +1,47 @@
+{
+  "operations": {
+    "POST /devices": {
+      "inputs": [
+        {
+          "parameter_location": "body",
+          "parameter_name": "recipient_id",
+          "resource": "Recipient",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Device",
+          "status_code": "201"
+        }
+      ]
+    },
+    "POST /recipients": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Recipient",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Device": {
+      "fields": [
+        "id",
+        "name",
+        "recipient_id"
+      ]
+    },
+    "Recipient": {
+      "fields": [
+        "id"
+      ]
+    }
+  }
+}

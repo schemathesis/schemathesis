@@ -218,6 +218,12 @@
           "parameter_name": "channel_id",
           "resource": "Channel",
           "resource_field": "channel_id"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "id",
+          "resource": "Message",
+          "resource_field": "id"
         }
       ],
       "outputs": [

@@ -1139,6 +1139,99 @@ def snapshot_json(snapshot):
             None,
             id="requestbody-without-producer-id",
         ),
+        pytest.param(
+            {
+                **operation("post", "/recipients", "201", component_ref("Recipient"), operation_id="createRecipient"),
+                **operation_with_body(
+                    "post",
+                    "/devices",
+                    "201",
+                    component_ref("DeviceDetails"),
+                    component_ref("Device"),
+                    operation_id="createDevice",
+                ),
+            },
+            {
+                "schemas": {
+                    "Recipient": SCHEMA_WITH_ID,
+                    "DeviceDetails": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}, "recipient_id": component_ref("Recipient")},
+                        "required": ["name", "recipient_id"],
+                    },
+                    "Device": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "name": {"type": "string"},
+                            "recipient_id": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="requestbody-field-ref-to-producer-schema",
+        ),
+        pytest.param(
+            {
+                **operation("post", "/recipients", "201", component_ref("Recipient"), operation_id="createRecipient"),
+                "/devices": {
+                    "post": {
+                        "operationId": "createDevice",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {"schema": component_ref("DeviceDetails")},
+                                "application/xml": {"schema": component_ref("DeviceDetails")},
+                            }
+                        },
+                        "responses": {
+                            "201": {
+                                "description": "Device created",
+                                "content": {"application/json": {"schema": component_ref("Device")}},
+                            }
+                        },
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Recipient": SCHEMA_WITH_ID,
+                    "DeviceDetails": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}, "recipient_id": component_ref("Recipient")},
+                        "required": ["name", "recipient_id"],
+                    },
+                    "Device": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "name": {"type": "string"},
+                            "recipient_id": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="requestbody-multiple-content-types-same-schema",
+        ),
+        pytest.param(
+            {
+                "/devices": {
+                    "post": {
+                        "operationId": "createDevice",
+                        "requestBody": {"content": {";invalid/media-type=malformed": {"schema": SCHEMA_WITH_ID}}},
+                        "responses": {
+                            "201": {
+                                "description": "Device created",
+                                "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                            }
+                        },
+                    }
+                }
+            },
+            None,
+            id="requestbody-invalid-media-type-key",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):
