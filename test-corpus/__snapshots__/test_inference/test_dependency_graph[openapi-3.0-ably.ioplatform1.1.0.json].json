@@ -200,6 +200,18 @@
           "parameter_name": "device_id",
           "resource": "Device",
           "resource_field": "device_id"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "id",
+          "resource": "Deviceregistration",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -218,6 +230,18 @@
           "parameter_name": "channel_id",
           "resource": "Channel",
           "resource_field": "channel_id"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "connectionId",
+          "resource": "Connection",
+          "resource_field": "connectionId"
         },
         {
           "parameter_location": "body",
@@ -251,7 +275,20 @@
       "outputs": []
     },
     "POST /push/deviceRegistrations": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "body",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "id",
+          "resource": "Deviceregistration",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -272,6 +309,18 @@
           "parameter_name": "device_id",
           "resource": "Device",
           "resource_field": "device_id"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        },
+        {
+          "parameter_location": "body",
+          "parameter_name": "id",
+          "resource": "Deviceregistration",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -298,6 +347,16 @@
         "status"
       ]
     },
+    "Client": {
+      "fields": [
+        "clientId"
+      ]
+    },
+    "Connection": {
+      "fields": [
+        "connectionId"
+      ]
+    },
     "Device": {
       "fields": [
         "device_id"
@@ -313,6 +372,11 @@
         "platform",
         "push.recipient",
         "push.state"
+      ]
+    },
+    "Deviceregistration": {
+      "fields": [
+        "id"
       ]
     },
     "Message": {

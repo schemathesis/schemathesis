@@ -129,7 +129,14 @@
       ]
     },
     "POST /oauth2/1/code": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "body",
+          "parameter_name": "client_id",
+          "resource": "Client",
+          "resource_field": "client_id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -262,6 +269,11 @@
     "Authorize": {
       "fields": [
         "details"
+      ]
+    },
+    "Client": {
+      "fields": [
+        "client_id"
       ]
     },
     "DemoAuthResponse": {
