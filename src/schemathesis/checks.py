@@ -81,7 +81,7 @@ class CheckContext:
 
     def _record_case(self, *, parent_id: str, case: Case) -> None:
         if self._recorder is not None:
-            self._recorder.record_case(parent_id=parent_id, transition=None, case=case)
+            self._recorder.record_case(parent_id=parent_id, case=case, transition=None, is_transition_applied=False)
 
     def _record_response(self, *, case_id: str, response: Response) -> None:
         if self._recorder is not None:

@@ -1,0 +1,91 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total (1 inferred)
+
+     ✅ N passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+________________________________ Stateful tests ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    'customer_id' is a required property
+
+    Schema:
+
+        {
+            "required": [
+                "id",
+                "customer_id",
+                "total"
+            ],
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        }
+
+    Value:
+
+        {
+            "id": "0",
+            "total": 0
+        }
+
+[201] Created:
+
+    `{"id":"0","total":0}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ❌ Stateful
+
+Failures:
+  ❌ Response violates schema: 1
+
+Test cases:
+  N generated, N found N unique failures, N skipped
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

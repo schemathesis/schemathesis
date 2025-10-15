@@ -6,6 +6,7 @@ from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
 from schemathesis.specs.openapi.stateful.dependencies import analyze, naming
+from test.utils import flaky
 
 KNOWN_INCORRECT_FIELD_MAPPINGS = {
     "merge-empty-schema-then-detailed": frozenset(
@@ -1517,6 +1518,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+@flaky(max_runs=5, min_passes=1)
 def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot_cli, ctx):
     order_response_schema = {
         "type": "object",
@@ -1614,6 +1616,121 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
     assert (
         cli.run(
             "--max-examples=10",
+            "-c response_schema_conformance",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@flaky(max_runs=5, min_passes=1)
+def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cli, ctx):
+    order_response_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "customer_id": {"type": "string"},
+            "total": {"type": "number"},
+        },
+        "required": ["id", "customer_id", "total"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/customers": {
+                "post": {
+                    "operationId": "createCustomer",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Customer created",
+                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                        }
+                    },
+                }
+            },
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {"content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}}},
+                    "responses": {
+                        "201": {
+                            "description": "Order created",
+                            "content": {"application/json": {"schema": order_response_schema}},
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    customers = {}
+    next_customer_id = 1
+    next_order_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/customers", methods=["POST"])
+    def create_customer():
+        nonlocal next_customer_id
+        data = request.get_json() or {}
+
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        customer_id = str(next_customer_id)
+        next_customer_id += 1
+
+        customers[customer_id] = {"id": customer_id, "name": data.get("name", "Unknown")}
+
+        return jsonify({"id": customer_id}), 201
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        nonlocal next_order_id
+        data = request.get_json() or {}
+
+        customer_id = data.get("customer_id")
+        next_order_id += 1
+
+        # Bug: When customer_id doesn't exist, missing required field
+        if customer_id not in customers:
+            return jsonify(
+                {
+                    "id": "0",
+                    "total": 0,
+                }
+            ), 201
+
+        # Valid customers get correct response
+        return jsonify(
+            {
+                "id": "0",
+                "customer_id": customer_id,
+                "total": 0,
+            }
+        ), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=50",
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",

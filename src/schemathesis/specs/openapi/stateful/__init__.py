@@ -49,6 +49,8 @@ class OpenAPIStateMachine(APIStateMachine):
 
 # The proportion of negative tests generated for "root" transitions
 NEGATIVE_TEST_CASES_THRESHOLD = 10
+# How often some transition is skipped
+USE_TRANSITION_THRESHOLD = 85
 
 
 @dataclass
@@ -226,7 +228,7 @@ def classify_root_transitions(operations: list[APIOperation], transitions: ApiTr
         if not operation_transitions or not operation_transitions.outgoing:
             continue
 
-        if is_likely_root_transition(operation, operation_transitions):
+        if is_likely_root_transition(operation):
             roots.reliable.add(operation.label)
         else:
             roots.fallback.add(operation.label)
@@ -234,7 +236,7 @@ def classify_root_transitions(operations: list[APIOperation], transitions: ApiTr
     return roots
 
 
-def is_likely_root_transition(operation: APIOperation, transitions: OperationTransitions) -> bool:
+def is_likely_root_transition(operation: APIOperation) -> bool:
     """Check if operation is likely to succeed as a root transition."""
     # POST operations with request bodies are likely to create resources
     if operation.method == "post" and operation.body:
@@ -269,8 +271,12 @@ def into_step_input(
                 and isinstance(transition.request_body.value, Ok)
                 and transition.request_body.value.ok() is not UNRESOLVABLE
                 and not link.merge_body
+                and draw(st.integers(min_value=0, max_value=99)) < USE_TRANSITION_THRESHOLD
             ):
                 kwargs["body"] = transition.request_body.value.ok()
+
+            is_applied = bool(kwargs)
+
             cases = strategies.combine(
                 [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **kwargs) for mode in modes]
             )
@@ -280,24 +286,26 @@ def into_step_input(
                 and isinstance(transition.request_body.value, Ok)
                 and transition.request_body.value.ok() is not UNRESOLVABLE
                 and link.merge_body
+                and draw(st.integers(min_value=0, max_value=99)) < USE_TRANSITION_THRESHOLD
             ):
                 new = transition.request_body.value.ok()
                 if isinstance(case.body, dict) and isinstance(new, dict):
                     case.body = {**case.body, **new}
                 else:
                     case.body = new
+                is_applied = True
                 if case.meta and case.meta.generation.mode == GenerationMode.NEGATIVE:
                     # It is possible that the new body is now valid and the whole test case could be valid too
                     for alternative in case.operation.body:
                         if alternative.media_type == case.media_type:
                             schema = alternative.optimized_schema
-                            if jsonschema.validators.validator_for(schema)(schema).is_valid(new):
+                            if jsonschema.validators.validator_for(schema)(schema).is_valid(case.body):
                                 case.meta.components[ParameterLocation.BODY] = ComponentInfo(
                                     mode=GenerationMode.POSITIVE
                                 )
                                 if all(info.mode == GenerationMode.POSITIVE for info in case.meta.components.values()):
                                     case.meta.generation.mode = GenerationMode.POSITIVE
-            return StepInput(case=case, transition=transition)
+            return StepInput(case=case, transition=transition, is_applied=is_applied)
 
         return inner(output=_output)
 
@@ -322,10 +330,13 @@ def transition(*, name: str, target: Bundle, input: st.SearchStrategy[StepInput]
     def step_function(self: OpenAPIStateMachine, input: StepInput) -> StepOutput | None:
         if input.transition is not None:
             self.recorder.record_case(
-                parent_id=input.transition.parent_id, transition=input.transition, case=input.case
+                parent_id=input.transition.parent_id,
+                transition=input.transition,
+                case=input.case,
+                is_transition_applied=input.is_applied,
             )
         else:
-            self.recorder.record_case(parent_id=None, transition=None, case=input.case)
+            self.recorder.record_case(parent_id=None, case=input.case, transition=None, is_transition_applied=False)
         self.control.record_step(input, self.recorder)
         return APIStateMachine._step(self, input=input)
 

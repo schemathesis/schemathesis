@@ -6,6 +6,15 @@
 
 - Use `requestBody` to infer producer -> producer dependencies.
 
+### :bug: Fixed
+
+- Do not mark stateful transitions as covered if they were not actually applied.
+- Avoid some false positives `negative_data_rejection` failures in stateful tests.
+
+### :wrench: Changed
+
+- Skip body transitions in small number of cases to allow discovering bugs triggered by non-stateful data in stateful tests.
+
 ## [4.3.2](https://github.com/schemathesis/schemathesis/compare/v4.3.1...v4.3.2) - 2025-10-14
 
 ### :bug: Fixed

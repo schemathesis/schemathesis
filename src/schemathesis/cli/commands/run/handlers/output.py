@@ -1048,7 +1048,11 @@ class OutputHandler(EventHandler):
             and event.status not in (Status.INTERRUPTED, Status.SKIP, None)
         ):
             assert self.stateful_tests_manager is not None
-            links_seen = {case.transition.id for case in event.recorder.cases.values() if case.transition is not None}
+            links_seen = {
+                case.transition.id
+                for case in event.recorder.cases.values()
+                if case.transition is not None and case.is_transition_applied
+            }
             self.stateful_tests_manager.update(links_seen, event.status)
             self._check_stateful_warnings(ctx, event)
 
