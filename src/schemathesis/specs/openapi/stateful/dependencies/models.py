@@ -195,6 +195,18 @@ class ResponseLinks:
         return {name: link_def.to_openapi() for name, link_def in self.links.items()}
 
 
+@dataclass
+class NormalizedLink:
+    """Normalized representation of a link."""
+
+    path: str
+    method: str
+    parameters: set[str]
+    request_body: Any
+
+    __slots__ = ("path", "method", "parameters", "request_body")
+
+
 class Cardinality(str, enum.Enum):
     """Whether there is one or many resources in a slot."""
 

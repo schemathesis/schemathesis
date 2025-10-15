@@ -5,7 +5,7 @@ Infers which operations must run before others by tracking resource creation and
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.result import Ok
@@ -16,6 +16,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     DefinitionSource,
     DependencyGraph,
     InputSlot,
+    NormalizedLink,
     OperationMap,
     OperationNode,
     OutputSlot,
@@ -25,6 +26,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
 
 if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 __all__ = [
@@ -86,3 +88,85 @@ def analyze(schema: BaseOpenAPISchema) -> DependencyGraph:
         update_input_field_bindings(resource, operations)
 
     return DependencyGraph(operations=operations, resources=resources)
+
+
+def inject_links(schema: BaseOpenAPISchema) -> int:
+    injected = 0
+    graph = analyze(schema)
+    for response_links in graph.iter_links():
+        operation = schema.get_operation_by_reference(response_links.producer_operation_ref)
+        response = operation.responses.get(response_links.status_code)
+        links = response.definition.setdefault(schema.adapter.links_keyword, {})
+
+        # Normalize existing links once
+        if links:
+            normalized_existing = [_normalize_link(link, schema) for link in links.values()]
+        else:
+            normalized_existing = []
+
+        for link_name, definition in response_links.links.items():
+            inferred_link = definition.to_openapi()
+
+            # Check if duplicate exists
+            if normalized_existing:
+                if _normalize_link(inferred_link, schema) in normalized_existing:
+                    continue
+
+            # Find unique name if collision exists
+            final_name = _resolve_link_name_collision(link_name, links)
+            links[final_name] = inferred_link
+            injected += 1
+    return injected
+
+
+def _normalize_link(link: dict[str, Any], schema: BaseOpenAPISchema) -> NormalizedLink:
+    """Normalize a link definition for comparison."""
+    operation = _resolve_link_operation(link, schema)
+
+    normalized_params = _normalize_parameter_keys(link.get("parameters", {}), operation)
+
+    return NormalizedLink(
+        path=operation.path,
+        method=operation.method,
+        parameters=normalized_params,
+        request_body=link.get("requestBody", {}),
+    )
+
+
+def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[str]:
+    """Normalize parameter keys to location.name format."""
+    normalized = set()
+
+    for parameter_name in parameters.keys():
+        # If already has location prefix, use as-is
+        if "." in parameter_name:
+            normalized.add(parameter_name)
+            continue
+
+        # Find the parameter and prepend location
+        for parameter in operation.iter_parameters():
+            if parameter.name == parameter_name:
+                normalized.add(f"{parameter.location.value}.{parameter_name}")
+                break
+
+    return normalized
+
+
+def _resolve_link_operation(link: dict, schema: BaseOpenAPISchema) -> APIOperation:
+    """Resolve link to operation, handling both operationRef and operationId."""
+    if "operationRef" in link:
+        return schema.get_operation_by_reference(link["operationRef"])
+    return schema.get_operation_by_id(link["operationId"])
+
+
+def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, Any]) -> str:
+    """Find unique link name if collision exists."""
+    if proposed_name not in existing_links:
+        return proposed_name
+
+    suffix = 0
+    while True:
+        candidate = f"{proposed_name}_{suffix}"
+        if candidate not in existing_links:
+            return candidate
+        suffix += 1
