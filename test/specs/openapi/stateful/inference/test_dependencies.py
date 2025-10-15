@@ -1131,6 +1131,16 @@ def snapshot_json(snapshot):
         ),
         pytest.param(
             {
+                **operation_with_body(
+                    "post", "/orders", "201", ORDER_REQUEST_WITH_CUSTOMER, ORDER_RESPONSE, operation_id="createOrder"
+                ),
+                **operation("post", "/customers", "201", SCHEMA_WITH_ID, operation_id="createCustomer"),
+            },
+            None,
+            id="requestbody-producer-discovered-later",
+        ),
+        pytest.param(
+            {
                 **operation("post", "/customers", "201", SCHEMA_WITH_ID, operation_id="createCustomer"),
                 **operation_with_body(
                     "post", "/products", "201", PRODUCT_REQUEST, PRODUCT_RESPONSE, operation_id="createProduct"
