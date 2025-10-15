@@ -37,12 +37,16 @@ class StepInput:
 
     case: Case
     transition: Transition | None  # None for initial steps
+    # Whether this transition was actually applied
+    # Data extraction failures can prevent it, as well as transitions can be skipped in some cases
+    # to improve discovery of bugs triggered by non-stateful inputs during stateful testing
+    is_applied: bool
 
-    __slots__ = ("case", "transition")
+    __slots__ = ("case", "transition", "is_applied")
 
     @classmethod
     def initial(cls, case: Case) -> StepInput:
-        return cls(case=case, transition=None)
+        return cls(case=case, transition=None, is_applied=False)
 
 
 @dataclass

@@ -810,7 +810,7 @@ def test_deduplication(ctx, response_factory):
     case = operation.Case()
     response = Response.from_requests(response_factory.requests(), True)
     recorder = ScenarioRecorder(label="test")
-    recorder.record_case(parent_id=None, transition=None, case=case)
+    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
     recorder.record_response(case_id=case.id, response=response)
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup):

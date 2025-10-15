@@ -124,7 +124,7 @@ Schemathesis detects the following relationships:
 - Schema composition: `allOf`, `oneOf`, `anyOf`
 
 !!! warning "Current limitation"
-    Only path parameters are supported as inputs to API operations; query, header, and body are coming soon.
+    Only path parameters and body payloads are supported as inputs to API operations; query and header are coming soon.
 
 ### 2. Location Header Learning
 

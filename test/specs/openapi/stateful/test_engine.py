@@ -613,7 +613,11 @@ def test_negative_changing_to_positive(app_runner):
                 }
             },
             "schemas": {
-                "CustomerUpdate": {"required": ["name"]},
+                "CustomerUpdate": {
+                    "required": ["name"],
+                    "additionalProperties": False,
+                    "properties": {"name": {"type": "string"}},
+                },
                 "CustomerCreate": {"type": "object", "properties": {"name": {"type": "string"}}},
             },
         },
@@ -629,7 +633,7 @@ def test_negative_changing_to_positive(app_runner):
         if id not in CUSTOMERS:
             return "", 404
         data = request.get_json(force=True, silent=True)
-        if not data:
+        if not data or not isinstance(data, dict) or list(data) != ["name"]:
             return jsonify({"error": ["Invalid JSON"]}), 400
         CUSTOMERS[id].update(data)
         return "", 204

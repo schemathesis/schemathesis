@@ -385,7 +385,7 @@ def test_func(
     transport_kwargs: dict[str, Any],
     continue_on_failure: bool,
 ) -> None:
-    recorder.record_case(parent_id=None, transition=None, case=case)
+    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
     try:
         response = case.call(**transport_kwargs)
     except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:

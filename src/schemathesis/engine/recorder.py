@@ -41,9 +41,16 @@ class ScenarioRecorder:
         self.checks = {}
         self.interactions = {}
 
-    def record_case(self, *, parent_id: str | None, transition: Transition | None, case: Case) -> None:
+    def record_case(
+        self, *, parent_id: str | None, case: Case, transition: Transition | None, is_transition_applied: bool
+    ) -> None:
         """Record a test case and its relationship to a parent, if applicable."""
-        self.cases[case.id] = CaseNode(value=case, parent_id=parent_id, transition=transition)
+        self.cases[case.id] = CaseNode(
+            value=case,
+            parent_id=parent_id,
+            transition=transition,
+            is_transition_applied=is_transition_applied,
+        )
 
     def record_response(self, *, case_id: str, response: Response) -> None:
         """Record the API response for a given test case."""
@@ -139,8 +146,9 @@ class CaseNode:
     # Transition may be absent if `parent_id` is present for cases when a case is derived inside a check
     # and outside of the implemented transition logic (e.g. Open API links)
     transition: Transition | None
+    is_transition_applied: bool
 
-    __slots__ = ("value", "parent_id", "transition")
+    __slots__ = ("value", "parent_id", "transition", "is_transition_applied")
 
 
 @dataclass
