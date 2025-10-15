@@ -3,14 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
-from hypothesis_jsonschema._canonicalise import (
-    SCHEMA_KEYS as SCHEMA_KEYS_TUPLE,
-)
-from hypothesis_jsonschema._canonicalise import (
-    SCHEMA_OBJECT_KEYS as SCHEMA_OBJECT_KEYS_TUPLE,
-)
-from hypothesis_jsonschema._canonicalise import canonicalish, merged
-
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
@@ -23,8 +15,23 @@ if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
 
 ROOT_POINTER = "/"
-SCHEMA_KEYS = frozenset(SCHEMA_KEYS_TUPLE)
-SCHEMA_OBJECT_KEYS = frozenset(SCHEMA_OBJECT_KEYS_TUPLE)
+SCHEMA_KEYS = frozenset(
+    {
+        "propertyNames",
+        "contains",
+        "if",
+        "items",
+        "oneOf",
+        "anyOf",
+        "additionalProperties",
+        "then",
+        "else",
+        "not",
+        "additionalItems",
+        "allOf",
+    }
+)
+SCHEMA_OBJECT_KEYS = frozenset({"dependencies", "properties", "patternProperties"})
 
 
 def resolve_all_refs(schema: JsonSchemaObject) -> dict[str, Any]:
@@ -48,6 +55,8 @@ def resolve_all_refs(schema: JsonSchemaObject) -> dict[str, Any]:
 
 
 def resolve_all_refs_inner(schema: JsonSchema, *, resolve: Callable[[str], dict[str, Any]]) -> dict[str, Any]:
+    from hypothesis_jsonschema._canonicalise import merged
+
     if schema is True:
         return {}
     if schema is False:
@@ -80,6 +89,8 @@ def resolve_all_refs_inner(schema: JsonSchema, *, resolve: Callable[[str], dict[
 
 def canonicalize(schema: dict[str, Any], resolver: RefResolver) -> Mapping[str, Any]:
     """Transform the input schema into its canonical-ish form."""
+    from hypothesis_jsonschema._canonicalise import canonicalish
+
     # Canonicalisation in `hypothesis_jsonschema` requires all references to be resovable and non-recursive
     # On the Schemathesis side bundling solves this problem
     bundled = bundle(schema, resolver, inline_recursive=True)

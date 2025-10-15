@@ -105,18 +105,7 @@ class EngineContext:
                 InferenceAlgorithm.DEPENDENCY_ANALYSIS
             )
         ):
-            graph = dependencies.analyze(self.schema)
-            for response_links in graph.iter_links():
-                operation = self.schema.get_operation_by_reference(response_links.producer_operation_ref)
-                response = operation.responses.get(response_links.status_code)
-                links = response.definition.setdefault(self.schema.adapter.links_keyword, {})
-
-                for link_name, definition in response_links.links.items():
-                    # Find unique name if collision exists
-                    final_name = _resolve_link_name_collision(link_name, links)
-                    links[final_name] = definition.to_openapi()
-                    injected += 1
-
+            injected += dependencies.inject_links(self.schema)
         return injected
 
     def stop(self) -> None:
@@ -171,16 +160,3 @@ class EngineContext:
             kwargs["proxies"] = {"all": proxy}
         self._transport_kwargs_cache[key] = kwargs
         return kwargs
-
-
-def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, Any]) -> str:
-    if proposed_name not in existing_links:
-        return proposed_name
-
-    # Name collision - find next available suffix
-    suffix = 0
-    while True:
-        candidate = f"{proposed_name}_{suffix}"
-        if candidate not in existing_links:
-            return candidate
-        suffix += 1
