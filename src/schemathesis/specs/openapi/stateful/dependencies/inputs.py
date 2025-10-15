@@ -36,7 +36,6 @@ def extract_inputs(
     Connects each parameter (e.g., `userId`) to its resource definition (`User`),
     creating placeholder resources if not yet discovered from their schemas.
     """
-    # Note: Currently limited to path parameters. Query / header / body will be supported in future releases.
     for param in operation.path_parameters:
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
@@ -186,16 +185,21 @@ def _resolve_body_dependencies(
             continue
         resource = resources.get(resource_name)
         if resource is None:
-            continue
-
-        field = (
-            naming.find_matching_field(
-                parameter=property_name,
-                resource=resource_name,
-                fields=resource.fields,
+            resource = ResourceDefinition.inferred_from_parameter(
+                name=resource_name,
+                parameter_name=property_name,
             )
-            or "id"
-        )
+            resources[resource_name] = resource
+            field = property_name
+        else:
+            field = (
+                naming.find_matching_field(
+                    parameter=property_name,
+                    resource=resource_name,
+                    fields=resource.fields,
+                )
+                or "id"
+            )
         yield InputSlot(
             resource=resource,
             resource_field=field,
