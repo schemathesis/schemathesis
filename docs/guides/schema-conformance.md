@@ -20,7 +20,7 @@ def test_with_conditional_logic():
         "http://api.example.com/users", json={"name": "Alice"}
     )
 
-    assert schema["/users"]["POST"].is_valid_response(response):
+    assert schema["/users"]["POST"].is_valid_response(response)
 ```
 
 ## Example
