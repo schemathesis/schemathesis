@@ -1707,6 +1707,9 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
         nonlocal next_order_id
         data = request.get_json() or {}
 
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
         customer_id = data.get("customer_id")
         next_order_id += 1
 
@@ -1815,6 +1818,9 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
     def create_product():
         nonlocal next_id
         data = request.get_json() or {}
+
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
         product_id = str(next_id)
         next_id += 1
 
@@ -1842,6 +1848,120 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
             "-c not_a_server_error",
             f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cli, app_runner, snapshot_cli, ctx):
+    order_response_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "customer_id": {"type": "string"},
+            "total": {"type": "number"},
+        },
+        "required": ["id", "customer_id", "total"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/customers": {
+                "post": {
+                    "operationId": "createCustomer",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Customer created",
+                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                        }
+                    },
+                }
+            },
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {"content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}}},
+                    "responses": {
+                        "201": {
+                            "description": "Order created",
+                            "content": {"application/json": {"schema": order_response_schema}},
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    customers = {}
+    next_customer_id = 1
+    next_order_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/customers", methods=["POST"])
+    def create_customer():
+        nonlocal next_customer_id
+        data = request.get_json() or {}
+
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        customer_id = str(next_customer_id)
+        next_customer_id += 1
+
+        customers[customer_id] = {"id": customer_id, "name": data.get("name", "Unknown")}
+
+        return jsonify({}), 201
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        nonlocal next_order_id
+        data = request.get_json() or {}
+
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        customer_id = data.get("customer_id")
+        if not isinstance(customer_id, str):
+            return {"error": "Invalid input"}
+
+        order_id = str(next_order_id)
+        next_order_id += 1
+
+        if customer_id in customers:
+            return jsonify(
+                {
+                    "id": order_id,
+                    "customer_id": customer_id,
+                    "total": str(data.get("total", 0)),
+                }
+            ), 201
+
+        return jsonify({"detail": "Customer does not exist"}), 404
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli

@@ -2,14 +2,15 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.4...HEAD) - TBD
 
+### :wrench: Changed
+
+- Display extraction failures for `requestBody` in explicit links.
+
 ## [4.3.4](https://github.com/schemathesis/schemathesis/compare/v4.3.3...v4.3.4) - 2025-10-17
 
 ### :wrench: Changed
 
 - Deduplicate explicit and inferred links.
-
-### :wrench: Changed
-
 - Do not report extraction failures for inferred links.
 
 ## [4.3.3](https://github.com/schemathesis/schemathesis/compare/v4.3.2...v4.3.3) - 2025-10-15
