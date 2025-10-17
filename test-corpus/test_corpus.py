@@ -374,7 +374,9 @@ def test_default(corpus, filename):
     schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])
 
-    dependencies.analyze(schema)
+    graph = dependencies.analyze(schema)
+    for _ in graph.iter_links():
+        pass
 
     handlers = [
         JunitXMLHandler(output=StringIO()),

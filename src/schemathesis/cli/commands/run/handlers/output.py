@@ -1295,9 +1295,10 @@ class OutputHandler(EventHandler):
                     else:
                         click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
                 else:
-                    description = (
-                        f"\n{indent}Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"
-                    )
+                    if failure.parameter_name == "body":
+                        description = f"\n{indent}Could not resolve request body via {failure.expression}"
+                    else:
+                        description = f"\n{indent}Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"
                     prefix = "$response.body"
                     if failure.expression.startswith(prefix):
                         description += f"\n{indent}Path `{failure.expression[len(prefix) :]}` not found in response"
