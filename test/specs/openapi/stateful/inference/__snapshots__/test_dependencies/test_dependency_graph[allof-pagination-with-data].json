@@ -20,7 +20,24 @@
         "latitude",
         "longitude",
         "name"
-      ]
+      ],
+      "types": {
+        "country": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     }
   }
 }

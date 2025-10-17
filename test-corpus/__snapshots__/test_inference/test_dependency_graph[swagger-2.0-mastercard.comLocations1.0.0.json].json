@@ -84,29 +84,66 @@
         "Atm",
         "PageOffset",
         "TotalCount"
-      ]
+      ],
+      "types": {
+        "Atm": [
+          "array"
+        ],
+        "PageOffset": [
+          "string"
+        ],
+        "TotalCount": [
+          "integer"
+        ]
+      }
     },
     "Categories": {
       "fields": [
         "Category"
-      ]
+      ],
+      "types": {
+        "Category": [
+          "array"
+        ]
+      }
     },
     "Countries": {
       "fields": [
         "Country"
-      ]
+      ],
+      "types": {
+        "Country": [
+          "array"
+        ]
+      }
     },
     "CountrySubdivisions": {
       "fields": [
         "CountrySubdivision"
-      ]
+      ],
+      "types": {
+        "CountrySubdivision": [
+          "array"
+        ]
+      }
     },
     "Merchants": {
       "fields": [
         "Merchant",
         "PageOffset",
         "TotalCount"
-      ]
+      ],
+      "types": {
+        "Merchant": [
+          "array"
+        ],
+        "PageOffset": [
+          "string"
+        ],
+        "TotalCount": [
+          "integer"
+        ]
+      }
     }
   }
 }

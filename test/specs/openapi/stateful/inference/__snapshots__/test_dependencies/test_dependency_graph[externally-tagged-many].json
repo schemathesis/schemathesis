@@ -15,10 +15,21 @@
   "resources": {
     "Merchant": {
       "fields": [
+        "category",
         "id",
-        "name",
-        "category"
-      ]
+        "name"
+      ],
+      "types": {
+        "category": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     }
   }
 }

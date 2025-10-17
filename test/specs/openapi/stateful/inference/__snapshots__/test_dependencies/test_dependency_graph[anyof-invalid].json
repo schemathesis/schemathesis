@@ -14,7 +14,8 @@
   },
   "resources": {
     "Data": {
-      "fields": []
+      "fields": [],
+      "types": {}
     }
   }
 }

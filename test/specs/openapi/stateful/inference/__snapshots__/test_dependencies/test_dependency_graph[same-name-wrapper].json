@@ -34,7 +34,12 @@
     "DataRequest": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     }
   }
 }

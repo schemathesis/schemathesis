@@ -337,7 +337,8 @@
     "Channel": {
       "fields": [
         "channel_id"
-      ]
+      ],
+      "types": {}
     },
     "ChannelDetails": {
       "fields": [
@@ -345,22 +346,44 @@
         "isGlobalMaster",
         "region",
         "status"
-      ]
+      ],
+      "types": {
+        "channelId": [
+          "string"
+        ],
+        "isGlobalMaster": [
+          "boolean"
+        ],
+        "region": [
+          "string"
+        ],
+        "status": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "Client": {
       "fields": [
         "clientId"
-      ]
+      ],
+      "types": {}
     },
     "Connection": {
       "fields": [
         "connectionId"
-      ]
+      ],
+      "types": {}
     },
     "Device": {
       "fields": [
         "device_id"
-      ]
+      ],
+      "types": {}
     },
     "DeviceDetails": {
       "fields": [
@@ -372,12 +395,44 @@
         "platform",
         "push.recipient",
         "push.state"
-      ]
+      ],
+      "types": {
+        "clientId": [
+          "string"
+        ],
+        "deviceSecret": [
+          "string"
+        ],
+        "formFactor": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "metadata": [
+          "object"
+        ],
+        "platform": [
+          "string"
+        ],
+        "push.recipient": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "push.state": [
+          "string"
+        ]
+      }
     },
     "Deviceregistration": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {}
     },
     "Message": {
       "fields": [
@@ -389,7 +444,38 @@
         "id",
         "name",
         "timestamp"
-      ]
+      ],
+      "types": {
+        "clientId": [
+          "string"
+        ],
+        "connectionId": [
+          "string"
+        ],
+        "data": [
+          "string"
+        ],
+        "encoding": [
+          "string"
+        ],
+        "extras": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "timestamp": [
+          "integer"
+        ]
+      }
     },
     "PresenceMessage": {
       "fields": [
@@ -401,13 +487,46 @@
         "extras",
         "id",
         "timestamp"
-      ]
+      ],
+      "types": {
+        "action": [
+          "string"
+        ],
+        "clientId": [
+          "string"
+        ],
+        "connectionId": [
+          "string"
+        ],
+        "data": [
+          "string"
+        ],
+        "encoding": [
+          "string"
+        ],
+        "extras": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "timestamp": [
+          "integer"
+        ]
+      }
     },
     "Stat": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "Time": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "TokenDetails": {
       "fields": [
@@ -416,7 +535,24 @@
         "issued",
         "keyName",
         "token"
-      ]
+      ],
+      "types": {
+        "capability": [
+          "string"
+        ],
+        "expires": [
+          "integer"
+        ],
+        "issued": [
+          "integer"
+        ],
+        "keyName": [
+          "string"
+        ],
+        "token": [
+          "string"
+        ]
+      }
     }
   }
 }

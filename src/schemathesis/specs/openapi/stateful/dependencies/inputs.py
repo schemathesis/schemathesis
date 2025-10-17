@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Iterator
 from schemathesis.core import media_types
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema.types import get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
@@ -36,6 +37,7 @@ def extract_inputs(
     Connects each parameter (e.g., `userId`) to its resource definition (`User`),
     creating placeholder resources if not yet discovered from their schemas.
     """
+    known_dependencies = set()
     for param in operation.path_parameters:
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
@@ -47,12 +49,16 @@ def extract_inputs(
             canonicalization_cache=canonicalization_cache,
         )
         if input_slot is not None:
+            if input_slot.resource.source >= DefinitionSource.SCHEMA_WITH_PROPERTIES:
+                known_dependencies.add(input_slot.resource.name)
             yield input_slot
 
     for body in operation.body:
         try:
             if media_types.is_json(body.media_type):
-                yield from _resolve_body_dependencies(body=body, operation=operation, resources=resources)
+                yield from _resolve_body_dependencies(
+                    body=body, operation=operation, resources=resources, known_dependencies=known_dependencies
+                )
         except MalformedMediaType:
             continue
 
@@ -162,8 +168,23 @@ def _find_resource_in_responses(
     return None
 
 
+GENERIC_FIELD_NAMES = frozenset(
+    {
+        "body",
+        "text",
+        "content",
+        "message",
+        "description",
+    }
+)
+
+
 def _resolve_body_dependencies(
-    *, body: OpenApiBody, operation: APIOperation, resources: ResourceMap
+    *,
+    body: OpenApiBody,
+    operation: APIOperation,
+    resources: ResourceMap,
+    known_dependencies: set[str],
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
     if not isinstance(schema, dict):
@@ -178,31 +199,57 @@ def _resolve_body_dependencies(
 
     # Inspect each property that could be a part of some other resource
     properties = resolved.get("properties", {})
+    required = resolved.get("required", [])
     path = operation.path
-    for property_name in properties:
+    for property_name, subschema in properties.items():
         resource_name = naming.from_parameter(property_name, path)
-        if resource_name is None:
-            continue
-        resource = resources.get(resource_name)
-        if resource is None:
-            resource = ResourceDefinition.inferred_from_parameter(
-                name=resource_name,
-                parameter_name=property_name,
-            )
-            resources[resource_name] = resource
-            field = property_name
-        else:
-            field = (
-                naming.find_matching_field(
-                    parameter=property_name,
-                    resource=resource_name,
-                    fields=resource.fields,
+        if resource_name is not None:
+            resource = resources.get(resource_name)
+            if resource is None:
+                resource = ResourceDefinition.inferred_from_parameter(
+                    name=resource_name,
+                    parameter_name=property_name,
                 )
-                or "id"
+                resources[resource_name] = resource
+                field = property_name
+            else:
+                field = (
+                    naming.find_matching_field(
+                        parameter=property_name,
+                        resource=resource_name,
+                        fields=resource.fields,
+                    )
+                    or "id"
+                )
+            yield InputSlot(
+                resource=resource,
+                resource_field=field,
+                parameter_name=property_name,
+                parameter_location=ParameterLocation.BODY,
             )
+            continue
+
+        # Skip generic property names & optional fields (at least for now)
+        if property_name in GENERIC_FIELD_NAMES or property_name not in required:
+            continue
+
+        # Find candidate resources among known dependencies that actually have this field
+        candidates = [
+            resources[dep] for dep in known_dependencies if dep in resources and property_name in resources[dep].fields
+        ]
+
+        # Skip ambiguous cases when multiple resources have same field name
+        if len(candidates) != 1:
+            continue
+
+        resource = candidates[0]
+        # Ensure the target field supports the same type
+        if not resource.types[property_name] & set(get_type(subschema)):
+            continue
+
         yield InputSlot(
             resource=resource,
-            resource_field=field,
+            resource_field=property_name,
             parameter_name=property_name,
             parameter_location=ParameterLocation.BODY,
         )

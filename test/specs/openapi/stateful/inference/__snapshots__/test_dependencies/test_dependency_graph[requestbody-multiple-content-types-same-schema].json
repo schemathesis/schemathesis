@@ -36,12 +36,28 @@
         "id",
         "name",
         "recipient_id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "recipient_id": [
+          "string"
+        ]
+      }
     },
     "Recipient": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     }
   }
 }

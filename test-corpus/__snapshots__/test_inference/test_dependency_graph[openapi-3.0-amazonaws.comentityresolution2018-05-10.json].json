@@ -195,7 +195,73 @@
         "roleArn",
         "workflowArn",
         "workflowName"
-      ]
+      ],
+      "types": {
+        "description": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "incrementalRunConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "inputSourceConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "outputSourceConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "resolutionTechniques": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "roleArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "workflowArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "workflowName": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "CreateSchemaMappingOutput": {
       "fields": [
@@ -203,22 +269,86 @@
         "mappedInputFields",
         "schemaArn",
         "schemaName"
-      ]
+      ],
+      "types": {
+        "description": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "mappedInputFields": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "schemaArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "schemaName": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "DeleteMatchingWorkflowOutput": {
       "fields": [
         "message"
-      ]
+      ],
+      "types": {
+        "message": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "DeleteSchemaMappingOutput": {
       "fields": [
         "message"
-      ]
+      ],
+      "types": {
+        "message": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "GetMatchIdOutput": {
       "fields": [
         "matchId"
-      ]
+      ],
+      "types": {
+        "matchId": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "GetMatchingJobOutput": {
       "fields": [
@@ -228,7 +358,57 @@
         "metrics",
         "startTime",
         "status"
-      ]
+      ],
+      "types": {
+        "endTime": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "errorDetails": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "jobId": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "metrics": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "startTime": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "status": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "GetMatchingWorkflowOutput": {
       "fields": [
@@ -243,7 +423,97 @@
         "updatedAt",
         "workflowArn",
         "workflowName"
-      ]
+      ],
+      "types": {
+        "createdAt": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "description": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "incrementalRunConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "inputSourceConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "outputSourceConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "resolutionTechniques": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "roleArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "tags": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "updatedAt": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "workflowArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "workflowName": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "GetSchemaMappingOutput": {
       "fields": [
@@ -254,12 +524,71 @@
         "schemaName",
         "tags",
         "updatedAt"
-      ]
+      ],
+      "types": {
+        "createdAt": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "description": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "mappedInputFields": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "schemaArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "schemaName": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "tags": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "updatedAt": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "Job": {
       "fields": [
         "jobId"
-      ]
+      ],
+      "types": {}
     },
     "JobSummary": {
       "fields": [
@@ -267,33 +596,116 @@
         "jobId",
         "startTime",
         "status"
-      ]
+      ],
+      "types": {
+        "endTime": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "jobId": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "startTime": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "status": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "ListMatchingWorkflowsOutput": {
       "fields": [
         "nextToken",
         "workflowSummaries"
-      ]
+      ],
+      "types": {
+        "nextToken": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "workflowSummaries": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "ListSchemaMappingsOutput": {
       "fields": [
         "nextToken",
         "schemaList"
-      ]
+      ],
+      "types": {
+        "nextToken": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "schemaList": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "StartMatchingJobOutput": {
       "fields": [
         "jobId"
-      ]
+      ],
+      "types": {
+        "jobId": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "TagMap": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "TagResourceOutput": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "UntagResourceOutput": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "UpdateMatchingWorkflowOutput": {
       "fields": [
@@ -304,7 +716,65 @@
         "resolutionTechniques",
         "roleArn",
         "workflowName"
-      ]
+      ],
+      "types": {
+        "description": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "incrementalRunConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "inputSourceConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "outputSourceConfig": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "resolutionTechniques": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "roleArn": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "workflowName": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     }
   }
 }

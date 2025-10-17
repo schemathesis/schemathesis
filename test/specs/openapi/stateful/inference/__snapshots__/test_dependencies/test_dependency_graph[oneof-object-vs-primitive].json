@@ -16,9 +16,20 @@
     "DetailedStatus": {
       "fields": [
         "id",
-        "state",
-        "message"
-      ]
+        "message",
+        "state"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "message": [
+          "string"
+        ],
+        "state": [
+          "string"
+        ]
+      }
     }
   }
 }

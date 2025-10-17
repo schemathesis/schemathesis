@@ -16,9 +16,20 @@
     "ChannelDetails": {
       "fields": [
         "id",
-        "name",
-        "memberCount"
-      ]
+        "memberCount",
+        "name"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "memberCount": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     }
   }
 }

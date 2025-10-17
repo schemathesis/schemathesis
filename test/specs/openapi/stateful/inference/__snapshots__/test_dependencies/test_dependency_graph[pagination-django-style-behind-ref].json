@@ -34,13 +34,26 @@
     "Channel": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     },
     "Message": {
       "fields": [
         "id",
         "text"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "text": [
+          "string"
+        ]
+      }
     }
   }
 }

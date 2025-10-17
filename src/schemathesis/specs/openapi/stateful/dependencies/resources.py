@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Iterator, Mapping, cast
 
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.bundler import BundleError
+from schemathesis.core.jsonschema.types import get_type
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.stateful.dependencies import naming
@@ -265,18 +266,21 @@ def _extract_resource_from_schema(
 
         properties = resolved.get("properties")
         if properties:
-            fields = list(properties)
+            fields = sorted(properties)
+            types = {field: set(get_type(subschema)) for field, subschema in properties.items()}
             source = DefinitionSource.SCHEMA_WITH_PROPERTIES
         else:
             fields = []
+            types = {}
             source = DefinitionSource.SCHEMA_WITHOUT_PROPERTIES
         if resource is not None:
             if resource.source < source:
                 resource.source = source
                 resource.fields = fields
+                resource.types = types
                 updated_resources.add(resource_name)
         else:
-            resource = ResourceDefinition(name=resource_name, fields=fields, source=source)
+            resource = ResourceDefinition(name=resource_name, fields=fields, types=types, source=source)
             resources[resource_name] = resource
 
     return resource

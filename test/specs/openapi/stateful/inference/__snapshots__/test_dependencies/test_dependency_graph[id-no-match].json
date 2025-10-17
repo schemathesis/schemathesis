@@ -34,7 +34,12 @@
     "Brand": {
       "fields": [
         "name"
-      ]
+      ],
+      "types": {
+        "name": [
+          "string"
+        ]
+      }
     }
   }
 }

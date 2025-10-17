@@ -27,14 +27,30 @@
     "Customer": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     },
     "Product": {
       "fields": [
         "id",
         "name",
         "price"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ]
+      }
     }
   }
 }

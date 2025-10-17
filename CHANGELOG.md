@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.4...HEAD) - TBD
 
+### :rocket: Added
+
+- Add matching required fields from known resources during dependency analysis.
+
 ### :wrench: Changed
 
 - Display extraction failures for `requestBody` in explicit links.

@@ -1934,7 +1934,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "accounts": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Addonresults.json": {
       "fields": [
@@ -1947,7 +1976,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "add_on_results": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Addresses.json": {
       "fields": [
@@ -1960,7 +2018,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "addresses": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Alltime.json": {
       "fields": [
@@ -1973,7 +2060,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Applications.json": {
       "fields": [
@@ -1986,7 +2102,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "applications": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Assignedaddons.json": {
       "fields": [
@@ -1999,7 +2144,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "assigned_add_ons": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Authorizedconnectapps.json": {
       "fields": [
@@ -2012,7 +2186,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "authorized_connect_apps": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Availablephonenumbers.json": {
       "fields": [
@@ -2025,7 +2228,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "countries": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Calls.json": {
       "fields": [
@@ -2038,7 +2270,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "calls": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Conferences.json": {
       "fields": [
@@ -2051,7 +2312,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "conferences": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Connectapps.json": {
       "fields": [
@@ -2064,7 +2354,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "connect_apps": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Credentiallistmappings.json": {
       "fields": [
@@ -2077,7 +2396,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "contents": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Credentiallists.json": {
       "fields": [
@@ -2090,7 +2438,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "credential_lists": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Credentials.json": {
       "fields": [
@@ -2103,7 +2480,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "credentials": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Daily.json": {
       "fields": [
@@ -2116,7 +2522,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Dependentphonenumbers.json": {
       "fields": [
@@ -2129,7 +2564,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "dependent_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Domains.json": {
       "fields": [
@@ -2142,7 +2606,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "domains": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Events.json": {
       "fields": [
@@ -2155,7 +2648,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "events": [
+          "array"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Extensions.json": {
       "fields": [
@@ -2168,12 +2690,46 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "extensions": [
+          "array"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Healthcheck": {
       "fields": [
         "status"
-      ]
+      ],
+      "types": {
+        "status": [
+          "string"
+        ]
+      }
     },
     "Incomingphonenumbers.json": {
       "fields": [
@@ -2186,7 +2742,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "incoming_phone_numbers": [
+          "array"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Ipaccesscontrollistmappings.json": {
       "fields": [
@@ -2199,7 +2784,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "contents": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Ipaccesscontrollists.json": {
       "fields": [
@@ -2212,7 +2826,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "ip_access_control_lists": [
+          "array"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Ipaddresses.json": {
       "fields": [
@@ -2225,7 +2868,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "ip_addresses": [
+          "array"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Keys.json": {
       "fields": [
@@ -2238,7 +2910,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "keys": [
+          "array"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Lastmonth.json": {
       "fields": [
@@ -2251,7 +2952,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Local.json": {
       "fields": [
@@ -2264,7 +2994,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Machinetomachine.json": {
       "fields": [
@@ -2277,7 +3036,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Media.json": {
       "fields": [
@@ -2290,7 +3078,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "media_list": [
+          "array"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Members.json": {
       "fields": [
@@ -2303,7 +3120,36 @@
         "queue_members",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "queue_members": [
+          "array"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Messages.json": {
       "fields": [
@@ -2316,7 +3162,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "messages": [
+          "array"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Mobile.json": {
       "fields": [
@@ -2329,7 +3204,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Monthly.json": {
       "fields": [
@@ -2342,7 +3246,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "National.json": {
       "fields": [
@@ -2355,7 +3288,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Notifications.json": {
       "fields": [
@@ -2368,7 +3330,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "notifications": [
+          "array"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Outgoingcallerids.json": {
       "fields": [
@@ -2381,7 +3372,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "outgoing_caller_ids": [
+          "array"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Participants.json": {
       "fields": [
@@ -2394,7 +3414,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "participants": [
+          "array"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Payloads.json": {
       "fields": [
@@ -2407,7 +3456,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "payloads": [
+          "array"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Queues.json": {
       "fields": [
@@ -2420,7 +3498,36 @@
         "queues",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "queues": [
+          "array"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Recordings.json": {
       "fields": [
@@ -2433,7 +3540,36 @@
         "recordings",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "recordings": [
+          "array"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Records.json": {
       "fields": [
@@ -2446,7 +3582,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Sharedcost.json": {
       "fields": [
@@ -2459,7 +3624,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Shortcodes.json": {
       "fields": [
@@ -2472,7 +3666,36 @@
         "short_codes",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "short_codes": [
+          "array"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Signingkeys.json": {
       "fields": [
@@ -2485,7 +3708,36 @@
         "signing_keys",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "signing_keys": [
+          "array"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Thismonth.json": {
       "fields": [
@@ -2498,7 +3750,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Today.json": {
       "fields": [
@@ -2511,7 +3792,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Tollfree.json": {
       "fields": [
@@ -2524,7 +3834,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Transcriptions.json": {
       "fields": [
@@ -2537,7 +3876,36 @@
         "start",
         "transcriptions",
         "uri"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "transcriptions": [
+          "array"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Triggers.json": {
       "fields": [
@@ -2550,7 +3918,36 @@
         "start",
         "uri",
         "usage_triggers"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_triggers": [
+          "array"
+        ]
+      }
     },
     "Voip.json": {
       "fields": [
@@ -2563,7 +3960,36 @@
         "previous_page_uri",
         "start",
         "uri"
-      ]
+      ],
+      "types": {
+        "available_phone_numbers": [
+          "array"
+        ],
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "Yearly.json": {
       "fields": [
@@ -2576,7 +4002,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "Yesterday.json": {
       "fields": [
@@ -2589,7 +4044,36 @@
         "start",
         "uri",
         "usage_records"
-      ]
+      ],
+      "types": {
+        "end": [
+          "integer"
+        ],
+        "first_page_uri": [
+          "string"
+        ],
+        "next_page_uri": [
+          "string"
+        ],
+        "page": [
+          "integer"
+        ],
+        "page_size": [
+          "integer"
+        ],
+        "previous_page_uri": [
+          "string"
+        ],
+        "start": [
+          "integer"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_records": [
+          "array"
+        ]
+      }
     },
     "api.v2010.account": {
       "fields": [
@@ -2603,7 +4087,39 @@
         "subresource_uris",
         "type",
         "uri"
-      ]
+      ],
+      "types": {
+        "auth_token": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "owner_account_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "type": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.address": {
       "fields": [
@@ -2623,7 +4139,57 @@
         "uri",
         "validated",
         "verified"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "city": [
+          "string"
+        ],
+        "customer_name": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "emergency_enabled": [
+          "boolean"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "street": [
+          "string"
+        ],
+        "street_secondary": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "validated": [
+          "boolean"
+        ],
+        "verified": [
+          "boolean"
+        ]
+      }
     },
     "api.v2010.account.application": {
       "fields": [
@@ -2648,7 +4214,72 @@
         "voice_fallback_url",
         "voice_method",
         "voice_url"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "message_status_callback": [
+          "string"
+        ],
+        "public_application_connect_enabled": [
+          "boolean"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_status_callback": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "status_callback": [
+          "string"
+        ],
+        "status_callback_method": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_caller_id_lookup": [
+          "boolean"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.authorized_connect_app": {
       "fields": [
@@ -2660,7 +4291,33 @@
         "connect_app_sid",
         "permissions",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "connect_app_company_name": [
+          "string"
+        ],
+        "connect_app_description": [
+          "string"
+        ],
+        "connect_app_friendly_name": [
+          "string"
+        ],
+        "connect_app_homepage_url": [
+          "string"
+        ],
+        "connect_app_sid": [
+          "string"
+        ],
+        "permissions": [
+          "array"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.available_phone_number_country": {
       "fields": [
@@ -2669,14 +4326,42 @@
         "country_code",
         "subresource_uris",
         "uri"
-      ]
+      ],
+      "types": {
+        "beta": [
+          "boolean"
+        ],
+        "country": [
+          "string"
+        ],
+        "country_code": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.balance": {
       "fields": [
         "account_sid",
         "balance",
         "currency"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "balance": [
+          "string"
+        ],
+        "currency": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call": {
       "fields": [
@@ -2706,7 +4391,87 @@
         "to_formatted",
         "trunk_sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "answered_by": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "caller_name": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "direction": [
+          "string"
+        ],
+        "duration": [
+          "string"
+        ],
+        "end_time": [
+          "string"
+        ],
+        "forwarded_from": [
+          "string"
+        ],
+        "from": [
+          "string"
+        ],
+        "from_formatted": [
+          "string"
+        ],
+        "group_sid": [
+          "string"
+        ],
+        "parent_call_sid": [
+          "string"
+        ],
+        "phone_number_sid": [
+          "string"
+        ],
+        "price": [
+          "string"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "queue_time": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "start_time": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "to": [
+          "string"
+        ],
+        "to_formatted": [
+          "string"
+        ],
+        "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.call_notification-instance": {
       "fields": [
@@ -2727,7 +4492,60 @@
         "response_headers",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "error_code": [
+          "string"
+        ],
+        "log": [
+          "string"
+        ],
+        "message_date": [
+          "string"
+        ],
+        "message_text": [
+          "string"
+        ],
+        "more_info": [
+          "string"
+        ],
+        "request_method": [
+          "string"
+        ],
+        "request_url": [
+          "string"
+        ],
+        "request_variables": [
+          "string"
+        ],
+        "response_body": [
+          "string"
+        ],
+        "response_headers": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.call_recording": {
       "fields": [
@@ -2749,7 +4567,68 @@
         "status",
         "track",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "channels": [
+          "integer"
+        ],
+        "conference_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "duration": [
+          "string"
+        ],
+        "encryption_details": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "error_code": [
+          "integer"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "source": [
+          "string"
+        ],
+        "start_time": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "track": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.payments": {
       "fields": [
@@ -2759,7 +4638,27 @@
         "date_updated",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.siprec": {
       "fields": [
@@ -2770,7 +4669,30 @@
         "sid",
         "status",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.stream": {
       "fields": [
@@ -2781,7 +4703,30 @@
         "sid",
         "status",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.user_defined_message": {
       "fields": [
@@ -2789,7 +4734,21 @@
         "call_sid",
         "date_created",
         "sid"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.call.user_defined_message_subscription": {
       "fields": [
@@ -2798,7 +4757,24 @@
         "date_created",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.conference": {
       "fields": [
@@ -2814,7 +4790,45 @@
         "status",
         "subresource_uris",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid_ending_conference": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "reason_conference_ended": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.conference.conference_recording": {
       "fields": [
@@ -2835,7 +4849,65 @@
         "start_time",
         "status",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "channels": [
+          "integer"
+        ],
+        "conference_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "duration": [
+          "string"
+        ],
+        "encryption_details": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "error_code": [
+          "integer"
+        ],
+        "price": [
+          "string"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "source": [
+          "string"
+        ],
+        "start_time": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.conference.participant": {
       "fields": [
@@ -2853,7 +4925,51 @@
         "start_conference_on_enter",
         "status",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "call_sid_to_coach": [
+          "string"
+        ],
+        "coaching": [
+          "boolean"
+        ],
+        "conference_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "end_conference_on_exit": [
+          "boolean"
+        ],
+        "hold": [
+          "boolean"
+        ],
+        "label": [
+          "string"
+        ],
+        "muted": [
+          "boolean"
+        ],
+        "start_conference_on_enter": [
+          "boolean"
+        ],
+        "status": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.connect_app": {
       "fields": [
@@ -2868,7 +4984,42 @@
         "permissions",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "authorize_redirect_url": [
+          "string"
+        ],
+        "company_name": [
+          "string"
+        ],
+        "deauthorize_callback_method": [
+          "string"
+        ],
+        "deauthorize_callback_url": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "homepage_url": [
+          "string"
+        ],
+        "permissions": [
+          "array"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.incoming_phone_number": {
       "fields": [
@@ -2906,7 +5057,111 @@
         "voice_method",
         "voice_receive_mode",
         "voice_url"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "address_requirements": [
+          "string"
+        ],
+        "address_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "bundle_sid": [
+          "string"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "emergency_address_sid": [
+          "string"
+        ],
+        "emergency_address_status": [
+          "string"
+        ],
+        "emergency_status": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "identity_sid": [
+          "string"
+        ],
+        "origin": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_application_sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "status_callback": [
+          "string"
+        ],
+        "status_callback_method": [
+          "string"
+        ],
+        "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_application_sid": [
+          "string"
+        ],
+        "voice_caller_id_lookup": [
+          "boolean"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_receive_mode": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on": {
       "fields": [
@@ -2921,7 +5176,47 @@
         "subresource_uris",
         "unique_name",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "configuration": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "resource_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "unique_name": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension": {
       "fields": [
@@ -2934,7 +5229,36 @@
         "sid",
         "unique_name",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "assigned_add_on_sid": [
+          "string"
+        ],
+        "enabled": [
+          "boolean"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "product_name": [
+          "string"
+        ],
+        "resource_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "unique_name": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.incoming_phone_number.incoming_phone_number_local": {
       "fields": [
@@ -2972,7 +5296,111 @@
         "voice_method",
         "voice_receive_mode",
         "voice_url"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "address_requirements": [
+          "string"
+        ],
+        "address_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "bundle_sid": [
+          "string"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "emergency_address_sid": [
+          "string"
+        ],
+        "emergency_address_status": [
+          "string"
+        ],
+        "emergency_status": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "identity_sid": [
+          "string"
+        ],
+        "origin": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_application_sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "status_callback": [
+          "string"
+        ],
+        "status_callback_method": [
+          "string"
+        ],
+        "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_application_sid": [
+          "string"
+        ],
+        "voice_caller_id_lookup": [
+          "boolean"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_receive_mode": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile": {
       "fields": [
@@ -3010,7 +5438,111 @@
         "voice_method",
         "voice_receive_mode",
         "voice_url"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "address_requirements": [
+          "string"
+        ],
+        "address_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "bundle_sid": [
+          "string"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "emergency_address_sid": [
+          "string"
+        ],
+        "emergency_address_status": [
+          "string"
+        ],
+        "emergency_status": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "identity_sid": [
+          "string"
+        ],
+        "origin": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_application_sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "status_callback": [
+          "string"
+        ],
+        "status_callback_method": [
+          "string"
+        ],
+        "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_application_sid": [
+          "string"
+        ],
+        "voice_caller_id_lookup": [
+          "boolean"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_receive_mode": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free": {
       "fields": [
@@ -3048,7 +5580,111 @@
         "voice_method",
         "voice_receive_mode",
         "voice_url"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "address_requirements": [
+          "string"
+        ],
+        "address_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "bundle_sid": [
+          "string"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "emergency_address_sid": [
+          "string"
+        ],
+        "emergency_address_status": [
+          "string"
+        ],
+        "emergency_status": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "identity_sid": [
+          "string"
+        ],
+        "origin": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_application_sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "status_callback": [
+          "string"
+        ],
+        "status_callback_method": [
+          "string"
+        ],
+        "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_application_sid": [
+          "string"
+        ],
+        "voice_caller_id_lookup": [
+          "boolean"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_receive_mode": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.key": {
       "fields": [
@@ -3056,7 +5692,21 @@
         "date_updated",
         "friendly_name",
         "sid"
-      ]
+      ],
+      "types": {
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.message": {
       "fields": [
@@ -3080,7 +5730,69 @@
         "subresource_uris",
         "to",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "body": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_sent": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "direction": [
+          "string"
+        ],
+        "error_code": [
+          "integer"
+        ],
+        "error_message": [
+          "string"
+        ],
+        "from": [
+          "string"
+        ],
+        "messaging_service_sid": [
+          "string"
+        ],
+        "num_media": [
+          "string"
+        ],
+        "num_segments": [
+          "string"
+        ],
+        "price": [
+          "string"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "to": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.message.media": {
       "fields": [
@@ -3091,7 +5803,30 @@
         "parent_sid",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "content_type": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "parent_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.message.message_feedback": {
       "fields": [
@@ -3101,7 +5836,27 @@
         "message_sid",
         "outcome",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "message_sid": [
+          "string"
+        ],
+        "outcome": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.new_key": {
       "fields": [
@@ -3110,7 +5865,24 @@
         "friendly_name",
         "secret",
         "sid"
-      ]
+      ],
+      "types": {
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "secret": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.new_signing_key": {
       "fields": [
@@ -3119,7 +5891,24 @@
         "friendly_name",
         "secret",
         "sid"
-      ]
+      ],
+      "types": {
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "secret": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.notification-instance": {
       "fields": [
@@ -3140,7 +5929,60 @@
         "response_headers",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "error_code": [
+          "string"
+        ],
+        "log": [
+          "string"
+        ],
+        "message_date": [
+          "string"
+        ],
+        "message_text": [
+          "string"
+        ],
+        "more_info": [
+          "string"
+        ],
+        "request_method": [
+          "string"
+        ],
+        "request_url": [
+          "string"
+        ],
+        "request_variables": [
+          "string"
+        ],
+        "response_body": [
+          "string"
+        ],
+        "response_headers": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.outgoing_caller_id": {
       "fields": [
@@ -3151,7 +5993,30 @@
         "phone_number",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.queue": {
       "fields": [
@@ -3164,7 +6029,36 @@
         "max_size",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "average_wait_time": [
+          "integer"
+        ],
+        "current_size": [
+          "integer"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "max_size": [
+          "integer"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.queue.member": {
       "fields": [
@@ -3174,7 +6068,27 @@
         "queue_sid",
         "uri",
         "wait_time"
-      ]
+      ],
+      "types": {
+        "call_sid": [
+          "string"
+        ],
+        "date_enqueued": [
+          "string"
+        ],
+        "position": [
+          "integer"
+        ],
+        "queue_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "wait_time": [
+          "integer"
+        ]
+      }
     },
     "api.v2010.account.recording": {
       "fields": [
@@ -3197,7 +6111,71 @@
         "status",
         "subresource_uris",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "channels": [
+          "integer"
+        ],
+        "conference_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "duration": [
+          "string"
+        ],
+        "encryption_details": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "error_code": [
+          "integer"
+        ],
+        "media_url": [
+          "string"
+        ],
+        "price": [
+          "string"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "source": [
+          "string"
+        ],
+        "start_time": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.recording.recording_add_on_result": {
       "fields": [
@@ -3211,7 +6189,39 @@
         "sid",
         "status",
         "subresource_uris"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "add_on_configuration_sid": [
+          "string"
+        ],
+        "add_on_sid": [
+          "string"
+        ],
+        "date_completed": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "reference_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ]
+      }
     },
     "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload": {
       "fields": [
@@ -3226,7 +6236,42 @@
         "reference_sid",
         "sid",
         "subresource_uris"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "add_on_configuration_sid": [
+          "string"
+        ],
+        "add_on_result_sid": [
+          "string"
+        ],
+        "add_on_sid": [
+          "string"
+        ],
+        "content_type": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "label": [
+          "string"
+        ],
+        "reference_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ]
+      }
     },
     "api.v2010.account.recording.recording_transcription": {
       "fields": [
@@ -3243,7 +6288,48 @@
         "transcription_text",
         "type",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "duration": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "recording_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "transcription_text": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.short_code": {
       "fields": [
@@ -3259,7 +6345,45 @@
         "sms_method",
         "sms_url",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "short_code": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.signing_key": {
       "fields": [
@@ -3267,7 +6391,21 @@
         "date_updated",
         "friendly_name",
         "sid"
-      ]
+      ],
+      "types": {
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_credential_list": {
       "fields": [
@@ -3278,7 +6416,30 @@
         "sid",
         "subresource_uris",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_credential_list.sip_credential": {
       "fields": [
@@ -3289,7 +6450,30 @@
         "sid",
         "uri",
         "username"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "credential_list_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "username": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_domain": {
       "fields": [
@@ -3314,7 +6498,72 @@
         "voice_status_callback_method",
         "voice_status_callback_url",
         "voice_url"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "auth_type": [
+          "string"
+        ],
+        "byoc_trunk_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "domain_name": [
+          "string"
+        ],
+        "emergency_caller_sid": [
+          "string"
+        ],
+        "emergency_calling_enabled": [
+          "boolean"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "secure": [
+          "boolean"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sip_registration": [
+          "boolean"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_status_callback_method": [
+          "string"
+        ],
+        "voice_status_callback_url": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping": {
       "fields": [
@@ -3323,7 +6572,24 @@
         "date_updated",
         "friendly_name",
         "sid"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping": {
       "fields": [
@@ -3332,7 +6598,24 @@
         "date_updated",
         "friendly_name",
         "sid"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping": {
       "fields": [
@@ -3341,7 +6624,24 @@
         "date_updated",
         "friendly_name",
         "sid"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_domain.sip_credential_list_mapping": {
       "fields": [
@@ -3352,7 +6652,30 @@
         "friendly_name",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "domain_sid": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping": {
       "fields": [
@@ -3363,7 +6686,30 @@
         "friendly_name",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "domain_sid": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_ip_access_control_list": {
       "fields": [
@@ -3374,7 +6720,30 @@
         "sid",
         "subresource_uris",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address": {
       "fields": [
@@ -3387,7 +6756,36 @@
         "ip_address",
         "sid",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "cidr_prefix_length": [
+          "integer"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "ip_access_control_list_sid": [
+          "string"
+        ],
+        "ip_address": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.token": {
       "fields": [
@@ -3398,7 +6796,30 @@
         "password",
         "ttl",
         "username"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "ice_servers": [
+          "array"
+        ],
+        "password": [
+          "string"
+        ],
+        "ttl": [
+          "string"
+        ],
+        "username": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.transcription": {
       "fields": [
@@ -3415,7 +6836,48 @@
         "transcription_text",
         "type",
         "uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "duration": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "recording_sid": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "transcription_text": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.usage.usage_trigger": {
       "fields": [
@@ -3435,7 +6897,57 @@
         "uri",
         "usage_category",
         "usage_record_uri"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "callback_method": [
+          "string"
+        ],
+        "callback_url": [
+          "string"
+        ],
+        "current_value": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_fired": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "recurring": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "trigger_by": [
+          "string"
+        ],
+        "trigger_value": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage_category": [
+          "string"
+        ],
+        "usage_record_uri": [
+          "string"
+        ]
+      }
     },
     "api.v2010.account.validation_request": {
       "fields": [
@@ -3444,7 +6956,24 @@
         "friendly_name",
         "phone_number",
         "validation_code"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "validation_code": [
+          "string"
+        ]
+      }
     }
   }
 }

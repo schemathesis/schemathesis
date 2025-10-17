@@ -57,14 +57,26 @@
   },
   "resources": {
     "Directory": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "File": {
       "fields": [
-        "id",
         "details",
+        "id",
         "metadata"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ],
+        "id": [
+          "integer"
+        ],
+        "metadata": [
+          "string"
+        ]
+      }
     }
   }
 }

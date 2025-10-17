@@ -78,7 +78,33 @@
         "sid",
         "url",
         "voice_region"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ],
+        "voice_region": [
+          "string"
+        ]
+      }
     },
     "routes.v2.sip_domain": {
       "fields": [
@@ -90,7 +116,33 @@
         "sip_domain",
         "url",
         "voice_region"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sip_domain": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ],
+        "voice_region": [
+          "string"
+        ]
+      }
     },
     "routes.v2.trunks": {
       "fields": [
@@ -102,7 +154,33 @@
         "sip_trunk_domain",
         "url",
         "voice_region"
-      ]
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sip_trunk_domain": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ],
+        "voice_region": [
+          "string"
+        ]
+      }
     }
   }
 }

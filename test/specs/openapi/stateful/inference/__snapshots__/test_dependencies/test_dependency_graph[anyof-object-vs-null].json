@@ -17,7 +17,15 @@
       "fields": [
         "id",
         "value"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "value": [
+          "string"
+        ]
+      }
     }
   }
 }

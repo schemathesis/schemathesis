@@ -36,7 +36,8 @@
   },
   "resources": {
     "Empty": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "Operation": {
       "fields": [
@@ -45,7 +46,29 @@
         "metadata",
         "name",
         "response"
-      ]
+      ],
+      "types": {
+        "done": [
+          "boolean"
+        ],
+        "error": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "metadata": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "response": [
+          "object"
+        ]
+      }
     }
   }
 }
