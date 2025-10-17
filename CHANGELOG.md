@@ -6,6 +6,10 @@
 
 - Deduplicate explicit and inferred links.
 
+### :wrench: Changed
+
+- Do not report extraction failures for inferred links.
+
 ## [4.3.3](https://github.com/schemathesis/schemathesis/compare/v4.3.2...v4.3.3) - 2025-10-15
 
 ### :rocket: Added

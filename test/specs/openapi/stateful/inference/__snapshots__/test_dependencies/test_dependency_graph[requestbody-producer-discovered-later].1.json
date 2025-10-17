@@ -9,6 +9,7 @@
           "customer_id": "$response.body#/id"
         },
         "x-schemathesis": {
+          "is_inferred": true,
           "merge_body": true
         }
       }

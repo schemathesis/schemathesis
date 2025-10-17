@@ -38,8 +38,19 @@ class OpenApiLink:
     parameters: list[NormalizedParameter]
     body: dict[str, Any] | NotSet
     merge_body: bool
+    is_inferred: bool
 
-    __slots__ = ("name", "status_code", "source", "target", "parameters", "body", "merge_body", "_cached_extract")
+    __slots__ = (
+        "name",
+        "status_code",
+        "source",
+        "target",
+        "parameters",
+        "body",
+        "merge_body",
+        "is_inferred",
+        "_cached_extract",
+    )
 
     def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: APIOperation):
         from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -69,6 +80,7 @@ class OpenApiLink:
         self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors)
         self.body = definition.get("requestBody", NOT_SET)
         self.merge_body = extension.get("merge_body", True) if extension else True
+        self.is_inferred = extension.get("is_inferred", False) if extension else False
 
         if errors:
             raise InvalidTransition(
@@ -148,6 +160,7 @@ class OpenApiLink:
         return Transition(
             id=f"{self.source.label} -> [{self.status_code}] {self.name} -> {self.target.label}",
             parent_id=output.case.id,
+            is_inferred=self.is_inferred,
             parameters=self.extract_parameters(output),
             request_body=self.extract_body(output),
         )

@@ -7,6 +7,9 @@
         "operationRef": "#/paths/~1groups~1{groupId}~1users/get",
         "parameters": {
           "path.groupId": "$response.body#/value/0/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }

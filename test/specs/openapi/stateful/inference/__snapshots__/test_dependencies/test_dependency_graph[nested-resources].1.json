@@ -7,6 +7,9 @@
         "operationRef": "#/paths/~1users~1{userId}~1posts/post",
         "parameters": {
           "path.userId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }
@@ -19,6 +22,9 @@
         "operationRef": "#/paths/~1users~1{userId}~1posts~1{postId}/get",
         "parameters": {
           "path.userId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }
@@ -31,6 +37,9 @@
         "operationRef": "#/paths/~1users~1{userId}~1posts~1{postId}/get",
         "parameters": {
           "path.postId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }

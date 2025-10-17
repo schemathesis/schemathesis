@@ -56,10 +56,11 @@ class Transition:
     # ID of the transition (e.g. link name)
     id: str
     parent_id: str
+    is_inferred: bool
     parameters: dict[str, dict[str, ExtractedParam]]
     request_body: ExtractedParam | None
 
-    __slots__ = ("id", "parent_id", "parameters", "request_body")
+    __slots__ = ("id", "parent_id", "is_inferred", "parameters", "request_body")
 
 
 @dataclass
