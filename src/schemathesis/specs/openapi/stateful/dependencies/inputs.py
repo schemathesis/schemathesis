@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Any, Iterator
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import get_type
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
@@ -179,6 +180,14 @@ GENERIC_FIELD_NAMES = frozenset(
 )
 
 
+def _maybe_resolve_bundled(root: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    # Right now, the body schema comes bundled to dependency analysis
+    if BUNDLE_STORAGE_KEY in root and "$ref" in schema:
+        key = schema["$ref"].split("/")[-1]
+        return root[BUNDLE_STORAGE_KEY][key]
+    return schema
+
+
 def _resolve_body_dependencies(
     *,
     body: OpenApiBody,
@@ -190,12 +199,30 @@ def _resolve_body_dependencies(
     if not isinstance(schema, dict):
         return
 
-    # Right now, the body schema comes bundled to dependency analysis
-    if BUNDLE_STORAGE_KEY in schema and "$ref" in schema:
-        schema_key = schema["$ref"].split("/")[-1]
-        resolved = schema[BUNDLE_STORAGE_KEY][schema_key]
-    else:
-        resolved = schema
+    resolved = _maybe_resolve_bundled(schema, schema)
+
+    # For `items`, we'll inject an array with extracted resource
+    items = resolved.get("items", {})
+    if items is not None:
+        resource_name = naming.from_path(operation.path)
+
+        if "$ref" in items:
+            schema_key = items["$ref"].split("/")[-1]
+            original_ref = body.name_to_uri[schema_key]
+            resource_name = resource_name_from_ref(original_ref)
+            resource = resources.get(resource_name)
+            if resource is None:
+                resource = ResourceDefinition.inferred_from_parameter(name=resource_name, parameter_name=None)
+                resources[resource_name] = resource
+                field = None
+            else:
+                field = None
+            yield InputSlot(
+                resource=resource,
+                resource_field=field,
+                parameter_name=0,
+                parameter_location=ParameterLocation.BODY,
+            )
 
     # Inspect each property that could be a part of some other resource
     properties = resolved.get("properties", {})
@@ -272,7 +299,7 @@ def update_input_field_bindings(resource_name: str, operations: OperationMap) ->
     for operation in operations.values():
         for input_slot in operation.inputs:
             # Skip inputs not using this resource
-            if input_slot.resource.name != resource_name:
+            if input_slot.resource.name != resource_name or isinstance(input_slot.parameter_name, int):
                 continue
 
             # Re-match parameter to upgraded resource fields

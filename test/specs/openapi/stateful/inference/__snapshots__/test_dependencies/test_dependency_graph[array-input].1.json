@@ -1,0 +1,18 @@
+[
+  [
+    "200",
+    "#/paths/~1tags~1{tagId}/get",
+    {
+      "PostTag": {
+        "operationRef": "#/paths/~1tags~1bulk/post",
+        "requestBody": [
+          "$response.body#/"
+        ],
+        "x-schemathesis": {
+          "is_inferred": true,
+          "merge_body": true
+        }
+      }
+    }
+  ]
+]

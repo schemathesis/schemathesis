@@ -25,6 +25,7 @@ def test_forms_open_api_2(
                 OpenApiBody.from_form_parameters(
                     definition=form_data_to_json_schema(open_api_2_user_form_parameters),
                     media_type=value,
+                    name_to_uri={},
                     adapter=v2,
                 )
                 for value in consumes
@@ -60,6 +61,7 @@ def test_multipart_form_open_api_2(
                 OpenApiBody.from_form_parameters(
                     definition=form_data_to_json_schema(open_api_2_user_form_with_file_parameters),
                     media_type="multipart/form-data",
+                    name_to_uri={},
                     adapter=v2,
                 )
             ]
@@ -85,6 +87,7 @@ def test_urlencoded_form_open_api_3(assert_parameters, make_openapi_3_schema, op
                     media_type="application/x-www-form-urlencoded",
                     is_required=True,
                     resource_name=None,
+                    name_to_uri={},
                     adapter=v3_0,
                 )
             ]
@@ -112,6 +115,7 @@ def test_loose_urlencoded_form_open_api_3(assert_parameters, make_openapi_3_sche
                     media_type="application/x-www-form-urlencoded",
                     is_required=True,
                     resource_name=None,
+                    name_to_uri={},
                     adapter=v3_0,
                 )
             ]
@@ -141,6 +145,7 @@ def test_multipart_form_open_api_3(
                     media_type="multipart/form-data",
                     is_required=True,
                     resource_name=None,
+                    name_to_uri={},
                     adapter=v3_0,
                 )
             ]

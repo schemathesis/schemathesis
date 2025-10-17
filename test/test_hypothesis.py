@@ -71,7 +71,9 @@ def test_get_examples(location, swagger_20):
     container = location.container_name
     operation = make_operation(
         swagger_20,
-        **{container: cls([parameter_cls.from_definition(definition=definition, adapter=v2, **kwargs)])},
+        **{
+            container: cls([parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)])
+        },
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -103,6 +105,7 @@ def test_no_body_in_get(swagger_20):
                         "name": "key",
                         "x-example": "John",
                     },
+                    name_to_uri={},
                     adapter=v2,
                 )
             ]
@@ -128,6 +131,7 @@ def test_custom_strategies(swagger_20):
                         "type": "string",
                         "format": "even_4_digits",
                     },
+                    name_to_uri={},
                     adapter=v2,
                 )
             ]
@@ -150,6 +154,7 @@ def test_default_strategies_binary(swagger_20):
                 }
             ]
         ),
+        name_to_uri={},
         media_type="multipart/form-data",
         adapter=v2,
     )
@@ -240,6 +245,7 @@ def test_default_strategies_bytes(swagger_20):
                     },
                     is_required=True,
                     media_type="text/plain",
+                    name_to_uri={},
                     resource_name=None,
                     adapter=v2,
                 )
@@ -277,7 +283,9 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         responses=swagger_20._parse_responses({}, ""),
         security=swagger_20._parse_security({}),
         base_url=openapi2_base_url,
-        headers=OpenApiParameterSet([OpenApiParameter.from_definition(definition=definition, adapter=v2)]),
+        headers=OpenApiParameterSet(
+            [OpenApiParameter.from_definition(definition=definition, name_to_uri={}, adapter=v2)]
+        ),
     )
 
     @given(case=operation.as_strategy())
