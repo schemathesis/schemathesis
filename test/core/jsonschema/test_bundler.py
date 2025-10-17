@@ -388,7 +388,7 @@ DEFINITIONS = {
 )
 def test_bundle(schema, store, expected):
     resolver = RefResolver.from_schema(store)
-    assert bundle(schema, resolver, inline_recursive=True) == expected
+    assert bundle(schema, resolver, inline_recursive=True).schema == expected
 
 
 def test_unresolvable_pointer():
@@ -420,7 +420,7 @@ def test_bundle_recursive_not_inlined():
 
     resolver = RefResolver.from_schema(store)
 
-    assert bundle(schema, resolver, inline_recursive=False) == {
+    assert bundle(schema, resolver, inline_recursive=False).schema == {
         "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
         BUNDLE_STORAGE_KEY: {
             "schema1": {
@@ -444,7 +444,7 @@ def test_bundle_non_recursive_inlined():
 
     resolver = RefResolver.from_schema(store)
 
-    assert bundle(schema, resolver, inline_recursive=False) == {"type": "object"}
+    assert bundle(schema, resolver, inline_recursive=False).schema == {"type": "object"}
 
 
 @pytest.mark.parametrize("schema", [SWAGGER_20, OPENAPI_30, OPENAPI_31])

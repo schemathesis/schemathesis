@@ -1,0 +1,45 @@
+{
+  "operations": {
+    "GET /tags/{tagId}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tagId",
+          "resource": "Tag",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Tag",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /tags/bulk": {
+      "inputs": [
+        {
+          "parameter_location": "body",
+          "parameter_name": 0,
+          "resource": "Tag",
+          "resource_field": null
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Tag": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

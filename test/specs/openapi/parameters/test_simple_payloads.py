@@ -34,6 +34,7 @@ def test_payload_open_api_2(
                     is_required=False,
                     media_type=value,
                     resource_name=None,
+                    name_to_uri={},
                     adapter=v2,
                 )
                 for value in consumes
@@ -70,6 +71,7 @@ def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schem
                     media_type=media_type,
                     is_required=True,
                     resource_name=None,
+                    name_to_uri={},
                     adapter=v3_0,
                 )
                 for media_type in media_types
