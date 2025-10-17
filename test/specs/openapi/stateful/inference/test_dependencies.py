@@ -1286,6 +1286,26 @@ def snapshot_json(snapshot):
             },
             id="subresource-extraction-nested-ref",
         ),
+        pytest.param(
+            {
+                **operation("get", "/tags/{tagId}", "200", component_ref("Tag")),
+                "/tags/bulk": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "items": component_ref("Tag"),
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+            },
+            {"schemas": {"Tag": SCHEMA_WITH_ID}},
+            id="array-input",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

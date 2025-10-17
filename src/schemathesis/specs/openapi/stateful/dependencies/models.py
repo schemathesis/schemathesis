@@ -58,17 +58,24 @@ class DependencyGraph:
                     links: dict[str, LinkDefinition] = {}
                     for input_slot in consumer.inputs:
                         if input_slot.resource is output_slot.resource:
-                            body_pointer = extend_pointer(
-                                output_slot.pointer, input_slot.resource_field, output_slot.cardinality
-                            )
+                            if input_slot.resource_field is not None:
+                                body_pointer = extend_pointer(
+                                    output_slot.pointer, input_slot.resource_field, output_slot.cardinality
+                                )
+                            else:
+                                # No resource field means use the whole resource
+                                body_pointer = output_slot.pointer
                             link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
                             parameters = {}
-                            request_body = {}
+                            request_body: dict[str, Any] | list = {}
                             # Data is extracted from response body
                             if input_slot.parameter_location == ParameterLocation.BODY:
-                                request_body = {
-                                    input_slot.parameter_name: f"$response.body#{body_pointer}",
-                                }
+                                if isinstance(input_slot.parameter_name, int):
+                                    request_body = [f"$response.body#{body_pointer}"]
+                                else:
+                                    request_body = {
+                                        input_slot.parameter_name: f"$response.body#{body_pointer}",
+                                    }
                             else:
                                 parameters = {
                                     f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
@@ -76,7 +83,10 @@ class DependencyGraph:
                             existing = links.get(link_name)
                             if existing is not None:
                                 existing.parameters.update(parameters)
-                                existing.request_body.update(request_body)
+                                if isinstance(existing.request_body, dict) and isinstance(request_body, dict):
+                                    existing.request_body.update(request_body)
+                                else:
+                                    existing.request_body = request_body
                                 continue
                             links[link_name] = LinkDefinition(
                                 operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
@@ -110,7 +120,9 @@ class DependencyGraph:
                     continue
                 resource = self.resources[input.resource.name]
                 if (
-                    input.resource_field not in resource.fields and resource.name not in known_mismatches
+                    input.resource_field not in resource.fields
+                    and resource.name not in known_mismatches
+                    and input.resource_field is not None
                 ):  # pragma: no cover
                     message = (
                         f"Operation '{operation.method.upper()} {operation.path}': "
@@ -120,7 +132,7 @@ class DependencyGraph:
                     matches = difflib.get_close_matches(input.resource_field, resource.fields, n=1, cutoff=0.6)
                     if matches:
                         message += f". Closest field - `{matches[0]}`"
-                    elif resource.fields:
+                    if resource.fields:
                         message += f". Available fields - {', '.join(resource.fields)}"
                     else:
                         message += ". Resource has no fields"
@@ -151,7 +163,7 @@ class LinkDefinition:
     parameters: dict[str, str]
     """Parameter mappings (e.g., {'path.id': '$response.body#/id'})"""
 
-    request_body: dict[str, str]
+    request_body: dict[str, str] | list
     """Request body (e.g., {'path.id': '$response.body#/id'})"""
 
     __slots__ = ("operation_ref", "parameters", "request_body")
@@ -240,10 +252,12 @@ class InputSlot:
 
     # Which resource is needed
     resource: ResourceDefinition
-    # Which field from that resource (e.g., "id")
-    resource_field: str
+    # Which field from that resource (e.g., "id").
+    # None if passing the whole resource
+    resource_field: str | None
     # Where it goes in the request (e.g., "userId")
-    parameter_name: str
+    # Integer means index in an array (only single items are supported)
+    parameter_name: str | int
     parameter_location: ParameterLocation
 
     __slots__ = ("resource", "resource_field", "parameter_name", "parameter_location")
@@ -284,8 +298,9 @@ class ResourceDefinition:
         return cls(name=name, fields=[], types={}, source=DefinitionSource.SCHEMA_WITHOUT_PROPERTIES)
 
     @classmethod
-    def inferred_from_parameter(cls, name: str, parameter_name: str) -> ResourceDefinition:
-        return cls(name=name, fields=[parameter_name], types={}, source=DefinitionSource.PARAMETER_INFERENCE)
+    def inferred_from_parameter(cls, name: str, parameter_name: str | None) -> ResourceDefinition:
+        fields = [parameter_name] if parameter_name is not None else []
+        return cls(name=name, fields=fields, types={}, source=DefinitionSource.PARAMETER_INFERENCE)
 
 
 class DefinitionSource(enum.IntEnum):

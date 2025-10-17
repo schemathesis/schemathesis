@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import InfiniteRecursiveReference
@@ -24,6 +25,14 @@ class BundleError(Exception):
         return f"Cannot bundle `{self.reference}`: expected JSON Schema (object or boolean), got {to_json_type_name(self.value)}"
 
 
+@dataclass
+class Bundle:
+    schema: JsonSchema
+    name_to_uri: dict[str, str]
+
+    __slots__ = ("schema", "name_to_uri")
+
+
 class Bundler:
     """Bundler tracks schema ids stored in a bundle."""
 
@@ -34,16 +43,16 @@ class Bundler:
     def __init__(self) -> None:
         self.counter = 0
 
-    def bundle(self, schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> JsonSchema:
+    def bundle(self, schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> Bundle:
         """Bundle a JSON Schema by embedding all references."""
         # Inlining recursive reference is required (for now) for data generation, but is unsound for data validation
         if not isinstance(schema, dict):
-            return schema
+            return Bundle(schema=schema, name_to_uri={})
 
         # Track visited URIs and their local definition names
         inlining_for_recursion: set[str] = set()
         visited: set[str] = set()
-        uri_to_def_name: dict[str, str] = {}
+        uri_to_name: dict[str, str] = {}
         defs = {}
 
         has_recursive_references = False
@@ -52,11 +61,11 @@ class Bundler:
 
         def get_def_name(uri: str) -> str:
             """Generate or retrieve the local definition name for a URI."""
-            name = uri_to_def_name.get(uri)
+            name = uri_to_name.get(uri)
             if name is None:
                 self.counter += 1
                 name = f"schema{self.counter}"
-                uri_to_def_name[uri] = name
+                uri_to_name[uri] = name
             return name
 
         def bundle_recursive(current: JsonSchema | list[JsonSchema]) -> JsonSchema | list[JsonSchema]:
@@ -162,13 +171,13 @@ class Bundler:
             for value in defs.values():
                 if isinstance(value, dict):
                     result.update(value)
-            return result
+            return Bundle(schema=result, name_to_uri={})
 
         if defs:
             bundled[BUNDLE_STORAGE_KEY] = defs
-        return bundled
+        return Bundle(schema=bundled, name_to_uri={v: k for k, v in uri_to_name.items()})
 
 
-def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> JsonSchema:
+def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> Bundle:
     """Bundle a JSON Schema by embedding all references."""
     return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)

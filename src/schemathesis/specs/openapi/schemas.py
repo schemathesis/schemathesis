@@ -406,7 +406,9 @@ class BaseOpenAPISchema(BaseSchema):
                     and operation.get_parameter(name=param_name, location=param_location) is not None
                 ):
                     continue
-                operation.add_parameter(OpenApiParameter.from_definition(definition=param, adapter=self.adapter))
+                operation.add_parameter(
+                    OpenApiParameter.from_definition(definition=param, name_to_uri={}, adapter=self.adapter)
+                )
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
 

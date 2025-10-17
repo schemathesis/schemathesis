@@ -38,11 +38,13 @@ FORM_MEDIA_TYPES = frozenset(["multipart/form-data", "application/x-www-form-url
 class OpenApiComponent(ABC):
     definition: Mapping[str, Any]
     is_required: bool
+    name_to_uri: dict[str, str]
     adapter: SpecificationAdapter
 
     __slots__ = (
         "definition",
         "is_required",
+        "name_to_uri",
         "adapter",
         "_optimized_schema",
         "_unoptimized_schema",
@@ -142,9 +144,11 @@ class OpenApiParameter(OpenApiComponent):
     """OpenAPI operation parameter."""
 
     @classmethod
-    def from_definition(cls, *, definition: Mapping[str, Any], adapter: SpecificationAdapter) -> OpenApiParameter:
+    def from_definition(
+        cls, *, definition: Mapping[str, Any], name_to_uri: dict[str, str], adapter: SpecificationAdapter
+    ) -> OpenApiParameter:
         is_required = definition.get("required", False)
-        return cls(definition=definition, is_required=is_required, adapter=adapter)
+        return cls(definition=definition, is_required=is_required, name_to_uri=name_to_uri, adapter=adapter)
 
     @property
     def name(self) -> str:
@@ -174,12 +178,14 @@ class OpenApiBody(OpenApiComponent):
 
     media_type: str
     resource_name: str | None
+    name_to_uri: dict[str, str]
 
     __slots__ = (
         "definition",
         "is_required",
         "media_type",
         "resource_name",
+        "name_to_uri",
         "adapter",
         "_optimized_schema",
         "_unoptimized_schema",
@@ -195,6 +201,7 @@ class OpenApiBody(OpenApiComponent):
         is_required: bool,
         media_type: str,
         resource_name: str | None,
+        name_to_uri: dict[str, str],
         adapter: SpecificationAdapter,
     ) -> OpenApiBody:
         return cls(
@@ -202,6 +209,7 @@ class OpenApiBody(OpenApiComponent):
             is_required=is_required,
             media_type=media_type,
             resource_name=resource_name,
+            name_to_uri=name_to_uri,
             adapter=adapter,
         )
 
@@ -211,6 +219,7 @@ class OpenApiBody(OpenApiComponent):
         *,
         definition: Mapping[str, Any],
         media_type: str,
+        name_to_uri: dict[str, str],
         adapter: SpecificationAdapter,
     ) -> OpenApiBody:
         return cls(
@@ -218,6 +227,7 @@ class OpenApiBody(OpenApiComponent):
             is_required=True,
             media_type=media_type,
             resource_name=None,
+            name_to_uri=name_to_uri,
             adapter=adapter,
         )
 
@@ -273,19 +283,24 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
     return media_type_object.get("schema", {})
 
 
-def _bundle_parameter(parameter: Mapping, resolver: RefResolver, bundler: Bundler) -> dict:
+def _bundle_parameter(
+    parameter: Mapping, resolver: RefResolver, bundler: Bundler
+) -> tuple[dict[str, Any], dict[str, str]]:
     """Bundle a parameter definition to make it self-contained."""
     _, definition = maybe_resolve(parameter, resolver, "")
     schema = definition.get("schema")
+    name_to_uri = {}
     if schema is not None:
         definition = {k: v for k, v in definition.items() if k != "schema"}
         try:
-            definition["schema"] = bundler.bundle(schema, resolver, inline_recursive=True)
+            bundled = bundler.bundle(schema, resolver, inline_recursive=True)
+            definition["schema"] = bundled.schema
+            name_to_uri = bundled.name_to_uri
         except BundleError as exc:
             location = parameter.get("in", "")
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
-    return cast(dict, definition)
+    return cast(dict, definition), name_to_uri
 
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
@@ -308,15 +323,17 @@ def iter_parameters_v2(
     form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
 
     form_parameters = []
+    form_name_to_uri = {}
     bundler = Bundler()
     for parameter in chain(definition.get("parameters", []), shared_parameters):
-        parameter = _bundle_parameter(parameter, resolver, bundler)
+        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
         if parameter["in"] in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
         if parameter["in"] == "formData":
             # We need to gather form parameters first before creating a composite parameter for them
             form_parameters.append(parameter)
+            form_name_to_uri.update(name_to_uri)
         elif parameter["in"] == ParameterLocation.BODY:
             # Take the original definition & extract the resource_name from there
             resource_name = None
@@ -330,17 +347,20 @@ def iter_parameters_v2(
                     definition=parameter,
                     is_required=parameter.get("required", False),
                     media_type=media_type,
+                    name_to_uri=name_to_uri,
                     resource_name=resource_name,
                     adapter=adapter,
                 )
         else:
-            yield OpenApiParameter.from_definition(definition=parameter, adapter=adapter)
+            yield OpenApiParameter.from_definition(definition=parameter, name_to_uri=name_to_uri, adapter=adapter)
 
     if form_parameters:
         form_data = form_data_to_json_schema(form_parameters)
         for media_type in form_data_media_types:
             # Individual `formData` parameters are joined into a single "composite" one.
-            yield OpenApiBody.from_form_parameters(definition=form_data, media_type=media_type, adapter=adapter)
+            yield OpenApiBody.from_form_parameters(
+                definition=form_data, media_type=media_type, name_to_uri=form_name_to_uri, adapter=adapter
+            )
 
 
 def iter_parameters_v3(
@@ -356,11 +376,11 @@ def iter_parameters_v3(
 
     bundler = Bundler()
     for parameter in chain(definition.get("parameters", []), shared_parameters):
-        parameter = _bundle_parameter(parameter, resolver, bundler)
+        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
         if parameter["in"] in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
-        yield OpenApiParameter.from_definition(definition=parameter, adapter=adapter)
+        yield OpenApiParameter.from_definition(definition=parameter, name_to_uri=name_to_uri, adapter=adapter)
 
     request_body_or_ref = operation.get("requestBody")
     if request_body_or_ref is not None:
@@ -372,6 +392,7 @@ def iter_parameters_v3(
         for media_type, content in request_body["content"].items():
             resource_name = None
             schema = content.get("schema")
+            name_to_uri = {}
             if isinstance(schema, dict):
                 content = dict(content)
                 if "$ref" in schema:
@@ -379,7 +400,8 @@ def iter_parameters_v3(
                 try:
                     to_bundle = cast(dict[str, Any], schema)
                     bundled = bundler.bundle(to_bundle, resolver, inline_recursive=True)
-                    content["schema"] = bundled
+                    content["schema"] = bundled.schema
+                    name_to_uri = bundled.name_to_uri
                 except BundleError as exc:
                     raise InvalidSchema.from_bundle_error(exc, "body") from exc
             yield OpenApiBody.from_definition(
@@ -387,6 +409,7 @@ def iter_parameters_v3(
                 is_required=required,
                 media_type=media_type,
                 resource_name=resource_name,
+                name_to_uri=name_to_uri,
                 adapter=adapter,
             )
 
@@ -400,6 +423,7 @@ def build_path_parameter_v2(kwargs: Mapping[str, Any]) -> OpenApiParameter:
 
     return OpenApiParameter.from_definition(
         definition={"in": ParameterLocation.PATH.value, "required": True, "type": "string", "minLength": 1, **kwargs},
+        name_to_uri={},
         adapter=v2,
     )
 
@@ -414,6 +438,7 @@ def build_path_parameter_v3_0(kwargs: Mapping[str, Any]) -> OpenApiParameter:
             "schema": {"type": "string", "minLength": 1},
             **kwargs,
         },
+        name_to_uri={},
         adapter=v3_0,
     )
 
@@ -428,6 +453,7 @@ def build_path_parameter_v3_1(kwargs: Mapping[str, Any]) -> OpenApiParameter:
             "schema": {"type": "string", "minLength": 1},
             **kwargs,
         },
+        name_to_uri={},
         adapter=v3_1,
     )
 

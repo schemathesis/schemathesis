@@ -226,7 +226,7 @@ def _prepare_schema(schema: JsonSchema, resolver: RefResolver, scope: str, nulla
 def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> JsonSchema:
     resolver.push_scope(scope)
     try:
-        return bundle(schema, resolver, inline_recursive=False)
+        return bundle(schema, resolver, inline_recursive=False).schema
     except RefResolutionError as exc:
         raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
     finally:

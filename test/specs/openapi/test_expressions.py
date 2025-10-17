@@ -48,7 +48,12 @@ def operation(openapi_30):
     )
     instance.add_parameter(
         OpenApiBody.from_definition(
-            definition=content, media_type=media_type, is_required=False, resource_name=None, adapter=v3_0
+            definition=content,
+            media_type=media_type,
+            is_required=False,
+            resource_name=None,
+            name_to_uri={},
+            adapter=v3_0,
         )
     )
     return instance

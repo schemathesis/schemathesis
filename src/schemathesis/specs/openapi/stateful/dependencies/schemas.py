@@ -93,7 +93,7 @@ def canonicalize(schema: dict[str, Any], resolver: RefResolver) -> Mapping[str, 
 
     # Canonicalisation in `hypothesis_jsonschema` requires all references to be resovable and non-recursive
     # On the Schemathesis side bundling solves this problem
-    bundled = bundle(schema, resolver, inline_recursive=True)
+    bundled = bundle(schema, resolver, inline_recursive=True).schema
     canonicalized = canonicalish(bundled)
     resolved = resolve_all_refs(canonicalized)
     resolved.pop(BUNDLE_STORAGE_KEY, None)

@@ -5,6 +5,7 @@
 ### :wrench: Changed
 
 - Display mutation metadata in `negative_data_rejection` failures if available. Currently, only available for the coverage phase.
+- Support `items` inside `requestBody` during dependency inference.
 
 ## [4.3.7](https://github.com/schemathesis/schemathesis/compare/v4.3.6...v4.3.7) - 2025-10-20
 
