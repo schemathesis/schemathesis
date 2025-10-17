@@ -1741,6 +1741,113 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, app_runner, snapshot_cli, ctx):
+    product_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "price": {"type": "number"},
+        },
+        "required": ["id", "name", "price"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/products": {
+                "post": {
+                    "operationId": "createProduct",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"enum": ["Product"]},
+                                        "price": {"type": "number"},
+                                    },
+                                    "required": ["name", "price"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Product created",
+                            "content": {"application/json": {"schema": product_schema}},
+                        }
+                    },
+                }
+            },
+            "/products/{productId}": {
+                "get": {
+                    "operationId": "getProduct",
+                    "parameters": [
+                        {
+                            "name": "productId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Product details",
+                            "content": {"application/json": {"schema": product_schema}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    products = {}
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        nonlocal next_id
+        data = request.get_json() or {}
+        product_id = str(next_id)
+        next_id += 1
+
+        products[product_id] = {
+            "id": product_id,
+            "name": str(data.get("name", "Product")),
+            "price": float(data.get("price", 9.99)),
+        }
+
+        # Producer response is missing the expected 'id' field, so link extraction fails
+        return jsonify({"name": products[product_id]["name"], "price": products[product_id]["price"]}), 201
+
+    @app.route("/products/<product_id>", methods=["GET"])
+    def get_product(product_id):
+        if product_id not in products:
+            return "", 404
+        p = products[product_id]
+        return jsonify({"id": p["id"], "name": p["name"], "price": p["price"]}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--mode=positive",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
 def customer_post(*, operation_id="createCustomer", response_schema=None, links=None):
     """Build /customers POST endpoint."""
     endpoint = {

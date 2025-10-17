@@ -7,6 +7,9 @@
         "operationRef": "#/paths/~1users~1{userId}/get",
         "parameters": {
           "path.userId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }

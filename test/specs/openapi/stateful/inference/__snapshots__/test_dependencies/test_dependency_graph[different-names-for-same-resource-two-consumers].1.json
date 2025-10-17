@@ -7,6 +7,9 @@
         "operationRef": "#/paths/~1users~1{userId}~1messages/get",
         "parameters": {
           "path.userId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }
@@ -19,6 +22,9 @@
         "operationRef": "#/paths/~1users~1{id}/get",
         "parameters": {
           "path.id": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }
