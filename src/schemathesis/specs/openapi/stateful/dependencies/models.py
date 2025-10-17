@@ -155,12 +155,13 @@ class LinkDefinition:
         """Convert to OpenAPI Links format."""
         links: dict[str, Any] = {
             "operationRef": self.operation_ref,
+            SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True},
         }
         if self.parameters:
             links["parameters"] = self.parameters
         if self.request_body:
             links["requestBody"] = self.request_body
-            links[SCHEMATHESIS_LINK_EXTENSION] = {"merge_body": True}
+            links[SCHEMATHESIS_LINK_EXTENSION]["merge_body"] = True
         return links
 
 

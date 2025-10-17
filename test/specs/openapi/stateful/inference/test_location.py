@@ -44,7 +44,7 @@ def link_by_ref(ref: str, **parameters):
 def _link_by(key: str, value: str, **parameters):
     return {
         key: value,
-        "x-inferred": True,
+        "x-schemathesis": {"is_inferred": True},
         "parameters": {key: f"$response.header.Location#regex:{regex}" for key, regex in parameters.items()},
     }
 

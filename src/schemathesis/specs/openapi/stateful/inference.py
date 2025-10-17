@@ -22,6 +22,7 @@ from werkzeug.routing import Map, MapAdapter, Rule
 
 from schemathesis.core.adapter import ResponsesContainer
 from schemathesis.core.transforms import encode_pointer
+from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 if TYPE_CHECKING:
     from schemathesis.engine.observations import LocationHeaderEntry
@@ -39,7 +40,7 @@ class OperationById:
     __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
-        return {"operationId": self.value, "x-inferred": True}
+        return {"operationId": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
 
 
 @dataclass(unsafe_hash=True)
@@ -53,7 +54,7 @@ class OperationByRef:
     __slots__ = ("value", "method", "path")
 
     def to_link_base(self) -> dict[str, Any]:
-        return {"operationRef": self.value, "x-inferred": True}
+        return {"operationRef": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
 
 
 OperationReference = Union[OperationById, OperationByRef]

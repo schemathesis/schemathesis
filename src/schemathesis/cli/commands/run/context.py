@@ -112,7 +112,8 @@ class Statistic:
             if has_failures:
                 self.cases_with_failures += 1
 
-            if case.transition is None:
+            # Don't report extraction failures for inferred transitions
+            if case.transition is None or case.transition.is_inferred:
                 continue
             transition = case.transition
             parent = recorder.cases[transition.parent_id]

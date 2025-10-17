@@ -7,6 +7,9 @@
         "operationRef": "#/paths/~1brands~1{id}/get",
         "parameters": {
           "path.id": "$response.body#/brandId"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
         }
       }
     }
