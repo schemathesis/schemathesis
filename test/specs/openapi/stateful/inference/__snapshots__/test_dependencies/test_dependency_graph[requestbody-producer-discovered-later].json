@@ -34,14 +34,30 @@
     "Customer": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     },
     "Order": {
       "fields": [
-        "id",
         "customer_id",
+        "id",
         "total"
-      ]
+      ],
+      "types": {
+        "customer_id": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "total": [
+          "number"
+        ]
+      }
     }
   }
 }

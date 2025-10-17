@@ -292,22 +292,41 @@
     "Advisory": {
       "fields": [
         "advisory_id"
-      ]
+      ],
+      "types": {}
     },
     "Inventory": {
       "fields": [
         "inventory_id"
-      ]
+      ],
+      "types": {}
     },
     "controllers.AdvisoriesSystemsResponse": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "controllers.AdvisoryDetailItem": {
       "fields": [
         "attributes",
         "id",
         "type"
-      ]
+      ],
+      "types": {
+        "attributes": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ]
+      }
     },
     "controllers.AdvisoryInlineItem": {
       "fields": [
@@ -319,21 +338,79 @@
         "public_date",
         "severity",
         "synopsis"
-      ]
+      ],
+      "types": {
+        "advisory_type": [
+          "integer"
+        ],
+        "applicable_systems": [
+          "integer"
+        ],
+        "cve_count": [
+          "integer"
+        ],
+        "description": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "public_date": [
+          "string"
+        ],
+        "severity": [
+          "integer"
+        ],
+        "synopsis": [
+          "string"
+        ]
+      }
     },
     "controllers.AdvisoryItem": {
       "fields": [
         "attributes",
         "id",
         "type"
-      ]
+      ],
+      "types": {
+        "attributes": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ]
+      }
     },
     "controllers.PackageDetailItem": {
       "fields": [
         "attributes",
         "id",
         "type"
-      ]
+      ],
+      "types": {
+        "attributes": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ]
+      }
     },
     "controllers.PackageItem": {
       "fields": [
@@ -341,7 +418,21 @@
         "summary",
         "systems_installed",
         "systems_updatable"
-      ]
+      ],
+      "types": {
+        "name": [
+          "string"
+        ],
+        "summary": [
+          "string"
+        ],
+        "systems_installed": [
+          "integer"
+        ],
+        "systems_updatable": [
+          "integer"
+        ]
+      }
     },
     "controllers.PackageSystemItem": {
       "fields": [
@@ -350,12 +441,34 @@
         "id",
         "installed_evra",
         "updatable"
-      ]
+      ],
+      "types": {
+        "available_evra": [
+          "string"
+        ],
+        "display_name": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "installed_evra": [
+          "string"
+        ],
+        "updatable": [
+          "boolean"
+        ]
+      }
     },
     "controllers.PackageVersionItem": {
       "fields": [
         "evra"
-      ]
+      ],
+      "types": {
+        "evra": [
+          "string"
+        ]
+      }
     },
     "controllers.SystemAdvisoriesDBLookup": {
       "fields": [
@@ -366,14 +479,53 @@
         "public_date",
         "severity",
         "synopsis"
-      ]
+      ],
+      "types": {
+        "advisory_type": [
+          "integer"
+        ],
+        "cve_count": [
+          "integer"
+        ],
+        "description": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "public_date": [
+          "string"
+        ],
+        "severity": [
+          "integer"
+        ],
+        "synopsis": [
+          "string"
+        ]
+      }
     },
     "controllers.SystemAdvisoryItem": {
       "fields": [
         "attributes",
         "id",
         "type"
-      ]
+      ],
+      "types": {
+        "attributes": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ]
+      }
     },
     "controllers.SystemInlineItem": {
       "fields": [
@@ -398,14 +550,95 @@
         "stale_timestamp",
         "stale_warning_timestamp",
         "third_party"
-      ]
+      ],
+      "types": {
+        "created": [
+          "string"
+        ],
+        "culled_timestamp": [
+          "string"
+        ],
+        "display_name": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "insights_id": [
+          "string"
+        ],
+        "last_evaluation": [
+          "string"
+        ],
+        "last_upload": [
+          "string"
+        ],
+        "os_major": [
+          "string"
+        ],
+        "os_minor": [
+          "string"
+        ],
+        "os_name": [
+          "string"
+        ],
+        "other_count": [
+          "integer"
+        ],
+        "packages_installed": [
+          "integer"
+        ],
+        "packages_updatable": [
+          "integer"
+        ],
+        "rhba_count": [
+          "integer"
+        ],
+        "rhea_count": [
+          "integer"
+        ],
+        "rhsa_count": [
+          "integer"
+        ],
+        "rhsm": [
+          "string"
+        ],
+        "stale": [
+          "boolean"
+        ],
+        "stale_timestamp": [
+          "string"
+        ],
+        "stale_warning_timestamp": [
+          "string"
+        ],
+        "third_party": [
+          "boolean"
+        ]
+      }
     },
     "controllers.SystemItem": {
       "fields": [
         "attributes",
         "id",
         "type"
-      ]
+      ],
+      "types": {
+        "attributes": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ]
+      }
     },
     "controllers.SystemPackageData": {
       "fields": [
@@ -415,7 +648,27 @@
         "summary",
         "updatable",
         "updates"
-      ]
+      ],
+      "types": {
+        "description": [
+          "string"
+        ],
+        "evra": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "summary": [
+          "string"
+        ],
+        "updatable": [
+          "boolean"
+        ],
+        "updates": [
+          "array"
+        ]
+      }
     },
     "controllers.SystemPackageInline": {
       "fields": [
@@ -425,10 +678,31 @@
         "name",
         "summary",
         "updatable"
-      ]
+      ],
+      "types": {
+        "description": [
+          "string"
+        ],
+        "evra": [
+          "string"
+        ],
+        "latest_evra": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "summary": [
+          "string"
+        ],
+        "updatable": [
+          "boolean"
+        ]
+      }
     },
     "controllers.SystemsAdvisoriesResponse": {
-      "fields": []
+      "fields": [],
+      "types": {}
     }
   }
 }

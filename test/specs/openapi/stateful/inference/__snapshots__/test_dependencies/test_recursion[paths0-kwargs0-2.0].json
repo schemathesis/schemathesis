@@ -16,7 +16,17 @@
     "WebService": {
       "fields": [
         "key1"
-      ]
+      ],
+      "types": {
+        "key1": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     }
   }
 }

@@ -14,7 +14,8 @@
   },
   "resources": {
     "EmployeesResponse": {
-      "fields": []
+      "fields": [],
+      "types": {}
     }
   }
 }

@@ -16,7 +16,8 @@
     "User": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {}
     }
   }
 }

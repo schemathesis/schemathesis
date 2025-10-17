@@ -424,18 +424,28 @@
     "City": {
       "fields": [
         "cityId"
-      ]
+      ],
+      "types": {}
     },
     "Country": {
       "fields": [
         "countryId"
-      ]
+      ],
+      "types": {}
     },
     "CountryResponse": {
       "fields": [
         "data",
         "errors"
-      ]
+      ],
+      "types": {
+        "data": [
+          "object"
+        ],
+        "errors": [
+          "array"
+        ]
+      }
     },
     "CountrySummary": {
       "fields": [
@@ -443,53 +453,122 @@
         "currencyCodes",
         "name",
         "wikiDataId"
-      ]
+      ],
+      "types": {
+        "code": [
+          "string"
+        ],
+        "currencyCodes": [
+          "array"
+        ],
+        "name": [
+          "string"
+        ],
+        "wikiDataId": [
+          "string"
+        ]
+      }
     },
     "Currency": {
       "fields": [
         "code",
         "countryCodes",
         "symbol"
-      ]
+      ],
+      "types": {
+        "code": [
+          "string"
+        ],
+        "countryCodes": [
+          "array"
+        ],
+        "symbol": [
+          "string"
+        ]
+      }
     },
     "DateTimeResponse": {
       "fields": [
         "data",
         "errors"
-      ]
+      ],
+      "types": {
+        "data": [
+          "string"
+        ],
+        "errors": [
+          "array"
+        ]
+      }
     },
     "DistanceResponse": {
       "fields": [
         "data",
         "errors"
-      ]
+      ],
+      "types": {
+        "data": [
+          "number"
+        ],
+        "errors": [
+          "array"
+        ]
+      }
     },
     "Division": {
       "fields": [
         "divisionId"
-      ]
+      ],
+      "types": {}
     },
     "LanguageDescriptor": {
       "fields": [
         "code",
         "name"
-      ]
+      ],
+      "types": {
+        "code": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     },
     "Locale": {
       "fields": [
         "code"
-      ]
+      ],
+      "types": {
+        "code": [
+          "string"
+        ]
+      }
     },
     "Location": {
       "fields": [
         "locationId"
-      ]
+      ],
+      "types": {}
     },
     "PopulatedPlaceResponse": {
       "fields": [
         "data",
         "errors"
-      ]
+      ],
+      "types": {
+        "data": [
+          "object"
+        ],
+        "errors": [
+          "array"
+        ]
+      }
     },
     "PopulatedPlaceSummary": {
       "fields": [
@@ -505,13 +584,64 @@
         "regionCode",
         "type",
         "wikiDataId"
-      ]
+      ],
+      "types": {
+        "country": [
+          "string"
+        ],
+        "countryCode": [
+          "string"
+        ],
+        "distance": [
+          "number"
+        ],
+        "id": [
+          "integer"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "name": [
+          "string"
+        ],
+        "population": [
+          "integer"
+        ],
+        "region": [
+          "string"
+        ],
+        "regionCode": [
+          "string"
+        ],
+        "type": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "wikiDataId": [
+          "string"
+        ]
+      }
     },
     "RegionResponse": {
       "fields": [
         "data",
         "errors"
-      ]
+      ],
+      "types": {
+        "data": [
+          "object"
+        ],
+        "errors": [
+          "array"
+        ]
+      }
     },
     "RegionSummary": {
       "fields": [
@@ -520,20 +650,56 @@
         "isoCode",
         "name",
         "wikiDataId"
-      ]
+      ],
+      "types": {
+        "countryCode": [
+          "string"
+        ],
+        "fipsCode": [
+          "string"
+        ],
+        "isoCode": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "wikiDataId": [
+          "string"
+        ]
+      }
     },
     "TimeResponse": {
       "fields": [
         "data",
         "errors"
-      ]
+      ],
+      "types": {
+        "data": [
+          "string"
+        ],
+        "errors": [
+          "array"
+        ]
+      }
     },
     "TimeZoneDescriptor": {
       "fields": [
         "id",
         "name",
         "rawUtcOffsetHours"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "rawUtcOffsetHours": [
+          "integer"
+        ]
+      }
     },
     "TimeZoneResponse": {
       "fields": [
@@ -541,12 +707,27 @@
         "id",
         "name",
         "rawUtcOffsetHours"
-      ]
+      ],
+      "types": {
+        "errors": [
+          "array"
+        ],
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "rawUtcOffsetHours": [
+          "integer"
+        ]
+      }
     },
     "Zone": {
       "fields": [
         "zoneId"
-      ]
+      ],
+      "types": {}
     }
   }
 }

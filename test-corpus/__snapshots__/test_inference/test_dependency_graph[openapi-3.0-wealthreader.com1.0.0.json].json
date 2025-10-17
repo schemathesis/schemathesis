@@ -43,14 +43,55 @@
         "logo",
         "name",
         "statistics"
-      ]
+      ],
+      "types": {
+        "bic": [
+          "string"
+        ],
+        "code": [
+          "string"
+        ],
+        "inputs": [
+          "object"
+        ],
+        "logo": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "statistics": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "entity-data": {
       "fields": [
         "payload",
         "statistics",
         "success"
-      ]
+      ],
+      "types": {
+        "payload": [
+          "object"
+        ],
+        "statistics": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "success": [
+          "boolean"
+        ]
+      }
     },
     "error-codes": {
       "fields": [
@@ -58,7 +99,21 @@
         "description",
         "how_to_proceed",
         "possible_reasons"
-      ]
+      ],
+      "types": {
+        "code": [
+          "integer"
+        ],
+        "description": [
+          "string"
+        ],
+        "how_to_proceed": [
+          "string"
+        ],
+        "possible_reasons": [
+          "string"
+        ]
+      }
     }
   }
 }

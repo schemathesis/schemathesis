@@ -14,7 +14,8 @@
   },
   "resources": {
     "User": {
-      "fields": []
+      "fields": [],
+      "types": {}
     }
   }
 }

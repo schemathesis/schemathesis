@@ -73,6 +73,11 @@ class DependencyGraph:
                                 parameters = {
                                     f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
                                 }
+                            existing = links.get(link_name)
+                            if existing is not None:
+                                existing.parameters.update(parameters)
+                                existing.request_body.update(request_body)
+                                continue
                             links[link_name] = LinkDefinition(
                                 operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
                                 parameters=parameters,
@@ -267,18 +272,20 @@ class ResourceDefinition:
     name: str
     # A sorted list of resource fields
     fields: list[str]
+    # Field types mapping
+    types: dict[str, set[str]]
     # How this resource was created
     source: DefinitionSource
 
-    __slots__ = ("name", "fields", "source")
+    __slots__ = ("name", "fields", "types", "source")
 
     @classmethod
     def without_properties(cls, name: str) -> ResourceDefinition:
-        return cls(name=name, fields=[], source=DefinitionSource.SCHEMA_WITHOUT_PROPERTIES)
+        return cls(name=name, fields=[], types={}, source=DefinitionSource.SCHEMA_WITHOUT_PROPERTIES)
 
     @classmethod
     def inferred_from_parameter(cls, name: str, parameter_name: str) -> ResourceDefinition:
-        return cls(name=name, fields=[parameter_name], source=DefinitionSource.PARAMETER_INFERENCE)
+        return cls(name=name, fields=[parameter_name], types={}, source=DefinitionSource.PARAMETER_INFERENCE)
 
 
 class DefinitionSource(enum.IntEnum):

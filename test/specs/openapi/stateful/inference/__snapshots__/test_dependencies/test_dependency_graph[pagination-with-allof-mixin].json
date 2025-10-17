@@ -29,7 +29,18 @@
         "email",
         "id",
         "name"
-      ]
+      ],
+      "types": {
+        "email": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     }
   }
 }

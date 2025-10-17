@@ -264,27 +264,78 @@
         "refresh_token",
         "scope",
         "token_type"
-      ]
+      ],
+      "types": {
+        "access_token": [
+          "string"
+        ],
+        "digilocker_id": [
+          "string"
+        ],
+        "dob": [
+          "integer"
+        ],
+        "eaadhar": [
+          "string"
+        ],
+        "expires_in": [
+          "integer"
+        ],
+        "gender": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "reference_key": [
+          "string"
+        ],
+        "refresh_token": [
+          "string"
+        ],
+        "scope": [
+          "string"
+        ],
+        "token_type": [
+          "string"
+        ]
+      }
     },
     "Authorize": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "Client": {
       "fields": [
         "client_id"
-      ]
+      ],
+      "types": {}
     },
     "DemoAuthResponse": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "DemoAuthVerifyResponse": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "DeviceAuthorizationCodeResponse": {
       "fields": [
@@ -292,17 +343,41 @@
         "dl_masked_email",
         "dl_masked_mobile",
         "expires_in"
-      ]
+      ],
+      "types": {
+        "device_code": [
+          "string"
+        ],
+        "dl_masked_email": [
+          "string"
+        ],
+        "dl_masked_mobile": [
+          "integer"
+        ],
+        "expires_in": [
+          "integer"
+        ]
+      }
     },
     "DocTypeResponse": {
       "fields": [
         "documents"
-      ]
+      ],
+      "types": {
+        "documents": [
+          "array"
+        ]
+      }
     },
     "EaadharXamlSchema": {
       "fields": [
         "KycRes"
-      ]
+      ],
+      "types": {
+        "KycRes": [
+          "object"
+        ]
+      }
     },
     "File": {
       "fields": [
@@ -316,12 +391,49 @@
         "size",
         "type",
         "uri"
-      ]
+      ],
+      "types": {
+        "date": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "issuer": [
+          "string"
+        ],
+        "mime": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "parent": [
+          "string"
+        ],
+        "size": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
     },
     "FileUploadResponse": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "GetStatisticsResponse": {
       "fields": [
@@ -332,12 +444,40 @@
         "requestors",
         "users",
         "yearwise_authentic_documents"
-      ]
+      ],
+      "types": {
+        "authentic_documents": [
+          "string"
+        ],
+        "count_as_on": [
+          "string"
+        ],
+        "issuers": [
+          "string"
+        ],
+        "monthwise_registations": [
+          "object"
+        ],
+        "requestors": [
+          "string"
+        ],
+        "users": [
+          "string"
+        ],
+        "yearwise_authentic_documents": [
+          "object"
+        ]
+      }
     },
     "Issued": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "IssuerResponse": {
       "fields": [
@@ -346,15 +486,38 @@
         "issuerid",
         "name",
         "orgid"
-      ]
+      ],
+      "types": {
+        "categories": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "issuerid": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "orgid": [
+          "string"
+        ]
+      }
     },
     "Pulldocument": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "Pushuri": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "SearchParametersResponse": {
       "fields": [
@@ -362,24 +525,64 @@
         "label",
         "paramname",
         "valuelist"
-      ]
+      ],
+      "types": {
+        "example": [
+          "string"
+        ],
+        "label": [
+          "string"
+        ],
+        "paramname": [
+          "string"
+        ],
+        "valuelist": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     },
     "User": {
       "fields": [
         "details"
-      ]
+      ],
+      "types": {
+        "details": [
+          "object"
+        ]
+      }
     },
     "VerifyAccountResponse": {
       "fields": [
         "digilockerid",
         "registered"
-      ]
+      ],
+      "types": {
+        "digilockerid": [
+          "string"
+        ],
+        "registered": [
+          "string"
+        ]
+      }
     },
     "XMLFormatSchema": {
       "fields": [
         "CertificateData",
         "Signature"
-      ]
+      ],
+      "types": {
+        "CertificateData": [
+          "array"
+        ],
+        "Signature": [
+          "object"
+        ]
+      }
     }
   }
 }

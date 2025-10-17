@@ -23,7 +23,17 @@
     "Read": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
     }
   }
 }

@@ -572,7 +572,30 @@
         "season",
         "team",
         "week"
-      ]
+      ],
+      "types": {
+        "defense": [
+          "object"
+        ],
+        "gameId": [
+          "integer"
+        ],
+        "offense": [
+          "object"
+        ],
+        "opponent": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "AdvancedSeasonStat": {
       "fields": [
@@ -581,16 +604,42 @@
         "offense",
         "season",
         "team"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "defense": [
+          "object"
+        ],
+        "offense": [
+          "object"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ]
+      }
     },
     "BoxScore": {
       "fields": [
         "players",
         "teams"
-      ]
+      ],
+      "types": {
+        "players": [
+          "object"
+        ],
+        "teams": [
+          "object"
+        ]
+      }
     },
     "Category": {
-      "fields": []
+      "fields": [],
+      "types": {}
     },
     "Coach": {
       "fields": [
@@ -598,7 +647,21 @@
         "hire_date",
         "last_name",
         "seasons"
-      ]
+      ],
+      "types": {
+        "first_name": [
+          "string"
+        ],
+        "hire_date": [
+          "string"
+        ],
+        "last_name": [
+          "string"
+        ],
+        "seasons": [
+          "array"
+        ]
+      }
     },
     "Conference": {
       "fields": [
@@ -607,7 +670,24 @@
         "id",
         "name",
         "short_name"
-      ]
+      ],
+      "types": {
+        "abbreviation": [
+          "string"
+        ],
+        "classification": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "short_name": [
+          "string"
+        ]
+      }
     },
     "ConferenceSPRating": {
       "fields": [
@@ -619,7 +699,33 @@
         "sos",
         "specialTeams",
         "year"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "defense": [
+          "object"
+        ],
+        "offense": [
+          "object"
+        ],
+        "rating": [
+          "number"
+        ],
+        "secondOrderWins": [
+          "number"
+        ],
+        "sos": [
+          "number"
+        ],
+        "specialTeams": [
+          "object"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "DraftPick": {
       "fields": [
@@ -641,13 +747,77 @@
         "round",
         "weight",
         "year"
-      ]
+      ],
+      "types": {
+        "collegeAthleteId": [
+          "integer"
+        ],
+        "collegeConference": [
+          "string"
+        ],
+        "collegeId": [
+          "integer"
+        ],
+        "collegeTeam": [
+          "string"
+        ],
+        "height": [
+          "integer"
+        ],
+        "hometownInfo": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "nflAthleteId": [
+          "integer"
+        ],
+        "nflTeam": [
+          "string"
+        ],
+        "overall": [
+          "integer"
+        ],
+        "pick": [
+          "integer"
+        ],
+        "position": [
+          "string"
+        ],
+        "preDraftGrade": [
+          "integer"
+        ],
+        "preDraftPositionRanking": [
+          "integer"
+        ],
+        "preDraftRanking": [
+          "integer"
+        ],
+        "round": [
+          "integer"
+        ],
+        "weight": [
+          "integer"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "DraftPosition": {
       "fields": [
         "abbreviation",
         "name"
-      ]
+      ],
+      "types": {
+        "abbreviation": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     },
     "DraftTeam": {
       "fields": [
@@ -655,7 +825,21 @@
         "location",
         "logo",
         "nickname"
-      ]
+      ],
+      "types": {
+        "displayName": [
+          "string"
+        ],
+        "location": [
+          "string"
+        ],
+        "logo": [
+          "string"
+        ],
+        "nickname": [
+          "string"
+        ]
+      }
     },
     "Drive": {
       "fields": [
@@ -683,7 +867,81 @@
         "start_yardline",
         "start_yards_to_goal",
         "yards"
-      ]
+      ],
+      "types": {
+        "defense": [
+          "string"
+        ],
+        "defense_conference": [
+          "string"
+        ],
+        "drive_number": [
+          "integer"
+        ],
+        "drive_result": [
+          "string"
+        ],
+        "end_defense_score": [
+          "integer"
+        ],
+        "end_offense_score": [
+          "integer"
+        ],
+        "end_period": [
+          "integer"
+        ],
+        "end_time": [
+          "object"
+        ],
+        "end_yardline": [
+          "integer"
+        ],
+        "end_yards_to_goal": [
+          "integer"
+        ],
+        "game_id": [
+          "integer"
+        ],
+        "id": [
+          "integer"
+        ],
+        "is_home_offense": [
+          "boolean"
+        ],
+        "offense": [
+          "string"
+        ],
+        "offense_conference": [
+          "string"
+        ],
+        "plays": [
+          "integer"
+        ],
+        "scoring": [
+          "boolean"
+        ],
+        "start_defense_score": [
+          "integer"
+        ],
+        "start_offense_score": [
+          "integer"
+        ],
+        "start_period": [
+          "integer"
+        ],
+        "start_time": [
+          "object"
+        ],
+        "start_yardline": [
+          "integer"
+        ],
+        "start_yards_to_goal": [
+          "integer"
+        ],
+        "yards": [
+          "integer"
+        ]
+      }
     },
     "Game": {
       "fields": [
@@ -720,7 +978,108 @@
         "venue",
         "venue_id",
         "week"
-      ]
+      ],
+      "types": {
+        "attendance": [
+          "integer"
+        ],
+        "away_conference": [
+          "string"
+        ],
+        "away_division": [
+          "string"
+        ],
+        "away_id": [
+          "integer"
+        ],
+        "away_line_scores": [
+          "array"
+        ],
+        "away_points": [
+          "integer"
+        ],
+        "away_post_win_prob": [
+          "number"
+        ],
+        "away_postgame_elo": [
+          "integer"
+        ],
+        "away_pregame_elo": [
+          "integer"
+        ],
+        "away_team": [
+          "string"
+        ],
+        "completed": [
+          "boolean"
+        ],
+        "conference_game": [
+          "boolean"
+        ],
+        "excitement_index": [
+          "number"
+        ],
+        "highlights": [
+          "string"
+        ],
+        "home_conference": [
+          "string"
+        ],
+        "home_division": [
+          "string"
+        ],
+        "home_id": [
+          "integer"
+        ],
+        "home_line_scores": [
+          "array"
+        ],
+        "home_points": [
+          "integer"
+        ],
+        "home_post_win_prob": [
+          "number"
+        ],
+        "home_postgame_elo": [
+          "integer"
+        ],
+        "home_pregame_elo": [
+          "integer"
+        ],
+        "home_team": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "neutral_site": [
+          "boolean"
+        ],
+        "notes": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "season_type": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "start_time_tbd": [
+          "boolean"
+        ],
+        "venue": [
+          "string"
+        ],
+        "venue_id": [
+          "integer"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "GameLines": {
       "fields": [
@@ -736,7 +1095,45 @@
         "seasonType",
         "startDate",
         "week"
-      ]
+      ],
+      "types": {
+        "awayConference": [
+          "string"
+        ],
+        "awayScore": [
+          "integer"
+        ],
+        "awayTeam": [
+          "string"
+        ],
+        "homeConference": [
+          "string"
+        ],
+        "homeScore": [
+          "integer"
+        ],
+        "homeTeam": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "lines": [
+          "array"
+        ],
+        "season": [
+          "integer"
+        ],
+        "seasonType": [
+          "string"
+        ],
+        "startDate": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "GameMedia": {
       "fields": [
@@ -752,7 +1149,45 @@
         "seasonType",
         "startTime",
         "week"
-      ]
+      ],
+      "types": {
+        "awayConference": [
+          "string"
+        ],
+        "awayTeam": [
+          "string"
+        ],
+        "homeConference": [
+          "string"
+        ],
+        "homeTeam": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "isStartTimeTBD": [
+          "boolean"
+        ],
+        "mediaType": [
+          "string"
+        ],
+        "outlet": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "seasonType": [
+          "string"
+        ],
+        "startTime": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "GamePPA": {
       "fields": [
@@ -764,7 +1199,33 @@
         "season",
         "team",
         "week"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "defense": [
+          "object"
+        ],
+        "gameId": [
+          "integer"
+        ],
+        "offense": [
+          "object"
+        ],
+        "opponent": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "GameWeather": {
       "fields": [
@@ -790,7 +1251,75 @@
         "week",
         "windDirection",
         "windSpeed"
-      ]
+      ],
+      "types": {
+        "awayConference": [
+          "string"
+        ],
+        "awayTeam": [
+          "string"
+        ],
+        "dewPoint": [
+          "number"
+        ],
+        "gameIndoors": [
+          "boolean"
+        ],
+        "homeConference": [
+          "string"
+        ],
+        "homeTeam": [
+          "string"
+        ],
+        "humidity": [
+          "number"
+        ],
+        "id": [
+          "integer"
+        ],
+        "precipitation": [
+          "number"
+        ],
+        "pressure": [
+          "number"
+        ],
+        "season": [
+          "integer"
+        ],
+        "seasonType": [
+          "string"
+        ],
+        "snowfall": [
+          "number"
+        ],
+        "startTime": [
+          "string"
+        ],
+        "temperature": [
+          "number"
+        ],
+        "venue": [
+          "string"
+        ],
+        "venueId": [
+          "integer"
+        ],
+        "weatherCondition": [
+          "string"
+        ],
+        "weatherConditionCode": [
+          "integer"
+        ],
+        "week": [
+          "integer"
+        ],
+        "windDirection": [
+          "number"
+        ],
+        "windSpeed": [
+          "number"
+        ]
+      }
     },
     "LivePlayByPlay": {
       "fields": [
@@ -804,7 +1333,39 @@
         "status",
         "teams",
         "yardsToGoal"
-      ]
+      ],
+      "types": {
+        "clock": [
+          "string"
+        ],
+        "distance": [
+          "integer"
+        ],
+        "down": [
+          "integer"
+        ],
+        "drives": [
+          "array"
+        ],
+        "id": [
+          "integer"
+        ],
+        "period": [
+          "integer"
+        ],
+        "possession": [
+          "string"
+        ],
+        "status": [
+          "string"
+        ],
+        "teams": [
+          "array"
+        ],
+        "yardsToGoal": [
+          "integer"
+        ]
+      }
     },
     "Play": {
       "fields": [
@@ -835,7 +1396,90 @@
         "yard_line",
         "yards_gained",
         "yards_to_goal"
-      ]
+      ],
+      "types": {
+        "away": [
+          "string"
+        ],
+        "clock": [
+          "object"
+        ],
+        "defense": [
+          "string"
+        ],
+        "defense_conference": [
+          "string"
+        ],
+        "defense_score": [
+          "integer"
+        ],
+        "defense_timeouts": [
+          "integer"
+        ],
+        "distance": [
+          "integer"
+        ],
+        "down": [
+          "integer"
+        ],
+        "drive_id": [
+          "integer"
+        ],
+        "drive_number": [
+          "integer"
+        ],
+        "game_id": [
+          "integer"
+        ],
+        "home": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "offense": [
+          "string"
+        ],
+        "offense_conference": [
+          "string"
+        ],
+        "offense_score": [
+          "integer"
+        ],
+        "offense_timeouts": [
+          "integer"
+        ],
+        "period": [
+          "integer"
+        ],
+        "play_number": [
+          "integer"
+        ],
+        "play_text": [
+          "string"
+        ],
+        "play_type": [
+          "string"
+        ],
+        "ppa": [
+          "number"
+        ],
+        "scoring": [
+          "boolean"
+        ],
+        "wallclock": [
+          "string"
+        ],
+        "yard_line": [
+          "integer"
+        ],
+        "yards_gained": [
+          "integer"
+        ],
+        "yards_to_goal": [
+          "integer"
+        ]
+      }
     },
     "PlayStat": {
       "fields": [
@@ -858,20 +1502,98 @@
         "teamScore",
         "week",
         "yardsToGoal"
-      ]
+      ],
+      "types": {
+        "athleteId": [
+          "integer"
+        ],
+        "athleteName": [
+          "string"
+        ],
+        "clock": [
+          "object"
+        ],
+        "conference": [
+          "string"
+        ],
+        "distance": [
+          "integer"
+        ],
+        "down": [
+          "integer"
+        ],
+        "driveId": [
+          "integer"
+        ],
+        "gameId": [
+          "integer"
+        ],
+        "opponent": [
+          "string"
+        ],
+        "opponentScore": [
+          "integer"
+        ],
+        "period": [
+          "integer"
+        ],
+        "playId": [
+          "integer"
+        ],
+        "season": [
+          "integer"
+        ],
+        "stat": [
+          "integer"
+        ],
+        "statType": [
+          "string"
+        ],
+        "team": [
+          "string"
+        ],
+        "teamScore": [
+          "integer"
+        ],
+        "week": [
+          "integer"
+        ],
+        "yardsToGoal": [
+          "integer"
+        ]
+      }
     },
     "PlayStatType": {
       "fields": [
         "id",
         "name"
-      ]
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ]
+      }
     },
     "PlayType": {
       "fields": [
         "abbreviation",
         "id",
         "text"
-      ]
+      ],
+      "types": {
+        "abbreviation": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "text": [
+          "string"
+        ]
+      }
     },
     "PlayWP": {
       "fields": [
@@ -892,7 +1614,60 @@
         "spread",
         "timeRemaining",
         "yardLine"
-      ]
+      ],
+      "types": {
+        "away": [
+          "string"
+        ],
+        "awayId": [
+          "integer"
+        ],
+        "awayScore": [
+          "integer"
+        ],
+        "distance": [
+          "integer"
+        ],
+        "down": [
+          "integer"
+        ],
+        "gamesId": [
+          "integer"
+        ],
+        "home": [
+          "string"
+        ],
+        "homeBall": [
+          "boolean"
+        ],
+        "homeId": [
+          "integer"
+        ],
+        "homeScore": [
+          "integer"
+        ],
+        "homeWinProb": [
+          "number"
+        ],
+        "playId": [
+          "integer"
+        ],
+        "playNumber": [
+          "integer"
+        ],
+        "playText": [
+          "string"
+        ],
+        "spread": [
+          "number"
+        ],
+        "timeRemaining": [
+          "integer"
+        ],
+        "yardLine": [
+          "integer"
+        ]
+      }
     },
     "Player": {
       "fields": [
@@ -912,13 +1687,71 @@
         "team",
         "weight",
         "year"
-      ]
+      ],
+      "types": {
+        "first_name": [
+          "string"
+        ],
+        "height": [
+          "integer"
+        ],
+        "home_city": [
+          "string"
+        ],
+        "home_country": [
+          "string"
+        ],
+        "home_county_fips": [
+          "string"
+        ],
+        "home_latitude": [
+          "number"
+        ],
+        "home_longitude": [
+          "number"
+        ],
+        "home_state": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "jersey": [
+          "integer"
+        ],
+        "last_name": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "recruit_ids": [
+          "array"
+        ],
+        "team": [
+          "string"
+        ],
+        "weight": [
+          "integer"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "PlayerGame": {
       "fields": [
         "id",
         "teams"
-      ]
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ],
+        "teams": [
+          "array"
+        ]
+      }
     },
     "PlayerGamePPA": {
       "fields": [
@@ -929,7 +1762,30 @@
         "season",
         "team",
         "week"
-      ]
+      ],
+      "types": {
+        "averagePPA": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "opponent": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "PlayerSearchResult": {
       "fields": [
@@ -945,7 +1801,45 @@
         "teamColor",
         "teamColorSecondary",
         "weight"
-      ]
+      ],
+      "types": {
+        "firstName": [
+          "string"
+        ],
+        "height": [
+          "integer"
+        ],
+        "hometown": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "jersey": [
+          "integer"
+        ],
+        "lastName": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "team": [
+          "string"
+        ],
+        "teamColor": [
+          "string"
+        ],
+        "teamColorSecondary": [
+          "string"
+        ],
+        "weight": [
+          "integer"
+        ]
+      }
     },
     "PlayerSeasonPPA": {
       "fields": [
@@ -957,7 +1851,33 @@
         "season",
         "team",
         "totalPPA"
-      ]
+      ],
+      "types": {
+        "averagePPA": [
+          "object"
+        ],
+        "conference": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "totalPPA": [
+          "object"
+        ]
+      }
     },
     "PlayerSeasonStat": {
       "fields": [
@@ -969,7 +1889,33 @@
         "stat",
         "statType",
         "team"
-      ]
+      ],
+      "types": {
+        "category": [
+          "string"
+        ],
+        "conference": [
+          "string"
+        ],
+        "player": [
+          "string"
+        ],
+        "playerId": [
+          "integer"
+        ],
+        "season": [
+          "integer"
+        ],
+        "stat": [
+          "number"
+        ],
+        "statType": [
+          "string"
+        ],
+        "team": [
+          "string"
+        ]
+      }
     },
     "PlayerUsage": {
       "fields": [
@@ -980,7 +1926,30 @@
         "season",
         "team",
         "usage"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "usage": [
+          "object"
+        ]
+      }
     },
     "PortalPlayer": {
       "fields": [
@@ -994,7 +1963,39 @@
         "season",
         "stars",
         "transferDate"
-      ]
+      ],
+      "types": {
+        "destination": [
+          "string"
+        ],
+        "eligibility": [
+          "string"
+        ],
+        "firstName": [
+          "string"
+        ],
+        "lastName": [
+          "string"
+        ],
+        "origin": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "rating": [
+          "number"
+        ],
+        "season": [
+          "integer"
+        ],
+        "stars": [
+          "integer"
+        ],
+        "transferDate": [
+          "string"
+        ]
+      }
     },
     "PositionGroupRecruitingRating": {
       "fields": [
@@ -1005,13 +2006,44 @@
         "positionGroup",
         "team",
         "totalRating"
-      ]
+      ],
+      "types": {
+        "averageRating": [
+          "number"
+        ],
+        "averageStars": [
+          "number"
+        ],
+        "commits": [
+          "number"
+        ],
+        "conference": [
+          "string"
+        ],
+        "positionGroup": [
+          "string"
+        ],
+        "team": [
+          "string"
+        ],
+        "totalRating": [
+          "number"
+        ]
+      }
     },
     "PredictedPoints": {
       "fields": [
         "predictedPoints",
         "yardLine"
-      ]
+      ],
+      "types": {
+        "predictedPoints": [
+          "number"
+        ],
+        "yardLine": [
+          "integer"
+        ]
+      }
     },
     "PregameWP": {
       "fields": [
@@ -1023,7 +2055,33 @@
         "seasonType",
         "spread",
         "week"
-      ]
+      ],
+      "types": {
+        "awayTeam": [
+          "string"
+        ],
+        "gameId": [
+          "integer"
+        ],
+        "homeTeam": [
+          "string"
+        ],
+        "homeWinProb": [
+          "number"
+        ],
+        "season": [
+          "integer"
+        ],
+        "seasonType": [
+          "string"
+        ],
+        "spread": [
+          "number"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "RankingWeek": {
       "fields": [
@@ -1031,7 +2089,21 @@
         "season",
         "seasonType",
         "week"
-      ]
+      ],
+      "types": {
+        "polls": [
+          "array"
+        ],
+        "season": [
+          "integer"
+        ],
+        "seasonType": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     },
     "Recruit": {
       "fields": [
@@ -1052,7 +2124,60 @@
         "stateProvince",
         "weight",
         "year"
-      ]
+      ],
+      "types": {
+        "athleteId": [
+          "integer"
+        ],
+        "city": [
+          "string"
+        ],
+        "committedTo": [
+          "string"
+        ],
+        "country": [
+          "string"
+        ],
+        "height": [
+          "number"
+        ],
+        "hometownInfo": [
+          "object"
+        ],
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "position": [
+          "string"
+        ],
+        "ranking": [
+          "integer"
+        ],
+        "rating": [
+          "number"
+        ],
+        "recruitType": [
+          "string"
+        ],
+        "school": [
+          "string"
+        ],
+        "stars": [
+          "integer"
+        ],
+        "stateProvince": [
+          "string"
+        ],
+        "weight": [
+          "integer"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "ReturningProduction": {
       "fields": [
@@ -1071,7 +2196,54 @@
         "totalReceivingPPA",
         "totalRushingPPA",
         "usage"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "passingUsage": [
+          "number"
+        ],
+        "percentPPA": [
+          "number"
+        ],
+        "percentPassingPPA": [
+          "number"
+        ],
+        "percentReceivingPPA": [
+          "number"
+        ],
+        "percentRushingPPA": [
+          "number"
+        ],
+        "receivingUsage": [
+          "number"
+        ],
+        "rushingUsage": [
+          "number"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "totalPPA": [
+          "number"
+        ],
+        "totalPassingPPA": [
+          "number"
+        ],
+        "totalReceivingPPA": [
+          "number"
+        ],
+        "totalRushingPPA": [
+          "number"
+        ],
+        "usage": [
+          "number"
+        ]
+      }
     },
     "ScoreboardGame": {
       "fields": [
@@ -1091,7 +2263,57 @@
         "tv",
         "venue",
         "weather"
-      ]
+      ],
+      "types": {
+        "awayTeam": [
+          "object"
+        ],
+        "betting": [
+          "object"
+        ],
+        "clock": [
+          "string"
+        ],
+        "conferenceGame": [
+          "boolean"
+        ],
+        "homeTeam": [
+          "object"
+        ],
+        "id": [
+          "integer"
+        ],
+        "neutralSite": [
+          "boolean"
+        ],
+        "period": [
+          "integer"
+        ],
+        "possession": [
+          "string"
+        ],
+        "situation": [
+          "string"
+        ],
+        "startDate": [
+          "string"
+        ],
+        "startTimeTBD": [
+          "boolean"
+        ],
+        "status": [
+          "string"
+        ],
+        "tv": [
+          "string"
+        ],
+        "venue": [
+          "object"
+        ],
+        "weather": [
+          "object"
+        ]
+      }
     },
     "Team": {
       "fields": [
@@ -1110,7 +2332,54 @@
         "mascot",
         "school",
         "twitter"
-      ]
+      ],
+      "types": {
+        "abbreviation": [
+          "string"
+        ],
+        "alt_color": [
+          "string"
+        ],
+        "alt_name_1": [
+          "string"
+        ],
+        "alt_name_2": [
+          "string"
+        ],
+        "alt_name_3": [
+          "string"
+        ],
+        "classification": [
+          "string"
+        ],
+        "color": [
+          "string"
+        ],
+        "conference": [
+          "string"
+        ],
+        "division": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "location": [
+          "object"
+        ],
+        "logos": [
+          "array"
+        ],
+        "mascot": [
+          "string"
+        ],
+        "school": [
+          "string"
+        ],
+        "twitter": [
+          "string"
+        ]
+      }
     },
     "TeamEloRating": {
       "fields": [
@@ -1118,13 +2387,35 @@
         "elo",
         "team",
         "year"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "elo": [
+          "number"
+        ],
+        "team": [
+          "string"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "TeamGame": {
       "fields": [
         "id",
         "teams"
-      ]
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ],
+        "teams": [
+          "array"
+        ]
+      }
     },
     "TeamMatchup": {
       "fields": [
@@ -1136,7 +2427,33 @@
         "team2",
         "team2Wins",
         "ties"
-      ]
+      ],
+      "types": {
+        "endYear": [
+          "integer"
+        ],
+        "games": [
+          "array"
+        ],
+        "startYear": [
+          "integer"
+        ],
+        "team1": [
+          "string"
+        ],
+        "team1Wins": [
+          "integer"
+        ],
+        "team2": [
+          "string"
+        ],
+        "team2Wins": [
+          "integer"
+        ],
+        "ties": [
+          "integer"
+        ]
+      }
     },
     "TeamPPA": {
       "fields": [
@@ -1145,7 +2462,24 @@
         "offense",
         "season",
         "team"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "defense": [
+          "object"
+        ],
+        "offense": [
+          "object"
+        ],
+        "season": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ]
+      }
     },
     "TeamRecord": {
       "fields": [
@@ -1158,7 +2492,36 @@
         "team",
         "total",
         "year"
-      ]
+      ],
+      "types": {
+        "awayGames": [
+          "object"
+        ],
+        "conference": [
+          "string"
+        ],
+        "conferenceGames": [
+          "object"
+        ],
+        "division": [
+          "string"
+        ],
+        "expectedWins": [
+          "number"
+        ],
+        "homeGames": [
+          "object"
+        ],
+        "team": [
+          "string"
+        ],
+        "total": [
+          "object"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "TeamRecruitingRank": {
       "fields": [
@@ -1166,7 +2529,21 @@
         "rank",
         "team",
         "year"
-      ]
+      ],
+      "types": {
+        "points": [
+          "number"
+        ],
+        "rank": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "TeamSPRating": {
       "fields": [
@@ -1180,7 +2557,39 @@
         "specialTeams",
         "team",
         "year"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "defense": [
+          "object"
+        ],
+        "offense": [
+          "object"
+        ],
+        "ranking": [
+          "number"
+        ],
+        "rating": [
+          "number"
+        ],
+        "secondOrderWins": [
+          "number"
+        ],
+        "sos": [
+          "number"
+        ],
+        "specialTeams": [
+          "object"
+        ],
+        "team": [
+          "string"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "TeamSRSRating": {
       "fields": [
@@ -1190,7 +2599,27 @@
         "rating",
         "team",
         "year"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "division": [
+          "string"
+        ],
+        "ranking": [
+          "number"
+        ],
+        "rating": [
+          "number"
+        ],
+        "team": [
+          "string"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "TeamSeasonStat": {
       "fields": [
@@ -1199,14 +2628,42 @@
         "statName",
         "statValue",
         "team"
-      ]
+      ],
+      "types": {
+        "conference": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "statName": [
+          "string"
+        ],
+        "statValue": [
+          "integer"
+        ],
+        "team": [
+          "string"
+        ]
+      }
     },
     "TeamTalent": {
       "fields": [
         "school",
         "talent",
         "year"
-      ]
+      ],
+      "types": {
+        "school": [
+          "string"
+        ],
+        "talent": [
+          "number"
+        ],
+        "year": [
+          "integer"
+        ]
+      }
     },
     "Venue": {
       "fields": [
@@ -1223,7 +2680,48 @@
         "timezone",
         "year_constructed",
         "zip"
-      ]
+      ],
+      "types": {
+        "capacity": [
+          "integer"
+        ],
+        "city": [
+          "string"
+        ],
+        "country_code": [
+          "string"
+        ],
+        "dome": [
+          "boolean"
+        ],
+        "elevation": [
+          "number"
+        ],
+        "grass": [
+          "boolean"
+        ],
+        "id": [
+          "integer"
+        ],
+        "location": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "state": [
+          "string"
+        ],
+        "timezone": [
+          "string"
+        ],
+        "year_constructed": [
+          "integer"
+        ],
+        "zip": [
+          "string"
+        ]
+      }
     },
     "Week": {
       "fields": [
@@ -1232,7 +2730,24 @@
         "season",
         "seasonType",
         "week"
-      ]
+      ],
+      "types": {
+        "firstGameStart": [
+          "string"
+        ],
+        "lastGameStart": [
+          "string"
+        ],
+        "season": [
+          "integer"
+        ],
+        "seasonType": [
+          "string"
+        ],
+        "week": [
+          "integer"
+        ]
+      }
     }
   }
 }

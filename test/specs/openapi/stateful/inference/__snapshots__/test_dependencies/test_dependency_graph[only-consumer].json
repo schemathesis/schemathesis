@@ -23,7 +23,12 @@
     "User": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     }
   }
 }
