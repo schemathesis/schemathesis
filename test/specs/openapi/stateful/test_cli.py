@@ -4,6 +4,7 @@ from xml.etree import ElementTree
 import pytest
 import yaml
 from _pytest.main import ExitCode
+from flask import Flask, jsonify, request
 
 from test.utils import flaky
 
@@ -251,6 +252,147 @@ def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
             "-c not_a_server_error",
             "--mode=positive",
             config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@flaky(max_runs=3, min_passes=1)
+def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_runner, snapshot_cli):
+    openapi = {
+        "openapi": "3.0.0",
+        "info": {"title": "Minimal API", "version": "1.0.0"},
+        "paths": {
+            "/products": {
+                "post": {
+                    "operationId": "createProduct",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}, "price": {"type": "number"}},
+                                    "required": ["name", "price"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created product",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "string"},
+                                            "name": {"type": "string"},
+                                            "price": {"type": "number"},
+                                        },
+                                        "required": ["id", "name", "price"],
+                                    }
+                                }
+                            },
+                            # Link: createOrder should take product id from response body
+                            "links": {
+                                "CreateOrder": {
+                                    "operationId": "createOrder",
+                                    # Attempt to populate order requestBody from response body id.
+                                    # This runtime expression will fail because producer omits `id`.
+                                    "requestBody": {"product_id": "$response.body#/id", "quantity": 1},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "product_id": {"type": "string"},
+                                        "quantity": {"type": "integer"},
+                                    },
+                                    "required": ["product_id", "quantity"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Order created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        },
+    }
+
+    # Minimal Flask app that stores products internally but returns a response that omits `id`.
+    app = Flask(__name__)
+    products = {}
+    next_id = 1
+    next_order_id = 1
+
+    @app.route("/openapi.json")
+    def get_openapi():
+        return jsonify(openapi)
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        nonlocal next_id
+        data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        product_id = str(next_id)
+        next_id += 1
+
+        products[product_id] = {
+            "id": product_id,
+            "name": str(data.get("name", "Product")),
+            "price": float(data.get("price", 9.99)),
+        }
+
+        return jsonify({"name": products[product_id]["name"], "price": products[product_id]["price"]}), 201
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        nonlocal next_order_id
+        data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        product_id = data.get("product_id")
+        if product_id not in products:
+            return jsonify({"detail": "product not found"}), 404
+        order_id = str(next_order_id)
+        next_order_id += 1
+        return jsonify({"id": order_id}), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=5",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
         )
         == snapshot_cli
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Generator
 
@@ -121,10 +122,32 @@ class Statistic:
             # We need a response to get there, so it should be present
             assert response is not None
 
+            history = None
+
+            if (
+                transition.request_body is not None
+                and isinstance(transition.request_body.value, Ok)
+                and transition.request_body.value.ok() is UNRESOLVABLE
+            ):
+                history = collect_history(parent, response)
+                extraction_failures.add(
+                    ExtractionFailure(
+                        id=transition.id,
+                        case_id=case_id,
+                        source=parent.value.operation.label,
+                        target=case.value.operation.label,
+                        parameter_name="body",
+                        expression=json.dumps(transition.request_body.definition),
+                        history=history,
+                        response=response,
+                        error=None,
+                    )
+                )
+
             for params in transition.parameters.values():
                 for parameter, extracted in params.items():
                     if isinstance(extracted.value, Ok) and extracted.value.ok() is UNRESOLVABLE:
-                        history = collect_history(parent, response)
+                        history = history or collect_history(parent, response)
                         extraction_failures.add(
                             ExtractionFailure(
                                 id=transition.id,
@@ -139,7 +162,7 @@ class Statistic:
                             )
                         )
                     elif isinstance(extracted.value, Err):
-                        history = collect_history(parent, response)
+                        history = history or collect_history(parent, response)
                         extraction_failures.add(
                             ExtractionFailure(
                                 id=transition.id,
