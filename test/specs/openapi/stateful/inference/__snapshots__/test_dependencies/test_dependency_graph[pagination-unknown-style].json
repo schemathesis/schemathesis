@@ -17,7 +17,15 @@
       "fields": [
         "nextLink",
         "random-field-with_items"
-      ]
+      ],
+      "types": {
+        "nextLink": [
+          "string"
+        ],
+        "random-field-with_items": [
+          "array"
+        ]
+      }
     }
   }
 }

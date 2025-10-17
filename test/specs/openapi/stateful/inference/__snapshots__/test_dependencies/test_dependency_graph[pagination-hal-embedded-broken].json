@@ -17,7 +17,15 @@
       "fields": [
         "_embedded",
         "page"
-      ]
+      ],
+      "types": {
+        "_embedded": [
+          "object"
+        ],
+        "page": [
+          "object"
+        ]
+      }
     }
   }
 }

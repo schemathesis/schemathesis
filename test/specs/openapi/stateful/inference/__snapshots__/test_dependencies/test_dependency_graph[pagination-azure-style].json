@@ -34,12 +34,22 @@
     "Group": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     },
     "User": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     }
   }
 }

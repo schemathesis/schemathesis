@@ -14,7 +14,8 @@
   },
   "resources": {
     "Merchant": {
-      "fields": []
+      "fields": [],
+      "types": {}
     }
   }
 }

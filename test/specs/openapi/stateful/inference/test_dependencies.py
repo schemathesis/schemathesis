@@ -1477,7 +1477,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
         if product.get("corrupted"):
             return jsonify(
                 {
-                    "id": str(1),
+                    "id": "1",
                     "name": product["name"],
                     "price": None,  # Schema requires number, not null
                 }
@@ -1960,6 +1960,128 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
     assert (
         cli.run(
             "--max-examples=10",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_schemathesis_stateful_finds_checksum_match_bug(cli, app_runner, snapshot_cli):
+    openapi = {
+        "openapi": "3.0.0",
+        "info": {"title": "Minimal Blog", "version": "1.0.0"},
+        "paths": {
+            "/posts": {
+                "post": {
+                    "operationId": "createPost",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"body": {"type": "string"}},
+                                    "required": ["body"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created post",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "string"},
+                                            "checksum": {"type": "string"},
+                                            "body": {"type": "string"},
+                                        },
+                                        "required": ["id", "checksum", "body"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/posts/{postId}": {
+                "put": {
+                    "operationId": "updatePost",
+                    "parameters": [{"name": "postId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "checksum": {"type": "string"},
+                                        "body": {"type": "string"},
+                                    },
+                                    "required": ["checksum", "body"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "204": {"description": "Updated"},
+                        "500": {"description": "Found checksum match"},
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        },
+    }
+
+    app = Flask(__name__)
+    posts = {}
+    next_id = 1
+
+    def make_checksum():
+        # deterministic simple checksum for stable snapshots
+        return "fixed-checksum"
+
+    @app.route("/openapi.json")
+    def get_openapi():
+        return jsonify(openapi)
+
+    @app.route("/posts", methods=["POST"])
+    def create_post():
+        nonlocal next_id
+        data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        post_id = str(next_id)
+        next_id += 1
+        checksum = make_checksum()
+        posts[post_id] = {"id": post_id, "body": data.get("body", ""), "checksum": checksum}
+        return jsonify({"id": post_id, "checksum": checksum, "body": posts[post_id]["body"]}), 201
+
+    @app.route("/posts/<post_id>", methods=["PUT"])
+    def update_post(post_id):
+        if post_id not in posts:
+            return jsonify({"detail": "not found"}), 404
+        payload = request.get_json() or {}
+        if not isinstance(payload, dict):
+            return {"error": "Invalid input"}
+
+        stored = posts[post_id]
+        # Planted bug: return 500 when checksums match
+        if payload.get("checksum") == stored.get("checksum"):
+            return jsonify({"detail": "Found checksum match"}), 500
+        stored["body"] = payload.get("body", stored["body"])
+        return "", 204
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "--mode=positive",
             "-c not_a_server_error",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",

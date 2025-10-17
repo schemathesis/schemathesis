@@ -38,7 +38,24 @@
         "id",
         "name",
         "updatedAt"
-      ]
+      ],
+      "types": {
+        "createdAt": [
+          "string"
+        ],
+        "email": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "updatedAt": [
+          "string"
+        ]
+      }
     }
   }
 }

@@ -16,7 +16,12 @@
     "TagMap": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     }
   }
 }

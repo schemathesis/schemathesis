@@ -135,24 +135,61 @@
         "properties",
         "tags",
         "type"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "location": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "properties": [
+          "object"
+        ],
+        "tags": [
+          "object"
+        ],
+        "type": [
+          "string"
+        ]
+      }
     },
     "Logs": {
       "fields": [
         "content"
-      ]
+      ],
+      "types": {
+        "content": [
+          "string"
+        ]
+      }
     },
     "Operation": {
       "fields": [
         "display",
         "name",
         "origin"
-      ]
+      ],
+      "types": {
+        "display": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "origin": [
+          "string"
+        ]
+      }
     },
     "Subscription": {
       "fields": [
         "subscriptionId"
-      ]
+      ],
+      "types": {}
     }
   }
 }

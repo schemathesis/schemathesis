@@ -27,7 +27,12 @@
     "Dataset": {
       "fields": [
         "id"
-      ]
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
     }
   }
 }
