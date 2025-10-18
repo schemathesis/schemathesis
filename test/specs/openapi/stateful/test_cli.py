@@ -360,13 +360,17 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
         if not isinstance(data, dict):
             return {"error": "Invalid input"}
 
+        price = data.get("price", 9.99)
+        if not isinstance(price, float):
+            return {"error": "Invalid price"}, 400
+
         product_id = str(next_id)
         next_id += 1
 
         products[product_id] = {
             "id": product_id,
             "name": str(data.get("name", "Product")),
-            "price": float(data.get("price", 9.99)),
+            "price": price,
         }
 
         return jsonify({"name": products[product_id]["name"], "price": products[product_id]["price"]}), 201
@@ -376,9 +380,12 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
         nonlocal next_order_id
         data = request.get_json() or {}
         if not isinstance(data, dict):
-            return {"error": "Invalid input"}
+            return {"error": "Invalid input"}, 400
 
         product_id = data.get("product_id")
+        if not isinstance(product_id, str):
+            return {"error": "Invalid product_id"}, 400
+
         if product_id not in products:
             return jsonify({"detail": "product not found"}), 404
         order_id = str(next_order_id)
