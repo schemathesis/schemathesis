@@ -8,7 +8,8 @@ import jsonschema
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
-from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
+from schemathesis.core import NOT_SET, NotSet, media_types
+from schemathesis.core.errors import InvalidStateMachine, InvalidTransition, MalformedMediaType
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
@@ -22,6 +23,7 @@ from schemathesis.generation.stateful.state_machine import APIStateMachine, Step
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.stateful.control import TransitionController
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
+from schemathesis.specs.openapi.stateful.state import BASE_EXPLORATION_RATE, TransitionState
 from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
@@ -49,8 +51,6 @@ class OpenAPIStateMachine(APIStateMachine):
 
 # The proportion of negative tests generated for "root" transitions
 NEGATIVE_TEST_CASES_THRESHOLD = 10
-# How often some transition is skipped
-USE_TRANSITION_THRESHOLD = 85
 
 
 @dataclass
@@ -68,16 +68,39 @@ class OperationTransitions:
 class ApiTransitions:
     """Stores all transitions grouped by operation."""
 
-    __slots__ = ("operations",)
+    __slots__ = ("operations", "state")
 
     def __init__(self) -> None:
         # operation label -> its transitions
         self.operations: dict[str, OperationTransitions] = {}
+        self.state: dict[str, TransitionState] = {}
 
     def add_outgoing(self, source: str, link: OpenApiLink) -> None:
         """Record an outgoing transition from source operation."""
         self.operations.setdefault(source, OperationTransitions()).outgoing.append(link)
         self.operations.setdefault(link.target.label, OperationTransitions()).incoming.append(link)
+
+    def add_state(self, name: str, link: OpenApiLink, target: APIOperation) -> None:
+        parameters = []
+        for parameter in link.parameters:
+            for stored in target.iter_parameters():
+                if parameter.location is not None and stored.location != parameter.location:
+                    continue
+                if parameter.name == stored.name:
+                    parameters.append((f"{parameter.container_name}.{parameter.name}", stored.is_required))
+        if not isinstance(link.body, NotSet):
+            body = None
+            for body in target.body:
+                try:
+                    if media_types.is_json(body.media_type):
+                        break
+                except MalformedMediaType:
+                    continue
+            if body is not None:
+                required = body.raw_schema.get("required", [])
+                for field in link.body:
+                    parameters.append((f"body.{field}", field in required))
+        self.state[name] = TransitionState(parameters=parameters)
 
 
 @dataclass
@@ -106,6 +129,8 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
                     link = OpenApiLink(name, status_code, link, operation)
                     if link.target.label in selected_labels:
                         transitions.add_outgoing(operation.label, link)
+                    full_name = f"{link.source.label} -> [{link.status_code}] {link.name} -> {link.target.label}"
+                    transitions.add_state(full_name, link, link.target)
                 except InvalidTransition as exc:
                     errors.append(exc)
 
@@ -163,6 +188,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     for target in operations:
         if target.label in transitions.operations:
             incoming = transitions.operations[target.label].incoming
+            config = schema.config.generation_for(operation=target, phase="stateful")
             if incoming:
                 for link in incoming:
                     bundle_name = f"{link.source.label} -> {link.status_code}"
@@ -170,19 +196,17 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                         f"{link.source.label} -> {link.status_code} -> {link.name} -> {target.label}"
                     )
                     assert name not in rules, name
-                    config = schema.config.generation_for(operation=target, phase="stateful")
                     rules[name] = precondition(is_transition_allowed(bundle_name, link.source.label, target.label))(
                         transition(
                             name=name,
                             target=catch_all,
                             input=bundles[bundle_name].flatmap(
-                                into_step_input(target=target, link=link, modes=config.modes)
+                                into_step_input(target=target, link=link, modes=config.modes, transitions=transitions)
                             ),
                         )
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
                 name = _normalize_name(f"RANDOM -> {target.label}")
-                config = schema.config.generation_for(operation=target, phase="stateful")
                 if len(config.modes) == 1:
                     case_strategy = target.as_strategy(generation_mode=config.modes[0], phase=TestPhase.STATEFUL)
                 else:
@@ -250,50 +274,101 @@ def is_likely_root_transition(operation: APIOperation) -> bool:
 
 
 def into_step_input(
-    target: APIOperation, link: OpenApiLink, modes: list[GenerationMode]
+    *, target: APIOperation, link: OpenApiLink, modes: list[GenerationMode], transitions: ApiTransitions
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
+    """A single transition between API operations."""
+
     def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
         @st.composite  # type: ignore[misc]
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
+            def biased_coin(p: float) -> bool:
+                return (
+                    draw(
+                        st.floats(
+                            min_value=0, max_value=1, allow_nan=False, allow_infinity=False, allow_subnormal=False
+                        )
+                    )
+                    < p
+                )
+
+            # Extract transition data from previous operation's output
             transition = link.extract(output)
 
-            kwargs: dict[str, Any] = {
-                container: {
-                    name: extracted.value.ok()
-                    for name, extracted in data.items()
-                    if isinstance(extracted.value, Ok) and extracted.value.ok() not in (None, UNRESOLVABLE)
-                }
-                for container, data in transition.parameters.items()
-            }
+            # Build request parameters based on learned success rate
+            transition_state = transitions.state[transition.id]
+            overrides: dict[str, Any] = {}
+            applied_parameters = []
+            for container, data in transition.parameters.items():
+                overrides[container] = {}
 
+                for name, extracted in data.items():
+                    # Skip if extraction failed or returned unusable value
+                    if not isinstance(extracted.value, Ok) or extracted.value.ok() in (None, UNRESOLVABLE):
+                        continue
+
+                    # Decide whether to use this parameter based on learned success rate
+                    param_key = f"{container}.{name}"
+                    use_probability = transition_state.parameters[param_key].use_probability
+
+                    if biased_coin(use_probability):
+                        overrides[container][name] = extracted.value.ok()
+                        applied_parameters.append(param_key)
+
+            # Get the extracted body value
             if (
                 transition.request_body is not None
                 and isinstance(transition.request_body.value, Ok)
                 and transition.request_body.value.ok() is not UNRESOLVABLE
-                and not link.merge_body
-                and draw(st.integers(min_value=0, max_value=99)) < USE_TRANSITION_THRESHOLD
             ):
-                kwargs["body"] = transition.request_body.value.ok()
+                request_body = transition.request_body.value.ok()
+            else:
+                request_body = NOT_SET
 
-            is_applied = bool(kwargs)
+            # Link suppose to replace the entire extracted body
+            if request_body is not NOT_SET and not link.merge_body and biased_coin(1 - BASE_EXPLORATION_RATE):
+                overrides["body"] = request_body
 
+                if isinstance(overrides["body"], dict):
+                    applied_parameters.extend(f"body.{field}" for field in overrides["body"])
+                else:
+                    applied_parameters.append("body")
+
+            # Generate a test case with possible overrides derived from stateful data
             cases = strategies.combine(
-                [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **kwargs) for mode in modes]
+                [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **overrides) for mode in modes]
             )
             case = draw(cases)
-            if (
-                transition.request_body is not None
-                and isinstance(transition.request_body.value, Ok)
-                and transition.request_body.value.ok() is not UNRESOLVABLE
-                and link.merge_body
-                and draw(st.integers(min_value=0, max_value=99)) < USE_TRANSITION_THRESHOLD
-            ):
-                new = transition.request_body.value.ok()
-                if isinstance(case.body, dict) and isinstance(new, dict):
-                    case.body = {**case.body, **new}
+
+            if request_body is not NOT_SET and link.merge_body:
+                if isinstance(request_body, dict):
+                    selected_fields = {}
+
+                    for field_name, field_value in request_body.items():
+                        field_key = f"body.{field_name}"
+                        # TODO: Can the value be `UNRESOLVABLE` ???
+
+                        use_probability = transition_state.parameters[field_key].use_probability
+                        if biased_coin(use_probability):
+                            selected_fields[field_name] = field_value
+                            applied_parameters.append(field_key)
+
+                    if selected_fields:
+                        if isinstance(case.body, dict):
+                            case.body = {**case.body, **selected_fields}
+                        else:
+                            # Can't merge into non-dict, replace entirely
+                            case.body = selected_fields
                 else:
-                    case.body = new
-                is_applied = True
+                    if "body" in transition_state.parameters:
+                        use_probability = transition_state.parameters["body"].use_probability
+                    else:
+                        use_probability = 1 - BASE_EXPLORATION_RATE
+
+                    if biased_coin(use_probability):
+                        case.body = request_body
+                        applied_parameters.append("body")
+
+                # Re-validate generation mode after merging body
                 if case.meta and case.meta.generation.mode == GenerationMode.NEGATIVE:
                     # It is possible that the new body is now valid and the whole test case could be valid too
                     for alternative in case.operation.body:
@@ -305,7 +380,8 @@ def into_step_input(
                                 )
                                 if all(info.mode == GenerationMode.POSITIVE for info in case.meta.components.values()):
                                     case.meta.generation.mode = GenerationMode.POSITIVE
-            return StepInput(case=case, transition=transition, is_applied=is_applied)
+
+            return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)
 

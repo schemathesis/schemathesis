@@ -37,16 +37,20 @@ class StepInput:
 
     case: Case
     transition: Transition | None  # None for initial steps
-    # Whether this transition was actually applied
+    # What parameters were actually applied
     # Data extraction failures can prevent it, as well as transitions can be skipped in some cases
     # to improve discovery of bugs triggered by non-stateful inputs during stateful testing
-    is_applied: bool
+    applied_parameters: list[str]
 
-    __slots__ = ("case", "transition", "is_applied")
+    __slots__ = ("case", "transition", "applied_parameters")
 
     @classmethod
     def initial(cls, case: Case) -> StepInput:
-        return cls(case=case, transition=None, is_applied=False)
+        return cls(case=case, transition=None, applied_parameters=[])
+
+    @property
+    def is_applied(self) -> bool:
+        return bool(self.applied_parameters)
 
 
 @dataclass
@@ -231,6 +235,7 @@ class APIStateMachine(RuleBasedStateMachine):
         kwargs = self.get_call_kwargs(input.case)
         response = self.call(input.case, **kwargs)
         self.after_call(response, input.case)
+        self.control.update_state(response, input)
         self.validate_response(response, input.case, **kwargs)
         return StepOutput(response, input.case)
 

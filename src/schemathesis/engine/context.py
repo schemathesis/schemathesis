@@ -98,6 +98,7 @@ class EngineContext:
             inferencer = LinkInferencer.from_schema(self.schema)
             for operation, entries in self.observations.location_headers.items():
                 injected += inferencer.inject_links(operation.responses, entries)
+
         if (
             isinstance(self.schema, BaseOpenAPISchema)
             and self.schema.config.phases.stateful.enabled

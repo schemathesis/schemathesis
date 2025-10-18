@@ -1528,6 +1528,177 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_dependency_pruning_learns_to_avoid_incorrect_links(cli, app_runner, snapshot_cli, ctx):
+    item_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "internal_code": {"type": "string"},  # String, not a rating!
+        },
+        "required": ["id", "name", "internal_code"],
+    }
+
+    review_response_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "item_id": {"type": "string"},
+            "rating": {"type": "integer"},
+        },
+        "required": ["id", "item_id", "rating"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Item created",
+                            "content": {"application/json": {"schema": item_schema}},
+                            # WRONG LINKS: maps string to integer field
+                            # Normally, they will decrease the effectiveness of stateful tests A LOT
+                            "links": {
+                                f"createReview-{i}": {
+                                    "operationId": "createReview",
+                                    "parameters": {
+                                        "itemId": "$response.body#/id",
+                                    },
+                                    "requestBody": {
+                                        "rating": "$response.body#/internal_code",
+                                    },
+                                }
+                                for i in range(5)
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}/reviews": {
+                "post": {
+                    "operationId": "createReview",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                                    },
+                                    "required": ["rating"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Review created",
+                            "content": {"application/json": {"schema": review_response_schema}},
+                        },
+                        "400": {"description": "Validation error"},
+                        "404": {"description": "Item not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    items = {}
+    next_item_id = 1
+    next_review_id = 1
+
+    total_requests = 0
+    validation_failures = 0
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        nonlocal next_item_id
+        data = request.get_json() or {}
+
+        item_id = str(next_item_id)
+        next_item_id += 1
+
+        items[item_id] = {
+            "id": item_id,
+            "name": data.get("name", "Item"),
+            "internal_code": "INTERNAL-XYZ",  # String, not valid rating
+        }
+
+        return jsonify(items[item_id]), 201
+
+    @app.route("/items/<item_id>/reviews", methods=["POST"])
+    def create_review(item_id):
+        nonlocal next_review_id
+        nonlocal validation_failures
+        nonlocal total_requests
+
+        total_requests += 1
+
+        if item_id not in items:
+            return {"error": "Item not found"}, 404
+
+        data = request.get_json() or {}
+
+        rating = data.get("rating")
+
+        # Rating must be integer 1-5
+        if not isinstance(rating, int) or not (1 <= rating <= 5):
+            validation_failures += 1
+            return {"error": "Invalid rating"}, 400
+
+        next_review_id += 1
+
+        return jsonify(
+            {
+                "id": 12345,  # Should be string, not int
+                "item_id": item_id,
+                "rating": rating,
+            }
+        ), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=50",
+            "-c response_schema_conformance",
+            "--continue-on-failure",
+            "--mode=positive",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )
+    # Pruning of links that don't work affects the success rate a lot
+    # Schemathesis should consistently get fewer validation errors from the tested API
+    # because it dynamically learns from feedback. Without pruning the failure rate here
+    # is normally >60%
+    assert validation_failures / total_requests < 0.25
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
 def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot_cli, ctx):
     order_response_schema = {

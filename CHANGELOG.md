@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Add matching required fields from known resources during dependency analysis.
+- Adaptive stateful testing. It learns from response feedback to prioritize valid parameter combinations.
 
 ### :wrench: Changed
 
