@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATEFUL_STEP_COUNT
 
@@ -43,6 +44,27 @@ class TransitionController:
         self.max_operations_per_source = _get_max_operations_per_source(transitions)
         # source -> derived API calls
         self.statistic: dict[str, dict[str, Counter[str]]] = {}
+
+    def update_state(self, response: Response, input: StepInput) -> None:
+        if (
+            input.transition is None
+            # No links were used, statistic is not relevant
+            or not input.is_applied
+            # Auth errors are Schemathesis config issues (missing header / custom auth)
+            # Hence do not count them here
+            or response.status_code in {401, 403}
+            # TODO: explain why
+            or response.status_code >= 500
+            or (input.case.meta and input.case.meta.generation.mode.is_negative)
+        ):
+            return
+        # TODO: 500 is treat as failure, but the stateful behavior could be correct and just masked by a bug elsewhere
+        #       if test case is negative, then something is deliberately broken and is likely rejected because of it
+        #       `applied_parameters` may receive blame for other components that are not even present in stateful data at all
+        self.transitions.state[input.transition.id].update(
+            is_success=200 <= response.status_code < 400,
+            applied_parameters=input.applied_parameters,
+        )
 
     def record_step(self, input: StepInput, recorder: ScenarioRecorder) -> None:
         """Record API call input."""

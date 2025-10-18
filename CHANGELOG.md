@@ -436,6 +436,10 @@
 
 ## [4.3.12](https://github.com/schemathesis/schemathesis/compare/v4.3.11...v4.3.12) - 2025-10-25
 
+### :rocket: Added
+
+- Adaptive stateful testing. It learns from response feedback to prioritize valid parameter combinations.
+
 ### :wrench: Changed
 
 - Infer links based on common REST patterns.
@@ -507,6 +511,7 @@
 
 - Setting an empty list to `phases.coverage.unexpected-methods` will disable testing of unexpected HTTP methods.
 - Schema bundler to correctly detect unbreakable indirect recursive cycles instead of failing with `RecursionError`.
+- Add matching required fields from known resources during dependency analysis.
 
 ### :wrench: Changed
 
