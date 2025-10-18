@@ -56,7 +56,7 @@ StrategyFactory = Callable[
 
 @st.composite  # type: ignore
 def openapi_cases(
-    draw: Callable,
+    draw: st.DrawFn,
     *,
     operation: APIOperation,
     hooks: HookDispatcher | None = None,
@@ -116,7 +116,7 @@ def openapi_cases(
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
-            strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config)
+            strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config, draw)
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(
@@ -200,11 +200,15 @@ def openapi_cases(
     return instance
 
 
+OPTIONAL_BODY_RATE = 0.05
+
+
 def _get_body_strategy(
     parameter: OpenApiBody,
     strategy_factory: StrategyFactory,
     operation: APIOperation,
     generation_config: GenerationConfig,
+    draw: st.DrawFn,
 ) -> st.SearchStrategy:
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
@@ -220,7 +224,12 @@ def _get_body_strategy(
         generation_config,
         operation.schema.adapter.jsonschema_validator_cls,
     )
-    if not parameter.is_required:
+    # It is likely will be rejected, hence choose it rarely
+    if (
+        not parameter.is_required
+        and draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
+        < OPTIONAL_BODY_RATE
+    ):
         strategy |= st.just(NOT_SET)
     return strategy
 
@@ -228,7 +237,7 @@ def _get_body_strategy(
 def get_parameters_value(
     value: dict[str, Any] | None,
     location: ParameterLocation,
-    draw: Callable,
+    draw: st.DrawFn,
     operation: APIOperation,
     ctx: HookContext,
     hooks: HookDispatcher | None,
@@ -279,7 +288,7 @@ def generate_parameter(
     location: ParameterLocation,
     explicit: dict[str, Any] | None,
     operation: APIOperation,
-    draw: Callable,
+    draw: st.DrawFn,
     ctx: HookContext,
     hooks: HookDispatcher | None,
     generator: GenerationMode,

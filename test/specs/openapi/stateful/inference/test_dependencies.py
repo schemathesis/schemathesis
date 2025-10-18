@@ -95,7 +95,7 @@ def operation_with_body(
     operation_id=None,
 ):
     op = response(response_status, response_schema)
-    op["requestBody"] = {"content": {"application/json": {"schema": request_body_schema}}}
+    op["requestBody"] = {"content": {"application/json": {"schema": request_body_schema}}, "required": True}
     if parameters:
         op["parameters"] = parameters
     if operation_id:
@@ -1194,7 +1194,8 @@ def snapshot_json(snapshot):
                             "content": {
                                 "application/json": {"schema": component_ref("DeviceDetails")},
                                 "application/xml": {"schema": component_ref("DeviceDetails")},
-                            }
+                            },
+                            "required": True,
                         },
                         "responses": {
                             "201": {
@@ -1231,7 +1232,12 @@ def snapshot_json(snapshot):
                 "/devices": {
                     "post": {
                         "operationId": "createDevice",
-                        "requestBody": {"content": {";invalid/media-type=malformed": {"schema": SCHEMA_WITH_ID}}},
+                        "requestBody": {
+                            "content": {
+                                ";invalid/media-type=malformed": {"schema": SCHEMA_WITH_ID},
+                            },
+                            "required": True,
+                        },
                         "responses": {
                             "201": {
                                 "description": "Device created",
@@ -1383,7 +1389,8 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
                                     "required": ["name", "price"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "201": {
@@ -1423,7 +1430,8 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
                                     "properties": {"name": {"type": "string"}, "price": {"type": "number"}},
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {"204": {"description": "Updated"}, "404": {"description": "Not found"}},
                 },
@@ -1444,9 +1452,9 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
         nonlocal next_id
         data = request.get_json() or {}
         if not isinstance(data, dict):
-            return {"error": "Invalid input"}
+            return {"error": "Invalid input"}, 400
         if not isinstance(data.get("price", 0), (int, float)):
-            return {"error": "Invalid price"}
+            return {"error": "Invalid price"}, 400
 
         product_id = str(next_id)
         next_id += 1
@@ -1492,7 +1500,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 
         data = request.get_json() or {}
         if not isinstance(data, dict):
-            return {"error": "Invalid input"}
+            return {"error": "Invalid input"}, 400
 
         # PATCH with empty body corrupts internal state
         if not data.get("name") and not data.get("price"):
@@ -1546,7 +1554,8 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
                                     "required": ["name"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "201": {
@@ -1559,7 +1568,14 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
             "/orders": {
                 "post": {
                     "operationId": "createOrder",
-                    "requestBody": {"content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}}},
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": ORDER_REQUEST_WITH_CUSTOMER,
+                            }
+                        },
+                        "required": True,
+                    },
                     "responses": {
                         "201": {
                             "description": "Order created",
@@ -1653,7 +1669,8 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
                                     "required": ["name"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "201": {
@@ -1666,7 +1683,14 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
             "/orders": {
                 "post": {
                     "operationId": "createOrder",
-                    "requestBody": {"content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}}},
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": ORDER_REQUEST_WITH_CUSTOMER,
+                            }
+                        },
+                        "required": True,
+                    },
                     "responses": {
                         "201": {
                             "description": "Order created",
@@ -1773,7 +1797,8 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
                                     "required": ["name", "price"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "201": {
@@ -1880,7 +1905,8 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
                                     "required": ["name"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "201": {
@@ -1893,7 +1919,14 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
             "/orders": {
                 "post": {
                     "operationId": "createOrder",
-                    "requestBody": {"content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}}},
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": ORDER_REQUEST_WITH_CUSTOMER,
+                            }
+                        },
+                        "required": True,
+                    },
                     "responses": {
                         "201": {
                             "description": "Order created",
@@ -1986,7 +2019,8 @@ def test_schemathesis_stateful_finds_checksum_match_bug(cli, app_runner, snapsho
                                     "required": ["body"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "201": {
@@ -2024,7 +2058,8 @@ def test_schemathesis_stateful_finds_checksum_match_bug(cli, app_runner, snapsho
                                     "required": ["checksum", "body"],
                                 }
                             }
-                        }
+                        },
+                        "required": True,
                     },
                     "responses": {
                         "204": {"description": "Updated"},
@@ -2125,7 +2160,10 @@ def order_post(
     }
 
     if use_request_body:
-        endpoint["post"]["requestBody"] = {"content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}}}
+        endpoint["post"]["requestBody"] = {
+            "content": {"application/json": {"schema": ORDER_REQUEST_WITH_CUSTOMER}},
+            "required": True,
+        }
     else:
         endpoint["post"]["parameters"] = [
             {"name": parameter_name, "in": parameter_in, "required": True, "schema": {"type": "string"}}
