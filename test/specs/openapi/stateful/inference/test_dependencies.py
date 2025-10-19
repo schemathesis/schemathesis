@@ -2305,6 +2305,127 @@ def link(target_operation, parameters=None, request_body=None, use_ref=False):
             1,
             id="no-existing-links",
         ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            request_body={
+                                "customer_id": "$response.body#/id",
+                                # Additional literal field
+                                "order_type": "standard",
+                            },
+                        )
+                    }
+                ),
+                **order_post(use_request_body=True),
+            },
+            0,
+            id="inferred-subset-of-explicit-link",
+        ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            parameters={
+                                "customer_id": "$response.body#/id",
+                                # Additional parameter
+                                "priority": "high",
+                            },
+                        )
+                    }
+                ),
+                # Inference would only find customer_id
+                **order_post(parameter_in="query"),
+            },
+            0,
+            id="inferred-parameter-subset-of-explicit",
+        ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            parameters={"customer_id": "$response.body#/id"},
+                        )
+                    }
+                ),
+                **order_post(parameter_name="customer_id", parameter_in="query"),
+            },
+            # Would infer the same, exact match
+            0,
+            id="inferred-equals-explicit-parameters",
+        ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            parameters={"customer_id": "$response.body#/id"},
+                            request_body={"order_type": "standard"},
+                        )
+                    }
+                ),
+                # No body inferred
+                **order_post(parameter_name="customer_id", parameter_in="query"),
+            },
+            0,
+            id="empty-inferred-body-is-subset",
+        ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            request_body="$response.body#/customer_data",
+                        )
+                    }
+                ),
+                **order_post(use_request_body=True),
+            },
+            1,
+            id="body-type-mismatch-string-vs-dict",
+        ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            parameters={"customer_id": "$response.body#/id"},
+                            # No request_body specified
+                        )
+                    }
+                ),
+                **order_post(use_request_body=True),
+            },
+            # Inferred link NOT a subset (has body, existing doesn't)
+            1,
+            id="inferred-body-not-subset-of-empty",
+        ),
+        pytest.param(
+            {
+                **customer_post(
+                    links={
+                        "CreateOrder": link(
+                            "createOrder",
+                            # Different source field
+                            request_body={"customer_id": "$response.body#/name"},
+                        )
+                    }
+                ),
+                **order_post(use_request_body=True),
+            },
+            # Inferred link NOT a subset (same key, different value)
+            1,
+            id="body-field-value-mismatch",
+        ),
     ],
 )
 def test_inject_links_deduplication(ctx, schema, expected):

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.stateful.dependencies.inputs import extract_inputs, update_input_field_bindings
@@ -107,9 +108,10 @@ def inject_links(schema: BaseOpenAPISchema) -> int:
         for link_name, definition in response_links.links.items():
             inferred_link = definition.to_openapi()
 
-            # Check if duplicate exists
+            # Check if duplicate / subsets exists
             if normalized_existing:
-                if _normalize_link(inferred_link, schema) in normalized_existing:
+                normalized = _normalize_link(inferred_link, schema)
+                if any(_is_subset_link(normalized, existing) for existing in normalized_existing):
                     continue
 
             # Find unique name if collision exists
@@ -170,3 +172,39 @@ def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, A
         if candidate not in existing_links:
             return candidate
         suffix += 1
+
+
+def _is_subset_link(inferred: NormalizedLink, existing: NormalizedLink) -> bool:
+    """Check if inferred link is a subset of existing link."""
+    # Must target the same operation
+    if inferred.path != existing.path or inferred.method != existing.method:
+        return False
+
+    # Inferred parameters must be subset of existing parameters
+    if not inferred.parameters.issubset(existing.parameters):
+        return False
+
+    # Inferred request body must be subset of existing body
+    return _is_request_body_subset(inferred.request_body, existing.request_body)
+
+
+def _is_request_body_subset(inferred_body: Any, existing_body: Any) -> bool:
+    """Check if inferred body is a subset of existing body."""
+    # Empty inferred body is always a subset
+    if not inferred_body:
+        return True
+
+    # If existing is empty but inferred isn't, not a subset
+    if not existing_body:
+        return False
+
+    # Both must be dicts for subset comparison, otherwise check for equality
+    if not isinstance(inferred_body, dict) or not isinstance(existing_body, dict):
+        return inferred_body == existing_body
+
+    # Check if all inferred fields exist in existing with same values
+    for key, value in inferred_body.items():
+        if existing_body.get(key, NOT_SET) != value:
+            return False
+
+    return True
