@@ -6,6 +6,10 @@
 
 - Add matching required fields from known resources during dependency analysis.
 
+### :bug: Fixed
+
+- Setting an empty list to `phases.coverage.unexpected-methods` will disable testing of unexpected HTTP methods.
+
 ### :wrench: Changed
 
 - Display extraction failures for `requestBody` in explicit links.
