@@ -1,10 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.4...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.5...HEAD) - TBD
 
-### :rocket: Added
-
-- Add matching required fields from known resources during dependency analysis.
+## [4.3.5](https://github.com/schemathesis/schemathesis/compare/v4.3.4...v4.3.5) - 2025-10-19
 
 ### :bug: Fixed
 
@@ -15,6 +13,7 @@
 
 - Display extraction failures for `requestBody` in explicit links.
 - If `requestBody` is optional, choose empty body only in 5% of cases (instead of 50%).
+- Add matching required fields from known resources during dependency analysis.
 - Improve deduplication of inferred links.
 
 ## [4.3.4](https://github.com/schemathesis/schemathesis/compare/v4.3.3...v4.3.4) - 2025-10-17
