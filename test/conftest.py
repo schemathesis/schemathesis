@@ -302,6 +302,7 @@ class CliSnapshotConfig:
     replace_test_cases: bool = True
     replace_phase_statistic: bool = False
     remove_last_line: bool = False
+    replace: bool = True
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> CliSnapshotConfig:
@@ -315,6 +316,8 @@ class CliSnapshotConfig:
         return self.request.getfixturevalue("testdir")
 
     def serialize(self, data: str) -> str:
+        if not self.replace:
+            return data
         if self.replace_test_cases:
             data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated, N skipped", data)
             # Cases with failures and skips
