@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - Setting an empty list to `phases.coverage.unexpected-methods` will disable testing of unexpected HTTP methods.
+- Schema bundler to correctly detect unbreakable indirect recursive cycles instead of failing with `RecursionError`.
 
 ### :wrench: Changed
 

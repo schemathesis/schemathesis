@@ -41,6 +41,7 @@ class Bundler:
             return schema
 
         # Track visited URIs and their local definition names
+        inlining_for_recursion: set[str] = set()
         visited: set[str] = set()
         uri_to_def_name: dict[str, str] = {}
         defs = {}
@@ -90,19 +91,26 @@ class Bundler:
                         # L is the number of levels. Even quadratic growth can be unacceptable for large schemas.
                         #
                         # In the future, it **should** be handled by `hypothesis-jsonschema` instead.
-                        cloned = deepclone(resolved_schema)
-                        remaining_references = sanitize(cloned)
-                        if reference in remaining_references:
-                            # This schema is either infinitely recursive or the sanitization logic misses it
+                        if resolved_uri in inlining_for_recursion:
+                            # Check if we're already trying to inline this schema
+                            # If yes, it means we have an unbreakable cycle
                             cycle = scopes[scopes.index(resolved_uri) :]
                             raise InfiniteRecursiveReference(reference, cycle)
 
-                        result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
-                        # Recursive references need `$ref` to be in them, which is only possible with `dict`
-                        bundled_clone = _bundle_recursive(cloned)
-                        assert isinstance(bundled_clone, dict)
-                        result.update(bundled_clone)
-                        return result
+                        # Track that we're inlining this schema
+                        inlining_for_recursion.add(resolved_uri)
+                        try:
+                            cloned = deepclone(resolved_schema)
+                            # Sanitize to remove optional recursive references
+                            sanitize(cloned)
+
+                            result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
+                            bundled_clone = _bundle_recursive(cloned)
+                            assert isinstance(bundled_clone, dict)
+                            result.update(bundled_clone)
+                            return result
+                        finally:
+                            inlining_for_recursion.discard(resolved_uri)
                     elif resolved_uri not in visited:
                         # Bundle only new schemas
                         visit(resolved_uri)

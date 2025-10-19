@@ -1,6 +1,7 @@
 import pytest
 
 from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle
 from schemathesis.core.jsonschema.bundler import BundleError
 from schemathesis.core.transforms import deepclone
@@ -451,3 +452,41 @@ def test_bundles_open_api_schemas(schema):
     # This is a smoke test, they should be bundled without errors
     resolver = RefResolver.from_schema(deepclone(schema))
     bundle(deepclone(schema), resolver, inline_recursive=True)
+
+
+def test_bundle_infinite_recursive_required_cycle_message():
+    schema = {"$ref": "#/definitions/A"}
+    store = {
+        "definitions": {
+            "A": {
+                "type": "object",
+                "properties": {"b": {"$ref": "#/definitions/B"}},
+                "required": ["b"],  # cannot remove `b` without breaking A
+            },
+            "B": {
+                "type": "object",
+                "properties": {"c": {"$ref": "#/definitions/C"}},
+                "required": ["c"],
+            },
+            "C": {
+                "type": "object",
+                "properties": {"a": {"$ref": "#/definitions/A"}},
+                "required": ["a"],
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    with pytest.raises(InfiniteRecursiveReference) as exc:
+        bundle(schema, resolver, inline_recursive=True)
+
+    assert (
+        str(exc.value)
+        == """Schema `#/definitions/A` has required references forming a cycle:
+
+  #/definitions/A ->
+  #/definitions/B ->
+  #/definitions/C ->
+  #/definitions/A"""
+    )
