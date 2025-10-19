@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1books~1/get",
+    {
+      "GetBook": {
+        "operationRef": "#/paths/~1books~1{id}~1notes/get",
+        "parameters": {
+          "path.id": "$response.body#/0/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

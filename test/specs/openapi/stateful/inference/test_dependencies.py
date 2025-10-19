@@ -378,6 +378,20 @@ def snapshot_json(snapshot):
         ),
         pytest.param(
             {
+                **operation("get", "/books/", "200", component_ref("Books")),
+                **operation("get", "/books/{id}/notes", "200", component_ref("Note")),
+            },
+            {
+                "schemas": {
+                    "Books": {"type": "array", "items": component_ref("Book")},
+                    "Book": SCHEMA_WITH_ID,
+                    "Note": SCHEMA_WITH_ID,
+                }
+            },
+            id="link-from-listing-to-details",
+        ),
+        pytest.param(
+            {
                 **operation(
                     "get",
                     "/channels/{channel_id}/messages",
@@ -1357,6 +1371,27 @@ def test_recursion(ctx, paths, kwargs, version, snapshot_json):
 )
 def test_resource_name_from_path(path, expected):
     assert naming.from_path(path) == expected
+
+
+@pytest.mark.parametrize(
+    ["path", "param_name", "expected"],
+    [
+        pytest.param("/channels/{channel_id}/notes/{id}", "id", "Note", id="id-refers-to-notes"),
+        pytest.param("/channels/{channel_id}/notes/{id}", "channel_id", "Channel", id="channel_id-refers-to-channels"),
+        pytest.param("/users/{user_id}/posts/{post_id}/comments/{id}", "id", "Comment", id="deeply-nested-id"),
+        pytest.param(
+            "/users/{user_id}/posts/{post_id}/comments/{id}", "post_id", "Post", id="deeply-nested-middle-param"
+        ),
+        pytest.param(
+            "/organizations/{org_id}/members", "org_id", "Organization", id="param-without-following-resource"
+        ),
+        pytest.param("/users/{id}", "id", "User", id="simple-path-with-id"),
+        pytest.param("/users/{id}/posts", None, "Post", id="no-param-name-fallback"),
+        pytest.param("/users/{id}/posts/{id}", "nonexistent", "Post", id="param-not-found-fallback"),
+    ],
+)
+def test_resource_name_from_path_with_param(path, param_name, expected):
+    assert naming.from_path(path, param_name) == expected
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

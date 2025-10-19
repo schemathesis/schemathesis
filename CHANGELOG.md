@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.5...HEAD) - TBD
 
+### :wrench: Changed
+
+- Support inference of dependencies from listings to subresources (`GET /orders` -> `GET /orders/{id}/notes`).
+
 ## [4.3.5](https://github.com/schemathesis/schemathesis/compare/v4.3.4...v4.3.5) - 2025-10-19
 
 ### :bug: Fixed

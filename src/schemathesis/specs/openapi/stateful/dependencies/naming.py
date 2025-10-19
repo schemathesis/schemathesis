@@ -4,26 +4,45 @@ from __future__ import annotations
 def from_parameter(parameter: str, path: str) -> str | None:
     # TODO: support other naming patterns
     # Named like "userId" -> look for "User" resource
-    if parameter.endswith("Id"):
+    if parameter.endswith("Id") and len(parameter) > 2:
         return to_pascal_case(parameter[:-2])
     # Named like "user_id" -> look for "User" resource
     elif parameter.endswith("_id"):
         return to_pascal_case(parameter[:-3])
     # Just "id" -> infer from path context
     elif parameter == "id":
-        return from_path(path)
+        return from_path(path, parameter_name=parameter)
     return None
 
 
-def from_path(path: str) -> str | None:
-    segments = [s for s in path.split("/") if s and "{" not in s]
+def from_path(path: str, parameter_name: str | None = None) -> str | None:
+    """Detect resource name from OpenAPI path."""
+    segments = [s for s in path.split("/") if s]
 
     if not segments:
         # API Root
         return None
 
-    singular = to_singular(segments[-1])
-    return to_pascal_case(singular)
+    # If parameter name provided, find the resource it refers to
+    if parameter_name:
+        placeholder = f"{{{parameter_name}}}"
+        try:
+            param_index = segments.index(placeholder)
+            if param_index > 0:
+                resource_segment = segments[param_index - 1]
+                if "{" not in resource_segment:
+                    singular = to_singular(resource_segment)
+                    return to_pascal_case(singular)
+        except ValueError:
+            pass  # Parameter not found in path
+
+    # Fallback to last non-parameter segment
+    non_param_segments = [s for s in segments if "{" not in s]
+    if non_param_segments:
+        singular = to_singular(non_param_segments[-1])
+        return to_pascal_case(singular)
+
+    return None
 
 
 IRREGULAR_TO_PLURAL = {
