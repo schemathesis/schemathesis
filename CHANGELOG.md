@@ -10,6 +10,7 @@
 
 - Display extraction failures for `requestBody` in explicit links.
 - If `requestBody` is optional, choose empty body only in 5% of cases (instead of 50%).
+- Improve deduplication of inferred links.
 
 ## [4.3.4](https://github.com/schemathesis/schemathesis/compare/v4.3.3...v4.3.4) - 2025-10-17
 
