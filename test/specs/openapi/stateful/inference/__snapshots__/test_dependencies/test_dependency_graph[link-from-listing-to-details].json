@@ -1,42 +1,52 @@
 {
   "operations": {
-    "PATCH /comments/{id}/read": {
+    "GET /books/": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Book",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /books/{id}/notes": {
       "inputs": [
         {
           "parameter_location": "path",
           "parameter_name": "id",
-          "resource": "Comment",
+          "resource": "Book",
           "resource_field": "id"
         }
       ],
       "outputs": [
         {
           "cardinality": "ONE",
-          "pointer": "/data",
-          "resource": "Read",
+          "pointer": "/",
+          "resource": "Note",
           "status_code": "200"
         }
       ]
     }
   },
   "resources": {
-    "Comment": {
-      "fields": [
-        "id"
-      ],
-      "types": {}
-    },
-    "Read": {
+    "Book": {
       "fields": [
         "id"
       ],
       "types": {
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
+          "string"
+        ]
+      }
+    },
+    "Note": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
           "string"
         ]
       }
