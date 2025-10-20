@@ -70,14 +70,14 @@ KNOWN_FIELDLESS_RESOURCES = {
             "Incident",
             "Standing",
             "Videogame",
+            "LeagueVideogame",
+            "CurrentVideogame",
         ]
     ),
     "ably.io/platform/1.1.0.json": frozenset(
         [
             # This one has an empty schema
             "Stat",
-            # This is an array of numbers
-            "Time",
         ]
     ),
     "amazonaws.com/entityresolution/2018-05-10.json": frozenset(
@@ -86,12 +86,6 @@ KNOWN_FIELDLESS_RESOURCES = {
             "TagMap",
             "TagResourceOutput",
             "UntagResourceOutput",
-        ]
-    ),
-    "collegefootballdata.com/4.4.12.json": frozenset(
-        [
-            # A simple string
-            "Category",
         ]
     ),
     "digitallocker.gov.in/authpartner/1.0.0.json": frozenset(

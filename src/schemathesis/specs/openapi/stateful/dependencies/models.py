@@ -58,7 +58,7 @@ class DependencyGraph:
                     links: dict[str, LinkDefinition] = {}
                     for input_slot in consumer.inputs:
                         if input_slot.resource is output_slot.resource:
-                            body_pointer = build_response_body_pointer(
+                            body_pointer = extend_pointer(
                                 output_slot.pointer, input_slot.resource_field, output_slot.cardinality
                             )
                             link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
@@ -127,14 +127,14 @@ class DependencyGraph:
                     raise AssertionError(message)
 
 
-def build_response_body_pointer(pointer: str, field: str, cardinality: Cardinality) -> str:
-    if not pointer.endswith("/"):
-        pointer += "/"
+def extend_pointer(base: str, field: str, cardinality: Cardinality) -> str:
+    if not base.endswith("/"):
+        base += "/"
     if cardinality == Cardinality.MANY:
         # For arrays, reference first element: /data → /data/0
-        pointer += "0/"
-    pointer += encode_pointer(field)
-    return pointer
+        base += "0/"
+    base += encode_pointer(field)
+    return base
 
 
 @dataclass
