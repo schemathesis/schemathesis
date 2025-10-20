@@ -6,6 +6,11 @@
 
 - Properly fix an empty list to `phases.coverage.unexpected-methods` disabling testing of unexpected HTTP methods.
 
+### :wrench: Changed
+
+- Infer subresource dependencies in responses.
+- Avoid creating resources that are not objects.
+
 ## [4.3.6](https://github.com/schemathesis/schemathesis/compare/v4.3.5...v4.3.6) - 2025-10-20
 
 ### :wrench: Changed
