@@ -2074,6 +2074,41 @@ def test_avoid_testing_unexpected_methods(ctx):
     assert not methods
 
 
+@pytest.mark.openapi_version("3.0")
+def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli, openapi3_base_url):
+    raw_schema = {
+        "/foo": {
+            "post": {
+                "parameters": [{"in": "query", "name": "key", "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            },
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            },
+        }
+    }
+    schema_path = ctx.openapi.write_schema(raw_schema)
+
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "--checks=unsupported_method",
+            f"--url={openapi3_base_url}",
+            "--phases=coverage",
+            "--mode=negative",
+            config={
+                "phases": {
+                    "coverage": {
+                        "unexpected-methods": [],
+                    }
+                },
+            },
+        )
+        == snapshot_cli
+    )
+
+
 def test_missing_authorization(ctx, cli, snapshot_cli, openapi3_base_url):
     # The reproduction code should not contain auth if it is explicitly specified
     schema_path = ctx.openapi.write_schema(
@@ -2175,10 +2210,6 @@ def _request_body(inner):
             }
         }
     }
-
-
-def _schemas(inner):
-    return {}
 
 
 @pytest.mark.parametrize(
