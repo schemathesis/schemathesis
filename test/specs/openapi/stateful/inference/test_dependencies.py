@@ -1264,6 +1264,28 @@ def snapshot_json(snapshot):
             None,
             id="requestbody-invalid-media-type-key",
         ),
+        pytest.param(
+            {
+                **operation("post", "/orders", "201", component_ref("Order"), operation_id="createOrder"),
+                **operation("get", "/users/{userId}", "200", component_ref("User"), [path_param("userId")]),
+            },
+            {
+                "schemas": {
+                    "User": SCHEMA_WITH_ID,
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "user": component_ref("User"),
+                            "another": True,
+                            "total": {"type": "number"},
+                        },
+                        "required": ["id", "user", "total"],
+                    },
+                }
+            },
+            id="subresource-extraction-nested-ref",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

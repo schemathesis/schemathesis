@@ -13,14 +13,7 @@
     },
     "GET /oauth2/1/file/{uri}": {
       "inputs": [],
-      "outputs": [
-        {
-          "cardinality": "ONE",
-          "pointer": "/",
-          "resource": "File",
-          "status_code": "200"
-        }
-      ]
+      "outputs": []
     },
     "GET /oauth2/1/files/": {
       "inputs": [],

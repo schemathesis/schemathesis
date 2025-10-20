@@ -45,6 +45,12 @@
           "pointer": "/",
           "resource": "ChannelDetails",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/status",
+          "resource": "ChannelStatus",
+          "status_code": "200"
         }
       ]
     },
@@ -110,19 +116,18 @@
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
+          "status_code": "2XX"
         }
       ]
     },
     "GET /push/channels": {
       "inputs": [],
-      "outputs": [
-        {
-          "cardinality": "MANY",
-          "pointer": "/",
-          "resource": "Channel",
-          "status_code": "2XX"
-        }
-      ]
+      "outputs": []
     },
     "GET /push/deviceRegistrations": {
       "inputs": [],
@@ -131,6 +136,12 @@
           "cardinality": "ONE",
           "pointer": "/",
           "resource": "DeviceDetails",
+          "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
           "status_code": "2XX"
         }
       ]
@@ -150,6 +161,12 @@
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
+          "status_code": "2XX"
         }
       ]
     },
@@ -168,6 +185,12 @@
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
+          "status_code": "2XX"
         }
       ]
     },
@@ -184,14 +207,7 @@
     },
     "GET /time": {
       "inputs": [],
-      "outputs": [
-        {
-          "cardinality": "MANY",
-          "pointer": "/",
-          "resource": "Time",
-          "status_code": "2XX"
-        }
-      ]
+      "outputs": []
     },
     "PATCH /push/deviceRegistrations/{device_id}": {
       "inputs": [
@@ -219,6 +235,12 @@
           "cardinality": "ONE",
           "pointer": "/",
           "resource": "DeviceDetails",
+          "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
           "status_code": "2XX"
         }
       ]
@@ -295,6 +317,12 @@
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
+          "status_code": "2XX"
         }
       ]
     },
@@ -329,6 +357,12 @@
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/push.recipient",
+          "resource": "Recipient",
+          "status_code": "2XX"
         }
       ]
     }
@@ -358,6 +392,25 @@
           "string"
         ],
         "status": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "ChannelStatus": {
+      "fields": [
+        "isActive",
+        "occupancy"
+      ],
+      "types": {
+        "isActive": [
+          "boolean"
+        ],
+        "occupancy": [
           "array",
           "boolean",
           "null",
@@ -520,11 +573,33 @@
         ]
       }
     },
-    "Stat": {
-      "fields": [],
-      "types": {}
+    "Recipient": {
+      "fields": [
+        "clientId",
+        "deviceId",
+        "deviceToken",
+        "registrationToken",
+        "transportType"
+      ],
+      "types": {
+        "clientId": [
+          "string"
+        ],
+        "deviceId": [
+          "string"
+        ],
+        "deviceToken": [
+          "string"
+        ],
+        "registrationToken": [
+          "string"
+        ],
+        "transportType": [
+          "string"
+        ]
+      }
     },
-    "Time": {
+    "Stat": {
       "fields": [],
       "types": {}
     },

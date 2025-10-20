@@ -15,6 +15,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     DefinitionSource,
     ResourceDefinition,
     ResourceMap,
+    extend_pointer,
 )
 from schemathesis.specs.openapi.stateful.dependencies.naming import from_path
 from schemathesis.specs.openapi.stateful.dependencies.schemas import (
@@ -144,6 +145,27 @@ def iter_resources_from_response(
         else:
             pointer = unwrapped.pointer
         yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
+        # Look for sub-resources
+        properties = unwrapped.schema.get("properties")
+        if isinstance(properties, dict):
+            for field, subschema in properties.items():
+                if isinstance(subschema, dict):
+                    reference = subschema.get("$ref")
+                    if isinstance(reference, str):
+                        result = _extract_resource_and_cardinality(
+                            schema=subschema,
+                            path=path,
+                            resources=resources,
+                            updated_resources=updated_resources,
+                            resolver=resolver,
+                            parent_ref=reference,
+                        )
+                        if result is not None:
+                            subresource, cardinality = result
+                            subresource_pointer = extend_pointer(pointer, field, cardinality=cardinality)
+                            yield ExtractedResource(
+                                resource=subresource, cardinality=cardinality, pointer=subresource_pointer
+                            )
 
 
 def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: RefResolver) -> str | None:
@@ -263,6 +285,10 @@ def _extract_resource_from_schema(
 
     if resource is None or resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
         _, resolved = maybe_resolve(schema, resolver, "")
+
+        if "type" in resolved and resolved["type"] != "object" and "properties" not in resolved:
+            # Skip strings, etc
+            return None
 
         properties = resolved.get("properties")
         if properties:

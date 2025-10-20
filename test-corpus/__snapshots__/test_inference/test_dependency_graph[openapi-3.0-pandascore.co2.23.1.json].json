@@ -63,6 +63,12 @@
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/videogame",
+          "resource": "LeagueVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -195,6 +201,42 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -293,6 +335,18 @@
           "cardinality": "ONE",
           "pointer": "/",
           "resource": "Serie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -481,6 +535,24 @@
           "pointer": "/",
           "resource": "Tournament",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "pointer": "/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -618,6 +690,312 @@
     }
   },
   "resources": {
+    "BaseLeague": {
+      "fields": [
+        "id",
+        "image_url",
+        "modified_at",
+        "name",
+        "slug",
+        "url"
+      ],
+      "types": {
+        "id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "image_url": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "modified_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "name": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "slug": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "url": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "BaseSerie": {
+      "fields": [
+        "begin_at",
+        "description",
+        "end_at",
+        "full_name",
+        "id",
+        "league_id",
+        "modified_at",
+        "name",
+        "season",
+        "slug",
+        "tier",
+        "winner_id",
+        "winner_type",
+        "year"
+      ],
+      "types": {
+        "begin_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "description": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "end_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "full_name": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "league_id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "modified_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "name": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "season": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "slug": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "tier": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "winner_id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "winner_type": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "year": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "BaseTournament": {
+      "fields": [
+        "begin_at",
+        "end_at",
+        "id",
+        "league_id",
+        "live_supported",
+        "modified_at",
+        "name",
+        "prizepool",
+        "serie_id",
+        "slug",
+        "winner_id",
+        "winner_type"
+      ],
+      "types": {
+        "begin_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "end_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "league_id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "live_supported": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "modified_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "name": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "prizepool": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "serie_id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "slug": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "winner_id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "winner_type": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
     "Bracket": {
       "fields": [
         "begin_at",
@@ -849,6 +1227,10 @@
         ]
       }
     },
+    "CurrentVideogame": {
+      "fields": [],
+      "types": {}
+    },
     "DeletionIncident": {
       "fields": [
         "change_type",
@@ -981,6 +1363,10 @@
           "string"
         ]
       }
+    },
+    "LeagueVideogame": {
+      "fields": [],
+      "types": {}
     },
     "Live": {
       "fields": [
@@ -1318,6 +1704,72 @@
           "string"
         ],
         "winner_id": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "MatchLive": {
+      "fields": [
+        "opens_at",
+        "supported",
+        "url"
+      ],
+      "types": {
+        "opens_at": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "supported": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "url": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "MatchLocalizedStreams": {
+      "fields": [
+        "english",
+        "official",
+        "russian"
+      ],
+      "types": {
+        "english": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "official": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "russian": [
           "array",
           "boolean",
           "null",
