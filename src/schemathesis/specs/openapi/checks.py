@@ -14,7 +14,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.generation.meta import CoveragePhaseData, TestPhase
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -227,9 +227,27 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
     ):
+        extra_info = ""
+        phase = case.meta.phase
+        if phase and phase.name == TestPhase.COVERAGE and isinstance(phase.data, CoveragePhaseData):
+            parts: list[str] = []
+            if "Missing" in phase.data.description:
+                extra_info = f"\nInvalid component: {phase.data.description}"
+            else:
+                if phase.data.parameter:
+                    parts.append(f"parameter `{phase.data.parameter}`")
+                location = phase.data.parameter_location
+                if location:
+                    parts.append(f"in {location.name.lower()}")
+                description = phase.data.description.lower()
+                if parts:
+                    parts.append(f"({description})")
+                else:
+                    parts.append(f"{description}")
+                extra_info = "\nInvalid component: " + " ".join(parts)
         raise AcceptedNegativeData(
             operation=case.operation.label,
-            message=f"Invalid data should have been rejected\nExpected: {', '.join(config.expected_statuses)}",
+            message=f"Invalid data should have been rejected\nExpected: {', '.join(config.expected_statuses)}{extra_info}",
             status_code=response.status_code,
             expected_statuses=config.expected_statuses,
         )
