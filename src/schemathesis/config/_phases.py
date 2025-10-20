@@ -102,7 +102,7 @@ class CoveragePhaseConfig(DiffBase):
     ) -> None:
         self.enabled = enabled
         self.generate_duplicate_query_parameters = generate_duplicate_query_parameters
-        self.unexpected_methods = unexpected_methods or DEFAULT_UNEXPECTED_METHODS
+        self.unexpected_methods = unexpected_methods if unexpected_methods is not None else DEFAULT_UNEXPECTED_METHODS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
         self._is_default = (

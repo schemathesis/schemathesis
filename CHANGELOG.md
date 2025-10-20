@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.6...HEAD) - TBD
 
+### :bug: Fixed
+
+- Properly fix an empty list to `phases.coverage.unexpected-methods` disabling testing of unexpected HTTP methods.
+
 ## [4.3.6](https://github.com/schemathesis/schemathesis/compare/v4.3.5...v4.3.6) - 2025-10-20
 
 ### :wrench: Changed
