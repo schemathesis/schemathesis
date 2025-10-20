@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping
 
 from schemathesis import transport
-from schemathesis.checks import CHECKS, CheckContext, CheckFunction, run_checks
+from schemathesis.checks import CHECKS, CheckContext, CheckFunction, load_all_checks, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.transport import Response
@@ -250,6 +250,10 @@ class Case:
         """
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
+
+        # In some cases checks may not be loaded.
+        # For example - non-Schemathesis tests that manually construct `Case` instances
+        load_all_checks()
 
         response = Response.from_any(response)
 

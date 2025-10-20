@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Properly fix an empty list to `phases.coverage.unexpected-methods` disabling testing of unexpected HTTP methods.
+- Import all checks inside `Case.validate_response`. It is relevant for manually constructing `Case` instances outside of Schemathesis tests. [#3184](https://github.com/schemathesis/schemathesis/discussions/3184)
 
 ### :wrench: Changed
 
