@@ -1,131 +1,463 @@
 {
   "operations": {
     "DELETE /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessageSubscriptions/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ResourceSid",
+          "resource": "Resource",
+          "resource_field": "ResourceSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "MessageSid",
+          "resource": "Message",
+          "resource_field": "MessageSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "RecordingSid",
+          "resource": "Recording",
+          "resource_field": "RecordingSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ReferenceSid",
+          "resource": "Reference",
+          "resource_field": "ReferenceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "AddOnResultSid",
+          "resource": "AddOnResult",
+          "resource_field": "AddOnResultSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ReferenceSid",
+          "resource": "Reference",
+          "resource_field": "ReferenceSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Transcriptions/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "DELETE /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": []
     },
     "GET /2010-04-01/Accounts.json": {
@@ -140,7 +472,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Addresses.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -151,18 +490,38 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Addresses/{AddressSid}/DependentPhoneNumbers.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "AddressSid",
+          "resource": "Address",
+          "resource_field": "AddressSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Dependentphonenumbers.json",
+          "resource": "DependentPhoneNumbers.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -173,7 +532,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Applications.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -184,7 +550,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -195,18 +568,38 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AuthorizedConnectApps.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Authorizedconnectapps.json",
+          "resource": "AuthorizedConnectApps.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AuthorizedConnectApps/{ConnectAppSid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConnectAppSid",
+          "resource": "ConnectApp",
+          "resource_field": "ConnectAppSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -217,18 +610,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Availablephonenumbers.json",
+          "resource": "AvailablePhoneNumbers.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -239,7 +646,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Local.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -250,18 +664,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/MachineToMachine.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Machinetomachine.json",
+          "resource": "MachineToMachine.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Mobile.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -272,7 +700,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/National.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -283,29 +718,50 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/SharedCost.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Sharedcost.json",
+          "resource": "SharedCost.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/TollFree.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Tollfree.json",
+          "resource": "TollFree.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Voip.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -316,7 +772,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Balance.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -327,7 +790,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -338,7 +808,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Events.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -349,7 +832,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Notifications.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -360,7 +856,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Notifications/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -371,7 +880,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -382,7 +904,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -393,7 +928,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -404,7 +946,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -415,7 +964,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -426,7 +988,26 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -437,7 +1018,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -448,7 +1042,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -459,7 +1066,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -470,18 +1084,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/ConnectApps.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Connectapps.json",
+          "resource": "ConnectApps.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -492,18 +1120,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Incomingphonenumbers.json",
+          "resource": "IncomingPhoneNumbers.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Local.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -514,7 +1156,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Mobile.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -525,29 +1174,68 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/TollFree.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Tollfree.json",
+          "resource": "TollFree.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ResourceSid",
+          "resource": "Resource",
+          "resource_field": "ResourceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Assignedaddons.json",
+          "resource": "AssignedAddOns.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{AssignedAddOnSid}/Extensions.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ResourceSid",
+          "resource": "Resource",
+          "resource_field": "ResourceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "AssignedAddOnSid",
+          "resource": "AssignedAddOn",
+          "resource_field": "AssignedAddOnSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -558,7 +1246,26 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{AssignedAddOnSid}/Extensions/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ResourceSid",
+          "resource": "Resource",
+          "resource_field": "ResourceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "AssignedAddOnSid",
+          "resource": "AssignedAddOn",
+          "resource_field": "AssignedAddOnSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -569,7 +1276,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ResourceSid",
+          "resource": "Resource",
+          "resource_field": "ResourceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -580,7 +1300,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -591,7 +1318,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Keys.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -602,7 +1336,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -613,7 +1354,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Messages.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -624,7 +1372,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "MessageSid",
+          "resource": "Message",
+          "resource_field": "MessageSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -635,7 +1396,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "MessageSid",
+          "resource": "Message",
+          "resource_field": "MessageSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -646,7 +1420,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -657,7 +1438,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Notifications.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -668,7 +1456,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Notifications/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -679,18 +1474,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Outgoingcallerids.json",
+          "resource": "OutgoingCallerIds.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -701,7 +1510,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Queues.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -712,7 +1528,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "QueueSid",
+          "resource": "Queue",
+          "resource_field": "QueueSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -723,7 +1552,26 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members/{CallSid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "QueueSid",
+          "resource": "Queue",
+          "resource_field": "QueueSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -734,7 +1582,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -745,7 +1600,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -756,7 +1618,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "RecordingSid",
+          "resource": "Recording",
+          "resource_field": "RecordingSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -767,7 +1642,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "RecordingSid",
+          "resource": "Recording",
+          "resource_field": "RecordingSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -778,18 +1666,50 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ReferenceSid",
+          "resource": "Reference",
+          "resource_field": "ReferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Addonresults.json",
+          "resource": "AddOnResults.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ReferenceSid",
+          "resource": "Reference",
+          "resource_field": "ReferenceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "AddOnResultSid",
+          "resource": "AddOnResult",
+          "resource_field": "AddOnResultSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -800,7 +1720,26 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ReferenceSid",
+          "resource": "Reference",
+          "resource_field": "ReferenceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "AddOnResultSid",
+          "resource": "AddOnResult",
+          "resource_field": "AddOnResultSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -811,7 +1750,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ReferenceSid",
+          "resource": "Reference",
+          "resource_field": "ReferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -822,7 +1774,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -833,18 +1792,38 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Credentiallists.json",
+          "resource": "CredentialLists.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -855,7 +1834,20 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -866,7 +1858,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -877,7 +1876,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -888,18 +1894,44 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Credentiallistmappings.json",
+          "resource": "CredentialListMappings.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -910,18 +1942,44 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Ipaccesscontrollistmappings.json",
+          "resource": "IpAccessControlListMappings.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -932,18 +1990,44 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Credentiallistmappings.json",
+          "resource": "CredentialListMappings.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -954,18 +2038,44 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Credentiallistmappings.json",
+          "resource": "CredentialListMappings.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -976,18 +2086,44 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Ipaccesscontrollistmappings.json",
+          "resource": "IpAccessControlListMappings.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -998,7 +2134,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1009,29 +2152,62 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Ipaccesscontrollists.json",
+          "resource": "IpAccessControlLists.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Ipaddresses.json",
+          "resource": "IpAddresses.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1042,7 +2218,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1053,18 +2236,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Shortcodes.json",
+          "resource": "ShortCodes.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1075,18 +2272,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SigningKeys.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Signingkeys.json",
+          "resource": "SigningKeys.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1097,7 +2308,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Transcriptions.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1108,7 +2326,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Transcriptions/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1119,7 +2344,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1130,18 +2362,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/AllTime.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Alltime.json",
+          "resource": "AllTime.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Daily.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1152,18 +2398,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/LastMonth.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Lastmonth.json",
+          "resource": "LastMonth.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Monthly.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1174,18 +2434,32 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/ThisMonth.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "pointer": "/",
-          "resource": "Thismonth.json",
+          "resource": "ThisMonth.json",
           "status_code": "200"
         }
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Today.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1196,7 +2470,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Yearly.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1207,7 +2488,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Yesterday.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1218,7 +2506,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Triggers.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1229,7 +2524,14 @@
       ]
     },
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1273,7 +2575,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Addresses.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1284,7 +2593,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1295,7 +2611,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Applications.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1306,7 +2629,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1317,7 +2647,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1328,7 +2665,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Payments.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1339,7 +2689,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Payments/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1350,7 +2713,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1361,7 +2737,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1372,7 +2761,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Siprec.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1383,7 +2785,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Siprec/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1394,7 +2809,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Streams.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1405,7 +2833,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Streams/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1416,7 +2857,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessageSubscriptions.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1427,7 +2881,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessages.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1438,7 +2905,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1449,7 +2923,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1460,7 +2947,26 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1471,7 +2977,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1482,7 +3001,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1493,7 +3019,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1504,7 +3037,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1515,7 +3055,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Local.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1526,7 +3073,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Mobile.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1537,7 +3091,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/TollFree.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1548,7 +3109,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "ResourceSid",
+          "resource": "Resource",
+          "resource_field": "ResourceSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1559,7 +3133,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1570,7 +3151,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Keys.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1581,7 +3169,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1592,7 +3187,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Messages.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1603,7 +3205,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Feedback.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "MessageSid",
+          "resource": "Message",
+          "resource_field": "MessageSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1614,7 +3229,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1625,7 +3247,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1636,7 +3265,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1647,7 +3283,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Queues.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1658,7 +3301,26 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members/{CallSid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "QueueSid",
+          "resource": "Queue",
+          "resource_field": "QueueSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1669,7 +3331,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1680,7 +3349,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1691,7 +3367,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1702,7 +3391,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "CredentialListSid",
+          "resource": "CredentialList",
+          "resource_field": "CredentialListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1713,7 +3415,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1724,7 +3433,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1735,7 +3451,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1746,7 +3475,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1757,7 +3499,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1768,7 +3523,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1779,7 +3547,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "DomainSid",
+          "resource": "Domain",
+          "resource_field": "DomainSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1790,7 +3571,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1801,7 +3589,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1812,7 +3607,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1823,7 +3631,20 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "IpAccessControlListSid",
+          "resource": "IpAccessControlList",
+          "resource_field": "IpAccessControlListSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1834,7 +3655,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1845,7 +3673,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1856,7 +3691,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SigningKeys.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1867,7 +3709,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1878,7 +3727,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Tokens.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1889,7 +3745,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Usage/Triggers.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1900,7 +3763,14 @@
       ]
     },
     "POST /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "AccountSid",
+          "resource": "Account",
+          "resource_field": "AccountSid"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -1923,6 +3793,12 @@
     }
   },
   "resources": {
+    "Account": {
+      "fields": [
+        "AccountSid"
+      ],
+      "types": {}
+    },
     "Accounts.json": {
       "fields": [
         "accounts",
@@ -1965,7 +3841,13 @@
         ]
       }
     },
-    "Addonresults.json": {
+    "AddOnResult": {
+      "fields": [
+        "AddOnResultSid"
+      ],
+      "types": {}
+    },
+    "AddOnResults.json": {
       "fields": [
         "add_on_results",
         "end",
@@ -2006,6 +3888,12 @@
           "string"
         ]
       }
+    },
+    "Address": {
+      "fields": [
+        "AddressSid"
+      ],
+      "types": {}
     },
     "Addresses.json": {
       "fields": [
@@ -2049,7 +3937,7 @@
         ]
       }
     },
-    "Alltime.json": {
+    "AllTime.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -2133,7 +4021,13 @@
         ]
       }
     },
-    "Assignedaddons.json": {
+    "AssignedAddOn": {
+      "fields": [
+        "AssignedAddOnSid"
+      ],
+      "types": {}
+    },
+    "AssignedAddOns.json": {
       "fields": [
         "assigned_add_ons",
         "end",
@@ -2175,7 +4069,7 @@
         ]
       }
     },
-    "Authorizedconnectapps.json": {
+    "AuthorizedConnectApps.json": {
       "fields": [
         "authorized_connect_apps",
         "end",
@@ -2217,7 +4111,7 @@
         ]
       }
     },
-    "Availablephonenumbers.json": {
+    "AvailablePhoneNumbers.json": {
       "fields": [
         "countries",
         "end",
@@ -2258,6 +4152,12 @@
           "string"
         ]
       }
+    },
+    "Call": {
+      "fields": [
+        "CallSid"
+      ],
+      "types": {}
     },
     "Calls.json": {
       "fields": [
@@ -2301,6 +4201,12 @@
         ]
       }
     },
+    "Conference": {
+      "fields": [
+        "ConferenceSid"
+      ],
+      "types": {}
+    },
     "Conferences.json": {
       "fields": [
         "conferences",
@@ -2343,7 +4249,13 @@
         ]
       }
     },
-    "Connectapps.json": {
+    "ConnectApp": {
+      "fields": [
+        "ConnectAppSid"
+      ],
+      "types": {}
+    },
+    "ConnectApps.json": {
       "fields": [
         "connect_apps",
         "end",
@@ -2385,7 +4297,13 @@
         ]
       }
     },
-    "Credentiallistmappings.json": {
+    "CredentialList": {
+      "fields": [
+        "CredentialListSid"
+      ],
+      "types": {}
+    },
+    "CredentialListMappings.json": {
       "fields": [
         "contents",
         "end",
@@ -2427,7 +4345,7 @@
         ]
       }
     },
-    "Credentiallists.json": {
+    "CredentialLists.json": {
       "fields": [
         "credential_lists",
         "end",
@@ -2553,7 +4471,7 @@
         ]
       }
     },
-    "Dependentphonenumbers.json": {
+    "DependentPhoneNumbers.json": {
       "fields": [
         "dependent_phone_numbers",
         "end",
@@ -2594,6 +4512,12 @@
           "string"
         ]
       }
+    },
+    "Domain": {
+      "fields": [
+        "DomainSid"
+      ],
+      "types": {}
     },
     "Domains.json": {
       "fields": [
@@ -2731,7 +4655,7 @@
         ]
       }
     },
-    "Incomingphonenumbers.json": {
+    "IncomingPhoneNumbers.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -2773,7 +4697,13 @@
         ]
       }
     },
-    "Ipaccesscontrollistmappings.json": {
+    "IpAccessControlList": {
+      "fields": [
+        "IpAccessControlListSid"
+      ],
+      "types": {}
+    },
+    "IpAccessControlListMappings.json": {
       "fields": [
         "contents",
         "end",
@@ -2815,7 +4745,7 @@
         ]
       }
     },
-    "Ipaccesscontrollists.json": {
+    "IpAccessControlLists.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -2857,7 +4787,7 @@
         ]
       }
     },
-    "Ipaddresses.json": {
+    "IpAddresses.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -2941,7 +4871,7 @@
         ]
       }
     },
-    "Lastmonth.json": {
+    "LastMonth.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -3025,7 +4955,7 @@
         ]
       }
     },
-    "Machinetomachine.json": {
+    "MachineToMachine.json": {
       "fields": [
         "available_phone_numbers",
         "end",
@@ -3150,6 +5080,12 @@
           "string"
         ]
       }
+    },
+    "Message": {
+      "fields": [
+        "MessageSid"
+      ],
+      "types": {}
     },
     "Messages.json": {
       "fields": [
@@ -3361,7 +5297,7 @@
         ]
       }
     },
-    "Outgoingcallerids.json": {
+    "OutgoingCallerIds.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -3487,6 +5423,12 @@
         ]
       }
     },
+    "Queue": {
+      "fields": [
+        "QueueSid"
+      ],
+      "types": {}
+    },
     "Queues.json": {
       "fields": [
         "end",
@@ -3528,6 +5470,12 @@
           "string"
         ]
       }
+    },
+    "Recording": {
+      "fields": [
+        "RecordingSid"
+      ],
+      "types": {}
     },
     "Recordings.json": {
       "fields": [
@@ -3613,7 +5561,19 @@
         ]
       }
     },
-    "Sharedcost.json": {
+    "Reference": {
+      "fields": [
+        "ReferenceSid"
+      ],
+      "types": {}
+    },
+    "Resource": {
+      "fields": [
+        "ResourceSid"
+      ],
+      "types": {}
+    },
+    "SharedCost.json": {
       "fields": [
         "available_phone_numbers",
         "end",
@@ -3655,7 +5615,7 @@
         ]
       }
     },
-    "Shortcodes.json": {
+    "ShortCodes.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -3697,7 +5657,7 @@
         ]
       }
     },
-    "Signingkeys.json": {
+    "SigningKeys.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -3739,7 +5699,7 @@
         ]
       }
     },
-    "Thismonth.json": {
+    "ThisMonth.json": {
       "fields": [
         "end",
         "first_page_uri",
@@ -3823,7 +5783,7 @@
         ]
       }
     },
-    "Tollfree.json": {
+    "TollFree.json": {
       "fields": [
         "available_phone_numbers",
         "end",

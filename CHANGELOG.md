@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.9...HEAD) - TBD
 
+### :wrench: Changed
+
+- Improve resources inference.
+
 ## [4.3.9](https://github.com/schemathesis/schemathesis/compare/v4.3.8...v4.3.9) - 2025-10-21
 
 ### :bug: Fixed
