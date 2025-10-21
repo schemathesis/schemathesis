@@ -4,6 +4,31 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
 
 
 @pytest.mark.parametrize(
+    ["parameter", "path", "expected"],
+    [
+        ("id", "/users/{id}", "User"),
+        ("ID", "/accounts/{ID}", "Account"),
+        ("userId", "/users/{userId}", "User"),
+        ("accountUuid", "/accounts/{accountUuid}", "Account"),
+        ("Uuid", "/accounts/{accountUuid}", None),
+        ("sessionGuid", "/sessions/{sessionGuid}", "Session"),
+        ("user_id", "/users/{user_id}", "User"),
+        ("account_uuid", "/accounts/{account_uuid}", "Account"),
+        ("_uuid", "/accounts/{account_uuid}", None),
+        ("session-guid", "/sessions/{session-guid}", "Session"),
+        ("messageSid", "/messages/{messageSid}", "Message"),
+        ("Sid", "/messages/{messageSid}", None),
+        ("id", "/users/{id}", "User"),
+        ("_id", "/users/{_id}", None),
+        ("uid", "/users/{uid}", None),
+        ("someRandom", "/users/{someRandom}", None),
+    ],
+)
+def test_from_parameter(parameter, path, expected):
+    assert naming.from_parameter(parameter, path) == expected
+
+
+@pytest.mark.parametrize(
     ["word", "expected"],
     [
         ("a", "a"),
@@ -120,6 +145,28 @@ def test_to_singular(word, expected):
 )
 def test_to_plural(word, expected):
     assert naming.to_plural(word) == expected
+
+
+@pytest.mark.parametrize(
+    ["text", "expected"],
+    [
+        ("user_id", "UserId"),
+        ("api_key", "ApiKey"),
+        ("sip_trunk", "SipTrunk"),
+        ("user-id", "UserId"),
+        ("api-key", "ApiKey"),
+        ("sipTrunk", "SipTrunk"),
+        ("userId", "UserId"),
+        ("accountHolder", "AccountHolder"),
+        ("UserProfile", "UserProfile"),
+        ("SipTrunk", "SipTrunk"),
+        ("API", "API"),
+        ("userID", "UserID"),
+        ("user", "User"),
+    ],
+)
+def test_to_pascal_case(text, expected):
+    assert naming.to_pascal_case(text) == expected
 
 
 @pytest.mark.parametrize(

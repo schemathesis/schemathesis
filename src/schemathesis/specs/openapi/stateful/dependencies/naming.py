@@ -2,16 +2,35 @@ from __future__ import annotations
 
 
 def from_parameter(parameter: str, path: str) -> str | None:
-    # TODO: support other naming patterns
-    # Named like "userId" -> look for "User" resource
-    if parameter.endswith("Id") and len(parameter) > 2:
-        return to_pascal_case(parameter[:-2])
-    # Named like "user_id" -> look for "User" resource
-    elif parameter.endswith("_id"):
-        return to_pascal_case(parameter[:-3])
-    # Just "id" -> infer from path context
-    elif parameter == "id":
+    parameter = parameter.strip()
+    lower = parameter.lower()
+
+    if lower == "id":
         return from_path(path, parameter_name=parameter)
+
+    # Capital-sensitive
+    capital_suffixes = ("Id", "Uuid", "Guid")
+    for suffix in capital_suffixes:
+        if parameter.endswith(suffix):
+            prefix = parameter[: -len(suffix)]
+            if len(prefix) >= 2:
+                return to_pascal_case(prefix)
+
+    # Snake_case (case-insensitive is fine here)
+    snake_suffixes = ("_guid", "_uuid", "_id", "-guid", "-uuid", "-id")
+    for suffix in snake_suffixes:
+        if lower.endswith(suffix):
+            prefix = parameter[: -len(suffix)]
+            if len(prefix) >= 2:
+                return to_pascal_case(prefix)
+
+    # Special cases that need exact match
+    # Twilio-style, capital S
+    if parameter.endswith("Sid"):
+        prefix = parameter[:-3]
+        if len(prefix) >= 2:
+            return to_pascal_case(prefix)
+
     return None
 
 
@@ -335,8 +354,12 @@ def to_plural(word: str) -> str:
 
 
 def to_pascal_case(text: str) -> str:
-    parts = text.replace("-", "_").split("_")
-    return "".join(word.capitalize() for word in parts if word)
+    # snake_case/kebab-case - split and capitalize each word
+    if "_" in text or "-" in text:
+        parts = text.replace("-", "_").split("_")
+        return "".join(word.capitalize() for word in parts if word)
+    # camelCase - just uppercase first letter, preserve the rest
+    return text[0].upper() + text[1:] if text else text
 
 
 def to_snake_case(text: str) -> str:

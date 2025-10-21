@@ -701,6 +701,18 @@ def snapshot_json(snapshot):
             operation("get", "/merchants", "200", component_ref("MerchantsResponse")),
             {
                 "schemas": {
+                    "MerchantsResponse": {
+                        "type": "object",
+                        "properties": {"Merchants": {"type": "string"}},
+                    },
+                }
+            },
+            id="externally-tagged-primitive-types",
+        ),
+        pytest.param(
+            operation("get", "/merchants", "200", component_ref("MerchantsResponse")),
+            {
+                "schemas": {
                     "Base": {"type": "object"},
                     "Foo": {"type": "object"},
                     "Merchant": {"allOf": [component_ref("Base"), component_ref("Foo")]},
