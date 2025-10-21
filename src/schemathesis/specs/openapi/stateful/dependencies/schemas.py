@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
@@ -425,7 +425,7 @@ def _detect_externally_tagged_pattern(schema: Mapping[str, Any], path: str) -> s
         if name.lower() not in possible_names:
             continue
 
-        if isinstance(subschema, dict):
+        if isinstance(subschema, dict) and "object" in get_type(subschema):
             return name
 
     return None

@@ -226,7 +226,7 @@
         {
           "parameter_location": "body",
           "parameter_name": "id",
-          "resource": "Deviceregistration",
+          "resource": "DeviceRegistration",
           "resource_field": "id"
         }
       ],
@@ -307,7 +307,7 @@
         {
           "parameter_location": "body",
           "parameter_name": "id",
-          "resource": "Deviceregistration",
+          "resource": "DeviceRegistration",
           "resource_field": "id"
         }
       ],
@@ -347,7 +347,7 @@
         {
           "parameter_location": "body",
           "parameter_name": "id",
-          "resource": "Deviceregistration",
+          "resource": "DeviceRegistration",
           "resource_field": "id"
         }
       ],
@@ -481,7 +481,7 @@
         ]
       }
     },
-    "Deviceregistration": {
+    "DeviceRegistration": {
       "fields": [
         "id"
       ],
