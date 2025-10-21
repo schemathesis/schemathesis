@@ -2,6 +2,11 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.8...HEAD) - TBD
 
+### :bug: Fixed
+
+- Missing required request body for some schemas during the coverage phase.
+- Adjust some schemas so `hypothesis-jsonschema` can generate data for them.
+
 ## [4.3.8](https://github.com/schemathesis/schemathesis/compare/v4.3.7...v4.3.8) - 2025-10-21
 
 ### :wrench: Changed
