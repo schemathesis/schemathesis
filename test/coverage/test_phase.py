@@ -200,6 +200,9 @@ def run_test(operation, test, modes=ALL_MODES, generate_duplicate_query_paramete
         config.phases.coverage.generate_duplicate_query_parameters = generate_duplicate_query_parameters
     if unexpected_methods is not None:
         config.phases.coverage.unexpected_methods = unexpected_methods
+    config.phases.examples.enabled = False
+    config.phases.fuzzing.enabled = False
+    config.phases.stateful.enabled = False
     test_func = create_test(
         operation=operation,
         test_func=test,
@@ -1973,6 +1976,99 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    ["required", "properties"],
+    (
+        (["key"], None),
+        (["key"], {"another": {"type": "string"}}),
+        (["key", "description"], {"key": {"type": "string"}}),
+    ),
+)
+def test_request_body_is_required(ctx, required, properties):
+    inner = {
+        "additionalProperties": False,
+        "required": required,
+        "type": "object",
+    }
+    if properties is not None:
+        inner["properties"] = properties
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "parameters": [
+                        {"in": "query", "name": "strict", "schema": {}},
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {"data": inner},
+                                    "type": "object",
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    operation = schema["/items"]["post"]
+
+    def test(case):
+        # Body is `required`, hence should never be unset for positive tests
+        assert case.body is not NOT_SET, case.meta.phase.data.description
+
+    run_positive_test(operation, test)
+
+
+@pytest.mark.parametrize("required", [["name"], ["name", "description"]])
+def test_request_body_with_references(ctx, required):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {"data": {"$ref": "#/components/schemas/Item"}},
+                                    "required": ["data"],
+                                    "type": "object",
+                                }
+                            }
+                        },
+                        "required": True,
+                    }
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Name": {"type": "string"},
+                "Item": {
+                    "additionalProperties": False,
+                    "properties": {"name": {"$ref": "#/components/schemas/Name"}},
+                    "required": required,
+                    "type": "object",
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    operation = schema["/items"]["post"]
+
+    def test(case):
+        # Body is `required`, hence should never be unset for positive tests
+        assert case.body is not NOT_SET, case.meta.phase.data.description
+
+    run_positive_test(operation, test)
 
 
 @pytest.mark.openapi_version("3.0")

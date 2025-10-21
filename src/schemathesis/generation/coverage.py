@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
 
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
 except ImportError:
@@ -346,6 +348,19 @@ class CoverageContext:
         if isinstance(schema, dict) and "examples" in schema:
             # Examples may contain binary data which will fail the canonicalisation process in `hypothesis-jsonschema`
             schema = {key: value for key, value in schema.items() if key != "examples"}
+        # Prevent some hard to satisfy schemas
+        if isinstance(schema, dict) and schema.get("additionalProperties") is False and "required" in schema:
+            # Set required properties to any value to simplify generation
+            schema = dict(schema)
+            properties = schema.setdefault("properties", {})
+            for key in schema["required"]:
+                properties.setdefault(key, {})
+
+        # Add bundled schemas if any
+        if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in self.root_schema:
+            schema = dict(schema)
+            schema[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
+
         return self.generate_from(from_schema(schema, custom_formats=self.custom_formats))
 
 

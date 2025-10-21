@@ -529,7 +529,6 @@ def _iter_coverage_cases(
 
     instant = Instant()
     responses = list(operation.responses.iter_examples())
-    # NOTE: The HEAD method is excluded
     custom_formats = _build_custom_formats(generation_config)
 
     seen_negative = coverage.HashSet()
