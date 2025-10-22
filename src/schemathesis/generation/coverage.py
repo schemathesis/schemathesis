@@ -8,6 +8,7 @@ from functools import lru_cache, partial
 from itertools import combinations
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.generation.hypothesis.strategies import combine
 
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
@@ -74,6 +75,14 @@ STRATEGIES_FOR_TYPE = {
     "array": ARRAY_STRATEGY,
     "object": OBJECT_STRATEGY,
 }
+
+
+def get_strategy_for_type(ty: str | list[str]) -> st.SearchStrategy:
+    if isinstance(ty, str):
+        return STRATEGIES_FOR_TYPE[ty]
+    return combine([STRATEGIES_FOR_TYPE[t] for t in ty if t in STRATEGIES_FOR_TYPE])
+
+
 FORMAT_STRATEGIES = {**BUILT_IN_STRING_FORMATS, **get_default_format_strategies(), **STRING_FORMATS}
 
 UNKNOWN_PROPERTY_KEY = "x-schemathesis-unknown-property"
@@ -269,11 +278,11 @@ class CoverageContext:
         if isinstance(schema, bool):
             return 0
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
-        if keys == ["type"] and isinstance(schema["type"], str) and schema["type"] in STRATEGIES_FOR_TYPE:
-            return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
+        if keys == ["type"]:
+            return cached_draw(get_strategy_for_type(schema["type"]))
         if keys == ["format", "type"]:
             if schema["type"] != "string":
-                return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
+                return cached_draw(get_strategy_for_type(schema["type"]))
             elif schema["format"] in FORMAT_STRATEGIES:
                 return cached_draw(FORMAT_STRATEGIES[schema["format"]])
         if (keys == ["maxLength", "minLength", "type"] or keys == ["maxLength", "type"]) and schema["type"] == "string":
