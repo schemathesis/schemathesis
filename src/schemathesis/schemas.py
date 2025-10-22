@@ -16,6 +16,8 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
+from hypothesis import strategies as st
+
 from schemathesis import transport
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
@@ -25,7 +27,6 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark, _should_skip_hook
@@ -458,7 +459,7 @@ class BaseSchema(Mapping):
             for operation in self.get_all_operations()
             if isinstance(operation, Ok)
         ]
-        return strategies.combine(_strategies)
+        return st.one_of(_strategies)
 
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         raise NotImplementedError
@@ -500,7 +501,7 @@ class APIOperationMap(Mapping):
         _strategies = [
             operation.as_strategy(generation_mode=generation_mode, **kwargs) for operation in self._data.values()
         ]
-        return strategies.combine(_strategies)
+        return st.one_of(_strategies)
 
 
 P = TypeVar("P", bound=OperationParameter)

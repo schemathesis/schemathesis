@@ -15,7 +15,6 @@ from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.meta import ComponentInfo, TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
@@ -277,8 +276,8 @@ def into_step_input(
 
             is_applied = bool(kwargs)
 
-            cases = strategies.combine(
-                [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **kwargs) for mode in modes]
+            cases = st.one_of(
+                target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **kwargs) for mode in modes
             )
             case = draw(cases)
             if (

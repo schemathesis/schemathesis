@@ -9,7 +9,6 @@ from itertools import combinations
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
-from schemathesis.generation.hypothesis.strategies import combine
 
 try:
     from json.encoder import _make_iterencode  # type: ignore[attr-defined]
@@ -81,7 +80,7 @@ STRATEGIES_FOR_TYPE = {
 def get_strategy_for_type(ty: str | list[str]) -> st.SearchStrategy:
     if isinstance(ty, str):
         return STRATEGIES_FOR_TYPE[ty]
-    return combine([STRATEGIES_FOR_TYPE[t] for t in ty if t in STRATEGIES_FOR_TYPE])
+    return st.one_of(STRATEGIES_FOR_TYPE[t] for t in ty if t in STRATEGIES_FOR_TYPE)
 
 
 FORMAT_STRATEGIES = {**BUILT_IN_STRING_FORMATS, **get_default_format_strategies(), **STRING_FORMATS}
