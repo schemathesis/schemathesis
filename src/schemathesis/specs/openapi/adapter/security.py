@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
     from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 
-ORIGINAL_SECURITY_TYPE_KEY = "x-original-securuty-type"
+ORIGINAL_SECURITY_TYPE_KEY = "x-original-security-type"
 
 
 @dataclass
