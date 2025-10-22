@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Internal error when generating invalid type in the coverage phase.
+- Internal error when generating valid instance against an array of types in the coverage phase. [#3194](https://github.com/schemathesis/schemathesis/issues/3194)
 
 ### :wrench: Changed
 

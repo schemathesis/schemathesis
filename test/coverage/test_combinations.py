@@ -1102,6 +1102,11 @@ def test_negative_multiple_types(nctx):
     assert not cover_schema(nctx, schema)
 
 
+def test_positive_multiple_types(pctx):
+    schema = {"type": ["string", "null"], "format": "date-time"}
+    assert cover_schema(pctx, schema) == ["", None]
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
