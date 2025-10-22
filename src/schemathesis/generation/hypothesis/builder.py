@@ -35,7 +35,7 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis import examples, setup, strategies
+from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import (
@@ -112,9 +112,7 @@ def create_test(
         **config.as_strategy_kwargs,
     }
     generation = config.project.generation_for(operation=operation)
-    strategy = strategies.combine(
-        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in generation.modes]
-    )
+    strategy = st.one_of(operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in generation.modes)
 
     hypothesis_test = create_base_test(
         test_function=test_func,

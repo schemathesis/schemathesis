@@ -10,7 +10,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation.hypothesis import examples, strategies
+from schemathesis.generation.hypothesis import examples
 from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
@@ -1522,7 +1522,7 @@ def test_find_in_responses(ctx, response, expected):
     assert list(operation.responses.iter_examples()) == expected
 
     if expected:
-        strategy = strategies.combine(operation.get_strategies_from_examples())
+        strategy = st.one_of(operation.get_strategies_from_examples())
         collected = []
 
         @given(strategy)
