@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.9...HEAD) - TBD
 
+### :bug: Fixed
+
+- Internal error when generating invalid type in the coverage phase.
+
 ### :wrench: Changed
 
 - Improve resources inference.

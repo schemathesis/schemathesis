@@ -1320,7 +1320,7 @@ def _negative_type(
     }.get(ctx.location)
 
     if "number" in types:
-        del strategies["integer"]
+        strategies.pop("integer", None)
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
     if ctx.location == ParameterLocation.QUERY:
