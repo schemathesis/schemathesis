@@ -2071,6 +2071,29 @@ def test_request_body_with_references(ctx, required):
     run_positive_test(operation, test)
 
 
+def test_request_body_without_validation_keywords(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"x-something": True}}},
+                        "required": True,
+                    }
+                }
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    operation = schema["/items"]["post"]
+
+    def test(case):
+        assert case.body is not NOT_SET, case.meta.phase.data.description
+
+    run_positive_test(operation, test)
+
+
 @pytest.mark.openapi_version("3.0")
 def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
     raw_schema = {
