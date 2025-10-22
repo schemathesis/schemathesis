@@ -8,6 +8,7 @@ from functools import lru_cache, partial
 from itertools import combinations
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 from schemathesis.generation.hypothesis.strategies import combine
 
 try:
@@ -514,12 +515,14 @@ def cover_schema_iter(
             # Can't resolve a reference - at this point, we can't generate anything useful as `$ref` is in the current schema root
             return
 
-    if schema == {} or schema is True:
+    if schema is True:
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
     elif schema is False:
         types = []
         schema = {"not": {}}
+    elif not any(k in ALL_KEYWORDS for k in schema):
+        types = ["null", "boolean", "string", "number", "array", "object"]
     else:
         types = schema.get("type", [])
     push_examples_to_properties(schema)
