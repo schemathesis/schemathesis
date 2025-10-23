@@ -461,6 +461,26 @@ class BaseSchema(Mapping):
         ]
         return st.one_of(_strategies)
 
+    def as_examples(
+        self,
+        **kwargs: Any,
+    ) -> SearchStrategy:
+        """Create a list of test cases based on the examples defined in the schema for all operations.
+
+        Use with `@given` in non-Schemathesis tests.
+
+        Args:
+            **kwargs: Additional keywords for each strategy.
+
+        Returns:
+            Combined Hypothesis strategy for all valid operations in the schema.
+
+        """
+        _strategies = [
+            operation.ok().as_examples(**kwargs) for operation in self.get_all_operations() if isinstance(operation, Ok)
+        ]
+        return st.one_of(_strategies)
+
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         raise NotImplementedError
 
@@ -501,6 +521,24 @@ class APIOperationMap(Mapping):
         _strategies = [
             operation.as_strategy(generation_mode=generation_mode, **kwargs) for operation in self._data.values()
         ]
+        return st.one_of(_strategies)
+
+    def as_examples(
+        self,
+        **kwargs: Any,
+    ) -> SearchStrategy:
+        """Create a list of test cases based on the examples defined in the schema for all operations in this subset.
+
+        Use with `@given` in non-Schemathesis tests.
+
+        Args:
+            **kwargs: Additional keywords for each strategy.
+
+        Returns:
+            Combined Hypothesis strategy for all valid operations in the schema.
+
+        """
+        _strategies = [operation.as_examples(**kwargs) for operation in self._data.values()]
         return st.one_of(_strategies)
 
 
@@ -703,6 +741,21 @@ class APIOperation(Generic[P, R, S]):
         self._apply_headers(kwargs)
         strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, **kwargs)
         strategy = self._apply_hooks(kwargs, ["before_generate_case"], strategy)
+        return strategy
+
+    def as_examples(
+        self,
+        **kwargs: Any,
+    ) -> SearchStrategy[Case]:
+        """Create a list of test cases based on the examples defined in the schema for this operation.
+
+        Args:
+            **kwargs: Extra arguments to the underlying strategy function.
+
+        """
+        self._apply_headers(kwargs)
+        strategy = st.one_of(self.schema.get_strategies_from_examples(self, **kwargs))
+        strategy = self._apply_hooks(kwargs, ["before_add_example", "before_generate_case"], strategy)
         return strategy
 
     def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
