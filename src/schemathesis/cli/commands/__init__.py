@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from typing import Any
 
 import click
-from tomli import TOMLDecodeError
 
 from schemathesis.cli.commands.data import Data
 from schemathesis.cli.commands.run import run as run_command
@@ -15,6 +15,11 @@ from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.core.errors import HookError, format_exception
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+
+if sys.version_info < (3, 11):
+    from tomli import TOMLDecodeError
+else:
+    from tomllib import TOMLDecodeError
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
