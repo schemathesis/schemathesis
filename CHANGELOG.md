@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.10...HEAD) - TBD
 
+### :bug: Fixed
+
+- Tomli dependency is optional for Python 3.11+. [#3199](https://github.com/schemathesis/schemathesis/issues/3199)
+
 ## [4.3.10](https://github.com/schemathesis/schemathesis/compare/v4.3.9...v4.3.10) - 2025-10-22
 
 ### :bug: Fixed
@@ -234,7 +238,7 @@
 - False positive `API accepted schema-violating request` caused by passing security-related header via CLI during the stateful phase.
 
 ## [4.0.25](https://github.com/schemathesis/schemathesis/compare/v4.0.24...v4.0.25) - 2025-08-10
-  
+
 ### :bug: Fixed
 
 - `workers = "auto"` being incorrectly rejected in configuration files. [#3015](https://github.com/schemathesis/schemathesis/issues/3015)
@@ -316,7 +320,7 @@ These improvements come from removing unnecessary memory allocations in unnecess
 ### :bug: Fixed
 
 - Generating negative test cases incorrectly marked as invalid if `anyOf` or `oneOf` are present. [#2975](https://github.com/schemathesis/schemathesis/issues/2975)
-- Set correct data generation mode for stateful test cases if after adding stateful data, a negative test case becomes positive. [#2983](https://github.com/schemathesis/schemathesis/issues/2983) 
+- Set correct data generation mode for stateful test cases if after adding stateful data, a negative test case becomes positive. [#2983](https://github.com/schemathesis/schemathesis/issues/2983)
 
 ## [4.0.16](https://github.com/schemathesis/schemathesis/compare/v4.0.15...v4.0.16) - 2025-07-31
 
@@ -375,7 +379,7 @@ These improvements come from removing unnecessary memory allocations in unnecess
 
 ### :wrench: Changed
 
-- Display cURL code samples on more network errors. [#2940](https://github.com/schemathesis/schemathesis/issues/2940) 
+- Display cURL code samples on more network errors. [#2940](https://github.com/schemathesis/schemathesis/issues/2940)
 
 ## [4.0.9](https://github.com/schemathesis/schemathesis/compare/v4.0.8...v4.0.9) - 2025-07-13
 
@@ -387,7 +391,7 @@ These improvements come from removing unnecessary memory allocations in unnecess
 
 - Do not display API probing result in the test phases summary.
 - Do not display API probing errors in CLI output. Treat errors as a missing capability.
-- Display cURL code samples on more network errors. [#2940](https://github.com/schemathesis/schemathesis/issues/2940) 
+- Display cURL code samples on more network errors. [#2940](https://github.com/schemathesis/schemathesis/issues/2940)
 
 ## [4.0.8](https://github.com/schemathesis/schemathesis/compare/v4.0.7...v4.0.8) - 2025-07-12
 
@@ -464,7 +468,7 @@ These improvements come from removing unnecessary memory allocations in unnecess
 
 ### :bug: Fixed
 
-- **CLI**: Combining `--include-*` & `--exclude-*`. [#2894](https://github.com/schemathesis/schemathesis/issues/2894) 
+- **CLI**: Combining `--include-*` & `--exclude-*`. [#2894](https://github.com/schemathesis/schemathesis/issues/2894)
 - Combining CLI filter options with config file-based filtering.
 
 ## [4.0.0](https://github.com/schemathesis/schemathesis/compare/v4.0.0-beta.1...v4.0.0) - 2025-06-10
@@ -486,7 +490,7 @@ Check the [Migration Guide](https://github.com/schemathesis/schemathesis/blob/ma
 - Restore `Case.formatted_path`.
 - Update serialization error messages.
 - Update documentation links in error messages.
-- Improved failure messages for `ignored_auth`. [#2779](https://github.com/schemathesis/schemathesis/issues/2779) 
+- Improved failure messages for `ignored_auth`. [#2779](https://github.com/schemathesis/schemathesis/issues/2779)
 - Do not show the "Missing test data" warning if stateful testing has non-404 responses. [#2795](https://github.com/schemathesis/schemathesis/issues/2795)
 - Restore support for validating `requests` / `httpx` / `werkzeug` responses in `validate_response` and `is_response_valid`.
 - Rename `is_response_valid` to `is_valid_response` for consistency with other functions in the codebase.
@@ -543,7 +547,7 @@ This should be the final alpha release. Going forward, I'll focus on documentati
 
 ### :rocket: Added
 
-- A way to configure status codes for the `not_a_server_error` check. [#2539](https://github.com/schemathesis/schemathesis/issues/2539) 
+- A way to configure status codes for the `not_a_server_error` check. [#2539](https://github.com/schemathesis/schemathesis/issues/2539)
 - `@schemathesis.serializer` decorator as a way to serialize data of media types not supported by Schemathesis.
 
 ### :bug: Fixed
@@ -612,7 +616,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 
 ### :bug: Fixed
 
-- **Coverage Phase**: 
+- **Coverage Phase**:
     - Do not generate empty path parameters.
     - Skip empty string examples for path parameters.
     - Generate default values if examples are incorrect or inappropriate for their location.
@@ -629,7 +633,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 ### :wrench: Changed
 
 - Enable all available checks by default.
-- Do not fallback to GraphQL loading if schema location ends with `openapi.json` and similar filenames. [#2757](https://github.com/schemathesis/schemathesis/issues/2757) 
+- Do not fallback to GraphQL loading if schema location ends with `openapi.json` and similar filenames. [#2757](https://github.com/schemathesis/schemathesis/issues/2757)
 - **INTERNAL**: Ignore deprecation warnings from `jsonschema`.
 
 ### :fire: Removed
@@ -1661,7 +1665,7 @@ and complete changelog will follow.
 -   `APIStateMachine.format_rules` method to format transition rules in
     a human-readable format.
 
-``` 
+```
 POST /user
 └── 201
     ├── GET /users/{ids}
@@ -2541,7 +2545,7 @@ def test_api(case):
     generate unique test cases only. This feature is also available as a
     hook in `schemathesis.contrib.unique_data`.
 
--   A few decorators & functions that provide a simpler API to extend Schemathesis:  
+-   A few decorators & functions that provide a simpler API to extend Schemathesis:
     -   `schemathesis.auth()` for authentication providers;
     -   `schemathesis.check` for checks;
     -   `schemathesis.hook` & `BaseSchema.hook` for hooks;

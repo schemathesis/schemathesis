@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from os import PathLike
 from random import Random
-
-import tomli
 
 from schemathesis.config._checks import (
     CheckConfig,
@@ -28,6 +27,11 @@ from schemathesis.config._phases import (
 )
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig, SchemathesisWarning, get_workers_count
 from schemathesis.config._report import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat, ReportsConfig
+
+if sys.version_info < (3, 11):
+    import tomli
+else:
+    import tomllib as tomli
 
 __all__ = [
     "SchemathesisConfig",
