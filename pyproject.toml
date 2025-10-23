@@ -49,7 +49,7 @@ dependencies = [
   "requests>=2.22,<3",
   "rich>=13.9.4",
   "starlette-testclient>=0.4.1,<1",
-  "tomli>=2.2.1",
+  "tomli>=2.2.1; python_version < '3.11'",
   "typing-extensions>=4.12.2",
   "werkzeug>=0.16.0,<4",
 ]
