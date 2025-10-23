@@ -650,6 +650,42 @@ class APIOperation(Generic[P, R, S]):
             if main in ("*", main_target) and sub in ("*", sub_target):
                 yield body
 
+    def _apply_headers(self, kwargs: dict[str, Any]) -> None:
+        if self.schema.config.headers:
+            headers = kwargs.setdefault("headers", {})
+            headers.update(self.schema.config.headers)
+
+    def _apply_hooks(
+        self, kwargs: dict[str, Any], hook_names: list[str], strategy: SearchStrategy[Case]
+    ) -> SearchStrategy[Case]:
+        def _apply_hooks_inner(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
+            context = HookContext(operation=self)
+            for hook_name in hook_names:
+                for hook in dispatcher.get_all_by_name(hook_name):
+                    if _should_skip_hook(hook, context):
+                        continue
+                    _strategy = hook(context, _strategy)
+            for hook in dispatcher.get_all_by_name("filter_case"):
+                if _should_skip_hook(hook, context):
+                    continue
+                _strategy = _strategy.filter(partial(hook, context))
+            for hook in dispatcher.get_all_by_name("map_case"):
+                if _should_skip_hook(hook, context):
+                    continue
+                _strategy = _strategy.map(partial(hook, context))
+            for hook in dispatcher.get_all_by_name("flatmap_case"):
+                if _should_skip_hook(hook, context):
+                    continue
+                _strategy = _strategy.flatmap(partial(hook, context))
+            return _strategy
+
+        strategy = _apply_hooks_inner(GLOBAL_HOOK_DISPATCHER, strategy)
+        strategy = _apply_hooks_inner(self.schema.hooks, strategy)
+        hooks = kwargs.get("hooks")
+        if hooks is not None:
+            strategy = _apply_hooks_inner(hooks, strategy)
+        return strategy
+
     def as_strategy(
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
@@ -664,39 +700,9 @@ class APIOperation(Generic[P, R, S]):
             **kwargs: Extra arguments to the underlying strategy function.
 
         """
-        if self.schema.config.headers:
-            headers = kwargs.setdefault("headers", {})
-            headers.update(self.schema.config.headers)
+        self._apply_headers(kwargs)
         strategy = self.schema.get_case_strategy(self, generation_mode=generation_mode, **kwargs)
-
-        def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
-            context = HookContext(operation=self)
-            for hook in dispatcher.get_all_by_name("before_generate_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                _strategy = hook(context, _strategy)
-            for hook in dispatcher.get_all_by_name("filter_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                hook = partial(hook, context)
-                _strategy = _strategy.filter(hook)
-            for hook in dispatcher.get_all_by_name("map_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                hook = partial(hook, context)
-                _strategy = _strategy.map(hook)
-            for hook in dispatcher.get_all_by_name("flatmap_case"):
-                if _should_skip_hook(hook, context):
-                    continue
-                hook = partial(hook, context)
-                _strategy = _strategy.flatmap(hook)
-            return _strategy
-
-        strategy = _apply_hooks(GLOBAL_HOOK_DISPATCHER, strategy)
-        strategy = _apply_hooks(self.schema.hooks, strategy)
-        hooks = kwargs.get("hooks")
-        if hooks is not None:
-            strategy = _apply_hooks(hooks, strategy)
+        strategy = self._apply_hooks(kwargs, ["before_generate_case"], strategy)
         return strategy
 
     def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
