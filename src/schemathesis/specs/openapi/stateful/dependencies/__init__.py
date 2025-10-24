@@ -29,6 +29,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     ResourceMap,
 )
 from schemathesis.specs.openapi.stateful.dependencies.outputs import extract_outputs
+from schemathesis.specs.openapi.stateful.dependencies.resources import remove_unused_resources
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -94,6 +95,9 @@ def analyze(schema: BaseOpenAPISchema) -> DependencyGraph:
 
     # Merge parameter-inferred resources with schema-defined ones
     merge_related_resources(operations, resources)
+
+    # Clean up orphaned resources
+    remove_unused_resources(operations, resources)
 
     return DependencyGraph(operations=operations, resources=resources)
 

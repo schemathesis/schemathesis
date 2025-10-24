@@ -584,12 +584,6 @@
         ]
       }
     },
-    "Job": {
-      "fields": [
-        "jobId"
-      ],
-      "types": {}
-    },
     "JobSummary": {
       "fields": [
         "endTime",

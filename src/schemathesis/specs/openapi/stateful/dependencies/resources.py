@@ -13,6 +13,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
     Cardinality,
     DefinitionSource,
+    OperationMap,
     ResourceDefinition,
     ResourceMap,
     extend_pointer,
@@ -310,3 +311,18 @@ def _extract_resource_from_schema(
             resources[resource_name] = resource
 
     return resource
+
+
+def remove_unused_resources(operations: OperationMap, resources: ResourceMap) -> None:
+    """Remove resources that aren't referenced by any operation."""
+    # Collect all resource names currently in use
+    used_resources = set()
+    for operation in operations.values():
+        for input_slot in operation.inputs:
+            used_resources.add(input_slot.resource.name)
+        for output_slot in operation.outputs:
+            used_resources.add(output_slot.resource.name)
+
+    unused = set(resources.keys()) - used_resources
+    for resource_name in unused:
+        del resources[resource_name]
