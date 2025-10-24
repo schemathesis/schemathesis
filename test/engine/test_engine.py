@@ -447,7 +447,7 @@ def filter_path_parameters():
     # ".." and "." strings are treated specially, but this behavior is outside the test's scope
     # "" shouldn't be allowed as a valid path parameter
 
-    def before_generate_path_parameters(context, strategy):
+    def before_generate_path_parameters(ctx, strategy):
         return strategy.filter(
             lambda x: x["key"] not in ("..", ".", "", "/") and not (isinstance(x["key"], str) and "/" in x["key"])
         )
