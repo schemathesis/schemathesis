@@ -4,9 +4,10 @@
 
 ### :bug: Fixed
 
-- Do not conservatively consider all recursive references as infinite ones in the example phase.
+- Do not conservatively consider all recursive references as infinite ones in the examples phase.
 - Mishandled a case of infinite recursion in the example phase.
 - Improve API spec detection for malformed JSON inputs.
+- Internal error on empty `allOf` in the examples phase.
 
 ### :wrench: Changed
 
