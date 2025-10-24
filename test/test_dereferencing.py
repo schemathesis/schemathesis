@@ -800,7 +800,10 @@ def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
                             {"properties": {"key": {"$ref": "#/components/schemas/account"}}},
                         ]
                     },
-                    "issue_change": {"properties": {"key": {"$ref": "#/components/schemas/issue"}}},
+                    "issue_change": {
+                        "properties": {"key": {"$ref": "#/components/schemas/issue"}},
+                        "example": {"key": 42},
+                    },
                     "object": {},
                 }
             },
@@ -823,7 +826,10 @@ def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
                             {"properties": {"key": {"$ref": "#/components/schemas/milestone"}}},
                         ]
                     },
-                    "issue_change": {"properties": {"key": {"$ref": "#/components/schemas/issue"}}},
+                    "issue_change": {
+                        "properties": {"key": {"$ref": "#/components/schemas/issue"}},
+                        "example": {"key": 42},
+                    },
                     "milestone": {"allOf": [{"$ref": "#/components/schemas/object"}]},
                     "object": {},
                 }
@@ -835,7 +841,77 @@ def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
 def test_multiple_hops_references(ctx, cli, openapi3_base_url, snapshot_cli, paths, components):
     schema_path = ctx.openapi.write_schema(paths, components=components)
     # There should be no recursion error in another thread
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={openapi3_base_url}",
+            "--phases=examples",
+            "--checks=not_a_server_error",
+            config={"warnings": False},
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.filterwarnings("error")
+def test_multiple_hops_references_swagger(ctx, cli, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "put": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "schema": {
+                                "$ref": "#/definitions/A1",
+                            },
+                        }
+                    ]
+                }
+            }
+        },
+        definitions={
+            "A1": {
+                "properties": {
+                    "": {
+                        "$ref": "#/definitions/A2",
+                    }
+                }
+            },
+            "A2": {
+                "allOf": [
+                    {"$ref": "#/definitions/allOf"},
+                    {"$ref": "#/definitions/A3"},
+                ]
+            },
+            "A3": {
+                "properties": {
+                    "key": {
+                        "items": {"$ref": "#/definitions/A4"},
+                    }
+                }
+            },
+            "A4": {
+                "properties": {
+                    "key": {"$ref": "#/definitions/A5"},
+                }
+            },
+            "A5": {"$ref": "#/definitions/allOf"},
+            "allOf": {},
+        },
+        version="2.0",
+    )
+    # There should be no recursion error in another thread
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--url={openapi3_base_url}",
+            "--phases=examples",
+            "--checks=not_a_server_error",
+            config={"warnings": False},
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.filterwarnings("error")
