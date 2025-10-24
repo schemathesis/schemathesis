@@ -5,6 +5,7 @@
 ### :wrench: Changed
 
 - Infer links based on common REST patterns.
+- Remove orphaned resources during dependency analysis.
 
 ## [4.3.11](https://github.com/schemathesis/schemathesis/compare/v4.3.10...v4.3.11) - 2025-10-24
 

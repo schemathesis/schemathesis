@@ -62,12 +62,6 @@
           "string"
         ]
       }
-    },
-    "Post": {
-      "fields": [
-        "postId"
-      ],
-      "types": {}
     }
   }
 }
