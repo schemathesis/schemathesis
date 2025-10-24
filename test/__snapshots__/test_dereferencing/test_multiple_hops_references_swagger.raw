@@ -8,7 +8,7 @@ Schemathesis dev
  ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
-     Specification:    Open API 3.0.2
+     Specification:    Open API 2.0
      Operations:       1 selected / 1 total
 
 
@@ -16,25 +16,27 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ✅  Examples (in 0.00s)
+ ⏭   Examples (in 0.00s)
 
-     ✅ 1 passed
+     ⏭  1 skipped
 
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Skipped: 1
+    - No examples in schema
 
 Test Phases:
-  ✅ Examples
+  ⏭  Examples
   ⏭  Coverage (disabled)
   ⏭  Fuzzing (disabled)
   ⏭  Stateful (disabled)
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+=============================== Empty test suite ===============================
