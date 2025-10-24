@@ -16,12 +16,13 @@ Hooks that execute during schema loading and operation initialization.
 
     All schema-level hooks return `None` and modify their arguments in-place.
 
-## Data-Generation Hooks
+## Data Generation Hooks
 
 Control how test data is generated for each request component.
 
 | Hook Pattern | Signature | Purpose | Return |
 |--------------|-----------|---------|---------|
+| **before_generate_{component}** | `(ctx, strategy: SearchStrategy) -> SearchStrategy` | Modify generation strategy | Modified strategy |
 | **filter_{component}** | `(ctx, value: Any) -> bool` | Exclude generated values | `True` to keep, `False` to reject |
 | **map_{component}** | `(ctx, value: Any) -> Any` | Transform generated values | Modified value |
 | **flatmap_{component}** | `(ctx, value: Any) -> SearchStrategy` | Generate dependent values | New strategy based on input |
