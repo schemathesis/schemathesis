@@ -1,0 +1,14 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ❌  Failed to load specification from /tmp/schema.json after 0.00s
+
+ Schema Loading Error
+
+ API schema does not appear syntactically valid
+
+     Expecting property name enclosed in double quotes: line 3 column 1 (char 23)

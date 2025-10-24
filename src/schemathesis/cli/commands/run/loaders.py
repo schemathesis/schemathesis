@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import warnings
+from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis import graphql, openapi
@@ -35,7 +36,10 @@ def should_try_more(exc: LoaderError) -> bool:
     import requests
     from yaml.reader import ReaderError
 
-    if isinstance(exc.__cause__, ReaderError) and "characters are not allowed" in str(exc.__cause__):
+    if (isinstance(exc.__cause__, ReaderError) and "characters are not allowed" in str(exc.__cause__)) or (
+        isinstance(exc.__cause__, JSONDecodeError)
+        and ('"swagger"' in exc.__cause__.doc or '"openapi"' in exc.__cause__.doc)
+    ):
         return False
 
     # We should not try other loaders for cases when we can't even establish connection
