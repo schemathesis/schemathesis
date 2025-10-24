@@ -1790,6 +1790,19 @@ def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url, no
     )
 
 
+@pytest.mark.skipif(sys.version_info >= (3, 13), reason="Error message is different")
+def test_malformed_schema(testdir, cli, snapshot_cli, openapi3_base_url):
+    schema_path = testdir.makefile(
+        ".json",
+        schema="""
+{
+   "swagger": "2.0",
+}
+    """,
+    )
+    assert cli.main("run", str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1") == snapshot_cli
+
+
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_references, openapi3_base_url, snapshot_cli):
     schema_path = ctx.makefile(schema_with_recursive_references)

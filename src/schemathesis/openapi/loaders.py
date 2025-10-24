@@ -303,10 +303,11 @@ def _load_yaml(content: str) -> dict[str, Any]:
     try:
         return deserialize_yaml(content)
     except yaml.YAMLError as exc:
-        kind = LoaderErrorKind.SYNTAX_ERROR
-        message = SCHEMA_SYNTAX_ERROR
-        extras = [entry for entry in str(exc).splitlines() if entry]
-        raise LoaderError(kind, message, extras=extras) from exc
+        raise LoaderError(
+            LoaderErrorKind.SYNTAX_ERROR,
+            SCHEMA_SYNTAX_ERROR,
+            extras=[entry for entry in str(exc).splitlines() if entry],
+        ) from exc
 
 
 SCHEMA_INVALID_ERROR = "The provided API schema does not appear to be a valid OpenAPI schema"

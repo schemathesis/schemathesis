@@ -6,6 +6,7 @@
 
 - Do not conservatively consider all recursive references as infinite ones in the example phase.
 - Mishandled a case of infinite recursion in the example phase.
+- Improve API spec detection for malformed JSON inputs.
 
 ### :wrench: Changed
 
