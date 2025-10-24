@@ -13,8 +13,8 @@
         {
           "parameter_location": "path",
           "parameter_name": "device_id",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         }
       ],
       "outputs": []
@@ -151,8 +151,8 @@
         {
           "parameter_location": "path",
           "parameter_name": "device_id",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -214,19 +214,19 @@
         {
           "parameter_location": "path",
           "parameter_name": "device_id",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         },
         {
           "parameter_location": "body",
           "parameter_name": "clientId",
-          "resource": "Client",
+          "resource": "DeviceDetails",
           "resource_field": "clientId"
         },
         {
           "parameter_location": "body",
           "parameter_name": "id",
-          "resource": "DeviceRegistration",
+          "resource": "DeviceDetails",
           "resource_field": "id"
         }
       ],
@@ -335,19 +335,19 @@
         {
           "parameter_location": "path",
           "parameter_name": "device_id",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         },
         {
           "parameter_location": "body",
           "parameter_name": "clientId",
-          "resource": "Client",
+          "resource": "DeviceDetails",
           "resource_field": "clientId"
         },
         {
           "parameter_location": "body",
           "parameter_name": "id",
-          "resource": "DeviceRegistration",
+          "resource": "DeviceDetails",
           "resource_field": "id"
         }
       ],

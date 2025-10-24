@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1blog~1posts/post",
+    {
+      "GetBlog post public": {
+        "operationRef": "#/paths/~1blog~1posts~1{postId}/get",
+        "parameters": {
+          "path.postId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

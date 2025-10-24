@@ -378,6 +378,31 @@ def snapshot_json(snapshot):
         ),
         pytest.param(
             {
+                **operation("post", "/blog/posts", "201", component_ref("Blog post public")),
+                **operation("get", "/blog/posts/{postId}", "200", component_ref("Blog post"), [path_param("postId")]),
+            },
+            {
+                "schemas": {
+                    "Blog post public": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}, "body": {"type": "string"}},
+                        "required": ["id", "body"],
+                    },
+                    "Blog post": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "checksum": {"type": "string"},
+                            "body": {"type": "string"},
+                        },
+                        "required": ["id", "body"],
+                    },
+                }
+            },
+            id="schema-names-mismatch",
+        ),
+        pytest.param(
+            {
                 **operation("get", "/books/", "200", component_ref("Books")),
                 **operation("get", "/books/{id}/notes", "200", component_ref("Note")),
             },

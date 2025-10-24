@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.11...HEAD) - TBD
 
+### :wrench: Changed
+
+- Infer links based on common REST patterns.
+
 ## [4.3.11](https://github.com/schemathesis/schemathesis/compare/v4.3.10...v4.3.11) - 2025-10-24
 
 ### :bug: Fixed
