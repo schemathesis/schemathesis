@@ -1855,6 +1855,37 @@ def test_empty_ref_in_allof(ctx, cli, snapshot_cli, openapi3_base_url):
 
 
 @pytest.mark.filterwarnings("error")
+def test_empty_all_of(ctx, cli, snapshot_cli, openapi2_base_url):
+    schema_file = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "put": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "schema": {
+                                "allOf": [],
+                            },
+                        }
+                    ]
+                }
+            }
+        },
+        version="2.0",
+    )
+
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "--phases=examples",
+            f"--url={openapi2_base_url}",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.filterwarnings("error")
 def test_multiple_hops_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
     schema_file = ctx.openapi.write_schema(
         {

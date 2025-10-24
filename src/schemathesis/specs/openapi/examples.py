@@ -253,7 +253,7 @@ def _expand_subschemas(
                     yield (subschema, current_path)
 
         # For allOf, merge all alternatives
-        if "allOf" in schema:
+        if "allOf" in schema and schema["allOf"]:
             subschema = deepclone(schema["allOf"][0])
             try:
                 subschema, expanded_path = _resolve_bundled(subschema, resolver, current_path)
