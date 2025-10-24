@@ -10,7 +10,11 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.result import Ok
-from schemathesis.specs.openapi.stateful.dependencies.inputs import extract_inputs, update_input_field_bindings
+from schemathesis.specs.openapi.stateful.dependencies.inputs import (
+    extract_inputs,
+    merge_related_resources,
+    update_input_field_bindings,
+)
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
     Cardinality,
@@ -87,6 +91,9 @@ def analyze(schema: BaseOpenAPISchema) -> DependencyGraph:
     #   - then `POST /users` response revealed `User.fields=["id", "email"]`
     for resource in updated_resources:
         update_input_field_bindings(resource, operations)
+
+    # Merge parameter-inferred resources with schema-defined ones
+    merge_related_resources(operations, resources)
 
     return DependencyGraph(operations=operations, resources=resources)
 

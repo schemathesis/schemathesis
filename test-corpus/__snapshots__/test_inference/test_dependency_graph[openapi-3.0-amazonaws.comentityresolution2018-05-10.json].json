@@ -71,7 +71,7 @@
         {
           "parameter_location": "path",
           "parameter_name": "jobId",
-          "resource": "Job",
+          "resource": "StartMatchingJobOutput",
           "resource_field": "jobId"
         }
       ],
