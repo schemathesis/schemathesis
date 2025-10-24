@@ -256,7 +256,7 @@ def _expand_subschemas(
         if "allOf" in schema:
             subschema = deepclone(schema["allOf"][0])
             try:
-                subschema, _ = _resolve_bundled(subschema, resolver, current_path)
+                subschema, expanded_path = _resolve_bundled(subschema, resolver, current_path)
             except InfiniteRecursiveReference:
                 return
 
@@ -278,7 +278,7 @@ def _expand_subschemas(
                         else:
                             subschema[key] = value
 
-            yield (subschema, current_path)
+            yield (subschema, expanded_path)
 
 
 def extract_inner_examples(examples: dict[str, Any] | list, schema: BaseOpenAPISchema) -> Generator[Any, None, None]:

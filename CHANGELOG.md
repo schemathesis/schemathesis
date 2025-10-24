@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Do not conservatively consider all recursive references as infinite ones in the example phase.
+- Mishandled a case of infinite recursion in the example phase.
 
 ### :wrench: Changed
 
