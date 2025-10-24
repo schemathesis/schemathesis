@@ -4,7 +4,11 @@
 
 ### :bug: Fixed
 
-- Tomli dependency is optional for Python 3.11+. [#3199](https://github.com/schemathesis/schemathesis/issues/3199)
+- Do not conservatively consider all recursive references as infinite ones in the example phase.
+
+### :wrench: Changed
+
+- Make `tomli` optional for Python 3.11+. [#3199](https://github.com/schemathesis/schemathesis/issues/3199)
 
 ## [4.3.10](https://github.com/schemathesis/schemathesis/compare/v4.3.9...v4.3.10) - 2025-10-22
 

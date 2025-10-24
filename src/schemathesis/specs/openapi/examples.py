@@ -12,7 +12,6 @@ from hypothesis_jsonschema import from_schema
 from schemathesis.config import GenerationConfig
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
-from schemathesis.core.jsonschema import references
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -216,11 +215,11 @@ def _resolve_bundled(
         if isinstance(reference, str):
             # Check if this reference is already in the current path
             if reference in reference_path:
-                # Try to remove recursive references to avoid infinite recursion
-                remaining_references = references.sanitize(schema)
-                if reference in remaining_references:
-                    cycle = list(reference_path[reference_path.index(reference) :])
-                    raise InfiniteRecursiveReference(reference, cycle)
+                # Real infinite recursive references are caught at the bundling stage.
+                # This recursion happens because of how the example phase generates data - it explores everything,
+                # so it is the easiest way to break such cycles
+                cycle = list(reference_path[reference_path.index(reference) :])
+                raise InfiniteRecursiveReference(reference, cycle)
 
             new_path = reference_path + (reference,)
 
@@ -238,7 +237,11 @@ def _expand_subschemas(
     *, schema: dict[str, Any] | bool, resolver: RefResolver, reference_path: tuple[str, ...]
 ) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...]], None, None]:
     """Expand schema and all its subschemas."""
-    schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+    try:
+        schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+    except InfiniteRecursiveReference:
+        return
+
     yield (schema, current_path)
 
     if isinstance(schema, dict):
@@ -252,11 +255,17 @@ def _expand_subschemas(
         # For allOf, merge all alternatives
         if "allOf" in schema:
             subschema = deepclone(schema["allOf"][0])
-            subschema, _ = _resolve_bundled(subschema, resolver, current_path)
+            try:
+                subschema, _ = _resolve_bundled(subschema, resolver, current_path)
+            except InfiniteRecursiveReference:
+                return
 
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
-                    sub, _ = _resolve_bundled(sub, resolver, current_path)
+                    try:
+                        sub, _ = _resolve_bundled(sub, resolver, current_path)
+                    except InfiniteRecursiveReference:
+                        return
                     for key, value in sub.items():
                         if key == "properties":
                             subschema.setdefault("properties", {}).update(value)
@@ -353,7 +362,10 @@ def extract_from_schema(
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties` and `items`
-    schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+    try:
+        schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+    except InfiniteRecursiveReference:
+        return
 
     if "properties" in schema:
         variants = {}
