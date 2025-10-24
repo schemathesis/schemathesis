@@ -14,6 +14,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     DefinitionSource,
     InputSlot,
     OperationMap,
+    OutputSlot,
     ResourceDefinition,
     ResourceMap,
 )
@@ -310,3 +311,118 @@ def update_input_field_bindings(resource_name: str, operations: OperationMap) ->
             )
             if new_field is not None:
                 input_slot.resource_field = new_field
+
+
+def merge_related_resources(operations: OperationMap, resources: ResourceMap) -> None:
+    """Merge parameter-inferred resources with schema-defined resources from related operations."""
+    candidates = find_producer_consumer_candidates(operations)
+
+    for producer_name, consumer_name in candidates:
+        producer = operations[producer_name]
+        consumer = operations[consumer_name]
+
+        # Try to upgrade each input slot
+        for input_slot in consumer.inputs:
+            result = try_merge_input_resource(input_slot, producer.outputs, resources)
+
+            if result is not None:
+                new_resource_name, new_field_name = result
+                # Update input slot to use the better resource definition
+                input_slot.resource = resources[new_resource_name]
+                input_slot.resource_field = new_field_name
+
+
+def try_merge_input_resource(
+    input_slot: InputSlot,
+    producer_outputs: list[OutputSlot],
+    resources: ResourceMap,
+) -> tuple[str, str] | None:
+    """Try to upgrade an input's resource to a producer's resource."""
+    consumer_resource = input_slot.resource
+
+    # Only upgrade parameter-inferred resources (low confidence)
+    if consumer_resource.source != DefinitionSource.PARAMETER_INFERENCE:
+        return None
+
+    # Try each producer output
+    for output in producer_outputs:
+        producer_resource = resources[output.resource.name]
+
+        # Only merge to schema-defined resources (high confidence)
+        if producer_resource.source != DefinitionSource.SCHEMA_WITH_PROPERTIES:
+            continue
+
+        # Try to match the input parameter to producer's fields
+        param_name = input_slot.parameter_name
+        if not isinstance(param_name, str):
+            continue
+
+        for resource_name in (input_slot.resource.name, producer_resource.name):
+            matched_field = naming.find_matching_field(
+                parameter=param_name,
+                resource=resource_name,
+                fields=producer_resource.fields,
+            )
+
+            if matched_field is not None:
+                return (producer_resource.name, matched_field)
+
+    return None
+
+
+def find_producer_consumer_candidates(operations: OperationMap) -> list[tuple[str, str]]:
+    """Find operation pairs that might produce/consume the same resource via REST patterns."""
+    candidates = []
+
+    # Group by base path to reduce comparisons
+    paths: dict[str, list[str]] = {}
+    for name, node in operations.items():
+        base = _extract_base_path(node.path)
+        paths.setdefault(base, []).append(name)
+
+    # Within each path group, find POST/PUT → GET/DELETE/PATCH patterns
+    for names in paths.values():
+        for producer_name in names:
+            producer = operations[producer_name]
+            # Producer must create/update and return data
+            if producer.method not in ("post", "put") or not producer.outputs:
+                continue
+
+            for consumer_name in names:
+                consumer = operations[consumer_name]
+                # Consumer must have path parameters
+                if not consumer.inputs:
+                    continue
+                # Paths must be related (collection + item pattern)
+                if _is_collection_item_pattern(producer.path, consumer.path):
+                    candidates.append((producer_name, consumer_name))
+
+    return candidates
+
+
+def _extract_base_path(path: str) -> str:
+    """Extract collection path: /blog/posts/{id} -> /blog/posts."""
+    parts = [p for p in path.split("/") if not p.startswith("{")]
+    return "/".join(parts).rstrip("/")
+
+
+def _is_collection_item_pattern(collection_path: str, item_path: str) -> bool:
+    """Check if paths follow REST collection/item pattern."""
+    # /blog/posts + /blog/posts/{postId}
+    normalized_collection = collection_path.rstrip("/")
+    normalized_item = item_path.rstrip("/")
+
+    # Must start with collection path
+    if not normalized_item.startswith(normalized_collection + "/"):
+        return False
+
+    # Extract the segment after collection path
+    remainder = normalized_item[len(normalized_collection) + 1 :]
+
+    # Must be a single path parameter: {paramName} with no slashes
+    return (
+        remainder.startswith("{")
+        and remainder.endswith("}")
+        and len(remainder) > 2  # Not empty {}
+        and "/" not in remainder
+    )
