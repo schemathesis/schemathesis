@@ -73,8 +73,9 @@ class ExtractedParam:
 
     definition: Any
     value: Result[Any, Exception]
+    is_required: bool
 
-    __slots__ = ("definition", "value")
+    __slots__ = ("definition", "value", "is_required")
 
 
 @dataclass

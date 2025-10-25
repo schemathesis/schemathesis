@@ -23,8 +23,9 @@ class NormalizedParameter:
     name: str
     expression: str
     container_name: str
+    is_required: bool
 
-    __slots__ = ("location", "name", "expression", "container_name")
+    __slots__ = ("location", "name", "expression", "container_name", "is_required")
 
 
 @dataclass(repr=False)
@@ -131,15 +132,21 @@ class OpenApiLink:
                 except Exception as exc:
                     errors.append(TransitionValidationError(str(exc)))
 
+            is_required = False
             if hasattr(self, "target"):
                 try:
                     container_name = self._get_parameter_container(location, name)
                 except TransitionValidationError as exc:
                     errors.append(exc)
                     continue
+
+                for param in self.target.iter_parameters():
+                    if param.name == name:
+                        is_required = param.is_required
+                        break
             else:
                 continue
-            result.append(NormalizedParameter(location, name, expression, container_name))
+            result.append(NormalizedParameter(location, name, expression, container_name, is_required=is_required))
         return result
 
     def _get_parameter_container(self, location: ParameterLocation | None, name: str) -> str:
@@ -178,7 +185,9 @@ class OpenApiLink:
                 value = Ok(expressions.evaluate(parameter.expression, output))
             except Exception as exc:
                 value = Err(exc)
-            container[parameter.name] = ExtractedParam(definition=parameter.expression, value=value)
+            container[parameter.name] = ExtractedParam(
+                definition=parameter.expression, value=value, is_required=parameter.is_required
+            )
         return extracted
 
     def extract_body(self, output: StepOutput) -> ExtractedParam | None:
@@ -188,7 +197,7 @@ class OpenApiLink:
                 value = Ok(expressions.evaluate(self.body, output, evaluate_nested=True))
             except Exception as exc:
                 value = Err(exc)
-            return ExtractedParam(definition=self.body, value=value)
+            return ExtractedParam(definition=self.body, value=value, is_required=True)
         return None
 
 
