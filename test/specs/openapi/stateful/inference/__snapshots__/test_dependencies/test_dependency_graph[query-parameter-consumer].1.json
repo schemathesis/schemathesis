@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1items/post",
+    {
+      "GetItem": {
+        "operationRef": "#/paths/~1items~1search/get",
+        "parameters": {
+          "query.itemId": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

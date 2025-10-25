@@ -1,0 +1,55 @@
+{
+  "operations": {
+    "GET /items/search": {
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "itemId",
+          "resource": "Item",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Search",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /items": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Item",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Item": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    },
+    "Search": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

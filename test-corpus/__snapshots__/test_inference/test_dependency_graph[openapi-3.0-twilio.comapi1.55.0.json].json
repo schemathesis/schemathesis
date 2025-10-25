@@ -796,6 +796,12 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "ParentCallSid",
+          "resource": "ParentCall",
+          "resource_field": "ParentCallSid"
         }
       ],
       "outputs": [
@@ -1606,6 +1612,18 @@
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "CallSid",
+          "resource": "Call",
+          "resource_field": "CallSid"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "ConferenceSid",
+          "resource": "Conference",
+          "resource_field": "ConferenceSid"
         }
       ],
       "outputs": [
@@ -5338,6 +5356,12 @@
           "string"
         ]
       }
+    },
+    "ParentCall": {
+      "fields": [
+        "ParentCallSid"
+      ],
+      "types": {}
     },
     "Participants.json": {
       "fields": [
