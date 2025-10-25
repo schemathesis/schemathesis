@@ -276,7 +276,22 @@ def into_step_input(
 
                     param_key = f"{container}.{name}"
 
-                    if biased_coin(1 - BASE_EXPLORATION_RATE):
+                    # Calculate exploration rate based on parameter characteristics
+                    exploration_rate = BASE_EXPLORATION_RATE
+
+                    # Path parameters are critical for routing - use link values more often
+                    if container == "path_parameters":
+                        exploration_rate *= 0.5
+
+                    # Required parameters should follow links more often, optional ones explored more
+                    # Path params are always required, so they get both multipliers
+                    if extracted.is_required:
+                        exploration_rate *= 0.5
+                    else:
+                        # Explore optional parameters more to avoid only testing link-provided values
+                        exploration_rate *= 3.0
+
+                    if biased_coin(1 - exploration_rate):
                         overrides[container][name] = extracted.value.ok()
                         applied_parameters.append(param_key)
 
