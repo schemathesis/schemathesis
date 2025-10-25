@@ -2239,6 +2239,127 @@ def test_schemathesis_stateful_finds_checksum_match_bug(cli, app_runner, snapsho
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_bug_when_link_always_used(cli, app_runner, snapshot_cli, ctx):
+    item_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+        },
+        "required": ["id", "name"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Item created",
+                            "content": {"application/json": {"schema": item_schema}},
+                            "links": {
+                                "GetItem": {
+                                    "operationId": "getItem",
+                                    "parameters": {
+                                        "id": "$response.body#/id",
+                                        # Link always provides json
+                                        "format": "json",
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                        {
+                            "name": "format",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "string", "enum": ["json", "xml"]},
+                        },
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Item details",
+                            "content": {"application/json": {"schema": item_schema}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    items = {}
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        nonlocal next_id
+        data = request.get_json() or {}
+
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
+        item_id = str(next_id)
+        next_id += 1
+
+        items[item_id] = {
+            "id": item_id,
+            "name": data.get("name", "Item"),
+        }
+
+        return jsonify({"id": item_id, "name": items[item_id]["name"]}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id not in items:
+            return "", 404
+
+        format_param = request.args.get("format", "json")
+        if format_param != "json":
+            return {"error": "xml format not implemented"}, 500
+
+        item = items[item_id]
+        return jsonify({"id": item["id"], "name": item["name"]}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=100",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
 def customer_post(*, operation_id="createCustomer", response_schema=None, links=None):
     """Build /customers POST endpoint."""
     endpoint = {
