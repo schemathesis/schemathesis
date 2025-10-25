@@ -1343,6 +1343,20 @@ def snapshot_json(snapshot):
             {"schemas": {"Tag": SCHEMA_WITH_ID}},
             id="array-input",
         ),
+        pytest.param(
+            {
+                **operation("post", "/items", "201", SCHEMA_WITH_ID),
+                **operation(
+                    "get",
+                    "/items/search",
+                    "200",
+                    SCHEMA_WITH_ID,
+                    [{"name": "itemId", "in": "query", "required": True, "schema": {"type": "string"}}],
+                ),
+            },
+            None,
+            id="query-parameter-consumer",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

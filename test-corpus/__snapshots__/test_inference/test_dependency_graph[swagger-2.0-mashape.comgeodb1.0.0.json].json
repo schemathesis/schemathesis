@@ -119,6 +119,12 @@
           "parameter_name": "cityId",
           "resource": "City",
           "resource_field": "cityId"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "toCityId",
+          "resource": "ToCity",
+          "resource_field": "toCityId"
         }
       ],
       "outputs": [
@@ -322,7 +328,14 @@
       ]
     },
     "GET /locale/currencies": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "countryId",
+          "resource": "Country",
+          "resource_field": "countryId"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -722,6 +735,12 @@
           "integer"
         ]
       }
+    },
+    "ToCity": {
+      "fields": [
+        "toCityId"
+      ],
+      "types": {}
     },
     "Zone": {
       "fields": [

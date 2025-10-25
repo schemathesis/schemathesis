@@ -1,7 +1,14 @@
 {
   "operations": {
     "GET /oauth2/1/authorize": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "client_id",
+          "resource": "Client",
+          "resource_field": "client_id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",

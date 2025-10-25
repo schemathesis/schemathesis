@@ -78,7 +78,14 @@
       ]
     },
     "GET /game/box/advanced": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -89,7 +96,14 @@
       ]
     },
     "GET /games": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "id",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -111,7 +125,14 @@
       ]
     },
     "GET /games/players": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -122,7 +143,14 @@
       ]
     },
     "GET /games/teams": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -133,7 +161,14 @@
       ]
     },
     "GET /games/weather": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -144,7 +179,14 @@
       ]
     },
     "GET /lines": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -155,7 +197,14 @@
       ]
     },
     "GET /live/plays": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "id",
+          "resource": "Play",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -166,7 +215,14 @@
       ]
     },
     "GET /metrics/wp": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -199,7 +255,26 @@
       ]
     },
     "GET /play/stats": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "gameId",
+          "resource": "Game",
+          "resource_field": "id"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "athleteId",
+          "resource": "Athlete",
+          "resource_field": "athleteId"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "statTypeId",
+          "resource": "StatType",
+          "resource_field": "statTypeId"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -254,7 +329,14 @@
       ]
     },
     "GET /player/usage": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "playerId",
+          "resource": "Player",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -287,7 +369,14 @@
       ]
     },
     "GET /ppa/players/games": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "playerId",
+          "resource": "Player",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -298,7 +387,14 @@
       ]
     },
     "GET /ppa/players/season": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "playerId",
+          "resource": "Player",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -615,6 +711,12 @@
           "string"
         ]
       }
+    },
+    "Athlete": {
+      "fields": [
+        "athleteId"
+      ],
+      "types": {}
     },
     "BoxScore": {
       "fields": [
@@ -2303,6 +2405,12 @@
           "object"
         ]
       }
+    },
+    "StatType": {
+      "fields": [
+        "statTypeId"
+      ],
+      "types": {}
     },
     "Team": {
       "fields": [

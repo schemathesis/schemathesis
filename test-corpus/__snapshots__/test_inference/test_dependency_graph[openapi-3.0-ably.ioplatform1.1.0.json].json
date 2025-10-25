@@ -1,11 +1,37 @@
 {
   "operations": {
     "DELETE /push/channelSubscriptions": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "deviceId",
+          "resource": "Device",
+          "resource_field": "device_id"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        }
+      ],
       "outputs": []
     },
     "DELETE /push/deviceRegistrations": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "deviceId",
+          "resource": "Device",
+          "resource_field": "device_id"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        }
+      ],
       "outputs": []
     },
     "DELETE /push/deviceRegistrations/{device_id}": {
@@ -79,6 +105,18 @@
           "parameter_name": "channel_id",
           "resource": "Channel",
           "resource_field": "channel_id"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "connectionId",
+          "resource": "Connection",
+          "resource_field": "connectionId"
         }
       ],
       "outputs": [
@@ -109,7 +147,20 @@
       ]
     },
     "GET /push/channelSubscriptions": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "deviceId",
+          "resource": "Device",
+          "resource_field": "device_id"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -130,7 +181,20 @@
       "outputs": []
     },
     "GET /push/deviceRegistrations": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "deviceId",
+          "resource": "Device",
+          "resource_field": "device_id"
+        },
+        {
+          "parameter_location": "query",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",

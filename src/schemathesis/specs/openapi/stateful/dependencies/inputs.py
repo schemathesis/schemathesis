@@ -40,7 +40,7 @@ def extract_inputs(
     creating placeholder resources if not yet discovered from their schemas.
     """
     known_dependencies = set()
-    for param in operation.path_parameters:
+    for param in operation.iter_parameters():
         input_slot = _resolve_parameter_dependency(
             parameter_name=param.name,
             parameter_location=param.location,
