@@ -484,6 +484,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Unknown type:" in formatted:
         return True
+    if "Unresolvable reference" in formatted:
+        return True
     if "Unresolvable JSON pointer" in formatted:
         return True
     if "Ensure that the definition complies with the OpenAPI specification" in formatted:
@@ -491,6 +493,10 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
     if "references non-existent operation" in formatted:
         return True
     if "is not defined in API operation" in formatted:
+        return True
+    if "is not in the specified alphabet" in formatted:
+        return True
+    if "Invalid Schema Object" in formatted:
         return True
     if "contain invalid link definitions" in formatted:
         return True

@@ -32,18 +32,18 @@ Schemathesis dev
 _________________________________ GET /success _________________________________
 Schema Error
 
-Invalid `properties` definition
+Invalid Schema Object in response definition
 
 Location:
     properties
 
 Problematic definition:
-"ABC"
+    "ABC"
 
 Error details:
     'ABC' is not of type 'object'
 
-Ensure that the definition complies with the OpenAPI specification
+See: https://spec.openapis.org/oas/v3.0.2#schema-object
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

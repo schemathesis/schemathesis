@@ -32,13 +32,11 @@ Schemathesis dev
 __________________________________ PUT /test ___________________________________
 Schema Error
 
-Unresolvable JSON pointer in the schema
+Unresolvable reference in the schema
 
 Error details:
-    JSON pointer: './unknown.json'
-    This typically means that the schema is referencing a component that doesn't exist.
-
-Ensure that the definition complies with the OpenAPI specification
+    Reference: ./unknown.json
+    File reference could not be resolved. Check that the file exists.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

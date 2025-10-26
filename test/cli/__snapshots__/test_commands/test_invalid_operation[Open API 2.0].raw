@@ -24,23 +24,23 @@ Schemathesis dev
 ________________________________ POST /invalid _________________________________
 Schema Error
 
-Invalid definition for element at index 0 in `parameters`
+Invalid Parameter Object at index 0
 
 Location:
     paths -> /invalid -> post -> parameters -> 0
 
 Problematic definition:
-{
-    "in": "query",
-    "name": "id",
-    "required": true,
-    "type": "int"
-}
+    {
+        "in": "query",
+        "name": "id",
+        "required": true,
+        "type": "int"
+    }
 
 Error details:
     The provided definition doesn't match any of the expected formats or types.
 
-Ensure that the definition complies with the OpenAPI specification
+See: https://spec.openapis.org/oas/v2.0#parameter-object
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

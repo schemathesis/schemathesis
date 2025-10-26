@@ -669,15 +669,15 @@ def test_unresolvable_reference_during_generation(ctx, testdir):
     main.write_text(json.dumps(schema), "utf8")
     schema = schemathesis.openapi.from_path(str(main))
 
-    with pytest.raises(InvalidSchema, match="Unresolvable JSON pointer in the schema"):
+    with pytest.raises(InvalidSchema, match="Unresolvable reference in the schema"):
         schema["/test"]["GET"].as_strategy()
 
 
 @pytest.mark.parametrize(
     ("key", "expected"),
     [
-        ("Key7", "Invalid `Key7` definition"),
-        ("Key8", "Invalid `Key8` definition"),
+        ("Key7", "Invalid Schema Object definition for `Key7`"),
+        ("Key8", "Invalid Schema Object definition for `Key8`"),
     ],
 )
 def test_uncommon_type_in_generation(ctx, testdir, key, expected):
