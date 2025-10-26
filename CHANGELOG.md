@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.12...HEAD) - TBD
 
+### :wrench: Changed
+
+- Add specification links to error messages on invalid schemas.
+
 ## [4.3.12](https://github.com/schemathesis/schemathesis/compare/v4.3.11...v4.3.12) - 2025-10-25
 
 ### :wrench: Changed

@@ -5,6 +5,8 @@ from __future__ import annotations
 import enum
 import re
 import traceback
+from dataclasses import dataclass
+from textwrap import indent
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
@@ -33,6 +35,60 @@ class SchemathesisError(Exception):
     """Base exception class for all Schemathesis errors."""
 
 
+class DefinitionKind(str, enum.Enum):
+    SCHEMA = "Schema Object"
+    SECURITY_SCHEME = "Security Scheme Object"
+    RESPONSES = "Responses Object"
+    PARAMETER = "Parameter Object"
+
+
+@dataclass
+class SchemaLocation:
+    kind: DefinitionKind
+    # Hint about where the definition is located
+    hint: str | None
+    # Open API spec version
+    version: str
+
+    __slots__ = ("kind", "hint", "version")
+
+    @classmethod
+    def response_schema(cls, version: str) -> SchemaLocation:
+        return cls(kind=DefinitionKind.SCHEMA, hint="in response definition", version=version)
+
+    @classmethod
+    def maybe_from_error_path(cls, path: list[str | int], version: str) -> SchemaLocation | None:
+        if len(path) == 3 and path[:2] == ["components", "securitySchemes"]:
+            return cls(kind=DefinitionKind.SECURITY_SCHEME, hint=f"definition for `{path[2]}`", version=version)
+        if len(path) == 3 and path[:2] == ["components", "schemas"]:
+            return cls(kind=DefinitionKind.SCHEMA, hint=f"definition for `{path[2]}`", version=version)
+        if len(path) == 4 and path[0] == "paths" and path[-1] == "responses":
+            return cls(kind=DefinitionKind.RESPONSES, hint=None, version=version)
+        if len(path) == 5 and path[0] == "paths" and path[3] == "parameters":
+            return cls(kind=DefinitionKind.PARAMETER, hint=f"at index {path[4]}", version=version)
+
+        return None
+
+    @property
+    def message(self) -> str:
+        message = f"Invalid {self.kind.value}"
+        if self.hint is not None:
+            message += f" {self.hint}"
+        else:
+            message += " definition"
+        return message
+
+    @property
+    def specification_url(self) -> str:
+        anchor = {
+            DefinitionKind.SCHEMA: "schema-object",
+            DefinitionKind.SECURITY_SCHEME: "security-scheme-object",
+            DefinitionKind.RESPONSES: "responses-object",
+            DefinitionKind.PARAMETER: "parameter-object",
+        }[self.kind]
+        return f"https://spec.openapis.org/oas/v{self.version}#{anchor}"
+
+
 class InvalidSchema(SchemathesisError):
     """Indicates errors in API schema validation or processing."""
 
@@ -56,9 +112,16 @@ class InvalidSchema(SchemathesisError):
 
     @classmethod
     def from_jsonschema_error(
-        cls, error: ValidationError | JsonSchemaError, path: str | None, method: str | None, config: OutputConfig
+        cls,
+        error: ValidationError | JsonSchemaError,
+        path: str | None,
+        method: str | None,
+        config: OutputConfig,
+        location: SchemaLocation | None = None,
     ) -> InvalidSchema:
-        if error.absolute_path:
+        if location is not None:
+            message = location.message
+        elif error.absolute_path:
             part = error.absolute_path[-1]
             if isinstance(part, int) and len(error.absolute_path) > 1:
                 parent = error.absolute_path[-2]
@@ -70,14 +133,18 @@ class InvalidSchema(SchemathesisError):
         error_path = " -> ".join(str(entry) for entry in error.path) or "[root]"
         message += f"\n\nLocation:\n    {error_path}"
         instance = truncate_json(error.instance, config=config)
-        message += f"\n\nProblematic definition:\n{instance}"
+        message += f"\n\nProblematic definition:\n{indent(instance, '    ')}"
         message += "\n\nError details:\n    "
         # This default message contains the instance which we already printed
         if "is not valid under any of the given schemas" in error.message:
             message += "The provided definition doesn't match any of the expected formats or types."
         else:
             message += error.message
-        message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
+        message += "\n\n"
+        if location is not None:
+            message += f"See: {location.specification_url}"
+        else:
+            message += SCHEMA_ERROR_SUGGESTION
         return cls(message, path=path, method=method)
 
     @classmethod
@@ -86,12 +153,14 @@ class InvalidSchema(SchemathesisError):
     ) -> InvalidSchema:
         notes = getattr(error, "__notes__", [])
         # Some exceptions don't have the actual reference in them, hence we add it manually via notes
-        pointer = f"'{notes[0]}'"
-        message = "Unresolvable JSON pointer in the schema"
+        reference = str(notes[0])
+        message = "Unresolvable reference in the schema"
         # Get the pointer value from "Unresolvable JSON pointer: 'components/UnknownParameter'"
-        message += f"\n\nError details:\n    JSON pointer: {pointer}"
-        message += "\n    This typically means that the schema is referencing a component that doesn't exist."
-        message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
+        message += f"\n\nError details:\n    Reference: {reference}"
+        if not reference.startswith(("http://", "https://", "#/")):
+            message += "\n    File reference could not be resolved. Check that the file exists."
+        elif reference.startswith(("#/components", "#/definitions")):
+            message += "\n    Component does not exist in the schema."
         return cls(message, path=path, method=method)
 
     def as_failing_test_function(self) -> Callable:

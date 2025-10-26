@@ -32,23 +32,19 @@ Schemathesis dev
 _____________________________________ /foo _____________________________________
 Schema Error
 
-Unresolvable JSON pointer in the schema
+Unresolvable reference in the schema
 
 Error details:
-    JSON pointer: '#/components/UnknownMethods'
-    This typically means that the schema is referencing a component that doesn't exist.
-
-Ensure that the definition complies with the OpenAPI specification
+    Reference: #/components/UnknownMethods
+    Component does not exist in the schema.
 __________________________________ POST /bar ___________________________________
 Schema Error
 
-Unresolvable JSON pointer in the schema
+Unresolvable reference in the schema
 
 Error details:
-    JSON pointer: '#/components/UnknownParameter'
-    This typically means that the schema is referencing a component that doesn't exist.
-
-Ensure that the definition complies with the OpenAPI specification
+    Reference: #/components/UnknownParameter
+    Component does not exist in the schema.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
