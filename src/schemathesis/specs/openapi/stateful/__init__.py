@@ -237,8 +237,8 @@ def classify_root_transitions(operations: list[APIOperation], transitions: ApiTr
 
 def is_likely_root_transition(operation: APIOperation) -> bool:
     """Check if operation is likely to succeed as a root transition."""
-    # POST operations with request bodies are likely to create resources
-    if operation.method == "post" and operation.body:
+    # POST operations are likely to create resources
+    if operation.method == "post":
         return True
 
     # GET operations without path parameters are likely to return lists
