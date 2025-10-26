@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Allow `POST` API operations without request bodies to be used in stateful tests when provided via explicit Open API links. [#3087](https://github.com/schemathesis/schemathesis/discussions/3087)
+- Link coverage reporting incorrectly marking parameterless links as "not applied".
 
 ### :wrench: Changed
 
