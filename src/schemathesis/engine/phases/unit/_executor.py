@@ -25,6 +25,7 @@ from schemathesis.core.errors import (
     InvalidRegexType,
     InvalidSchema,
     MalformedMediaType,
+    SchemaLocation,
     SerializationNotPossible,
 )
 from schemathesis.core.failures import Failure, FailureGroup
@@ -198,6 +199,9 @@ def run_test(
                     path=operation.path,
                     method=operation.method,
                     config=ctx.config.output,
+                    location=SchemaLocation.maybe_from_error_path(
+                        list(exc.absolute_path), ctx.schema.specification.version
+                    ),
                 )
             )
     except InvalidArgument as exc:

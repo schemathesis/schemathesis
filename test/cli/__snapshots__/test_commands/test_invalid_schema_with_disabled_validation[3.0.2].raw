@@ -32,21 +32,21 @@ Schemathesis dev
 __________________________________ POST /data __________________________________
 Schema Error
 
-Invalid `bearerAuth` definition
+Invalid Security Scheme Object definition for `bearerAuth`
 
 Location:
     components -> securitySchemes -> bearerAuth
 
 Problematic definition:
-{
-    "scheme": "bearer",
-    "bearerFormat": "uuid"
-}
+    {
+        "scheme": "bearer",
+        "bearerFormat": "uuid"
+    }
 
 Error details:
     The provided definition doesn't match any of the expected formats or types.
 
-Ensure that the definition complies with the OpenAPI specification
+See: https://spec.openapis.org/oas/v3.0.2#security-scheme-object
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

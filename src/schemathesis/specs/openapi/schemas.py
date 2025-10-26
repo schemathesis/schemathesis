@@ -27,7 +27,13 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import InfiniteRecursiveReference, InvalidSchema, OperationNotFound
+from schemathesis.core.errors import (
+    SCHEMA_ERROR_SUGGESTION,
+    InfiniteRecursiveReference,
+    InvalidSchema,
+    OperationNotFound,
+    SchemaLocation,
+)
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transport import Response
@@ -61,7 +67,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful import APIStateMachine
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
-SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
 
@@ -317,9 +322,13 @@ class BaseOpenAPISchema(BaseSchema):
             self.validate()
         except jsonschema.ValidationError as exc:
             raise InvalidSchema.from_jsonschema_error(
-                exc, path=path, method=method, config=self.config.output
+                exc,
+                path=path,
+                method=method,
+                config=self.config.output,
+                location=SchemaLocation.maybe_from_error_path(list(exc.absolute_path), self.specification.version),
             ) from None
-        raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method) from error
+        raise InvalidSchema(SCHEMA_ERROR_SUGGESTION, path=path, method=method) from error
 
     def validate(self) -> None:
         with suppress(TypeError):
@@ -540,7 +549,11 @@ class BaseOpenAPISchema(BaseSchema):
             definition.validator.validate(data)
         except jsonschema.SchemaError as exc:
             raise InvalidSchema.from_jsonschema_error(
-                exc, path=operation.path, method=operation.method, config=self.config.output
+                exc,
+                path=operation.path,
+                method=operation.method,
+                config=self.config.output,
+                location=SchemaLocation.response_schema(self.specification.version),
             ) from exc
         except jsonschema.ValidationError as exc:
             failures.append(
