@@ -301,6 +301,7 @@ class CliSnapshotConfig:
     replace_reproduce_with: bool = False
     replace_test_cases: bool = True
     replace_phase_statistic: bool = False
+    replace_stateful_statistic: bool = True
     remove_last_line: bool = False
     replace: bool = True
 
@@ -374,7 +375,8 @@ class CliSnapshotConfig:
         if self.replace_phase_statistic:
             data = re.sub("🚫 [0-9]+ errors", "🚫 1 error", data)
         if "Stateful" in data:
-            data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
+            if self.replace_stateful_statistic:
+                data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
             before, after = data.split("Stateful", 1)
             after = re.sub(r"\d+ passed", "N passed", after)
             data = before + "Stateful" + after

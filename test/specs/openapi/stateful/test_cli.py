@@ -455,3 +455,85 @@ def test_unique_inputs(ctx, cli, snapshot_cli, openapi3_base_url):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_stateful_statistic=False)
+def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snapshot_cli, ctx):
+    session_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+    }
+
+    sessions_list_schema = {
+        "type": "object",
+        "properties": {
+            "sessions": {
+                "type": "array",
+                "items": session_schema,
+            }
+        },
+        "required": ["sessions"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/sessions": {
+                "post": {
+                    "operationId": "createSession",
+                    "responses": {
+                        "200": {
+                            "description": "Session created",
+                            "content": {"application/json": {"schema": session_schema}},
+                            "links": {
+                                "GetSessions": {
+                                    "operationId": "getSessions",
+                                }
+                            },
+                        }
+                    },
+                },
+                "get": {
+                    "operationId": "getSessions",
+                    "responses": {
+                        "200": {
+                            "description": "List of sessions",
+                            "content": {"application/json": {"schema": sessions_list_schema}},
+                        }
+                    },
+                },
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    sessions = {}
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/sessions", methods=["POST"])
+    def create_session():
+        nonlocal next_id
+        session_id = str(next_id)
+        next_id += 1
+        sessions[session_id] = {"id": session_id}
+        return jsonify({"id": session_id}), 200
+
+    @app.route("/sessions", methods=["GET"])
+    def get_sessions():
+        return jsonify({"sessions": list(sessions.values())}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
