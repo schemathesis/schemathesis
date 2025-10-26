@@ -456,12 +456,7 @@
           "string"
         ],
         "status": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ]
       }
     },
@@ -475,12 +470,7 @@
           "boolean"
         ],
         "occupancy": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ]
       }
     },
@@ -533,12 +523,7 @@
           "string"
         ],
         "push.recipient": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "push.state": [
           "string"
@@ -576,12 +561,7 @@
           "string"
         ],
         "extras": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"
@@ -622,12 +602,7 @@
           "string"
         ],
         "extras": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"

@@ -701,12 +701,7 @@
       ],
       "types": {
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "image_url": [
           "array",
@@ -717,27 +712,12 @@
           "string"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "url": [
@@ -793,35 +773,15 @@
           "string"
         ],
         "full_name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "league_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
@@ -841,11 +801,6 @@
           "string"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "tier": [
@@ -873,12 +828,7 @@
           "string"
         ],
         "year": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ]
       }
     },
@@ -915,43 +865,18 @@
           "string"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "league_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "live_supported": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "prizepool": [
@@ -963,19 +888,9 @@
           "string"
         ],
         "serie_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "winner_id": [
@@ -1034,20 +949,10 @@
           "string"
         ],
         "detailed_stats": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "draw": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "end_at": [
           "array",
@@ -1058,12 +963,7 @@
           "string"
         ],
         "forfeit": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "game_advantage": [
           "array",
@@ -1074,28 +974,13 @@
           "string"
         ],
         "games": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "live": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "live_embed_url": [
           "array",
@@ -1106,36 +991,16 @@
           "string"
         ],
         "match_type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "number_of_games": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "official_stream_url": [
           "array",
@@ -1146,12 +1011,7 @@
           "string"
         ],
         "opponents": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "original_scheduled_at": [
           "array",
@@ -1162,12 +1022,7 @@
           "string"
         ],
         "previous_matches": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "scheduled_at": [
           "array",
@@ -1186,36 +1041,16 @@
           "string"
         ],
         "status": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "streams": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "streams_list": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "tournament_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "winner_id": [
           "array",
@@ -1241,11 +1076,6 @@
       ],
       "types": {
         "change_type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "id": [
@@ -1257,27 +1087,12 @@
           "string"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "object": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ]
       }
@@ -1299,12 +1114,7 @@
       ],
       "types": {
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "image_url": [
           "array",
@@ -1315,35 +1125,15 @@
           "string"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "series": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "url": [
@@ -1376,12 +1166,7 @@
       ],
       "types": {
         "endpoints": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "event": [
           "array",
@@ -1392,12 +1177,7 @@
           "string"
         ],
         "match": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ]
       }
     },
@@ -1448,20 +1228,10 @@
           "string"
         ],
         "detailed_stats": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "draw": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "end_at": [
           "array",
@@ -1472,12 +1242,7 @@
           "string"
         ],
         "forfeit": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "game_advantage": [
           "array",
@@ -1488,44 +1253,19 @@
           "string"
         ],
         "games": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "league": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "league_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "live": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "live_embed_url": [
           "array",
@@ -1536,36 +1276,16 @@
           "string"
         ],
         "match_type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "number_of_games": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "official_stream_url": [
           "array",
@@ -1576,12 +1296,7 @@
           "string"
         ],
         "opponents": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "original_scheduled_at": [
           "array",
@@ -1600,12 +1315,7 @@
           "string"
         ],
         "results": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "scheduled_at": [
           "array",
@@ -1616,20 +1326,10 @@
           "string"
         ],
         "serie": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "serie_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "slug": [
           "array",
@@ -1640,52 +1340,22 @@
           "string"
         ],
         "status": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "streams": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "streams_list": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "tournament": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "tournament_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "videogame": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "videogame_version": [
           "array",
@@ -1729,12 +1399,7 @@
           "string"
         ],
         "supported": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "url": [
           "array",
@@ -1754,28 +1419,13 @@
       ],
       "types": {
         "english": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "official": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "russian": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ]
       }
     },
@@ -1786,20 +1436,10 @@
       ],
       "types": {
         "opponent_type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "opponents": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ]
       }
     },
@@ -1873,12 +1513,7 @@
           "string"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "image_url": [
           "array",
@@ -1897,11 +1532,6 @@
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "nationality": [
@@ -1977,43 +1607,18 @@
           "string"
         ],
         "full_name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "league": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "league_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
@@ -2033,11 +1638,6 @@
           "string"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "tier": [
@@ -2049,20 +1649,10 @@
           "string"
         ],
         "tournaments": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "videogame": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "videogame_title": [
           "array",
@@ -2089,12 +1679,7 @@
           "string"
         ],
         "year": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ]
       }
     },
@@ -2136,59 +1721,24 @@
           "string"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "league": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "league_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "live_supported": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "matches": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "prizepool": [
@@ -2200,44 +1750,19 @@
           "string"
         ],
         "serie": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "serie_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "teams": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "videogame": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "winner_id": [
           "array",
@@ -2264,19 +1789,9 @@
       ],
       "types": {
         "current": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ]
       }
@@ -2315,12 +1830,7 @@
           "string"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "image_url": [
           "array",
@@ -2339,28 +1849,13 @@
           "string"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "players": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "slug": [
           "array",
@@ -2411,67 +1906,27 @@
           "string"
         ],
         "expected_roster": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "league": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "league_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "live_supported": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "boolean"
         ],
         "matches": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "modified_at": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "name": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "prizepool": [
@@ -2483,44 +1938,19 @@
           "string"
         ],
         "serie": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "serie_id": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "integer"
         ],
         "slug": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ],
         "teams": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "videogame": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "winner_id": [
           "array",
@@ -2547,19 +1977,9 @@
       ],
       "types": {
         "rosters": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "type": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
           "string"
         ]
       }
@@ -2594,12 +2014,7 @@
           "string"
         ],
         "leagues": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "array"
         ],
         "name": [
           "array",

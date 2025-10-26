@@ -232,30 +232,38 @@ def unwrap_schema(
         _, resolved = maybe_resolve(array_schema, resolver, "")
         pointer = f"/{encode_pointer(array_field)}"
 
+        uses_parent_ref = False
         # Try to unwrap one more time
         if resolved.get("type") == "array" or "items" in resolved:
             nested_items = resolved.get("items")
             if isinstance(nested_items, dict):
                 _, resolved_items = maybe_resolve(nested_items, resolver, "")
-                external_tag = _detect_externally_tagged_pattern(resolved_items, path)
+                external_tag = _detect_externally_tagged_pattern(resolved_items, path, parent_ref)
                 if external_tag:
-                    nested_properties = resolved_items["properties"][external_tag]
+                    external_tag_, uses_parent_ref = external_tag
+                    nested_properties = resolved_items["properties"][external_tag_]
                     _, resolved = maybe_resolve(nested_properties, resolver, "")
-                    pointer += f"/{encode_pointer(external_tag)}"
+                    pointer += f"/{encode_pointer(external_tag_)}"
 
+        ref = parent_ref if uses_parent_ref else array_schema.get("$ref")
         return UnwrappedSchema(pointer=pointer, schema=resolved, ref=array_schema.get("$ref"))
 
     # External tag
-    external_tag = _detect_externally_tagged_pattern(schema, path)
+    external_tag = _detect_externally_tagged_pattern(schema, path, parent_ref)
     if external_tag:
-        tagged_schema = properties[external_tag]
+        external_tag_, uses_parent_ref = external_tag
+        tagged_schema = properties[external_tag_]
         _, resolved_tagged = maybe_resolve(tagged_schema, resolver, "")
 
         resolved = try_unwrap_all_of(resolved_tagged)
-        ref = resolved.get("$ref") or resolved_tagged.get("$ref") or tagged_schema.get("$ref")
+        ref = (
+            parent_ref
+            if uses_parent_ref
+            else resolved.get("$ref") or resolved_tagged.get("$ref") or tagged_schema.get("$ref")
+        )
 
         _, resolved = maybe_resolve(resolved, resolver, "")
-        return UnwrappedSchema(pointer=f"/{encode_pointer(external_tag)}", schema=resolved, ref=ref)
+        return UnwrappedSchema(pointer=f"/{encode_pointer(external_tag_)}", schema=resolved, ref=ref)
 
     # No wrapper - single object at root
     return UnwrappedSchema(pointer="/", schema=schema, ref=schema.get("$ref"))
@@ -391,7 +399,9 @@ def _is_pagination_wrapper(
     return None
 
 
-def _detect_externally_tagged_pattern(schema: Mapping[str, Any], path: str) -> str | None:
+def _detect_externally_tagged_pattern(
+    schema: Mapping[str, Any], path: str, parent_ref: str | None
+) -> tuple[str, bool] | None:
     """Detect externally tagged resource pattern.
 
     Pattern: {ResourceName: [...]} or {resourceName: [...]}
@@ -420,12 +430,18 @@ def _detect_externally_tagged_pattern(schema: Mapping[str, Any], path: str) -> s
         # `data_request`
         naming.to_snake_case(resource_name),
     }
+    parent_names = set()
+    if parent_ref is not None:
+        maybe_resource_name = resource_name_from_ref(parent_ref)
+        parent_names.add(naming.to_plural(maybe_resource_name.lower()))
+        parent_names.add(naming.to_snake_case(maybe_resource_name))
+        possible_names = possible_names.union(parent_names)
 
     for name, subschema in properties.items():
         if name.lower() not in possible_names:
             continue
 
         if isinstance(subschema, dict) and "object" in get_type(subschema):
-            return name
+            return name, name.lower() in parent_names
 
     return None

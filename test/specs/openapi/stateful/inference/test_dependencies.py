@@ -380,6 +380,82 @@ def snapshot_json(snapshot):
         ),
         pytest.param(
             {
+                "/search": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "in": "query",
+                                "name": "user_guid",
+                                "schema": {"type": "string"},
+                            },
+                        ]
+                    }
+                },
+                "/profile": {
+                    "get": {
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/User",
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+            },
+            {"schemas": {"User": {"properties": {"guid": {"type": "string"}}}}},
+            id="field-name-suffix",
+        ),
+        pytest.param(
+            {
+                "/something": {
+                    "post": {
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": "#/components/schemas/Category",
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "/categories/{id}.json": {
+                    "delete": {
+                        "responses": {
+                            "200": {
+                                "description": "Ok",
+                            }
+                        }
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Category": {
+                        "properties": {
+                            "category": component_ref("CategoryFields"),
+                        }
+                    },
+                    "CategoryFields": {
+                        "properties": {
+                            "id": {"type": "integer"},
+                        },
+                        "type": "object",
+                    },
+                }
+            },
+            id="field-as-resource-name",
+        ),
+        pytest.param(
+            {
                 **operation("post", "/blog/posts", "201", component_ref("Blog post public")),
                 **operation("get", "/blog/posts/{postId}", "200", component_ref("Blog post"), [path_param("postId")]),
             },
