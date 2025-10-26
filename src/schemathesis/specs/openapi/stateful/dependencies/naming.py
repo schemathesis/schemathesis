@@ -394,13 +394,13 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
             return field
 
     # Extract parameter components
-    parameter_prefix, param_suffix = _split_parameter_name(parameter)
+    parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
     parameter_prefix_normalized = _normalize_for_matching(parameter_prefix)
 
     # Parameter has resource prefix, field might not
     # Example: `channelId` - `Channel.id`
     if parameter_prefix and parameter_prefix_normalized == resource_normalized:
-        suffix_normalized = _normalize_for_matching(param_suffix)
+        suffix_normalized = _normalize_for_matching(parameter_suffix)
 
         for field in fields:
             field_normalized = _normalize_for_matching(field)
@@ -409,8 +409,8 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
 
     # Parameter has no prefix, field might have resource prefix
     # Example: `id` - `Channel.channelId`
-    if not parameter_prefix and param_suffix:
-        expected_field_normalized = resource_normalized + _normalize_for_matching(param_suffix)
+    if not parameter_prefix and parameter_suffix:
+        expected_field_normalized = resource_normalized + _normalize_for_matching(parameter_suffix)
 
         for field in fields:
             field_normalized = _normalize_for_matching(field)
@@ -433,7 +433,7 @@ def _normalize_for_matching(text: str) -> str:
     return text.lower().replace("_", "").replace("-", "")
 
 
-def _split_parameter_name(param_name: str) -> tuple[str, str]:
+def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
     """Split parameter into (prefix, suffix) components.
 
     Examples:
@@ -444,13 +444,16 @@ def _split_parameter_name(param_name: str) -> tuple[str, str]:
         "channel_id" -> ("channel", "_id")
 
     """
-    if param_name.endswith("Id") and len(param_name) > 2:
-        return (param_name[:-2], "Id")
+    if parameter_name.endswith("Id") and len(parameter_name) > 2:
+        return (parameter_name[:-2], "Id")
 
-    if param_name.endswith("_id") and len(param_name) > 3:
-        return (param_name[:-3], "_id")
+    if parameter_name.endswith("_id") and len(parameter_name) > 3:
+        return (parameter_name[:-3], "_id")
 
-    return ("", param_name)
+    if parameter_name.endswith("_guid") and len(parameter_name) > 5:
+        return (parameter_name[:-5], "_guid")
+
+    return ("", parameter_name)
 
 
 def strip_affixes(name: str, prefixes: list[str], suffixes: list[str]) -> str:
