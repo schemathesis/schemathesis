@@ -50,6 +50,9 @@ class StepInput:
 
     @property
     def is_applied(self) -> bool:
+        # If the transition has no parameters or body, count it as applied
+        if self.transition is not None and not self.transition.parameters and self.transition.request_body is None:
+            return True
         return bool(self.applied_parameters)
 
 

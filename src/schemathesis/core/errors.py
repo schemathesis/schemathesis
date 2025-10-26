@@ -223,13 +223,13 @@ class InvalidStateMachine(SchemathesisError):
         for source, target_groups in by_source.items():
             for (target, status), transitions in target_groups.items():
                 for transition in transitions:
-                    result += f"\n\n  {_format_transition(source, status, transition.name, target)}\n"
+                    result += f"\n\n  {format_transition(source, status, transition.name, target)}\n"
                     for error in transition.errors:
                         result += f"\n     - {error.message}"
         return result
 
 
-def _format_transition(source: str, status: str, transition: str, target: str) -> str:
+def format_transition(source: str, status: str, transition: str, target: str) -> str:
     return f"{source} -> [{status}] {transition} -> {target}"
 
 
