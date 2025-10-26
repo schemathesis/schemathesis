@@ -10,6 +10,7 @@
 ### :wrench: Changed
 
 - Add specification links to error messages on invalid schemas.
+- Improve dependency inference.
 
 ## [4.3.12](https://github.com/schemathesis/schemathesis/compare/v4.3.11...v4.3.12) - 2025-10-25
 

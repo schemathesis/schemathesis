@@ -52,12 +52,7 @@
           "boolean"
         ],
         "error": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "metadata": [
           "object"

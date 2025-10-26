@@ -60,12 +60,7 @@
           "number"
         ],
         "user": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ]
       }
     },

@@ -294,7 +294,13 @@ def _extract_resource_from_schema(
         properties = resolved.get("properties")
         if properties:
             fields = sorted(properties)
-            types = {field: set(get_type(subschema)) for field, subschema in properties.items()}
+            types = {}
+            for field, subschema in properties.items():
+                if isinstance(subschema, dict):
+                    _, resolved_subschema = maybe_resolve(subschema, resolver, "")
+                else:
+                    resolved_subschema = subschema
+                types[field] = set(get_type(cast(dict, resolved_subschema)))
             source = DefinitionSource.SCHEMA_WITH_PROPERTIES
         else:
             fields = []

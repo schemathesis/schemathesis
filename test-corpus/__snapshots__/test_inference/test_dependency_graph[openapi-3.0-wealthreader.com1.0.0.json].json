@@ -61,12 +61,7 @@
           "string"
         ],
         "statistics": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ]
       }
     },
@@ -81,12 +76,7 @@
           "object"
         ],
         "statistics": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "success": [
           "boolean"

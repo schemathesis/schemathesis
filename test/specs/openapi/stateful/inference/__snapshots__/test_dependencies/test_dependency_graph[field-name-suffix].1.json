@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1profile/get",
+    {
+      "GetUser": {
+        "operationRef": "#/paths/~1search/get",
+        "parameters": {
+          "query.user_guid": "$response.body#/guid"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

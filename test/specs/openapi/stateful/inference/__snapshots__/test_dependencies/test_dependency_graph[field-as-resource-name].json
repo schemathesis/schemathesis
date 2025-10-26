@@ -1,0 +1,38 @@
+{
+  "operations": {
+    "DELETE /categories/{id}.json": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Category",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    },
+    "POST /something": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/category",
+          "resource": "Category",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Category": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ]
+      }
+    }
+  }
+}

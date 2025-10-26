@@ -1,0 +1,38 @@
+{
+  "operations": {
+    "GET /profile": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /search": {
+      "inputs": [
+        {
+          "parameter_location": "query",
+          "parameter_name": "user_guid",
+          "resource": "User",
+          "resource_field": "guid"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "User": {
+      "fields": [
+        "guid"
+      ],
+      "types": {
+        "guid": [
+          "string"
+        ]
+      }
+    }
+  }
+}

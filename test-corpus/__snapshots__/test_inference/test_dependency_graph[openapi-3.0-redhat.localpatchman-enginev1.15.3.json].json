@@ -313,12 +313,7 @@
       ],
       "types": {
         "attributes": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"
@@ -374,12 +369,7 @@
       ],
       "types": {
         "attributes": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"
@@ -397,12 +387,7 @@
       ],
       "types": {
         "attributes": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"
@@ -512,12 +497,7 @@
       ],
       "types": {
         "attributes": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"
@@ -625,12 +605,7 @@
       ],
       "types": {
         "attributes": [
-          "array",
-          "boolean",
-          "null",
-          "number",
-          "object",
-          "string"
+          "object"
         ],
         "id": [
           "string"
