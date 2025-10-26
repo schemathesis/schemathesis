@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from flask import Flask, jsonify, request
 from syrupy.extensions.json import JSONSnapshotExtension
@@ -1649,6 +1651,119 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_with_others(
+    cli, app_runner, snapshot_cli, ctx
+):
+    schema = ctx.openapi.build_schema(
+        {
+            "/sessions": {
+                "post": {
+                    "operationId": "createSession",
+                    "responses": {
+                        "201": {
+                            "description": "Session created",
+                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                            "links": {
+                                "GetSession": {
+                                    "operationId": "getSession",
+                                    "parameters": {"sessionId": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/sessions/{sessionId}": {
+                "get": {
+                    "operationId": "getSession",
+                    "parameters": [{"name": "sessionId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+            "/workspaces": {
+                "post": {
+                    "operationId": "createWorkspace",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                            "links": {
+                                "GetWorkspace": {
+                                    "operationId": "getWorkspace",
+                                    "parameters": {"workspaceId": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/workspaces/{workspaceId}": {
+                "get": {
+                    "operationId": "getWorkspace",
+                    "parameters": [
+                        {"name": "workspaceId", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {
+                        "200": {
+                            "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    sessions = {}
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/sessions", methods=["POST"])
+    def create_session():
+        session_id = str(uuid.uuid4())
+        sessions[session_id] = {"id": session_id}
+        return jsonify({"id": session_id}), 201
+
+    @app.route("/sessions/<session_id>", methods=["GET"])
+    def get_session(session_id):
+        if session_id not in sessions:
+            return "", 404
+        # Always fails with 500 for valid sessions
+        return jsonify({"error": "Internal error"}), 500
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c not_a_server_error",
+            f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
         )
         == snapshot_cli

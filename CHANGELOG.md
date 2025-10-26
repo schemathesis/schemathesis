@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.12...HEAD) - TBD
 
+### :bug: Fixed
+
+- Allow `POST` API operations without request bodies to be used in stateful tests when provided via explicit Open API links. [#3087](https://github.com/schemathesis/schemathesis/discussions/3087)
+
 ### :wrench: Changed
 
 - Add specification links to error messages on invalid schemas.
