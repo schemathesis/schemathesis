@@ -19,9 +19,7 @@ from typing import (
 )
 from urllib.parse import urlsplit
 
-import graphql
 from hypothesis import strategies as st
-from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
@@ -52,6 +50,7 @@ from schemathesis.schemas import (
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
+    import graphql
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthStorage
@@ -143,6 +142,8 @@ class GraphQLSchema(BaseSchema):
 
     @property
     def client_schema(self) -> graphql.GraphQLSchema:
+        import graphql
+
         if not hasattr(self, "_client_schema"):
             self._client_schema = graphql.build_client_schema(self.raw_schema)
         return self._client_schema
@@ -336,6 +337,9 @@ def graphql_cases(
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
 ) -> Any:
+    import graphql
+    from hypothesis_graphql import strategies as gql_st
+
     start = time.monotonic()
     definition = cast(GraphQLOperationDefinition, operation.definition)
     strategy_factory = {
