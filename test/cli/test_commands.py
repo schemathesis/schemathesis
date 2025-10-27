@@ -305,6 +305,74 @@ def test_invalid_type_with_ref(cli, ctx, openapi3_base_url, snapshot_cli):
     )
 
 
+def test_unsatisfiable_with_ref(cli, ctx, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ObjectType",
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "IntegerType": {"type": "integer", "minimum": 100, "maximum": 1000},
+                "StringType": {"type": "string", "pattern": "^[A-Z]{3,10}$"},
+                "ObjectType": {
+                    "type": "object",
+                    "properties": {
+                        "nested": {"$ref": "#/components/schemas/NestedSchema"},
+                        "another": {
+                            "allOf": [
+                                {"$ref": "#/components/schemas/IntegerType"},
+                                {"$ref": "#/components/schemas/StringType"},
+                            ]
+                        },
+                    },
+                    "required": ["nested", "another"],
+                },
+                "NestedSchema": {"type": "array", "items": {"type": "boolean"}, "minItems": 5},
+            }
+        },
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
+    )
+
+
+def test_unsatisfiable_query_parameter(cli, ctx, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 100, "maximum": 10},
+                        }
+                    ],
+                    "responses": {"default": {"description": "Ok"}},
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
+    )
+
+
 @pytest.mark.operations("teapot")
 @pytest.mark.parametrize("workers", [1, 2])
 def test_status_code_conformance(cli, schema_url, workers, snapshot_cli):

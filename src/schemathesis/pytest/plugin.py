@@ -34,7 +34,7 @@ from schemathesis.generation.hypothesis.given import (
     merge_given_args,
     validate_given_args,
 )
-from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error, ignore_hypothesis_output
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import APIOperation
 
@@ -293,6 +293,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     For example - kwargs validation is failed for some strategy.
     """
     from schemathesis.generation.hypothesis.builder import (
+        ApiOperationMark,
         InvalidHeadersExampleMark,
         InvalidRegexMark,
         MissingPathParameters,
@@ -327,6 +328,10 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             if invalid_headers is not None:
                 raise InvalidHeadersExample.from_headers(invalid_headers) from None
             pytest.skip(exc.args[0])
+        except Unsatisfiable:
+            operation = ApiOperationMark.get(pyfuncitem.obj)
+            assert operation is not None
+            raise build_unsatisfiable_error(operation, with_tip=True) from None
         except SchemaError as exc:
             raise InvalidRegexPattern.from_schema_error(exc, from_examples=False) from exc
 

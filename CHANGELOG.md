@@ -5,6 +5,7 @@
 ### :wrench: Changed
 
 - Load `graphql` package lazily.
+- `Unsatisfiable` schema errors now show the specific parameter and its schema.
 
 ## [4.3.13](https://github.com/schemathesis/schemathesis/compare/v4.3.12...v4.3.13) - 2025-10-26
 

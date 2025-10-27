@@ -121,6 +121,8 @@ def create_test(
         kwargs=config.given_kwargs,
     )
 
+    ApiOperationMark.set(hypothesis_test, operation)
+
     if config.seed is not None:
         hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
 
@@ -957,3 +959,4 @@ InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_head
 MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
 InfiniteRecursiveReferenceMark = Mark[InfiniteRecursiveReference](attr_name="infinite_recursive_reference")
 UnresolvableReferenceMark = Mark[UnresolvableReference](attr_name="unresolvable_reference")
+ApiOperationMark = Mark[APIOperation](attr_name="api_operation")

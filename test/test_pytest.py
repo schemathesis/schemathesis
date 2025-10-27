@@ -688,6 +688,40 @@ def test(case):
         assert "Authorization: secret" in result.stdout.str()
 
 
+def extract_hypothesis_error(text):
+    lines = text.split("\n")
+    result_lines = []
+    capturing = False
+
+    for line in lines:
+        if "E   hypothesis" in line:
+            capturing = True
+
+        if capturing:
+            if line.startswith("All traceback"):
+                break
+            result_lines.append(line)
+
+    return "\n".join(result_lines)
+
+
+@pytest.mark.operations("unsatisfiable")
+def test_unsatisfiable_schema(testdir, openapi3_schema_url, snapshot):
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+@schema.parametrize()
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert extract_hypothesis_error(result.stdout.str()) == snapshot
+
+
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
