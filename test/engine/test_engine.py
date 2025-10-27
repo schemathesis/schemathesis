@@ -628,7 +628,7 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
 @pytest.mark.parametrize(
     ("phases", "expected", "total_errors"),
     [
-        ([PhaseName.EXAMPLES, PhaseName.FUZZING], "Failed to generate test cases for this API operation", 2),
+        ([PhaseName.EXAMPLES, PhaseName.FUZZING], "Cannot generate test data for query parameter 'key'", 2),
         ([PhaseName.EXAMPLES], "Failed to generate test cases from examples for this API operation", 1),
     ],
 )
@@ -672,7 +672,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     # And the tests are failing because of the unsatisfiable schema
     stream.assert_errors()
     errors = stream.find_all(events.NonFatalError)
-    assert expected in [str(err.value) for err in errors]
+    assert expected in [str(err.value).splitlines()[0] for err in errors]
     assert len(errors) == total_errors
 
 

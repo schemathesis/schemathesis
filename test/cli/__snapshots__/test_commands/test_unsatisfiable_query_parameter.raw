@@ -5,10 +5,10 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
-     Specification:    Open API 2.0
+     Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
@@ -16,34 +16,21 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ⏭   Examples (in 0.00s)
-
-     ⏭  1 skipped
-
- ⏭   Coverage (in 0.00s)
-
-     ⏭  1 skipped
-
  🚫  Fuzzing (in 0.00s)
 
      🚫 1 error
 
 ==================================== ERRORS ====================================
-_____________________________ POST /unsatisfiable ______________________________
+__________________________________ GET /test ___________________________________
 Schema Error
 
-Cannot generate test data for request body (application/json)
+Cannot generate test data for query parameter 'id'
 Schema:
 
 {
-    "allOf": [
-        {
-            "type": "integer"
-        },
-        {
-            "type": "string"
-        }
-    ]
+    "type": "integer",
+    "minimum": 100,
+    "maximum": 10
 }
 
 This usually means:
@@ -63,10 +50,10 @@ API Operations:
   Errored: 1
 
 Test Phases:
-  ⏭  Examples
-  ⏭  Coverage
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   🚫 Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Errors:
   🚫 Schema Error: 1
