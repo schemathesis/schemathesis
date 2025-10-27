@@ -8,7 +8,7 @@ repos:
       - id: end-of-file-fixer
         exclude: ^.*\.raw$
       - id: trailing-whitespace
-        exclude: ^.*\.(md|raw)$
+        exclude: ^.*\.(md|raw|ambr)$
       - id: debug-statements
       - id: mixed-line-ending
         args: [--fix=lf]

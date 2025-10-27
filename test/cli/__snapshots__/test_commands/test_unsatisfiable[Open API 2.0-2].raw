@@ -32,13 +32,26 @@ Schemathesis dev
 _____________________________ POST /unsatisfiable ______________________________
 Schema Error
 
-Failed to generate test cases for this API operation. Possible reasons:
+Cannot generate test data for request body (application/json)
+Schema:
 
-    - Contradictory schema constraints, such as a minimum value exceeding the maximum.
-    - Invalid schema definitions for headers or cookies, for example allowing for non-ASCII characters.
-    - Excessive schema complexity, which hinders parameter generation.
+{
+    "allOf": [
+        {
+            "type": "integer"
+        },
+        {
+            "type": "string"
+        }
+    ]
+}
 
-Tip: Examine the schema for inconsistencies and consider simplifying it.
+This usually means:
+  - Type mismatch (e.g., enum with strings but type: integer)
+  - Contradictory constraints (e.g., minimum > maximum)
+  - Regex that's too complex to generate values for
+
+Tip: Review all parameters and request body schemas for conflicting constraints.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

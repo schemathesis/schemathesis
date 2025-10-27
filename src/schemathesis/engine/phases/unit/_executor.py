@@ -54,7 +54,7 @@ from schemathesis.generation.hypothesis.builder import (
     UnresolvableReferenceMark,
     UnsatisfiableExampleMark,
 )
-from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error, ignore_hypothesis_output
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -165,7 +165,7 @@ def run_test(
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.ERROR
-        yield non_fatal_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
+        yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
