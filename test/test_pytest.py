@@ -722,6 +722,52 @@ def test(case):
     assert extract_hypothesis_error(result.stdout.str()) == snapshot
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires a more complex test setup")
+@pytest.mark.operations("unsatisfiable")
+def test_health_check_failure(ctx, testdir, openapi3_base_url, snapshot):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items/{item_id}/": {
+                "patch": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                        "required": True,
+                    }
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "additionalProperties": False,
+                    "required": [
+                        "A",
+                        "B",
+                        "C",
+                        "D",
+                    ],
+                    "type": "object",
+                }
+            }
+        },
+    )
+
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_path('{schema_path}')
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+schema.config.base_url = '{openapi3_base_url}'
+
+@schema.parametrize()
+def test(case):
+    pass
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert extract_hypothesis_error(result.stdout.str()) == snapshot
+
+
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""

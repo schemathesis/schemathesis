@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 
+from hypothesis import HealthCheck
+
 from schemathesis import errors
 from schemathesis.core.errors import (
     InfiniteRecursiveReference,
@@ -23,6 +25,7 @@ from schemathesis.core.errors import (
     get_request_error_message,
     split_traceback,
 )
+from schemathesis.generation.hypothesis.reporting import HEALTH_CHECK_ACTIONS, HEALTH_CHECK_TITLES
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -119,15 +122,6 @@ class EngineErrorInfo:
             scalar_name = scalar_name_from_error(self._error)
             return f"Scalar type '{scalar_name}' is not recognized"
 
-        if self._kind == RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE:
-            return HEALTH_CHECK_MESSAGE_DATA_TOO_LARGE
-        if self._kind == RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH:
-            return HEALTH_CHECK_MESSAGE_FILTER_TOO_MUCH
-        if self._kind == RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW:
-            return HEALTH_CHECK_MESSAGE_TOO_SLOW
-        if self._kind == RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE:
-            return HEALTH_CHECK_MESSAGE_LARGE_BASE_EXAMPLE
-
         if self._kind in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
@@ -216,16 +210,9 @@ def scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str:
 
 
 def extract_health_check_error(error: hypothesis.errors.FailedHealthCheck) -> hypothesis.HealthCheck | None:
-    from hypothesis import HealthCheck
-
-    match = re.search(r"add HealthCheck\.(\w+) to the suppress_health_check ", str(error))
-    if match:
-        return {
-            "data_too_large": HealthCheck.data_too_large,
-            "filter_too_much": HealthCheck.filter_too_much,
-            "too_slow": HealthCheck.too_slow,
-            "large_base_example": HealthCheck.large_base_example,
-        }.get(match.group(1))
+    for key, title in HEALTH_CHECK_TITLES.items():
+        if title in str(error):
+            return key
     return None
 
 
@@ -233,7 +220,13 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
     """Get a user-friendly suggestion for handling the error."""
 
     def _format_health_check_suggestion(label: str) -> str:
-        return f"Bypass this health check using {bold(f'`--suppress-health-check={label}`')}."
+        base = {
+            "data_too_large": HEALTH_CHECK_ACTIONS[HealthCheck.data_too_large],
+            "filter_too_much": HEALTH_CHECK_ACTIONS[HealthCheck.filter_too_much],
+            "too_slow": HEALTH_CHECK_ACTIONS[HealthCheck.too_slow],
+            "large_base_example": HEALTH_CHECK_ACTIONS[HealthCheck.large_base_example],
+        }[label]
+        return f"{base} or bypass this health check using {bold(f'`--suppress-health-check={label}`')}."
 
     return {
         RuntimeErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--tls-verify=false`')}.",
@@ -250,28 +243,6 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
             "large_base_example"
         ),
     }.get(error_type)
-
-
-HEALTH_CHECK_MESSAGE_DATA_TOO_LARGE = """There's a notable occurrence of examples surpassing the maximum size limit.
-Typically, generating excessively large examples can compromise the quality of test outcomes.
-
-Consider revising the schema to more accurately represent typical use cases
-or applying constraints to reduce the data size."""
-HEALTH_CHECK_MESSAGE_FILTER_TOO_MUCH = """A significant number of generated examples are being filtered out, indicating
-that the schema's constraints may be too complex.
-
-This level of filtration can slow down testing and affect the distribution
-of generated data. Review and simplify the schema constraints where
-possible to mitigate this issue."""
-HEALTH_CHECK_MESSAGE_TOO_SLOW = "Data generation is extremely slow. Consider reducing the complexity of the schema."
-HEALTH_CHECK_MESSAGE_LARGE_BASE_EXAMPLE = """A health check has identified that the smallest example derived from the schema
-is excessively large, potentially leading to inefficient test execution.
-
-This is commonly due to schemas that specify large-scale data structures by
-default, such as an array with an extensive number of elements.
-
-Consider revising the schema to more accurately represent typical use cases
-or applying constraints to reduce the data size."""
 
 
 @enum.unique

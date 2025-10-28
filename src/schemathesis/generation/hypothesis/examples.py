@@ -28,17 +28,23 @@ def default_settings() -> settings:
 T = TypeVar("T")
 
 
-def generate_one(strategy: st.SearchStrategy[T]) -> T:  # type: ignore[type-var]
+def generate_one(strategy: st.SearchStrategy[T], suppress_health_check: list | None = None) -> T:  # type: ignore[type-var]
     examples: list[T] = []
-    add_single_example(strategy, examples)
+    add_single_example(strategy, examples, suppress_health_check)
     return examples[0]
 
 
-def add_single_example(strategy: st.SearchStrategy[T], examples: list[T]) -> None:
-    from hypothesis import given, seed
+def add_single_example(
+    strategy: st.SearchStrategy[T], examples: list[T], suppress_health_check: list | None = None
+) -> None:
+    from hypothesis import given, seed, settings
+
+    applied_settings = default_settings()
+    if suppress_health_check is not None:
+        applied_settings = settings(applied_settings, suppress_health_check=suppress_health_check)
 
     @given(strategy)  # type: ignore
-    @default_settings()  # type: ignore
+    @applied_settings  # type: ignore
     def example_generating_inner_function(ex: T) -> None:
         examples.append(ex)
 

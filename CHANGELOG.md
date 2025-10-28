@@ -6,6 +6,10 @@
 
 - Override order for explicit transport arguments to `Case.call` and `Case.call_and_validate`.
 
+### :wrench: Changed
+
+- Health check failure errors now show the specific parameter and its schema causing slow generation or filtering issues.
+
 ## [4.3.14](https://github.com/schemathesis/schemathesis/compare/v4.3.13...v4.3.14) - 2025-10-28
 
 ### :wrench: Changed

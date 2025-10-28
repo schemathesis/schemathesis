@@ -373,6 +373,36 @@ def test_unsatisfiable_query_parameter(cli, ctx, openapi3_base_url, snapshot_cli
     )
 
 
+def test_health_check_message(cli, ctx, openapi3_base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items/{item_id}/": {
+                "patch": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                        "required": True,
+                    }
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "additionalProperties": False,
+                    "required": [
+                        "A",
+                        "B",
+                        "C",
+                        "D",
+                    ],
+                    "type": "object",
+                }
+            }
+        },
+    )
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing") == snapshot_cli
+
+
 @pytest.mark.operations("teapot")
 @pytest.mark.parametrize("workers", [1, 2])
 def test_status_code_conformance(cli, schema_url, workers, snapshot_cli):
