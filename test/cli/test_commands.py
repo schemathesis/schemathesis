@@ -388,14 +388,9 @@ def test_health_check_message(cli, ctx, openapi3_base_url, snapshot_cli):
         components={
             "schemas": {
                 "Item": {
-                    "additionalProperties": False,
-                    "required": [
-                        "A",
-                        "B",
-                        "C",
-                        "D",
-                    ],
-                    "type": "object",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "abc",
                 }
             }
         },

@@ -93,6 +93,8 @@ def _to_json_schema(
             # Read-only properties should not occur in requests
             rewrite_properties(schema, is_read_only)
 
+    ensure_required_properties(schema)
+
     for keyword, value in schema.items():
         if keyword in IN_VALUE and isinstance(value, dict):
             schema[keyword] = _to_json_schema(
@@ -119,6 +121,22 @@ def _to_json_schema(
                 )
 
     return schema
+
+
+def ensure_required_properties(schema: dict[str, Any]) -> None:
+    if schema.get("additionalProperties") is not False:
+        return
+
+    required = schema.get("required")
+    if not required or not isinstance(required, list):
+        return
+
+    properties = schema.setdefault("properties", {})
+
+    # Add missing required properties as empty schemas
+    for name in required:
+        if name not in properties:
+            properties[name] = {}
 
 
 IN_VALUE = frozenset(

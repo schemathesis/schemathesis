@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Override order for explicit transport arguments to `Case.call` and `Case.call_and_validate`.
+- Generating `required` properties when they are absent from `properties` and `additionalProperties` is set to `false`.
 
 ### :wrench: Changed
 

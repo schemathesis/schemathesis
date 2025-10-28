@@ -202,6 +202,40 @@ def test_merge_length_into_pattern(ctx):
     test()
 
 
+def test_required_without_properties(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": False,
+                                    "type": "object",
+                                    "required": ["A"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/data"]["POST"]
+
+    @given(operation.as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    test()
+
+
 @pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.build_schema(
