@@ -1,4 +1,27 @@
 # serializer version: 1
+# name: test_health_check_failure
+  '''
+  E   hypothesis.errors.FailedHealthCheck: Too many generated examples are filtered out for request body (application/json)
+      Schema:
+      
+      {
+          "additionalProperties": false,
+          "required": [
+              "A",
+              "B",
+              "C",
+              "D"
+          ],
+          "type": "object"
+      }
+      
+      This usually means:
+        - Complex regex patterns that match few strings
+        - Multiple overlapping constraints (pattern + format + enum)
+      
+      Tip: Simplify constraints or widen acceptable value ranges. You can disable this health check with @settings(suppress_health_check=[HealthCheck.filter_too_much])
+  '''
+# ---
 # name: test_unsatisfiable_schema
   '''
   E   hypothesis.errors.Unsatisfiable: Cannot generate test data for request body (application/json)

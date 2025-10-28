@@ -54,7 +54,11 @@ from schemathesis.generation.hypothesis.builder import (
     UnresolvableReferenceMark,
     UnsatisfiableExampleMark,
 )
-from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error, ignore_hypothesis_output
+from schemathesis.generation.hypothesis.reporting import (
+    build_health_check_error,
+    build_unsatisfiable_error,
+    ignore_hypothesis_output,
+)
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -162,6 +166,9 @@ def run_test(
             status = Status.FAILURE
     except BaseExceptionGroup:
         status = Status.ERROR
+    except hypothesis.errors.FailedHealthCheck as exc:
+        status = Status.ERROR
+        yield non_fatal_error(build_health_check_error(operation, exc, with_tip=False))
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.ERROR
@@ -211,7 +218,11 @@ def run_test(
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
             yield non_fatal_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
         else:
-            yield non_fatal_error(exc)
+            health_check = build_health_check_error(operation, exc, with_tip=False)
+            if isinstance(health_check, hypothesis.errors.FailedHealthCheck):
+                yield non_fatal_error(health_check)
+            else:
+                yield non_fatal_error(exc)
     except hypothesis.errors.DeadlineExceeded as exc:
         status = Status.ERROR
         yield non_fatal_error(DeadlineExceeded.from_exc(exc))
