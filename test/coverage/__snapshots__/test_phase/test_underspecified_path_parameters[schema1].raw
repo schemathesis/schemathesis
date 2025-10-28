@@ -24,9 +24,11 @@ Schemathesis dev
 ____________________ GET /organizations/{organization_id}/ _____________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Unsupported method incorrect response
+- Unsupported methods
 
-    Wrong status for unsupported method TRACE (got 404, expected 405)
+    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
+
+    Return 405 for methods not listed in the OpenAPI spec
 
 [404] Not Found:
 
@@ -49,7 +51,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Failures:
-  ❌ Unsupported method incorrect response: 1
+  ❌ Unsupported methods: 1
 
 Test cases:
   N generated, N found N unique failures
