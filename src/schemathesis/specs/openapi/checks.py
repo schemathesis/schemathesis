@@ -320,7 +320,7 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
                 method=cast(str, response.request.method),
                 status_code=response.status_code,
                 failure_reason="wrong_status",
-                message=f"Wrong status for unsupported method {response.request.method} (got {response.status_code}, expected 405)",
+                message=f"Unsupported method {response.request.method} returned {response.status_code}, expected 405 Method Not Allowed\n\nReturn 405 for methods not listed in the OpenAPI spec",
             )
 
         allow_header = response.headers.get("allow")
@@ -331,7 +331,7 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
                 status_code=response.status_code,
                 allow_header_present=False,
                 failure_reason="missing_allow_header",
-                message=f"Missing Allow header for unsupported method {response.request.method}",
+                message=f"{response.request.method} returned 405 without required `Allow` header\n\nAdd `Allow` header listing supported methods (required by RFC 9110)",
             )
     return None
 

@@ -449,7 +449,7 @@ class UnsupportedMethodResponse(Failure):
         allow_header_present: bool | None = None,
         failure_reason: str,  # "wrong_status" or "missing_allow_header"
         message: str,
-        title: str = "Unsupported method incorrect response",
+        title: str = "Unsupported methods",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
