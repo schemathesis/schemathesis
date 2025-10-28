@@ -612,6 +612,31 @@ def test_call_overrides(mocker, arg, openapi_30):
     _assert_override(spy, arg, original, overridden)
 
 
+@pytest.mark.parametrize("with_config", [True, False])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"verify": False},
+        {"cert": "abc"},
+        {"timeout": 42},
+    ],
+)
+def test_call_transport_overrides(mocker, with_config, kwargs, openapi_30):
+    spy = mocker.patch("requests.Session.request", side_effect=ValueError)
+    if with_config:
+        # Config should be overridden anyway
+        openapi_30.config.tls_verify = "/tmp"
+        openapi_30.config.request_cert = "/tmp"
+        openapi_30.config.request_timeout = 0.5
+    case = openapi_30["/users"]["GET"].Case()
+    try:
+        case.call(**kwargs, base_url="http://127.0.0.1")
+    except ValueError:
+        pass
+    for key, value in kwargs.items():
+        assert spy.call_args[1][key] == value
+
+
 def test_merge_at():
     data = {"params": {"A": 1}}
     merge_at(data, "params", {"B": 2})
