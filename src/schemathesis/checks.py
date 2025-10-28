@@ -187,3 +187,14 @@ def run_checks(
                 on_failure(name, collected, sub_failure)
 
     return collected
+
+
+def __getattr__(name: str) -> Any:
+    try:
+        return CHECKS.get_one(name)
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+
+
+def __dir__() -> list[str]:
+    return sorted(list(globals().keys()) + CHECKS.get_all_names())
