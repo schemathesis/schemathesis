@@ -21,26 +21,32 @@ Schemathesis dev
      🚫 1 error
 
 ==================================== ERRORS ====================================
-__________________________________ POST /data __________________________________
+___________________________ PATCH /items/{item_id}/ ____________________________
 Failed Health Check
 
-Minimum possible example is too large for request body (application/json)
+Too many generated examples are filtered out for request body (application/json)
 Schema:
 
 {
-    "type": "array",
-    "items": {
-        "type": "integer"
-    },
-    "minItems": 100000
+    "additionalProperties": false,
+    "required": [
+        "A",
+        "B",
+        "C",
+        "D"
+    ],
+    "type": "object"
 }
 
 This usually means:
-  - Arrays with large minimum size (e.g., minItems: 100)
-  - Many required properties with their own large minimums
-  - Nested structures that multiply size requirements
+  - Complex regex patterns that match few strings
+  - Multiple overlapping constraints (pattern + format + enum)
 
-Tip: Reduce minimum size requirements or number of required properties or bypass this health check using `--suppress-health-check=large_base_example`.
+Tip: Simplify constraints or widen acceptable value ranges or bypass this health check using `--suppress-health-check=filter_too_much`.
+
+Schema Error
+
+Path parameter 'item_id' is not defined
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -59,10 +65,11 @@ Test Phases:
 
 Errors:
   🚫 Failed Health Check: 1
+  🚫 Schema Error: 1
 
 Test cases:
   No test cases were generated
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+============================== 2 errors in 1.00s ===============================

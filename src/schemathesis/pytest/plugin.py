@@ -9,7 +9,7 @@ import pytest
 from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
-from hypothesis.errors import InvalidArgument, Unsatisfiable
+from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
 from schemathesis.core.control import SkipTest
@@ -34,7 +34,12 @@ from schemathesis.generation.hypothesis.given import (
     merge_given_args,
     validate_given_args,
 )
-from schemathesis.generation.hypothesis.reporting import build_unsatisfiable_error, ignore_hypothesis_output
+from schemathesis.generation.hypothesis.reporting import (
+    HealthCheckTipStyle,
+    build_health_check_error,
+    build_unsatisfiable_error,
+    ignore_hypothesis_output,
+)
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import APIOperation
 
@@ -328,6 +333,12 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             if invalid_headers is not None:
                 raise InvalidHeadersExample.from_headers(invalid_headers) from None
             pytest.skip(exc.args[0])
+        except FailedHealthCheck as exc:
+            operation = ApiOperationMark.get(pyfuncitem.obj)
+            assert operation is not None
+            raise build_health_check_error(
+                operation, exc, with_tip=True, tip_style=HealthCheckTipStyle.PYTEST
+            ) from None
         except Unsatisfiable:
             operation = ApiOperationMark.get(pyfuncitem.obj)
             assert operation is not None
