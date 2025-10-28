@@ -28,14 +28,9 @@ Too many generated examples are filtered out for request body (application/json)
 Schema:
 
 {
-    "additionalProperties": false,
-    "required": [
-        "A",
-        "B",
-        "C",
-        "D"
-    ],
-    "type": "object"
+    "type": "string",
+    "format": "date-time",
+    "pattern": "abc"
 }
 
 This usually means:

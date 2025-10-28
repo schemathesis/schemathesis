@@ -5,14 +5,9 @@
       Schema:
       
       {
-          "additionalProperties": false,
-          "required": [
-              "A",
-              "B",
-              "C",
-              "D"
-          ],
-          "type": "object"
+          "type": "string",
+          "format": "date-time",
+          "pattern": "abc"
       }
       
       This usually means:
