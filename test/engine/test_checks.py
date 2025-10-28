@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from hypothesis import given, settings
 
-import schemathesis
+import schemathesis.checks
 from schemathesis import Case
 from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.config._checks import ChecksConfig
@@ -1153,3 +1153,9 @@ The following required headers are missing from the response:
 )
 def test_coerce_header_value(value, schema, expected):
     assert _coerce_header_value(value, schema) == expected
+
+
+def test_module_access():
+    # It is done via `__getattr__`
+    _ = schemathesis.checks.negative_data_rejection
+    assert "negative_data_rejection" in dir(schemathesis.checks)

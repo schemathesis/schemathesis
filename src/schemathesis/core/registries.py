@@ -26,6 +26,9 @@ class Registry(Generic[T]):
     def get_all(self) -> list[T]:
         return list(self._items.values())
 
+    def get_one(self, name: str) -> T:
+        return self._items[name]
+
     def get_by_names(self, names: Sequence[str]) -> list[T]:
         """Get items by their names."""
         return [self._items[name] for name in names]
