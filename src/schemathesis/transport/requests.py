@@ -114,7 +114,9 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             data.setdefault("cert", cert)
 
         kwargs.pop("base_url", None)
-        data.update({key: value for key, value in kwargs.items() if key not in data})
+        for key, value in kwargs.items():
+            if key not in ("headers", "cookies", "params") or key not in data:
+                data[key] = value
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
 
         current_session_headers: MutableMapping[str, Any] = {}

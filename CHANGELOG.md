@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.14...HEAD) - TBD
 
+### :bug: Fixed
+
+- Override order for explicit transport arguments to `Case.call` and `Case.call_and_validate`.
+
 ## [4.3.14](https://github.com/schemathesis/schemathesis/compare/v4.3.13...v4.3.14) - 2025-10-28
 
 ### :wrench: Changed
