@@ -1,19 +1,19 @@
 # Configuration Options
 
-This reference covers all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
+This page lists every `schemathesis.toml` option and how it is resolved at runtime. The settings are organized into two main categories:
 
 - **Global**: These control CLI behavior, output formatting, and overall test execution. They are defined at the top level and affect the CLI invocation.
-- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[[project]]` namespace), they are used as defaults for any tested project.
+- **Project**: Settings under `[[project]]` customize a single API. If you place project settings at the top level (without `[[project]]`), they become defaults for all projects.
 
 ## Configuration Resolution
 
-Schemathesis applies settings in the following hierarchy (from highest to lowest precedence):
+Schemathesis applies settings from highest to lowest precedence:
 
 1. CLI options
 2. Operation-specific phase settings
 3. Global phase settings (e.g., `[phases.fuzzing]`)
-4. Operation-level settings (e.g., `[[operations]]`)
-5. Project-level settings (e.g., `[[project]]`)
+4. Operation settings (e.g., `[[operations]]`)
+5. Project settings (e.g., `[[project]]`)
 6. Global settings
 
 ## Environment Variable Substitution
@@ -28,7 +28,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 This allows you to maintain a single configuration file across different environments by changing environment variables rather than the configuration itself.
 
 !!! note ""
-    If you use `pytest`, environment variables are resolved when the `SchemathesisConfig` object is initialized, which usually happens inside schema loaders like `schemathesis.openapi.from_url`.
+    With `pytest`, variables are resolved when `SchemathesisConfig` is created (typically inside `schemathesis.openapi.from_url`).
 
 ## Operation-Specific Configuration
 
@@ -42,9 +42,9 @@ include-path = "/users"
 exclude-method = "POST"
 # By full operation name
 # include-name = "POST /users/"
-# By Open API tag
+# By OpenAPI tag
 # include-tag = "admin"
-# By Open API operation ID
+# By OpenAPI operation ID
 # include-operation-id = "delete-user"
 enabled = false
 ```
@@ -81,7 +81,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     **Type**: `Boolean or None`  
     **Default**: `null`  
 
-    Controls ANSI color output in the CLI. Schemathesis auto-detects color support by default. Set to `true` to force color output or `false` to disable it.
+    Use color in CLI output. Schemathesis auto-detects color support by default Set `true` to force color, `false` to disable.
 
     ```toml
     color = false
@@ -133,7 +133,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     **Type**: `Boolean` or `Array[String]`  
     **Default**: `true` (all warnings enabled)  
 
-    Controls which warnings are displayed during test execution. Warnings highlight issues that could prevent tests from reaching your API's core logic.
+    Warnings flag conditions that may keep tests from exercising core logic. Set `false` to disable all, or list specific warnings to enable only those.
 
     ```toml
     # Disable all warnings
