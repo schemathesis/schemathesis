@@ -1,10 +1,10 @@
 # Configuration
 
-Most Schemathesis usage works without configuration. Use a config file for authentication, adjusting test generation, or customizing behavior for specific API operations.
+You don’t need a config file to get started. Add one when you need auth, different test volumes, per-operation overrides, or environment-specific settings.
 
 ## Quick Start
 
-### Creating Your First Config File
+### Create your first config file
 
 Create `schemathesis.toml` in your project directory:
 
@@ -13,12 +13,15 @@ Create `schemathesis.toml` in your project directory:
 generation.max-examples = 500
 
 # Increase timeout for slow APIs
-request-timeout = 10.0
+request-timeout = 10.0  # seconds
 
 # Basic authentication
 [auth]
 basic = { username = "${USERNAME}", password = "${PASSWORD}" }
 ```
+
+!!! note ""
+    Variables like `${USERNAME}` are read from your environment when Schemathesis loads the config.
 
 Set environment variables:
 ```bash
@@ -26,40 +29,40 @@ export USERNAME="your_username"
 export PASSWORD="your_password"
 ```
 
-Run Schemathesis - it automatically finds and uses the config:
+Run Schemathesis. It automatically loads `schemathesis.toml`.
 ```bash
 schemathesis run https://api.example.com/openapi.json
 ```
 
-### Config File Location
+### Config file location
 
 Schemathesis looks for `schemathesis.toml` in:
 
 1. Current directory
-2. Parent directories (up to project root)
-3. Path specified with `--config-file`
+2. Parent directories (up to repository root)
+3. A path you pass with `--config-file` (this takes precedence)
 
-## Common Configuration Scenarios
+## Common configuration scenarios
 
 ### Authentication
 
-**API Key in Headers:**
+API key in a header:
 ```toml
 headers = { "X-API-Key" = "${API_KEY}" }
 ```
 
-**Bearer Token:**
+Bearer token in the `Authorization` header:
 ```toml
 headers = { Authorization = "Bearer ${TOKEN}" }
 ```
 
-**Basic Authentication:**
+Basic auth:
 ```toml
 [auth]
 basic = { username = "${USERNAME}", password = "${PASSWORD}" }
 ```
 
-**Different Auth for Specific Operations:**
+Different auth for specific operations:
 ```toml
 # Default auth for most operations
 headers = { Authorization = "Bearer ${TOKEN}" }
@@ -70,51 +73,54 @@ include-tag = "admin"
 headers = { Authorization = "Bearer ${ADMIN_TOKEN}" }
 ```
 
-### Adjusting Test Generation
+### Adjusting test generation
 
-**Run More Tests (Better Coverage, Slower):**
+More tests (better coverage, slower):
 ```toml
 generation.max-examples = 1000
 ```
 
-**Run Fewer Tests (Faster Feedback):**
+Fewer tests (faster feedback):
 ```toml
 generation.max-examples = 50
 ```
 
-**Thorough Testing for Important Endpoints:**
+Deeper testing for important API operations:
 ```toml
-# Default: fast testing
+# Default: fast feedback
 generation.max-examples = 100
 
-# Critical endpoints: more testing
+# Important operations: more depth
 [[operations]]
 include-path-regex = "/(payments|users)/"
 generation.max-examples = 500
 ```
 
-### Handling Slow APIs
+### Slow APIs
 
-**Increase Timeouts:**
+If you see timeouts or flaky failures, increase per-operation timeouts.
+
+Increase timeouts:
 ```toml
-request-timeout = 30.0  # 30 seconds
+request-timeout = 30.0  # seconds
 ```
 
-**Different Timeouts by Operation:**
+Different timeouts by operation:
 ```toml
 # Default timeout
 request-timeout = 5.0
 
-# Slow operations need more time
+# Give slow operations more time
 [[operations]]
 include-tag = "slow"
 request-timeout = 30.0
 ```
 
-### Environment-Specific Configuration
+### Environment-specific configuration
 
-**Different Base URLs per Environment:**
+Different base URLs per environment:
 ```toml
+# Switch base URL by environment variable
 base-url = "https://${ENVIRONMENT}.api.example.com"
 ```
 
@@ -122,22 +128,22 @@ base-url = "https://${ENVIRONMENT}.api.example.com"
 # Development
 export ENVIRONMENT="dev"
 
-# Production  
+# Production
 export ENVIRONMENT="prod"
 ```
 
-**Skip Problematic Endpoints in Development:**
+Skip problematic endpoints in development:
 ```toml
 [[operations]]
 include-path = "/billing/charge"
 enabled = false
 ```
 
-## Advanced Configuration
+## Advanced configuration
 
-**Advanced Filtering with Expressions:**
+Advanced filtering with expressions:
 ```toml
-# Operations without operationId
+# Ignore operations that lack operationId
 [[operations]]
 include-by = "operationId == null"
 enabled = false
@@ -148,9 +154,9 @@ exclude-by = "responses/200/description != 'Success'"
 checks.response_schema_conformance.enabled = false
 ```
 
-### Test Phase Control
+### Test phase control
 
-**Disable Specific Testing Phases:**
+Disable specific testing phases:
 ```toml
 [phases]
 # Skip stateful testing for faster runs
@@ -160,7 +166,7 @@ stateful.enabled = false
 stateful.generation.max-examples = 10
 ```
 
-**Phase-Specific Settings per Operation:**
+Phase-specific settings per operation:
 ```toml
 [[operations]]
 include-name = "POST /orders"
@@ -170,9 +176,10 @@ phases.fuzzing.generation.max-examples = 500
 phases.stateful.generation.max-examples = 20
 ```
 
-### Multi-Project Configuration
+### Multi-project configuration
 
-**Testing Multiple APIs:**
+Top-level options act as defaults for all projects. Each `[[project]]` can override them.
+
 ```toml
 # Global defaults
 generation.max-examples = 100
@@ -192,9 +199,9 @@ base-url = "https://users.example.com"
 request-timeout = 2.0
 ```
 
-### Custom Check Configuration
+### Custom check configuration
 
-**Disable Problematic Checks:**
+Disable noisy checks:
 ```toml
 [checks]
 # Disable globally
@@ -206,7 +213,7 @@ include-name = "POST /uploads"
 checks.positive_data_acceptance.expected-statuses = [200, 201, 202]
 ```
 
-**Enable Only Specific Checks:**
+Enable only specific checks:
 ```toml
 [checks]
 enabled = false
