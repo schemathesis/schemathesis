@@ -3,8 +3,10 @@ import platform
 from pathlib import Path
 
 import pytest
+from flask import Flask, jsonify
 from hypothesis import HealthCheck, given, settings
 from jsonschema.validators import Draft4Validator
+from werkzeug.exceptions import InternalServerError
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
@@ -1001,3 +1003,67 @@ def test_resolve_large_schema():
     # Should not fail
     for _ in schema.get_all_operations():
         pass
+
+
+@pytest.mark.parametrize(
+    "kind",
+    ["html", "500", "number"],
+    ids=["html_instead_of_yaml", "500", "number"],
+)
+def test_remote_ref_fails(ctx, kind, cli, snapshot_cli, app_runner):
+    app = Flask(__name__)
+    path = "/external/schemas/user.yaml"
+
+    @app.route("/openapi.json")
+    def openapi():
+        return jsonify(
+            ctx.openapi.build_schema(
+                {
+                    "/test": {
+                        "get": {
+                            "requestBody": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "$ref": f"http://127.0.0.1:{port}{path}#/User",
+                                        }
+                                    }
+                                },
+                                "required": True,
+                            },
+                        }
+                    }
+                }
+            )
+        )
+
+    if kind == "html":
+
+        @app.route(path)
+        def external():
+            html = "<!doctype html><html><title>Not YAML</title><body>Oops</body></html>"
+            return html, 200, {"Content-Type": "text/html"}
+
+    elif kind == "500":
+
+        @app.route(path)
+        def external():
+            raise InternalServerError
+
+    elif kind == "number":
+
+        @app.route(path)
+        def external():
+            return jsonify(42)
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--checks=not_a_server_error",
+            config={"warnings": False},
+        )
+        == snapshot_cli
+    )
