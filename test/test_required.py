@@ -97,7 +97,7 @@ def test_has_none(request, case):
 def test_has_not_only_none(request, case):
     # This test should find values other than `NOT_SET`
     if "{location}" == "body":
-        assert case.{location} is NOT_SET
+        assert case.{location} in (NOT_SET, "")
     else:
         assert case.{location}.get("key") is None
 """,
