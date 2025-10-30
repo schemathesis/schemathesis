@@ -123,8 +123,7 @@ def vcr_writer(output: TextOutput, config: ProjectConfig, queue: Queue) -> None:
     current_id = 1
 
     def write_header_values(stream: IO, values: list[str]) -> None:
-        for v in values:
-            stream.write(f"      - {json.dumps(v)}\n")
+        stream.writelines(f"      - {json.dumps(v)}\n" for v in values)
 
     if config.output.sanitization.enabled:
         sanitization_keys = config.output.sanitization.keys_to_sanitize
