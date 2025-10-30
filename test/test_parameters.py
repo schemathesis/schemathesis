@@ -583,6 +583,7 @@ def test_read_only(schema_url):
         # Then `writeOnly` should not affect the response schema
         response = case.call_and_validate()
         assert "write" not in response.json()
+        assert "read" in response.json()
 
     test()
 
@@ -601,6 +602,7 @@ def test_write_only(schema_url):
         # And `readOnly` should only occur in responses
         response = case.call_and_validate()
         assert "write" not in response.json()
+        assert "read" in response.json()
 
     test()
 

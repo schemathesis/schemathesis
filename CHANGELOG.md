@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.15...HEAD) - TBD
 
+### :racing_car: Performance
+
+- ~10x faster data generation for schemas with `readOnly` / `writeOnly`.
+
 ## [4.3.15](https://github.com/schemathesis/schemathesis/compare/v4.3.14...v4.3.15) - 2025-10-29
 
 ### :bug: Fixed

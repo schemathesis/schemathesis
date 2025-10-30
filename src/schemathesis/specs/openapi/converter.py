@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from itertools import chain
 from typing import Any, Callable, overload
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
@@ -188,27 +187,15 @@ def update_pattern_in_schema(schema: dict[str, Any]) -> None:
 
 def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, Any]], bool]) -> None:
     required = schema.get("required", [])
-    forbidden = []
     for name, subschema in list(schema.get("properties", {}).items()):
         if predicate(subschema):
             if name in required:
                 required.remove(name)
-            del schema["properties"][name]
-            forbidden.append(name)
-    if forbidden:
-        forbid_properties(schema, forbidden)
+            schema["properties"][name] = {"not": {}}
     if not schema.get("required"):
         schema.pop("required", None)
     if not schema.get("properties"):
         schema.pop("properties", None)
-
-
-def forbid_properties(schema: dict[str, Any], forbidden: list[str]) -> None:
-    """Explicitly forbid properties via the `not` keyword."""
-    not_schema = schema.setdefault("not", {})
-    already_forbidden = not_schema.setdefault("required", [])
-    already_forbidden.extend(forbidden)
-    not_schema["required"] = list(set(chain(already_forbidden, forbidden)))
 
 
 def is_write_only(schema: dict[str, Any] | bool) -> bool:
