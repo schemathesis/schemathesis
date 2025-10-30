@@ -242,7 +242,7 @@ def _expand_subschemas(
     except InfiniteRecursiveReference:
         return
 
-    yield (schema, current_path)
+    yield schema, current_path
 
     if isinstance(schema, dict):
         # For anyOf/oneOf, yield each alternative with the same path
@@ -250,10 +250,10 @@ def _expand_subschemas(
             if key in schema:
                 for subschema in schema[key]:
                     # Each alternative starts with the current path
-                    yield (subschema, current_path)
+                    yield subschema, current_path
 
         # For allOf, merge all alternatives
-        if "allOf" in schema and schema["allOf"]:
+        if schema.get("allOf"):
             subschema = deepclone(schema["allOf"][0])
             try:
                 subschema, expanded_path = _resolve_bundled(subschema, resolver, current_path)
@@ -278,7 +278,7 @@ def _expand_subschemas(
                         else:
                             subschema[key] = value
 
-            yield (subschema, expanded_path)
+            yield subschema, expanded_path
 
 
 def extract_inner_examples(examples: dict[str, Any] | list, schema: BaseOpenAPISchema) -> Generator[Any, None, None]:
