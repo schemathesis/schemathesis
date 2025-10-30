@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.15...HEAD) - TBD
 
+### :wrench: Changed
+
+- Improve error message when remote reference is not JSON / YAML.
+
 ### :racing_car: Performance
 
 - ~10x faster data generation for schemas with `readOnly` / `writeOnly`.

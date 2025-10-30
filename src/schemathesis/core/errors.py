@@ -161,6 +161,8 @@ class InvalidSchema(SchemathesisError):
             message += "\n    File reference could not be resolved. Check that the file exists."
         elif reference.startswith(("#/components", "#/definitions")):
             message += "\n    Component does not exist in the schema."
+        elif isinstance(error.__cause__, RemoteDocumentError):
+            message += f"\n    {error.__cause__}"
         return cls(message, path=path, method=method)
 
     def as_failing_test_function(self) -> Callable:
@@ -174,6 +176,13 @@ class InvalidSchema(SchemathesisError):
             raise self
 
         return actual_test
+
+
+class RemoteDocumentError(SchemathesisError):
+    """Remote reference resolution failed.
+
+    This exception carries more context than the default one in `jsonschema`.
+    """
 
 
 class HookError(SchemathesisError):

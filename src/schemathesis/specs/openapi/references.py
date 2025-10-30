@@ -9,6 +9,7 @@ import requests
 
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.deserialization import deserialize_yaml
+from schemathesis.core.errors import RemoteDocumentError
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
 
@@ -30,10 +31,39 @@ def load_file_uri(location: str) -> dict[str, Any]:
     return load_file_impl(location, urlopen)
 
 
+_HTML_MARKERS = (b"<!doctype", b"<html", b"<head", b"<body")
+
+
+def _looks_like_html(content_type: str | None, body: bytes) -> bool:
+    if content_type and "html" in content_type.lower():
+        return True
+    head = body.lstrip()[:64].lower()
+    return any(head.startswith(m) for m in _HTML_MARKERS)
+
+
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
     response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT)
-    return deserialize_yaml(response.content)
+    content_type = response.headers.get("Content-Type", "")
+    body = response.content or b""
+
+    def _suffix() -> str:
+        return f"(HTTP {response.status_code}, Content-Type={content_type}, size={len(body)})"
+
+    if not (200 <= response.status_code < 300):
+        raise RemoteDocumentError(f"Failed to fetch {_suffix()}")
+
+    if _looks_like_html(content_type, body):
+        raise RemoteDocumentError(f"Expected YAML/JSON, got HTML {_suffix()}")
+
+    document = deserialize_yaml(response.content)
+
+    if not isinstance(document, (dict, list)):
+        raise RemoteDocumentError(
+            f"Remote document is parsed as {type(document).__name__}, but an object/array is expected {_suffix()}"
+        )
+
+    return document
 
 
 JSONType = Union[None, bool, float, str, list, Dict[str, Any]]
