@@ -142,7 +142,7 @@ def _format_anyof_error(error: ValidationError) -> str:
         )
     elif list(error.schema_path) == ["properties", "workers", "anyOf"]:
         return (
-            f"Invalid value for 'workers': {repr(error.instance)}\n\n"
+            f"Invalid value for 'workers': {error.instance!r}\n\n"
             f"Expected either:\n"
             f"  - A positive integer (e.g., workers = 4)\n"
             f'  - The string "auto" for automatic detection (workers = "auto")'

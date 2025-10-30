@@ -48,7 +48,7 @@ Loader.add_implicit_resolver(  # type: ignore
                     |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*
                     |[-+]?\.(?:inf|Inf|INF)
                     |\.(?:nan|NaN|NAN))$""",
-        re.X,
+        re.VERBOSE,
     ),
     list("-+0123456789."),
 )
