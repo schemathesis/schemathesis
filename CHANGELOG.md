@@ -2,6 +2,9 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.15...HEAD) - TBD
 
+### :wrench: Changed
+- add `refurb` rule and simplify ruff in pre-commits
+
 ## [4.3.15](https://github.com/schemathesis/schemathesis/compare/v4.3.14...v4.3.15) - 2025-10-29
 
 ### :bug: Fixed
