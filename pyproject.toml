@@ -27,6 +27,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
   "Topic :: Software Development :: Testing",
@@ -61,7 +62,7 @@ tests = [
   "Flask>=2.1.1,<3.0",
   "hypothesis-openapi>=0.2,<1; python_version >= '3.10'",
   "pydantic>=1.10.2",
-  "pytest-asyncio>=0.18.0,<1.0",
+  "pytest-asyncio>=1.0,<2.0",
   "pytest-httpserver>=1.0,<2.0",
   "pytest-mock>=3.7.0,<4.0",
   "pytest-trio>=0.8,<1.0",
@@ -72,7 +73,7 @@ tests = [
   "trustme>=0.9.0,<1.0",
 ]
 cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3"]
-bench = ["pytest-codspeed==2.2.1"]
+bench = ["pytest-codspeed==4.2.0"]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 dev = ["schemathesis[tests,cov,bench,docs]"]
 

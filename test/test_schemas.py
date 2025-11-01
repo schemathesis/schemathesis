@@ -269,5 +269,9 @@ def test_ssl_error(server):
         schemathesis.openapi.from_url(f"https://127.0.0.1:{server['port']}")
     assert exc.value.message == "SSL verification problem"
     assert exc.value.extras[0].startswith(
-        ("[SSL: WRONG_VERSION_NUMBER] wrong version number", "[SSL] record layer failure")
+        (
+            "[SSL: WRONG_VERSION_NUMBER] wrong version number",
+            "[SSL] record layer failure",
+            "[SSL: RECORD_LAYER_FAILURE] record layer failure",
+        )
     )

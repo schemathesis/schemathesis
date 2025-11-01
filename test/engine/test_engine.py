@@ -8,6 +8,7 @@ from unittest.mock import ANY
 import pytest
 from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
+from py import sys
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -97,6 +98,10 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     interactions = list(stream.find(events.ScenarioFinished, status=Status.FAILURE).recorder.interactions.values())
     assert len(interactions) == 1
     failure = interactions[0]
+    if sys.version_info >= (3, 14):
+        encoding = ["gzip, deflate, zstd"]
+    else:
+        encoding = ["gzip, deflate"]
     assert asdict(failure.request) == {
         "uri": f"{openapi3_base_url}/failure",
         "method": "GET",
@@ -104,7 +109,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
         "body_size": None,
         "headers": {
             "Accept": ["*/*"],
-            "Accept-Encoding": ["gzip, deflate"],
+            "Accept-Encoding": encoding,
             "Connection": ["keep-alive"],
             "User-Agent": [USER_AGENT],
             SCHEMATHESIS_TEST_CASE_HEADER: [ANY],
@@ -125,7 +130,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
         "body_size": None,
         "headers": {
             "Accept": ["*/*"],
-            "Accept-Encoding": ["gzip, deflate"],
+            "Accept-Encoding": encoding,
             "Connection": ["keep-alive"],
             "User-Agent": [USER_AGENT],
             SCHEMATHESIS_TEST_CASE_HEADER: [ANY],

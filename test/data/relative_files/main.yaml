@@ -11,4 +11,4 @@ servers:
 
 paths:
   /user_account:
-    $ref: "paths/user-account.yaml/#"
+    $ref: "paths/user-account.yaml#/"
