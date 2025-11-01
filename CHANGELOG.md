@@ -10,6 +10,7 @@
 
 - Config-based auth, headers, test phases and generation settings not applied when using `schemathesis.pytest.from_fixture`.
 - Support for method-based tests with `schemathesis.pytest.from_fixture`.
+- Checks not loaded when using `schemathesis.pytest.from_fixture`, causing `AttributeError` when accessing `schemathesis.checks.*`.
 
 ## [4.3.16](https://github.com/schemathesis/schemathesis/compare/v4.3.15...v4.3.16) - 2025-10-30
 
