@@ -9,6 +9,7 @@ from jsonschema import Draft4Validator
 import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
@@ -325,7 +326,7 @@ def make_header_param(schema, **kwargs):
 
 def test_header_filtration_not_needed(ctx, mocker):
     # When schema contains a simple header
-    mocked = mocker.spy(_hypothesis, "is_valid_header")
+    mocked = mocker.spy(filters, "is_valid_header")
     schema = ctx.openapi.build_schema({})
     make_header_param(schema)
 
@@ -343,7 +344,7 @@ def test_header_filtration_not_needed(ctx, mocker):
 
 def test_header_filtration_needed(ctx, mocker):
     # When schema contains a header with a custom format
-    mocked = mocker.spy(_hypothesis, "is_valid_header")
+    mocked = mocker.spy(filters, "is_valid_header")
     schema = ctx.openapi.build_schema({})
     make_header_param(schema, format="date")
 
@@ -362,7 +363,7 @@ def test_header_filtration_needed(ctx, mocker):
 
 def test_missing_header_filter(ctx, mocker):
     # Regression. See GH-1142
-    mocked = mocker.spy(_hypothesis, "is_valid_header")
+    mocked = mocker.spy(filters, "is_valid_header")
     # When some header parameters have the `format` keyword
     # And some don't
     schema = ctx.openapi.build_schema(

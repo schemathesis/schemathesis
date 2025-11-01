@@ -28,7 +28,7 @@ from schemathesis.generation.meta import (
     StatefulPhaseData,
     TestPhase,
 )
-from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
+from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 
@@ -235,7 +235,7 @@ def get_parameters_value(
     operation: APIOperation,
     ctx: HookContext,
     hooks: HookDispatcher | None,
-    strategy_factory: StrategyFactory,
+    generation_mode: GenerationMode,
     generation_config: GenerationConfig,
 ) -> dict[str, Any] | None:
     """Get the final value for the specified location.
@@ -244,10 +244,10 @@ def get_parameters_value(
     generate those parts.
     """
     if value is None:
-        strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config)
+        strategy = get_parameters_strategy(operation, generation_mode, location, generation_config)
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         return draw(strategy)
-    strategy = get_parameters_strategy(operation, strategy_factory, location, generation_config, exclude=value.keys())
+    strategy = get_parameters_strategy(operation, generation_mode, location, generation_config, exclude=value.keys())
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
@@ -298,11 +298,8 @@ def generate_parameter(
     ):
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
-        strategy_factory = make_positive_strategy
         generator = GenerationMode.POSITIVE
-    else:
-        strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generator]
-    value = get_parameters_value(explicit, location, draw, operation, ctx, hooks, strategy_factory, generation_config)
+    value = get_parameters_value(explicit, location, draw, operation, ctx, hooks, generator, generation_config)
     used_generator: GenerationMode | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
@@ -336,52 +333,15 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
 
 def get_parameters_strategy(
     operation: APIOperation,
-    strategy_factory: StrategyFactory,
+    generation_mode: GenerationMode,
     location: ParameterLocation,
     generation_config: GenerationConfig,
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
-
     container = getattr(operation, location.container_name)
     if container:
-        schema = container.get_schema_with_exclusions(exclude)
-
-        if not schema["properties"] and strategy_factory is make_negative_strategy:
-            # Nothing to negate - all properties were excluded
-            strategy = st.none()
-        else:
-            assert isinstance(operation.schema, BaseOpenAPISchema)
-            strategy = strategy_factory(
-                schema,
-                operation.label,
-                location,
-                None,
-                generation_config,
-                operation.schema.adapter.jsonschema_validator_cls,
-            )
-            serialize = operation.get_parameter_serializer(location)
-            if serialize is not None:
-                strategy = strategy.map(serialize)
-            filter_func = {
-                ParameterLocation.PATH: is_valid_path,
-                ParameterLocation.HEADER: is_valid_header,
-                ParameterLocation.COOKIE: is_valid_header,
-                ParameterLocation.QUERY: is_valid_query,
-            }[location]
-            # Headers with special format do not need filtration
-            if not (location.is_in_header and _can_skip_header_filter(schema)):
-                strategy = strategy.filter(filter_func)
-            # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
-            # `True` / `False` / `None` improves chances of them passing validation in apps
-            # that expect boolean / null types
-            # and not aware of Python-specific representation of those types
-            if location == ParameterLocation.PATH:
-                strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
-            elif location == ParameterLocation.QUERY:
-                strategy = strategy.map(jsonify_python_specific_types)
-        return strategy
+        return container.get_strategy(operation, generation_config, generation_mode, exclude)
     # No parameters defined for this location
     return st.none()
 

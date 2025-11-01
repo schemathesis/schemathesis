@@ -8,7 +8,8 @@ import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
+from schemathesis.openapi.generation.filters import is_valid_header
+from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
 
 from .utils import as_param

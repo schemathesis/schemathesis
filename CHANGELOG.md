@@ -16,6 +16,10 @@
 
 - Improve error messages for exceptions in custom auth providers.
 
+### :racing_car: Performance
+
+- ~30% faster fuzzing & stateful phases due to aggressive caching of data generation strategies.
+
 ## [4.3.16](https://github.com/schemathesis/schemathesis/compare/v4.3.15...v4.3.16) - 2025-10-30
 
 ### :wrench: Changed

@@ -16,7 +16,8 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.engine import events, from_schema
 from schemathesis.generation.hypothesis import setup
-from schemathesis.specs.openapi._hypothesis import get_parameters_strategy, make_positive_strategy
+from schemathesis.generation.modes import GenerationMode
+from schemathesis.specs.openapi._hypothesis import get_parameters_strategy
 from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -182,7 +183,7 @@ def _get_parameters_strategy(operations, config):
             ParameterLocation.PATH,
             ParameterLocation.QUERY,
         ]:
-            get_parameters_strategy(operation.ok(), make_positive_strategy, location, config)
+            get_parameters_strategy(operation.ok(), GenerationMode.POSITIVE, location, config)
 
 
 @pytest.mark.benchmark

@@ -516,13 +516,14 @@ class OpenApiParameterSet(ParameterSet):
     items: list[OpenApiParameter]
     location: ParameterLocation
 
-    __slots__ = ("items", "location", "_schema", "_schema_cache")
+    __slots__ = ("items", "location", "_schema", "_schema_cache", "_strategy_cache")
 
     def __init__(self, location: ParameterLocation, items: list[OpenApiParameter] | None = None) -> None:
         self.location = location
         self.items = items or []
         self._schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
+        self._strategy_cache: dict[tuple[frozenset[str], GenerationMode], st.SearchStrategy] = {}
 
     @property
     def schema(self) -> dict[str, Any]:
@@ -560,6 +561,75 @@ class OpenApiParameterSet(ParameterSet):
 
         self._schema_cache[exclude_key] = schema
         return schema
+
+    def get_strategy(
+        self,
+        operation: APIOperation,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        exclude: Iterable[str] = (),
+    ) -> st.SearchStrategy:
+        """Get a Hypothesis strategy for this parameter set with specified exclusions."""
+        exclude_key = frozenset(exclude)
+        cache_key = (exclude_key, generation_mode)
+
+        if cache_key in self._strategy_cache:
+            return self._strategy_cache[cache_key]
+
+        # Import here to avoid circular dependency
+        from hypothesis import strategies as st
+
+        from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query
+        from schemathesis.specs.openapi._hypothesis import (
+            GENERATOR_MODE_TO_STRATEGY_FACTORY,
+            _can_skip_header_filter,
+            jsonify_python_specific_types,
+            make_negative_strategy,
+            quote_all,
+        )
+        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
+        # Get schema with exclusions
+        schema = self.get_schema_with_exclusions(exclude)
+
+        strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
+
+        if not schema["properties"] and strategy_factory is make_negative_strategy:
+            # Nothing to negate - all properties were excluded
+            strategy = st.none()
+        else:
+            assert isinstance(operation.schema, BaseOpenAPISchema)
+            strategy = strategy_factory(
+                schema,
+                operation.label,
+                self.location,
+                None,
+                generation_config,
+                operation.schema.adapter.jsonschema_validator_cls,
+            )
+            serialize = operation.get_parameter_serializer(self.location)
+            if serialize is not None:
+                strategy = strategy.map(serialize)
+            filter_func = {
+                ParameterLocation.PATH: is_valid_path,
+                ParameterLocation.HEADER: is_valid_header,
+                ParameterLocation.COOKIE: is_valid_header,
+                ParameterLocation.QUERY: is_valid_query,
+            }[self.location]
+            # Headers with special format do not need filtration
+            if not (self.location.is_in_header and _can_skip_header_filter(schema)):
+                strategy = strategy.filter(filter_func)
+            # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
+            # `True` / `False` / `None` improves chances of them passing validation in apps
+            # that expect boolean / null types
+            # and not aware of Python-specific representation of those types
+            if self.location == ParameterLocation.PATH:
+                strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
+            elif self.location == ParameterLocation.QUERY:
+                strategy = strategy.map(jsonify_python_specific_types)
+
+        self._strategy_cache[cache_key] = strategy
+        return strategy
 
 
 COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"
