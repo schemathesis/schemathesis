@@ -8,8 +8,9 @@ from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
@@ -41,8 +42,8 @@ def get_exclude_headers(case: Case) -> list[str]:
     if (
         case.meta is not None
         and isinstance(case.meta.phase.data, CoveragePhaseData)
-        and case.meta.phase.data.description.startswith("Missing")
-        and case.meta.phase.data.description.endswith("at header")
+        and case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
+        and case.meta.phase.data.parameter_location == ParameterLocation.HEADER
         and case.meta.phase.data.parameter is not None
     ):
         return [case.meta.phase.data.parameter]

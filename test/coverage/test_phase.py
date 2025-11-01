@@ -24,7 +24,7 @@ from schemathesis.generation.hypothesis.builder import (
     _iter_coverage_cases,
     create_test,
 )
-from schemathesis.generation.meta import TestPhase
+from schemathesis.generation.meta import CoverageScenario, TestPhase
 from test.utils import assert_requests_call
 
 
@@ -1933,7 +1933,7 @@ def test_negative_query_parameter(ctx, schema, expected, required):
     def test(case):
         if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if case.meta.phase.data.description.startswith("Unspecified"):
+        if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
             return
         kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
         request = Request(**kwargs).prepare()
@@ -2117,7 +2117,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
     def test(case):
         if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if not case.meta.phase.data.description.startswith("Unspecified"):
+        if case.meta.phase.data.scenario != CoverageScenario.UNSPECIFIED_HTTP_METHOD:
             return
         methods.add(case.method)
         assert f"-X {case.method}" in case.as_curl_command()
@@ -2183,7 +2183,7 @@ def test_avoid_testing_unexpected_methods(ctx):
     def test(case):
         if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if not case.meta.phase.data.description.startswith("Unspecified"):
+        if case.meta.phase.data.scenario != CoverageScenario.UNSPECIFIED_HTTP_METHOD:
             return
         methods.add(case.method)
         assert f"-X {case.method}" in case.as_curl_command()
@@ -2310,7 +2310,7 @@ def test_nested_parameters(ctx):
     def test(case):
         if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if not case.meta.phase.data.description.startswith("Unspecified"):
+        if case.meta.phase.data.scenario != CoverageScenario.UNSPECIFIED_HTTP_METHOD:
             return
         ranges.add(case.query["range"])
 
@@ -2493,7 +2493,7 @@ def assert_coverage(schema, modes, expected, path=None):
         meta = case.meta
         if meta.phase.name != TestPhase.COVERAGE:
             return
-        if meta.phase.data.description.startswith("Unspecified"):
+        if meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
             return
         assert_requests_call(case)
         mode = meta.generation.mode
@@ -2517,12 +2517,13 @@ def assert_coverage(schema, modes, expected, path=None):
                 "cookie",
             ]
             and not (
-                meta.phase.data.description == "Object with unexpected properties" and meta.phase.data.parameter is None
+                meta.phase.data.scenario == CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES
+                and meta.phase.data.parameter is None
             )
         ):
             _validate_negative_parameter_serialization(case)
 
-        if meta.phase.data.description == "Maximum length string":
+        if meta.phase.data.scenario == CoverageScenario.MAXIMUM_LENGTH_STRING:
             value, parameter = get_value_and_parameter(case)
             assert len(value) == parameter.definition["schema"]["maxLength"]
 
@@ -2566,10 +2567,10 @@ def _validate_negative_parameter_serialization(case):
 
     # Get the serialized values that will actually be sent to the API
     data = case.meta.phase.data
-    if data.description.startswith("Missing") and parameter.definition.get("required"):
+    if data.scenario == CoverageScenario.MISSING_PARAMETER and parameter.definition.get("required"):
         # Missing required parameter - proper negative test case
         return
-    if data.description.startswith("Duplicate"):
+    if data.scenario == CoverageScenario.DUPLICATE_PARAMETER:
         # Duplicate parameter is negative not in the schema sense
         return
     serialized_items = _get_serialized_parameter_values(value, data.parameter, data.parameter_location)

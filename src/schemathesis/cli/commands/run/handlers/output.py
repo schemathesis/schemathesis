@@ -20,13 +20,14 @@ from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
-from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
 
@@ -1079,7 +1080,9 @@ class OutputHandler(EventHandler):
             return bool(
                 case.meta
                 and isinstance(case.meta.phase.data, CoveragePhaseData)
-                and case.meta.phase.data.description == "Missing `Authorization` at header"
+                and case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
+                and case.meta.phase.data.parameter == "Authorization"
+                and case.meta.phase.data.parameter_location == ParameterLocation.HEADER
             )
 
         if SchemathesisWarning.MISSING_AUTH in warnings:
