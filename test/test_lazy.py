@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from schemathesis.generation.modes import GenerationMode
@@ -647,3 +649,62 @@ def test_api(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_hypothesis_settings_from_config(testdir):
+    # When hypothesis settings are configured in schemathesis.toml for a specific operation
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[[operations]]
+include-path = "/users"
+
+[operations.generation]
+max-examples = 5
+
+[phases.examples]
+enabled = false
+
+[phases.coverage]
+enabled = false
+""",
+    )
+
+    # Then operation-specific hypothesis settings should be applied when using from_fixture
+    testdir.make_test(
+        """
+import pytest
+import schemathesis
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "query", "schema": {"type": "integer"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+call_count = 0
+
+@lazy_schema.parametrize()
+def test_api(case):
+    global call_count
+    call_count += 1
+    print(f"Call count: {call_count}")
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+    counts = re.findall(r"Call count: (\d+)", result.stdout.str())
+    max_count = int(counts[-1])
+    assert max_count <= 10, f"Expected max_examples=5 to limit calls to ~5, but got {max_count}"
