@@ -65,7 +65,7 @@ def get_all_tests(
                 operation=operation,
                 test_func=test_func,
                 config=HypothesisTestConfig(
-                    settings=settings,
+                    settings=settings or schema.config.get_hypothesis_settings(operation=operation),
                     modes=modes,
                     seed=seed,
                     project=schema.config,
