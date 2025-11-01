@@ -604,3 +604,46 @@ async def test_fail(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=2, failed=2)
+
+
+def test_phases_from_config(testdir):
+    # When test phases are configured in schemathesis.toml
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[phases.examples]
+enabled = false
+
+[phases.coverage]
+enabled = false
+""",
+    )
+
+    # Then phases should be applied when using from_fixture
+    testdir.make_test(
+        """
+import pytest
+import schemathesis
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+def test_api(case):
+    assert case.meta.phase.name == "fuzzing"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
