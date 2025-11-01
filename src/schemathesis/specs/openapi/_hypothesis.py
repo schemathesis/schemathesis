@@ -346,23 +346,8 @@ def get_parameters_strategy(
 
     container = getattr(operation, location.container_name)
     if container:
-        schema = container.schema
-        if exclude:
-            # Need to exclude some parameters - create a shallow copy to avoid mutating cached schema
-            schema = dict(schema)
-            if location == ParameterLocation.HEADER:
-                # Remove excluded headers case-insensitively
-                exclude_lower = {name.lower() for name in exclude}
-                schema["properties"] = {
-                    key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
-                }
-                if "required" in schema:
-                    schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
-            else:
-                # Non-header locations: remove by exact name
-                schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude}
-                if "required" in schema:
-                    schema["required"] = [key for key in schema["required"] if key not in exclude]
+        schema = container.get_schema_with_exclusions(exclude)
+
         if not schema["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()

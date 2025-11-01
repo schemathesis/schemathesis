@@ -514,19 +514,52 @@ def build_path_parameter_v3_1(kwargs: Mapping[str, Any]) -> OpenApiParameter:
 @dataclass
 class OpenApiParameterSet(ParameterSet):
     items: list[OpenApiParameter]
+    location: ParameterLocation
 
-    __slots__ = ("items", "_schema")
+    __slots__ = ("items", "location", "_schema", "_schema_cache")
 
-    def __init__(self, items: list[OpenApiParameter] | None = None) -> None:
+    def __init__(self, location: ParameterLocation, items: list[OpenApiParameter] | None = None) -> None:
+        self.location = location
         self.items = items or []
         self._schema: dict | NotSet = NOT_SET
+        self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
 
     @property
     def schema(self) -> dict[str, Any]:
         if self._schema is NOT_SET:
-            self._schema = parameters_to_json_schema(self.items)
+            self._schema = parameters_to_json_schema(self.items, self.location)
         assert not isinstance(self._schema, NotSet)
         return self._schema
+
+    def get_schema_with_exclusions(self, exclude: Iterable[str]) -> dict[str, Any]:
+        """Get cached schema with specified parameters excluded."""
+        exclude_key = frozenset(exclude)
+
+        if exclude_key in self._schema_cache:
+            return self._schema_cache[exclude_key]
+
+        schema = self.schema
+        if exclude_key:
+            # Need to exclude some parameters - create a shallow copy to avoid mutating cached schema
+            schema = dict(schema)
+            if self.location == ParameterLocation.HEADER:
+                # Remove excluded headers case-insensitively
+                exclude_lower = {name.lower() for name in exclude_key}
+                schema["properties"] = {
+                    key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
+                }
+                if "required" in schema:
+                    schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
+            else:
+                # Non-header locations: remove by exact name
+                schema["properties"] = {
+                    key: value for key, value in schema["properties"].items() if key not in exclude_key
+                }
+                if "required" in schema:
+                    schema["required"] = [key for key in schema["required"] if key not in exclude_key]
+
+        self._schema_cache[exclude_key] = schema
+        return schema
 
 
 COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"
@@ -535,31 +568,30 @@ COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"
 def form_data_to_json_schema(parameters: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Convert raw form parameter definitions to a JSON Schema."""
     parameter_data = (
-        (param["name"], extract_parameter_schema_v2(param), param.get("required", False), ParameterLocation.BODY)
-        for param in parameters
+        (param["name"], extract_parameter_schema_v2(param), param.get("required", False)) for param in parameters
     )
 
-    merged = _merge_parameters_to_object_schema(parameter_data)
+    merged = _merge_parameters_to_object_schema(parameter_data, ParameterLocation.BODY)
 
     return {"schema": merged, COMBINED_FORM_DATA_MARKER: True}
 
 
-def parameters_to_json_schema(parameters: Iterable[OpenApiParameter]) -> dict[str, Any]:
+def parameters_to_json_schema(parameters: Iterable[OpenApiParameter], location: ParameterLocation) -> dict[str, Any]:
     """Convert multiple Open API parameters to a JSON Schema."""
-    parameter_data = ((param.name, param.optimized_schema, param.is_required, param.location) for param in parameters)
+    parameter_data = ((param.name, param.optimized_schema, param.is_required) for param in parameters)
 
-    return _merge_parameters_to_object_schema(parameter_data)
+    return _merge_parameters_to_object_schema(parameter_data, location)
 
 
 def _merge_parameters_to_object_schema(
-    parameters: Iterable[tuple[str, Any, bool, ParameterLocation]],
+    parameters: Iterable[tuple[str, Any, bool]], location: ParameterLocation
 ) -> dict[str, Any]:
     """Merge parameter data into a JSON Schema object."""
     properties = {}
     required = []
     bundled = {}
 
-    for name, subschema, is_required, location in parameters:
+    for name, subschema, is_required in parameters:
         # Extract bundled data if present
         if isinstance(subschema, dict) and BUNDLE_STORAGE_KEY in subschema:
             subschema = dict(subschema)
