@@ -185,9 +185,24 @@ class LazySchema:
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
 
                 def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
-                    override = overrides.for_operation(config=schema.config, operation=_operation)
+                    as_strategy_kwargs: dict[str, Any] = {}
 
-                    return {location.container_name: entry for location, entry in override.items() if entry}
+                    auth = schema.config.auth_for(operation=_operation)
+                    if auth is not None:
+                        from requests.auth import _basic_auth_str
+
+                        as_strategy_kwargs["headers"] = {"Authorization": _basic_auth_str(*auth)}
+
+                    headers = schema.config.headers_for(operation=_operation)
+                    if headers:
+                        as_strategy_kwargs["headers"] = headers
+
+                    override = overrides.for_operation(config=schema.config, operation=_operation)
+                    for location, entry in override.items():
+                        if entry:
+                            as_strategy_kwargs[location.container_name] = entry
+
+                    return as_strategy_kwargs
 
                 tests = list(
                     get_all_tests(
