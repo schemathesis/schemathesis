@@ -225,3 +225,29 @@ def verify_auth(ctx, response, case):
     """) as module:
         # Then all auths should be properly applied
         assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+@pytest.mark.filterwarnings("error")
+@pytest.mark.parametrize("refresh_interval", [None, 60], ids=["no-cache", "with-cache"])
+def test_auth_get_raises_exception(ctx, cli, schema_url, snapshot_cli, refresh_interval):
+    # When auth provider's get() method raises an exception (with or without caching)
+    decorator = (
+        "@schemathesis.auth()"
+        if refresh_interval is None
+        else f"@schemathesis.auth(refresh_interval={refresh_interval})"
+    )
+    module = ctx.write_pymodule(
+        f"""
+{decorator}
+class BrokenAuth:
+    def get(self, case, context):
+        raise AttributeError("'str' object has no attribute 'get'")
+
+    def set(self, case, data, context):
+        case.headers = {{"Authorization": f"Bearer {{data}}"}}
+"""
+    )
+    # Then the error should be caught and displayed clearly
+    assert cli.main("run", schema_url, "--max-examples=1", hooks=module) == snapshot_cli

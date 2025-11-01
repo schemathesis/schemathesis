@@ -12,6 +12,10 @@
 - Support for method-based tests with `schemathesis.pytest.from_fixture`.
 - Checks not loaded when using `schemathesis.pytest.from_fixture`, causing `AttributeError` when accessing `schemathesis.checks.*`.
 
+### :wrench: Changed
+
+- Improve error messages for exceptions in custom auth providers.
+
 ## [4.3.16](https://github.com/schemathesis/schemathesis/compare/v4.3.15...v4.3.16) - 2025-10-30
 
 ### :wrench: Changed
