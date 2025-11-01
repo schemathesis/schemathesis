@@ -14,7 +14,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CoveragePhaseData, TestPhase
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, TestPhase
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -44,7 +44,7 @@ def is_unexpected_http_status_case(case: Case) -> bool:
     return bool(
         case.meta
         and isinstance(case.meta.phase.data, CoveragePhaseData)
-        and case.meta.phase.data.description.startswith("Unspecified HTTP method")
+        and case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
     )
 
 
@@ -287,8 +287,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
     if (
         data.parameter
         and data.parameter_location == ParameterLocation.HEADER
-        and data.description
-        and data.description.startswith("Missing ")
+        and data.scenario == CoverageScenario.MISSING_PARAMETER
     ):
         if data.parameter.lower() == "authorization":
             expected_statuses = {401}
@@ -313,7 +312,7 @@ def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> boo
     if meta is None or not isinstance(meta.phase.data, CoveragePhaseData) or response.request.method == "OPTIONS":
         return None
     data = meta.phase.data
-    if data.description and data.description.startswith("Unspecified HTTP method:"):
+    if data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
         if response.status_code != 405:
             raise UnsupportedMethodResponse(
                 operation=case.operation.label,

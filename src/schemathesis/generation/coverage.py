@@ -38,6 +38,7 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 
 from ..specs.openapi.converter import update_pattern_in_schema
@@ -93,17 +94,19 @@ UNKNOWN_PROPERTY_VALUE = 42
 class GeneratedValue:
     value: Any
     generation_mode: GenerationMode
+    scenario: CoverageScenario
     description: str
     parameter: str | None
     location: str | None
 
-    __slots__ = ("value", "generation_mode", "description", "parameter", "location")
+    __slots__ = ("value", "generation_mode", "scenario", "description", "parameter", "location")
 
     @classmethod
-    def with_positive(cls, value: Any, *, description: str) -> GeneratedValue:
+    def with_positive(cls, value: Any, *, scenario: CoverageScenario, description: str) -> GeneratedValue:
         return cls(
             value=value,
             generation_mode=GenerationMode.POSITIVE,
+            scenario=scenario,
             description=description,
             location=None,
             parameter=None,
@@ -111,11 +114,12 @@ class GeneratedValue:
 
     @classmethod
     def with_negative(
-        cls, value: Any, *, description: str, location: str, parameter: str | None = None
+        cls, value: Any, *, scenario: CoverageScenario, description: str, location: str, parameter: str | None = None
     ) -> GeneratedValue:
         return cls(
             value=value,
             generation_mode=GenerationMode.NEGATIVE,
+            scenario=scenario,
             description=description,
             location=location,
             parameter=parameter,
@@ -449,15 +453,15 @@ def _cover_positive_for_type(
                     yield from cover_schema_iter(ctx, canonical)
         if enum is not NOT_SET:
             for value in enum:
-                yield PositiveValue(value, description="Enum value")
+                yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
         elif const is not NOT_SET:
-            yield PositiveValue(const, description="Const value")
+            yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
         elif ty is not None:
             if ty == "null":
-                yield PositiveValue(None, description="Value null value")
+                yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
             elif ty == "boolean":
-                yield PositiveValue(True, description="Valid boolean value")
-                yield PositiveValue(False, description="Valid boolean value")
+                yield PositiveValue(True, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
+                yield PositiveValue(False, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
             elif ty == "string":
                 yield from _positive_string(ctx, schema)
             elif ty == "integer" or ty == "number":
@@ -563,15 +567,32 @@ def cover_schema_iter(
                 elif key == "maximum":
                     next = value + 1
                     if seen.insert(next):
-                        yield NegativeValue(next, description="Value greater than maximum", location=ctx.current_path)
+                        yield NegativeValue(
+                            next,
+                            scenario=CoverageScenario.VALUE_ABOVE_MAXIMUM,
+                            description="Value greater than maximum",
+                            location=ctx.current_path,
+                        )
                 elif key == "minimum":
                     next = value - 1
                     if seen.insert(next):
-                        yield NegativeValue(next, description="Value smaller than minimum", location=ctx.current_path)
+                        yield NegativeValue(
+                            next,
+                            scenario=CoverageScenario.VALUE_BELOW_MINIMUM,
+                            description="Value smaller than minimum",
+                            location=ctx.current_path,
+                        )
                 elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and seen.insert(value):
                     verb = "greater" if key == "exclusiveMaximum" else "smaller"
                     limit = "maximum" if key == "exclusiveMaximum" else "minimum"
-                    yield NegativeValue(value, description=f"Value {verb} than {limit}", location=ctx.current_path)
+                    scenario = (
+                        CoverageScenario.VALUE_ABOVE_MAXIMUM
+                        if key == "exclusiveMaximum"
+                        else CoverageScenario.VALUE_BELOW_MINIMUM
+                    )
+                    yield NegativeValue(
+                        value, scenario=scenario, description=f"Value {verb} than {limit}", location=ctx.current_path
+                    )
                 elif key == "multipleOf":
                     for value_ in _negative_multiple_of(ctx, schema, value):
                         if seen.insert(value_.value):
@@ -584,7 +605,10 @@ def cover_schema_iter(
                         value = ""
                         if ctx.is_valid_for_location(value) and seen.insert(value):
                             yield NegativeValue(
-                                value, description="String smaller than minLength", location=ctx.current_path
+                                value,
+                                scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
+                                description="String smaller than minLength",
+                                location=ctx.current_path,
                             )
                     else:
                         with suppress(InvalidArgument):
@@ -604,7 +628,10 @@ def cover_schema_iter(
                                 value = ctx.generate_from_schema(new_schema)
                             if ctx.is_valid_for_location(value) and seen.insert(value):
                                 yield NegativeValue(
-                                    value, description="String smaller than minLength", location=ctx.current_path
+                                    value,
+                                    scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
+                                    description="String smaller than minLength",
+                                    location=ctx.current_path,
                                 )
                 elif key == "maxLength" and value < INTERNAL_BUFFER_SIZE:
                     try:
@@ -629,7 +656,10 @@ def cover_schema_iter(
                             value = ctx.generate_from_schema(new_schema)
                         if seen.insert(value):
                             yield NegativeValue(
-                                value, description="String larger than maxLength", location=ctx.current_path
+                                value,
+                                scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
+                                description="String larger than maxLength",
+                                location=ctx.current_path,
                             )
                     except (InvalidArgument, Unsatisfiable):
                         pass
@@ -669,6 +699,7 @@ def cover_schema_iter(
                         if seen.insert(array_value):
                             yield NegativeValue(
                                 array_value,
+                                scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
                                 description="Array with more items than allowed by maxItems",
                                 location=ctx.current_path,
                             )
@@ -680,6 +711,7 @@ def cover_schema_iter(
                             if seen.insert(array_value):
                                 yield NegativeValue(
                                     array_value,
+                                    scenario=CoverageScenario.ARRAY_ABOVE_MAX_ITEMS,
                                     description="Array with more items than allowed by maxItems",
                                     location=ctx.current_path,
                                 )
@@ -693,6 +725,7 @@ def cover_schema_iter(
                         if seen.insert(array_value):
                             yield NegativeValue(
                                 array_value,
+                                scenario=CoverageScenario.ARRAY_BELOW_MIN_ITEMS,
                                 description="Array with fewer items than allowed by minItems",
                                 location=ctx.current_path,
                             )
@@ -707,6 +740,7 @@ def cover_schema_iter(
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield NegativeValue(
                         {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
+                        scenario=CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
                         description="Object with unexpected properties",
                         location=ctx.current_path,
                     )
@@ -838,12 +872,12 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         has_valid_example = False
         if example and ctx.is_valid_for_location(example) and seen_values.insert(example):
             has_valid_example = True
-            yield PositiveValue(example, description="Example value")
+            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
                 if ctx.is_valid_for_location(example) and seen_values.insert(example):
                     has_valid_example = True
-                    yield PositiveValue(example, description="Example value")
+                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
@@ -852,18 +886,18 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             and seen_values.insert(default)
         ):
             has_valid_example = True
-            yield PositiveValue(default, description="Default value")
+            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
         if not has_valid_example:
             if not min_length and not max_length or "pattern" in schema:
                 value = ctx.generate_from_schema(schema)
                 seen_values.insert(value)
                 seen_constraints.add((min_length, max_length))
-                yield PositiveValue(value, description="Valid string")
+                yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
     elif not min_length and not max_length or "pattern" in schema:
         value = ctx.generate_from_schema(schema)
         seen_values.insert(value)
         seen_constraints.add((min_length, max_length))
-        yield PositiveValue(value, description="Valid string")
+        yield PositiveValue(value, scenario=CoverageScenario.VALID_STRING, description="Valid string")
 
     if min_length is not None and min_length < INTERNAL_BUFFER_SIZE:
         # Exactly the minimum length
@@ -872,7 +906,9 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "maxLength": min_length})
             if seen_values.insert(value):
-                yield PositiveValue(value, description="Minimum length string")
+                yield PositiveValue(
+                    value, scenario=CoverageScenario.MINIMUM_LENGTH_STRING, description="Minimum length string"
+                )
 
         # One character more than minimum if possible
         larger = min_length + 1
@@ -881,7 +917,11 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger})
             if seen_values.insert(value):
-                yield PositiveValue(value, description="Near-boundary length string")
+                yield PositiveValue(
+                    value,
+                    scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
+                    description="Near-boundary length string",
+                )
 
     if max_length is not None:
         # Exactly the maximum length
@@ -890,7 +930,9 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "minLength": max_length, "maxLength": max_length})
             if seen_values.insert(value):
-                yield PositiveValue(value, description="Maximum length string")
+                yield PositiveValue(
+                    value, scenario=CoverageScenario.MAXIMUM_LENGTH_STRING, description="Maximum length string"
+                )
 
         # One character less than maximum if possible
         smaller = max_length - 1
@@ -903,7 +945,11 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller})
             if seen_values.insert(value):
-                yield PositiveValue(value, description="Near-boundary length string")
+                yield PositiveValue(
+                    value,
+                    scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
+                    description="Near-boundary length string",
+                )
 
 
 def closest_multiple_greater_than(y: int, x: int) -> int:
@@ -935,22 +981,22 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
 
     if example or examples or default:
         if example and seen.insert(example):
-            yield PositiveValue(example, description="Example value")
+            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
                 if seen.insert(example):
-                    yield PositiveValue(example, description="Example value")
+                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
             and seen.insert(default)
         ):
-            yield PositiveValue(default, description="Default value")
+            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
     elif not minimum and not maximum:
         value = ctx.generate_from_schema(schema)
         seen.insert(value)
-        yield PositiveValue(value, description="Valid number")
+        yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
 
     if minimum is not None:
         # Exactly the minimum
@@ -959,7 +1005,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         else:
             smallest = minimum
         if seen.insert(smallest):
-            yield PositiveValue(smallest, description="Minimum value")
+            yield PositiveValue(smallest, scenario=CoverageScenario.MINIMUM_VALUE, description="Minimum value")
 
         # One more than minimum if possible
         if multiple_of is not None:
@@ -967,7 +1013,9 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         else:
             larger = minimum + 1
         if (not maximum or larger <= maximum) and seen.insert(larger):
-            yield PositiveValue(larger, description="Near-boundary number")
+            yield PositiveValue(
+                larger, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
+            )
 
     if maximum is not None:
         # Exactly the maximum
@@ -976,7 +1024,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         else:
             largest = maximum
         if seen.insert(largest):
-            yield PositiveValue(largest, description="Maximum value")
+            yield PositiveValue(largest, scenario=CoverageScenario.MAXIMUM_VALUE, description="Maximum value")
 
         # One less than maximum if possible
         if multiple_of is not None:
@@ -984,7 +1032,9 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         else:
             smaller = maximum - 1
         if (minimum is None or smaller >= minimum) and seen.insert(smaller):
-            yield PositiveValue(smaller, description="Near-boundary number")
+            yield PositiveValue(
+                smaller, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
+            )
 
 
 def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
@@ -997,20 +1047,20 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
 
     if example or examples or default:
         if example and seen.insert(example):
-            yield PositiveValue(example, description="Example value")
+            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
                 if seen.insert(example):
-                    yield PositiveValue(example, description="Example value")
+                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
             and seen.insert(default)
         ):
-            yield PositiveValue(default, description="Default value")
+            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
     elif seen.insert(template):
-        yield PositiveValue(template, description="Valid array")
+        yield PositiveValue(template, scenario=CoverageScenario.VALID_ARRAY, description="Valid array")
 
     # Boundary and near-boundary sizes
     min_items = schema.get("minItems")
@@ -1023,14 +1073,18 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             seen_constraints.add(larger)
             value = ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger})
             if seen.insert(value):
-                yield PositiveValue(value, description="Near-boundary items array")
+                yield PositiveValue(
+                    value, scenario=CoverageScenario.NEAR_BOUNDARY_ITEMS_ARRAY, description="Near-boundary items array"
+                )
 
     if max_items is not None:
         if max_items < INTERNAL_BUFFER_SIZE and max_items not in seen_constraints:
             seen_constraints.add(max_items)
             value = ctx.generate_from_schema({**schema, "minItems": max_items})
             if seen.insert(value):
-                yield PositiveValue(value, description="Maximum items array")
+                yield PositiveValue(
+                    value, scenario=CoverageScenario.MAXIMUM_ITEMS_ARRAY, description="Maximum items array"
+                )
 
         # One item smaller than maximum if possible
         smaller = max_items - 1
@@ -1042,7 +1096,9 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         ):
             value = ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})
             if seen.insert(value):
-                yield PositiveValue(value, description="Near-boundary items array")
+                yield PositiveValue(
+                    value, scenario=CoverageScenario.NEAR_BOUNDARY_ITEMS_ARRAY, description="Near-boundary items array"
+                )
 
     if "items" in schema and "enum" in schema["items"] and isinstance(schema["items"]["enum"], list) and max_items != 0:
         # Ensure there is enough items to pass `minItems` if it is specified
@@ -1050,12 +1106,20 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         for variant in schema["items"]["enum"]:
             value = [variant] * length
             if seen.insert(value):
-                yield PositiveValue(value, description="Enum value from available for items array")
+                yield PositiveValue(
+                    value,
+                    scenario=CoverageScenario.ENUM_VALUE_ITEMS_ARRAY,
+                    description="Enum value from available for items array",
+                )
     elif min_items is None and max_items is None and "items" in schema and isinstance(schema["items"], dict):
         # Otherwise only an empty array is generated
         sub_schema = schema["items"]
         for item in cover_schema_iter(ctx, sub_schema):
-            yield PositiveValue([item.value], description=f"Single-item array: {item.description}")
+            yield PositiveValue(
+                [item.value],
+                scenario=CoverageScenario.VALID_ARRAY,
+                description=f"Single-item array: {item.description}",
+            )
 
 
 def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:
@@ -1065,18 +1129,18 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
 
     if example or examples or default:
         if example:
-            yield PositiveValue(example, description="Example value")
+            yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example, description="Example value")
+                yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
-            yield PositiveValue(default, description="Default value")
+            yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
     else:
-        yield PositiveValue(template, description="Valid object")
+        yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
 
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
@@ -1087,22 +1151,36 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
     for name in optional:
         combo = {k: v for k, v in template.items() if k in required or k == name}
         if combo != template:
-            yield PositiveValue(combo, description=f"Object with all required properties and '{name}'")
+            yield PositiveValue(
+                combo,
+                scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
+                description=f"Object with all required properties and '{name}'",
+            )
     # Generate one combination for each size from 2 to N-1
     for selection in select_combinations(optional):
         combo = {k: v for k, v in template.items() if k in required or k in selection}
-        yield PositiveValue(combo, description="Object with all required and a subset of optional properties")
+        yield PositiveValue(
+            combo,
+            scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
+            description="Object with all required and a subset of optional properties",
+        )
     # Generate only required properties
     if set(properties) != required:
         only_required = {k: v for k, v in template.items() if k in required}
-        yield PositiveValue(only_required, description="Object with only required properties")
+        yield PositiveValue(
+            only_required,
+            scenario=CoverageScenario.OBJECT_ONLY_REQUIRED,
+            description="Object with only required properties",
+        )
     seen = HashSet()
     for name, sub_schema in properties.items():
         seen.insert(template.get(name))
         for new in cover_schema_iter(ctx, sub_schema):
             if seen.insert(new.value):
                 yield PositiveValue(
-                    {**template, name: new.value}, description=f"Object with valid '{name}' value: {new.description}"
+                    {**template, name: new.value},
+                    scenario=CoverageScenario.VALID_OBJECT,
+                    description=f"Object with valid '{name}' value: {new.description}",
                 )
         seen.clear()
 
@@ -1126,6 +1204,7 @@ def _negative_enum(ctx: CoverageContext, value: list, seen: HashSet) -> Generato
     ).filter(is_not_in_value)
     yield NegativeValue(
         ctx.generate_from(strategy),
+        scenario=CoverageScenario.INVALID_ENUM_VALUE,
         description="Invalid enum value",
         location=ctx.current_path,
     )
@@ -1140,6 +1219,7 @@ def _negative_properties(
             for value in cover_schema_iter(nctx, sub_schema):
                 yield NegativeValue(
                     {**template, key: value.value},
+                    scenario=value.scenario,
                     description=f"Object with invalid '{key}' value: {value.description}",
                     location=nctx.current_path,
                     parameter=key,
@@ -1159,6 +1239,7 @@ def _negative_pattern_properties(
             for value in cover_schema_iter(nctx, sub_schema):
                 yield NegativeValue(
                     {**template, key: value.value},
+                    scenario=value.scenario,
                     description=f"Object with invalid pattern key '{key}' ('{pattern}') value: {value.description}",
                     location=nctx.current_path,
                 )
@@ -1172,6 +1253,7 @@ def _negative_items(ctx: CoverageContext, schema: dict[str, Any] | bool) -> Gene
         if ctx.leads_to_negative_test_case(items):
             yield NegativeValue(
                 items,
+                scenario=value.scenario,
                 description=f"Array with invalid items: {value.description}",
                 location=nctx.current_path,
             )
@@ -1194,6 +1276,7 @@ def _negative_pattern(
             .filter(partial(_not_matching_pattern, pattern=compiled))
             .filter(ctx.is_valid_for_location)
         ),
+        scenario=CoverageScenario.INVALID_PATTERN,
         description=f"Value not matching the '{pattern}' pattern",
         location=ctx.current_path,
     )
@@ -1208,6 +1291,7 @@ def _negative_multiple_of(
 ) -> Generator[GeneratedValue, None, None]:
     yield NegativeValue(
         ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of)),
+        scenario=CoverageScenario.NOT_MULTIPLE_OF,
         description=f"Non-multiple of {multiple_of}",
         location=ctx.current_path,
     )
@@ -1215,7 +1299,12 @@ def _negative_multiple_of(
 
 def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     unique = jsonify(ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1}))
-    yield NegativeValue(unique + unique, description="Non-unique items", location=ctx.current_path)
+    yield NegativeValue(
+        unique + unique,
+        scenario=CoverageScenario.NON_UNIQUE_ITEMS,
+        description="Non-unique items",
+        location=ctx.current_path,
+    )
 
 
 def _negative_required(
@@ -1224,6 +1313,7 @@ def _negative_required(
     for key in required:
         yield NegativeValue(
             {k: v for k, v in template.items() if k != key},
+            scenario=CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY,
             description=f"Missing required property: {key}",
             location=ctx.current_path,
             parameter=key,
@@ -1253,6 +1343,7 @@ def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generat
             strategy = strategy.filter(functools.partial(_is_invalid_format, format=format))
     yield NegativeValue(
         ctx.generate_from(strategy),
+        scenario=CoverageScenario.INVALID_FORMAT,
         description=f"Value not matching the '{format}' format",
         location=ctx.current_path,
     )
@@ -1379,7 +1470,9 @@ def _negative_type(
     for strategy in strategies.values():
         value = ctx.generate_from(strategy)
         if seen.insert(value) and ctx.is_valid_for_location(value):
-            yield NegativeValue(value, description="Incorrect type", location=ctx.current_path)
+            yield NegativeValue(
+                value, scenario=CoverageScenario.INCORRECT_TYPE, description="Incorrect type", location=ctx.current_path
+            )
 
 
 def push_examples_to_properties(schema: dict[str, Any]) -> None:

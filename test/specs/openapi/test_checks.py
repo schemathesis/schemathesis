@@ -11,6 +11,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
+    CoverageScenario,
     GenerationInfo,
     PhaseInfo,
 )
@@ -234,6 +235,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
                 ParameterLocation.QUERY: ComponentInfo(mode=GenerationMode.NEGATIVE),
             },
             phase=PhaseInfo.coverage(
+                CoverageScenario.UNSPECIFIED_HTTP_METHOD,
                 description="Unspecified HTTP method: PUT",
             ),
         ),
