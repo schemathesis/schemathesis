@@ -516,18 +516,21 @@ def _merge_parameters_to_object_schema(
             # ensures unique names
             bundled.update(subschema_bundle)
 
-        if (
-            location.is_in_header
-            and isinstance(subschema, dict)
-            and list(subschema) == ["type"]
-            and subschema["type"] == "string"
-        ):
-            subschema.setdefault("format", HEADER_FORMAT)
+        # Apply location-specific adjustments to individual parameter schemas
+        if isinstance(subschema, dict):
+            # Headers: add HEADER_FORMAT for plain string types
+            if location.is_in_header and list(subschema) == ["type"] and subschema["type"] == "string":
+                subschema = {**subschema, "format": HEADER_FORMAT}
+
+            # Path parameters: ensure string types have minLength >= 1
+            elif location == ParameterLocation.PATH and subschema.get("type") == "string":
+                if "minLength" not in subschema:
+                    subschema = {**subschema, "minLength": 1}
 
         properties[name] = subschema
 
-        # Avoid duplicate entries in required
-        if is_required and name not in required:
+        # Path parameters are always required
+        if (location == ParameterLocation.PATH or is_required) and name not in required:
             required.append(name)
 
     merged = {
