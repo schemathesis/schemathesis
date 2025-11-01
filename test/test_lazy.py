@@ -741,3 +741,46 @@ class TestAPI:
     # Then it should work without crashes
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
+
+
+def test_checks_available_with_from_fixture(tmp_path):
+    # When using from_fixture, checks should be accessible without AttributeError
+    # Run in subprocess to avoid test pre-loading modules
+    import subprocess
+    import sys
+
+    test_file = tmp_path / "test_isolated.py"
+    test_file.write_text("""
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_checks_are_loaded(case):
+    _ = schemathesis.checks.status_code_conformance
+""")
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", str(test_file), "-v", "-p", "no:cacheprovider"],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+    )
+
+    assert result.returncode == 0, f"Test failed:\n{result.stdout}\n{result.stderr}"
