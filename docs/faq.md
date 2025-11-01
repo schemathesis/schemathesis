@@ -96,6 +96,27 @@ Schemathesis has the following limitations:
 
 If you encounter issues not listed here, please report them on our [GitHub issues page](https://github.com/schemathesis/schemathesis/issues).
 
+## Why is Schemathesis skipping my Authorization header?
+
+Schemathesis **intentionally** removes or modifies authentication in some test cases. This is security testing, not a bug.
+
+**Why this happens:**
+
+Schemathesis verifies that your API properly validates authentication by testing with:
+- No authentication credentials
+- Incorrect authentication credentials
+
+This helps catch authentication bypass vulnerabilities where APIs accept requests they should reject.
+
+**When you'll see this:**
+
+- The `ignored_auth` check makes additional requests without auth or with invalid credentials
+- Some test cases in the coverage phase may omit required headers including Authorization
+- You'll see failures if your API accepts requests it should reject
+
+!!! important ""
+    The majority of test cases still use your provided authentication normally. Only specific security-focused tests intentionally modify it.
+
 ## Can I use Schemathesis with Allure?
 
 Yes, through JUnit XML export. Allure can generate rich visual reports from Schemathesis test results.
