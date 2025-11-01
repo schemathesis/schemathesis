@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import warnings
 from dataclasses import dataclass
 from enum import Enum
@@ -227,7 +228,7 @@ def create_base_test(
 
     funcobj = hypothesis.given(*args, **{**kwargs, "case": strategy})(test_wrapper)
 
-    if asyncio.iscoroutinefunction(test_function):
+    if inspect.iscoroutinefunction(test_function):
         funcobj.hypothesis.inner_test = make_async_test(test_function)  # type: ignore
     return funcobj
 

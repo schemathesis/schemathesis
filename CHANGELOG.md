@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.16...HEAD) - TBD
 
+### :rocket: Added
+
+- Python 3.14 builds.
+
 ## [4.3.16](https://github.com/schemathesis/schemathesis/compare/v4.3.15...v4.3.16) - 2025-10-30
 
 ### :wrench: Changed
