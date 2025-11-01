@@ -708,3 +708,36 @@ def test_api(case):
     counts = re.findall(r"Call count: (\d+)", result.stdout.str())
     max_count = int(counts[-1])
     assert max_count <= 10, f"Expected max_examples=5 to limit calls to ~5, but got {max_count}"
+
+
+def test_lazy_fixture_with_test_class(testdir):
+    # When using from_fixture with a test method inside a class
+    testdir.make_test(
+        """
+import pytest
+import schemathesis
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+class TestAPI:
+    @lazy_schema.parametrize()
+    def test_users(self, case):
+        assert case.operation.path == "/users"
+"""
+    )
+    # Then it should work without crashes
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
