@@ -335,7 +335,9 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
     headers = container.schema["properties"]
     if not headers:
         return True
-    return any(header != {"type": "string"} for header in headers.values())
+    return any(
+        header not in ({"type": "string"}, {"type": "string", "format": HEADER_FORMAT}) for header in headers.values()
+    )
 
 
 def get_schema_for_location(location: ParameterLocation, parameters: OpenApiParameterSet) -> dict[str, Any]:
@@ -464,13 +466,6 @@ def make_positive_strategy(
     validator_cls: type[jsonschema.protocols.Validator],
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
-    if location.is_in_header and isinstance(schema, dict):
-        # We try to enforce the right header values via "format"
-        # This way, only allowed values will be used during data generation, which reduces the amount of filtering later
-        # If a property schema contains `pattern` it leads to heavy filtering and worse performance - therefore, skip it
-        for sub_schema in schema.get("properties", {}).values():
-            if list(sub_schema) == ["type"] and sub_schema["type"] == "string":
-                sub_schema.setdefault("format", HEADER_FORMAT)
     custom_formats = _build_custom_formats(generation_config)
     return from_schema(
         schema,
