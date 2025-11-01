@@ -325,6 +325,27 @@ class IncorrectUsage(SchemathesisError):
     """Indicates incorrect usage of Schemathesis' public API."""
 
 
+class AuthenticationError(SchemathesisError):
+    """Error during authentication provider execution.
+
+    This error wraps exceptions that occur when obtaining or setting
+    authentication data via custom auth providers.
+    """
+
+    def __init__(self, provider_name: str, method: str, message: str) -> None:
+        self.provider_name = provider_name
+        self.method = method
+        self.message = message
+        super().__init__(
+            f"Error in '{provider_name}.{method}()': {message}\n\n"
+            f"Common causes:\n"
+            f"  - Auth endpoint returned an error response\n"
+            f"  - Response format doesn't match expectations (text vs JSON)\n"
+            f"  - Network or connection issues\n"
+            f"  - Logic error in the authentication provider implementation"
+        )
+
+
 class NoLinksFound(IncorrectUsage):
     """Raised when no valid links are available for stateful testing."""
 

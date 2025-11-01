@@ -17,7 +17,7 @@ from typing import (
     runtime_checkable,
 )
 
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.errors import AuthenticationError, IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
 from schemathesis.generation.case import Case
@@ -128,6 +128,7 @@ class CachingAuthProvider(Generic[Auth]):
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
         """Get cached auth value."""
+        __tracebackhide__ = True
         cache_entry = self._get_cache_entry(case, context)
         if cache_entry is None or self.timer() >= cache_entry.expires:
             with self._refresh_lock:
@@ -136,7 +137,11 @@ class CachingAuthProvider(Generic[Auth]):
                     # Another thread updated the cache
                     return cache_entry.data
                 # We know that optional auth is possible only inside a higher-level wrapper
-                data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
+                try:
+                    data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
+                except Exception as exc:
+                    provider_name = self.provider.__class__.__name__
+                    raise AuthenticationError(provider_name, "get", str(exc)) from exc
                 self._set_cache_entry(data, case, context)
                 return data
         return cache_entry.data
@@ -270,11 +275,25 @@ class SelectiveAuthProvider(Generic[Auth]):
     filter_set: FilterSet
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
+        __tracebackhide__ = True
         if self.filter_set.match(context):
-            return self.provider.get(case, context)
+            try:
+                return self.provider.get(case, context)
+            except AuthenticationError:
+                # Already wrapped, re-raise as-is
+                raise
+            except Exception as exc:
+                # Need to unwrap to get the actual provider class name
+                provider = self.provider
+                # Unwrap caching providers
+                while isinstance(provider, (CachingAuthProvider, KeyedCachingAuthProvider)):
+                    provider = provider.provider
+                provider_name = provider.__class__.__name__
+                raise AuthenticationError(provider_name, "get", str(exc)) from exc
         return None
 
     def set(self, case: Case, data: Auth, context: AuthContext) -> None:
+        __tracebackhide__ = True
         self.provider.set(case, data, context)
 
 
@@ -418,6 +437,7 @@ class AuthStorage(Generic[Auth]):
 
     def set(self, case: Case, context: AuthContext) -> None:
         """Set authentication data on a generated test case."""
+        __tracebackhide__ = True
         if not self.is_defined:
             raise IncorrectUsage("No auth provider is defined.")
         for provider in self.providers:
@@ -433,6 +453,7 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
 
     If there is no auth defined, then this function is no-op.
     """
+    __tracebackhide__ = True
     if auth_storage is not None:
         auth_storage.set(case, context)
     elif case.operation.schema.auth.is_defined:

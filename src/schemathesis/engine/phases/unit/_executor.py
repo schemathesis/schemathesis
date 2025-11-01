@@ -19,6 +19,7 @@ from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
+    AuthenticationError,
     InternalError,
     InvalidHeadersExample,
     InvalidRegexPattern,
@@ -173,6 +174,9 @@ def run_test(
         # We need more clear error message here
         status = Status.ERROR
         yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
+    except AuthenticationError as exc:
+        status = Status.ERROR
+        yield non_fatal_error(exc)
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=phase)
