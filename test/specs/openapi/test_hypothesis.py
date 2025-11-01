@@ -135,15 +135,14 @@ def test_inlined_definitions(deeply_nested_schema):
     test()
 
 
-@pytest.mark.parametrize("keywords", [{}, {"pattern": r"\A[A-F0-9]{12}\Z"}])
 @pytest.mark.hypothesis_nested
-def test_valid_headers(keywords):
+def test_valid_headers():
     # When headers are generated
     # And there is no other keywords than "type"
     strategy = make_positive_strategy(
         {
             "type": "object",
-            "properties": {"X-Foo": {"type": "string", **keywords}},
+            "properties": {"X-Foo": {"type": "string", "pattern": r"\A[A-F0-9]{12}\Z"}},
             "required": ["X-Foo"],
             "additionalProperties": False,
         },
@@ -166,7 +165,13 @@ def test_configure_headers():
     strategy = make_positive_strategy(
         {
             "type": "object",
-            "properties": {"X-Foo": {"type": "string"}},
+            "properties": {
+                "X-Foo": {
+                    "type": "string",
+                    # This is added a few layers above
+                    "format": formats.HEADER_FORMAT,
+                }
+            },
             "required": ["X-Foo"],
             "additionalProperties": False,
         },

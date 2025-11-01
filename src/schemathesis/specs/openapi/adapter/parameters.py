@@ -17,6 +17,7 @@ from schemathesis.schemas import ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
+from schemathesis.specs.openapi.formats import HEADER_FORMAT
 
 if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
@@ -482,7 +483,8 @@ COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"
 def form_data_to_json_schema(parameters: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Convert raw form parameter definitions to a JSON Schema."""
     parameter_data = (
-        (param["name"], extract_parameter_schema_v2(param), param.get("required", False)) for param in parameters
+        (param["name"], extract_parameter_schema_v2(param), param.get("required", False), ParameterLocation.BODY)
+        for param in parameters
     )
 
     merged = _merge_parameters_to_object_schema(parameter_data)
@@ -492,18 +494,20 @@ def form_data_to_json_schema(parameters: Sequence[Mapping[str, Any]]) -> dict[st
 
 def parameters_to_json_schema(parameters: Iterable[OpenApiParameter]) -> dict[str, Any]:
     """Convert multiple Open API parameters to a JSON Schema."""
-    parameter_data = ((param.name, param.optimized_schema, param.is_required) for param in parameters)
+    parameter_data = ((param.name, param.optimized_schema, param.is_required, param.location) for param in parameters)
 
     return _merge_parameters_to_object_schema(parameter_data)
 
 
-def _merge_parameters_to_object_schema(parameters: Iterable[tuple[str, Any, bool]]) -> dict[str, Any]:
+def _merge_parameters_to_object_schema(
+    parameters: Iterable[tuple[str, Any, bool, ParameterLocation]],
+) -> dict[str, Any]:
     """Merge parameter data into a JSON Schema object."""
     properties = {}
     required = []
     bundled = {}
 
-    for name, subschema, is_required in parameters:
+    for name, subschema, is_required, location in parameters:
         # Extract bundled data if present
         if isinstance(subschema, dict) and BUNDLE_STORAGE_KEY in subschema:
             subschema = dict(subschema)
@@ -511,6 +515,14 @@ def _merge_parameters_to_object_schema(parameters: Iterable[tuple[str, Any, bool
             # NOTE: Bundled schema names are not overlapping as they were bundled via the same `Bundler` that
             # ensures unique names
             bundled.update(subschema_bundle)
+
+        if (
+            location.is_in_header
+            and isinstance(subschema, dict)
+            and list(subschema) == ["type"]
+            and subschema["type"] == "string"
+        ):
+            subschema.setdefault("format", HEADER_FORMAT)
 
         properties[name] = subschema
 
@@ -522,8 +534,9 @@ def _merge_parameters_to_object_schema(parameters: Iterable[tuple[str, Any, bool
         "properties": properties,
         "additionalProperties": False,
         "type": "object",
-        "required": required,
     }
+    if required:
+        merged["required"] = required
     if bundled:
         merged[BUNDLE_STORAGE_KEY] = bundled
 
