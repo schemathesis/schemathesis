@@ -6,6 +6,10 @@
 
 - Python 3.14 builds.
 
+### :bug: Fixed
+
+- Config-based auth and headers not applied when using `schemathesis.pytest.from_fixture`.
+
 ## [4.3.16](https://github.com/schemathesis/schemathesis/compare/v4.3.15...v4.3.16) - 2025-10-30
 
 ### :wrench: Changed
