@@ -17,7 +17,6 @@ from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -340,22 +339,6 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
     )
 
 
-def get_schema_for_location(location: ParameterLocation, parameters: OpenApiParameterSet) -> dict[str, Any]:
-    schema = deepclone(parameters.schema)
-    if location == ParameterLocation.PATH:
-        schema["required"] = list(schema["properties"])
-        # Shallow copy properties dict itself and each modified property
-        properties = schema.get("properties", {})
-        if properties:
-            schema["properties"] = {
-                key: {**value, "minLength": value.get("minLength", 1)}
-                if value.get("type") == "string" and "minLength" not in value
-                else value
-                for key, value in properties.items()
-            }
-    return schema
-
-
 def get_parameters_strategy(
     operation: APIOperation,
     strategy_factory: StrategyFactory,
@@ -368,21 +351,23 @@ def get_parameters_strategy(
 
     container = getattr(operation, location.container_name)
     if container:
-        schema = get_schema_for_location(location, container)
-        if location == ParameterLocation.HEADER and exclude:
-            # Remove excluded headers case-insensitively
-            exclude_lower = {name.lower() for name in exclude}
-            schema["properties"] = {
-                key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
-            }
-            if "required" in schema:
-                schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
-        elif exclude:
-            # Non-header locations: remove by exact name
+        schema = container.schema
+        if exclude:
+            # Need to exclude some parameters - create a shallow copy to avoid mutating cached schema
             schema = dict(schema)
-            schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude}
-            if "required" in schema:
-                schema["required"] = [key for key in schema["required"] if key not in exclude]
+            if location == ParameterLocation.HEADER:
+                # Remove excluded headers case-insensitively
+                exclude_lower = {name.lower() for name in exclude}
+                schema["properties"] = {
+                    key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
+                }
+                if "required" in schema:
+                    schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
+            else:
+                # Non-header locations: remove by exact name
+                schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude}
+                if "required" in schema:
+                    schema["required"] = [key for key in schema["required"] if key not in exclude]
         if not schema["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()

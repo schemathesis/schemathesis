@@ -340,7 +340,6 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     # Check if the case contains only additional properties in query, headers, or cookies.
     # This function is used to determine if negation is solely in the form of extra properties,
     # which are often ignored for backward-compatibility by the tested apps
-    from ._hypothesis import get_schema_for_location
     from .schemas import BaseOpenAPISchema
 
     meta = case.meta
@@ -358,7 +357,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
         value = getattr(case, location.container_name)
         if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
             container = getattr(case.operation, location.container_name)
-            schema = get_schema_for_location(location, container)
+            schema = container.schema
 
             if _has_serialization_sensitive_types(schema, container):
                 # Can't reliably determine if only additional properties were added
