@@ -318,3 +318,152 @@ def test(case):
     )
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=2)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_basic_auth_from_fixture_with_toml_config(testdir, openapi3_base_url):
+    # When a user:
+    # 1. Has a schemathesis.toml with basic auth configured
+    # 2. Uses the pytest schema loader `schemathesis.pytest.from_fixture`
+    # 3. Calls `case.call()`
+    testdir.makefile(
+        ".toml",
+        schemathesis=f"""
+base-url = "{openapi3_base_url}"
+[auth]
+basic = {{ username = "testuser", password = "testpass" }}
+""",
+    )
+
+    # Then the auth credentials from schemathesis.toml should be automatically applied to the request
+    testdir.makepyfile(
+        """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+
+@pytest.fixture
+def api_schema():
+    raw_schema = {
+        "openapi": "3.0.0",
+        "paths": {
+            "/success": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    }
+    return schemathesis.openapi.from_dict(raw_schema)
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api_with_auth(case):
+    # Auth from config is applied as Authorization header
+    assert case.headers.get("Authorization") == "Basic dGVzdHVzZXI6dGVzdHBhc3M="
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_headers_from_fixture_with_toml_config(testdir, openapi3_base_url):
+    # When headers are configured in schemathesis.toml
+    testdir.makefile(
+        ".toml",
+        schemathesis=f"""
+base-url = "{openapi3_base_url}"
+[headers]
+X-API-Key = "secret-key"
+X-Client-ID = "test-client"
+""",
+    )
+
+    # Then headers should be automatically applied to cases when using from_fixture
+    testdir.makepyfile(
+        """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/success": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api_with_headers(case):
+    assert case.headers.get("X-API-Key") == "secret-key"
+    assert case.headers.get("X-Client-ID") == "test-client"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_overrides_from_fixture_with_toml_config(testdir, openapi3_base_url):
+    # When operation-specific overrides are configured in schemathesis.toml
+    testdir.makefile(
+        ".toml",
+        schemathesis=f"""
+base-url = "{openapi3_base_url}"
+
+[[operations]]
+include-path = "/success"
+parameters = {{ id = 42, status = "active" }}
+""",
+    )
+
+    # Then overrides should be automatically applied to cases when using from_fixture
+    testdir.makepyfile(
+        """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "query", "schema": {"type": "integer"}},
+                        {"name": "status", "in": "query", "schema": {"type": "string"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api_with_overrides(case):
+    assert case.query.get("id") == 42
+    assert case.query.get("status") == "active"
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
