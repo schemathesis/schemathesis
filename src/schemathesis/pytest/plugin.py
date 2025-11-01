@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio
+import inspect
 import unittest
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
@@ -172,7 +172,7 @@ class SchemathesisCase(PyCollector):
                         as_strategy_kwargs=as_strategy_kwargs,
                     ),
                 )
-                if asyncio.iscoroutinefunction(self.test_function):
+                if inspect.iscoroutinefunction(self.test_function):
                     # `pytest-trio` expects a coroutine function
                     if is_trio_test:
                         funcobj.hypothesis.inner_test = self.test_function  # type: ignore
