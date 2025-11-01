@@ -16,6 +16,75 @@ class TestPhase(str, Enum):
     STATEFUL = "stateful"
 
 
+class CoverageScenario(str, Enum):
+    """Coverage test scenario types."""
+
+    # Positive scenarios - Valid values
+    EXAMPLE_VALUE = "example_value"
+    DEFAULT_VALUE = "default_value"
+    ENUM_VALUE = "enum_value"
+    CONST_VALUE = "const_value"
+    VALID_STRING = "valid_string"
+    VALID_NUMBER = "valid_number"
+    VALID_BOOLEAN = "valid_boolean"
+    VALID_ARRAY = "valid_array"
+    VALID_OBJECT = "valid_object"
+    NULL_VALUE = "null_value"
+
+    # Positive scenarios - Boundary values for strings
+    MINIMUM_LENGTH_STRING = "minimum_length_string"
+    MAXIMUM_LENGTH_STRING = "maximum_length_string"
+    NEAR_BOUNDARY_LENGTH_STRING = "near_boundary_length_string"
+
+    # Positive scenarios - Boundary values for numbers
+    MINIMUM_VALUE = "minimum_value"
+    MAXIMUM_VALUE = "maximum_value"
+    NEAR_BOUNDARY_NUMBER = "near_boundary_number"
+
+    # Positive scenarios - Boundary values for arrays
+    MINIMUM_ITEMS_ARRAY = "minimum_items_array"
+    MAXIMUM_ITEMS_ARRAY = "maximum_items_array"
+    NEAR_BOUNDARY_ITEMS_ARRAY = "near_boundary_items_array"
+    ENUM_VALUE_ITEMS_ARRAY = "enum_value_items_array"
+
+    # Positive scenarios - Objects
+    OBJECT_ONLY_REQUIRED = "object_only_required"
+    OBJECT_REQUIRED_AND_OPTIONAL = "object_required_and_optional"
+
+    # Positive scenarios - Default test case
+    DEFAULT_POSITIVE_TEST = "default_positive_test"
+
+    # Negative scenarios - Boundary violations for numbers
+    VALUE_ABOVE_MAXIMUM = "value_above_maximum"
+    VALUE_BELOW_MINIMUM = "value_below_minimum"
+
+    # Negative scenarios - Boundary violations for strings
+    STRING_ABOVE_MAX_LENGTH = "string_above_max_length"
+    STRING_BELOW_MIN_LENGTH = "string_below_min_length"
+
+    # Negative scenarios - Boundary violations for arrays
+    ARRAY_ABOVE_MAX_ITEMS = "array_above_max_items"
+    ARRAY_BELOW_MIN_ITEMS = "array_below_min_items"
+
+    # Negative scenarios - Constraint violations
+    OBJECT_UNEXPECTED_PROPERTIES = "object_unexpected_properties"
+    OBJECT_MISSING_REQUIRED_PROPERTY = "object_missing_required_property"
+    INCORRECT_TYPE = "incorrect_type"
+    INVALID_ENUM_VALUE = "invalid_enum_value"
+    INVALID_FORMAT = "invalid_format"
+    INVALID_PATTERN = "invalid_pattern"
+    NOT_MULTIPLE_OF = "not_multiple_of"
+    NON_UNIQUE_ITEMS = "non_unique_items"
+
+    # Negative scenarios - Missing parameters
+    MISSING_PARAMETER = "missing_parameter"
+    DUPLICATE_PARAMETER = "duplicate_parameter"
+
+    # Negative scenarios - Unsupported patterns
+    UNSUPPORTED_PATH_PATTERN = "unsupported_path_pattern"
+    UNSPECIFIED_HTTP_METHOD = "unspecified_http_method"
+
+
 @dataclass
 class ComponentInfo:
     """Information about how a specific component was generated."""
@@ -50,12 +119,13 @@ class ExamplesPhaseData:
 class CoveragePhaseData:
     """Metadata specific to coverage phase."""
 
+    scenario: CoverageScenario
     description: str
     location: str | None
     parameter: str | None
     parameter_location: ParameterLocation | None
 
-    __slots__ = ("description", "location", "parameter", "parameter_location")
+    __slots__ = ("scenario", "description", "location", "parameter", "parameter_location")
 
 
 @dataclass
@@ -70,6 +140,7 @@ class PhaseInfo:
     @classmethod
     def coverage(
         cls,
+        scenario: CoverageScenario,
         description: str,
         location: str | None = None,
         parameter: str | None = None,
@@ -78,7 +149,11 @@ class PhaseInfo:
         return cls(
             name=TestPhase.COVERAGE,
             data=CoveragePhaseData(
-                description=description, location=location, parameter=parameter, parameter_location=parameter_location
+                scenario=scenario,
+                description=description,
+                location=location,
+                parameter=parameter,
+                parameter_location=parameter_location,
             ),
         )
 

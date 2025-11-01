@@ -43,6 +43,7 @@ from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
     CoveragePhaseData,
+    CoverageScenario,
     GenerationInfo,
     PhaseInfo,
 )
@@ -583,6 +584,7 @@ def _iter_coverage_cases(
                     coverage.GeneratedValue(
                         "value",
                         generation_mode=GenerationMode.NEGATIVE,
+                        scenario=CoverageScenario.UNSUPPORTED_PATH_PATTERN,
                         description="Sample value for unsupported path parameter pattern",
                         parameter=name,
                         location="/",
@@ -639,6 +641,7 @@ def _iter_coverage_cases(
                     ),
                     components=data.components,
                     phase=PhaseInfo.coverage(
+                        scenario=value.scenario,
                         description=value.description,
                         location=value.location,
                         parameter=body.media_type,
@@ -661,6 +664,7 @@ def _iter_coverage_cases(
                             ),
                             components=data.components,
                             phase=PhaseInfo.coverage(
+                                scenario=next_value.scenario,
                                 description=next_value.description,
                                 location=next_value.location,
                                 parameter=body.media_type,
@@ -681,7 +685,9 @@ def _iter_coverage_cases(
                     mode=GenerationMode.POSITIVE,
                 ),
                 components=data.components,
-                phase=PhaseInfo.coverage(description="Default positive test case"),
+                phase=PhaseInfo.coverage(
+                    scenario=CoverageScenario.DEFAULT_POSITIVE_TEST, description="Default positive test case"
+                ),
             ),
         )
 
@@ -707,6 +713,7 @@ def _iter_coverage_cases(
                     generation=GenerationInfo(time=instant.elapsed, mode=value.generation_mode),
                     components=data.components,
                     phase=PhaseInfo.coverage(
+                        scenario=value.scenario,
                         description=value.description,
                         location=value.location,
                         parameter=name,
@@ -726,7 +733,10 @@ def _iter_coverage_cases(
                 _meta=CaseMetadata(
                     generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                     components=data.components,
-                    phase=PhaseInfo.coverage(description=f"Unspecified HTTP method: {method.upper()}"),
+                    phase=PhaseInfo.coverage(
+                        scenario=CoverageScenario.UNSPECIFIED_HTTP_METHOD,
+                        description=f"Unspecified HTTP method: {method.upper()}",
+                    ),
                 ),
             )
         # Generate duplicate query parameters
@@ -751,6 +761,7 @@ def _iter_coverage_cases(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                             components=data.components,
                             phase=PhaseInfo.coverage(
+                                scenario=CoverageScenario.DUPLICATE_PARAMETER,
                                 description=f"Duplicate `{parameter.name}` query parameter",
                                 parameter=parameter.name,
                                 parameter_location=ParameterLocation.QUERY,
@@ -777,6 +788,7 @@ def _iter_coverage_cases(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                             components=data.components,
                             phase=PhaseInfo.coverage(
+                                scenario=CoverageScenario.MISSING_PARAMETER,
                                 description=f"Missing `{name}` at {location.value}",
                                 parameter=name,
                                 parameter_location=location,
@@ -803,6 +815,7 @@ def _iter_coverage_cases(
         # Helper function to create and yield a case
         def make_case(
             container_values: dict,
+            scenario: CoverageScenario,
             description: str,
             _location: ParameterLocation,
             _parameter: str | None,
@@ -819,6 +832,7 @@ def _iter_coverage_cases(
                     ),
                     components=data.components,
                     phase=PhaseInfo.coverage(
+                        scenario=scenario,
                         description=description,
                         parameter=_parameter,
                         parameter_location=_location,
@@ -862,6 +876,7 @@ def _iter_coverage_cases(
                     more = next(iterator)
                     yield make_case(
                         more.value,
+                        more.scenario,
                         more.description,
                         _location,
                         more.parameter,
@@ -877,6 +892,7 @@ def _iter_coverage_cases(
             if GenerationMode.POSITIVE in generation_modes:
                 yield make_case(
                     only_required,
+                    CoverageScenario.OBJECT_ONLY_REQUIRED,
                     "Only required properties",
                     location,
                     None,
@@ -892,8 +908,9 @@ def _iter_coverage_cases(
                     assert case.meta is not None
                     assert isinstance(case.meta.phase.data, CoveragePhaseData)
                     # Already generated in one of the blocks above
-                    if location != "path" and not case.meta.phase.data.description.startswith(
-                        "Missing required property"
+                    if (
+                        location != "path"
+                        and case.meta.phase.data.scenario != CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY
                     ):
                         yield case
 
@@ -903,6 +920,7 @@ def _iter_coverage_cases(
             if combo != base_container and GenerationMode.POSITIVE in generation_modes:
                 yield make_case(
                     combo,
+                    CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
                     f"All required properties and optional '{opt_param}'",
                     location,
                     None,
@@ -915,8 +933,9 @@ def _iter_coverage_cases(
                         assert case.meta is not None
                         assert isinstance(case.meta.phase.data, CoveragePhaseData)
                         # Already generated in one of the blocks above
-                        if location != "path" and not case.meta.phase.data.description.startswith(
-                            "Missing required property"
+                        if (
+                            location != "path"
+                            and case.meta.phase.data.scenario != CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY
                         ):
                             yield case
 
@@ -928,6 +947,7 @@ def _iter_coverage_cases(
                     if combo != base_container:
                         yield make_case(
                             combo,
+                            CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
                             f"All required and {size} optional properties",
                             location,
                             None,

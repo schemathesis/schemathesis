@@ -15,6 +15,7 @@
 ### :wrench: Changed
 
 - Improve error messages for exceptions in custom auth providers.
+- Refactor coverage phase metadata to use type-safe enums instead of string-based checks.
 
 ### :racing_car: Performance
 
