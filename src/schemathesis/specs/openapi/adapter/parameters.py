@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Sequence, cast
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
@@ -13,13 +14,16 @@ from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.validation import check_header_name
-from schemathesis.schemas import ParameterSet
+from schemathesis.generation.modes import GenerationMode
+from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT
 
 if TYPE_CHECKING:
+    from hypothesis import strategies as st
+
     from schemathesis.core.compat import RefResolver
 
 
@@ -192,6 +196,8 @@ class OpenApiBody(OpenApiComponent):
         "_unoptimized_schema",
         "_raw_schema",
         "_examples",
+        "_positive_strategy_cache",
+        "_negative_strategy_cache",
     )
 
     @classmethod
@@ -232,6 +238,11 @@ class OpenApiBody(OpenApiComponent):
             adapter=adapter,
         )
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self._positive_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
+        self._negative_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
+
     @property
     def location(self) -> ParameterLocation:
         return ParameterLocation.BODY
@@ -248,6 +259,47 @@ class OpenApiBody(OpenApiComponent):
     def _get_default_type(self) -> str | None:
         """Return default type if body is a form type."""
         return "object" if self.media_type in FORM_MEDIA_TYPES else None
+
+    def get_strategy(
+        self,
+        operation: APIOperation,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+    ) -> st.SearchStrategy:
+        """Get a Hypothesis strategy for this body parameter."""
+        # Check cache based on generation mode
+        if generation_mode == GenerationMode.POSITIVE:
+            if self._positive_strategy_cache is not NOT_SET:
+                assert not isinstance(self._positive_strategy_cache, NotSet)
+                return self._positive_strategy_cache
+        elif self._negative_strategy_cache is not NOT_SET:
+            assert not isinstance(self._negative_strategy_cache, NotSet)
+            return self._negative_strategy_cache
+
+        # Import here to avoid circular dependency
+        from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
+        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
+        # Build the strategy
+        strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
+        schema = self.optimized_schema
+        assert isinstance(operation.schema, BaseOpenAPISchema)
+        strategy = strategy_factory(
+            schema,
+            operation.label,
+            ParameterLocation.BODY,
+            self.media_type,
+            generation_config,
+            operation.schema.adapter.jsonschema_validator_cls,
+        )
+
+        # Cache the strategy
+        if generation_mode == GenerationMode.POSITIVE:
+            self._positive_strategy_cache = strategy
+        else:
+            self._negative_strategy_cache = strategy
+
+        return strategy
 
 
 OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "description"])
