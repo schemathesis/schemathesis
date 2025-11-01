@@ -35,7 +35,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@v7
 
-      - run: uvx pre-commit run --all-files
+      - run: uvx prek run --all-files
 
   tests:
     strategy:
