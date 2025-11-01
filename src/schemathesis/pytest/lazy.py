@@ -37,7 +37,6 @@ def get_all_tests(
     *,
     schema: BaseSchema,
     test_func: Callable,
-    modes: list[HypothesisTestMode],
     settings: hypothesis.settings | None = None,
     seed: int | None = None,
     as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None,
@@ -51,6 +50,17 @@ def get_all_tests(
                 _as_strategy_kwargs = as_strategy_kwargs(operation)
             else:
                 _as_strategy_kwargs = {}
+
+            # Get modes from config for this operation
+            modes = []
+            phases = schema.config.phases_for(operation=operation)
+            if phases.examples.enabled:
+                modes.append(HypothesisTestMode.EXAMPLES)
+            if phases.fuzzing.enabled:
+                modes.append(HypothesisTestMode.FUZZING)
+            if phases.coverage.enabled:
+                modes.append(HypothesisTestMode.COVERAGE)
+
             test = create_test(
                 operation=operation,
                 test_func=test_func,
@@ -209,7 +219,6 @@ class LazySchema:
                         schema=schema,
                         test_func=test_func,
                         settings=settings,
-                        modes=list(HypothesisTestMode),
                         as_strategy_kwargs=as_strategy_kwargs,
                         given_kwargs=given_kwargs,
                     )
