@@ -180,7 +180,7 @@ class LazySchema:
             else:
                 given_kwargs = {}
 
-            def wrapped_test(request: FixtureRequest) -> None:
+            def wrapped_test(*args: Any, request: FixtureRequest, **kwargs: Any) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True
                 schema = get_schema(
@@ -189,7 +189,13 @@ class LazySchema:
                     test_function=test_func,
                     filter_set=self.filter_set,
                 )
-                fixtures = get_fixtures(test_func, request, given_kwargs)
+                # Check if test function is a method and inject self from request.instance
+                sig = signature(test_func)
+                if "self" in sig.parameters and request.instance is not None:
+                    fixtures = {"self": request.instance}
+                    fixtures.update(get_fixtures(test_func, request, given_kwargs))
+                else:
+                    fixtures = get_fixtures(test_func, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = request.node._nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
@@ -237,14 +243,22 @@ class LazySchema:
                         _schema_error(subtests, result.err(), node_id)
                 subtests.item._nodeid = node_id
 
-            wrapped_test = pytest.mark.usefixtures(self.fixture_name)(wrapped_test)
-            _copy_marks(test_func, wrapped_test)
+            sig = signature(test_func)
+            if "self" in sig.parameters:
+                # For methods, wrap with staticmethod to prevent pytest from passing self
+                wrapped_test = staticmethod(wrapped_test)  # type: ignore[assignment]
+                wrapped_func = wrapped_test.__func__  # type: ignore[attr-defined]
+            else:
+                wrapped_func = wrapped_test
+
+            wrapped_func = pytest.mark.usefixtures(self.fixture_name)(wrapped_func)
+            _copy_marks(test_func, wrapped_func)
 
             # Needed to prevent a failure when settings are applied to the test function
-            wrapped_test.is_hypothesis_test = True  # type: ignore
-            wrapped_test.hypothesis = HypothesisHandle(test_func, wrapped_test, given_kwargs)  # type: ignore
+            wrapped_func.is_hypothesis_test = True  # type: ignore
+            wrapped_func.hypothesis = HypothesisHandle(test_func, wrapped_func, given_kwargs)  # type: ignore
 
-            return wrapped_test
+            return wrapped_test if "self" in sig.parameters else wrapped_func
 
         return wrapper
 
@@ -311,5 +325,7 @@ def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: dict[str
     """Load fixtures, needed for the test function."""
     sig = signature(func)
     return {
-        name: request.getfixturevalue(name) for name in sig.parameters if name != "case" and name not in given_kwargs
+        name: request.getfixturevalue(name)
+        for name in sig.parameters
+        if name not in ("case", "self") and name not in given_kwargs
     }
