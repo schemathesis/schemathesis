@@ -1,0 +1,73 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ 🚫  Coverage (in 0.00s)
+
+     🚫 1 error
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+_________________________________ GET /success _________________________________
+Authentication Error
+
+Error in 'BrokenAuth.get()': 'str' object has no attribute 'get'
+
+Common causes:
+  - Auth endpoint returned an error response
+  - Response format doesn't match expectations (text vs JSON)
+  - Network or connection issues
+  - Logic error in the authentication provider implementation
+
+    Traceback (most recent call last):
+      File "/package-root/auths.py", line XXX, in get
+        data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
+      File "/tmp/module.py", line XXX, in get
+        raise AttributeError("'str' object has no attribute 'get'")
+    AttributeError: 'str' object has no attribute 'get'
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
+
+Test Phases:
+  ⏭  Examples
+  🚫 Coverage
+  🚫 Fuzzing
+  ⏭  Stateful (not applicable)
+
+Errors:
+  🚫 Authentication Error: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

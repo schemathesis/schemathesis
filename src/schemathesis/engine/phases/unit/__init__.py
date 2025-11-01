@@ -11,7 +11,7 @@ import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import AuthenticationError, InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
@@ -182,7 +182,7 @@ def worker_task(
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
-                    except (InvalidSchema, InvalidArgument) as exc:
+                    except (InvalidSchema, InvalidArgument, AuthenticationError) as exc:
                         on_error(exc, method=operation.method, path=operation.path)
                         continue
 
