@@ -183,6 +183,12 @@ class LazySchema:
             def wrapped_test(*args: Any, request: FixtureRequest, **kwargs: Any) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True
+
+                # Load all checks eagerly, so they are accessible inside the test function
+                from schemathesis.checks import load_all_checks
+
+                load_all_checks()
+
                 schema = get_schema(
                     request=request,
                     name=self.fixture_name,
