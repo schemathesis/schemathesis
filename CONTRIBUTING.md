@@ -7,12 +7,12 @@ Welcome! Thank you for considering contributing to Schemathesis. Your feedback a
 **For code contributions**: Make sure you have the following installed:
 
 - Python 3.9 or higher
-- `pre-commit`
+- `prek`
 - `tox`
 - `curl` (required by some integration tests; install via your OS package manager, e.g., `apt install curl` or `brew install curl`)
 
 ```bash
-uv pip install pre-commit tox
+uv pip install prek tox
 ```
 
 **For documentation contributions**: No specific prerequisites are required.
@@ -53,10 +53,10 @@ uv pip install -e ".[dev]"
 
 This will install all the necessary packages for development, including those for documentation and tests.
 
-3. **Set Up Pre-commit Hooks**: Enable [pre-commit](https://pre-commit.com).
+3. **Set Up Pre-commit Hooks**: Enable [prek](https://github.com/j178/prek).
 
 ```bash
-pre-commit install
+prek install
 ```
 
 4. **Branching**: Create a new branch and switch to it. Target your pull request to the `master` branch of the main repository.
