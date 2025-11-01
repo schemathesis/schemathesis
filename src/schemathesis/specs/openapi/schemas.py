@@ -35,6 +35,7 @@ from schemathesis.core.errors import (
     SchemaLocation,
 )
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -389,10 +390,10 @@ class BaseOpenAPISchema(BaseSchema):
             schema=self,
             responses=responses,
             security=security,
-            path_parameters=OpenApiParameterSet(),
-            query=OpenApiParameterSet(),
-            headers=OpenApiParameterSet(),
-            cookies=OpenApiParameterSet(),
+            path_parameters=OpenApiParameterSet(ParameterLocation.PATH),
+            query=OpenApiParameterSet(ParameterLocation.QUERY),
+            headers=OpenApiParameterSet(ParameterLocation.HEADER),
+            cookies=OpenApiParameterSet(ParameterLocation.COOKIE),
         )
         for parameter in parameters:
             operation.add_parameter(parameter)

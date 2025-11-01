@@ -10,6 +10,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.examples import (
@@ -911,7 +912,7 @@ def test_partial_examples(ctx):
     strategy = operation.get_strategies_from_examples()[0]
     # Then all generated examples should have those missing parts generated according to the API schema
     example = examples.generate_one(strategy)
-    parameters_schema = parameters_to_json_schema(operation.path_parameters)
+    parameters_schema = parameters_to_json_schema(operation.path_parameters, ParameterLocation.PATH)
     jsonschema.validate(example.path_parameters, parameters_schema)
 
 

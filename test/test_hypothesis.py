@@ -69,11 +69,15 @@ def test_get_examples(location, swagger_20):
             "x-example": example,
         }
     container = location.container_name
+    if location == ParameterLocation.BODY:
+        param_set = cls([parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)])
+    else:
+        param_set = cls(
+            location, [parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)]
+        )
     operation = make_operation(
         swagger_20,
-        **{
-            container: cls([parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)])
-        },
+        **{container: param_set},
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
@@ -96,6 +100,7 @@ def test_no_body_in_get(swagger_20):
         responses=swagger_20._parse_responses({}, ""),
         security=swagger_20._parse_security({}),
         query=OpenApiParameterSet(
+            ParameterLocation.QUERY,
             [
                 OpenApiParameter.from_definition(
                     definition={
@@ -108,7 +113,7 @@ def test_no_body_in_get(swagger_20):
                     name_to_uri={},
                     adapter=v2,
                 )
-            ]
+            ],
         ),
     )
     strategies = operation.get_strategies_from_examples()
@@ -122,6 +127,7 @@ def test_custom_strategies(swagger_20):
     operation = make_operation(
         swagger_20,
         query=OpenApiParameterSet(
+            ParameterLocation.QUERY,
             [
                 OpenApiParameter.from_definition(
                     definition={
@@ -134,7 +140,7 @@ def test_custom_strategies(swagger_20):
                     name_to_uri={},
                     adapter=v2,
                 )
-            ]
+            ],
         ),
     )
     result = operation.as_strategy().example()
@@ -318,7 +324,8 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         security=swagger_20._parse_security({}),
         base_url=openapi2_base_url,
         headers=OpenApiParameterSet(
-            [OpenApiParameter.from_definition(definition=definition, name_to_uri={}, adapter=v2)]
+            ParameterLocation.HEADER,
+            [OpenApiParameter.from_definition(definition=definition, name_to_uri={}, adapter=v2)],
         ),
     )
 
