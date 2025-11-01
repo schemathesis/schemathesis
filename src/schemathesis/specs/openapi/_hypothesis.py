@@ -115,7 +115,9 @@ def openapi_cases(
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
-            strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config, draw)
+            strategy = _get_body_strategy(
+                parameter, strategy_factory, operation, generation_config, draw, body_generator
+            )
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(
@@ -208,21 +210,14 @@ def _get_body_strategy(
     operation: APIOperation,
     generation_config: GenerationConfig,
     draw: st.DrawFn,
+    generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
-
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
-    schema = parameter.optimized_schema
-    assert isinstance(operation.schema, BaseOpenAPISchema)
-    strategy = strategy_factory(
-        schema,
-        operation.label,
-        ParameterLocation.BODY,
-        parameter.media_type,
-        generation_config,
-        operation.schema.adapter.jsonschema_validator_cls,
-    )
+
+    # Use the cached strategy from the parameter
+    strategy = parameter.get_strategy(operation, generation_config, generation_mode)
+
     # It is likely will be rejected, hence choose it rarely
     if (
         not parameter.is_required
