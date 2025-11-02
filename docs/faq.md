@@ -84,11 +84,6 @@ Compared to tools like Dredd, Schemathesis focuses more on finding unexpected ed
 
 Schemathesis has the following limitations:
 
-### Schema Processing Limitations
-
-- **Recursive References:**  
-  Schemathesis handles most recursive schemas by cutting recursion at a defined depth. However, in a very small fraction of cases (approximately 25 out of over 100,000 schemas tested), complex recursive patterns involving multiple reference hops may cause errors. For more details, see [GitHub issue #947](https://github.com/schemathesis/schemathesis/issues/947).
-
 ### GraphQL Limitations
 
 - **Negative Testing:**  

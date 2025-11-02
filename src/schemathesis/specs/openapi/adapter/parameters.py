@@ -587,6 +587,7 @@ class OpenApiParameterSet(ParameterSet):
             make_negative_strategy,
             quote_all,
         )
+        from schemathesis.specs.openapi.negative import GeneratedValue
         from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
         # Get schema with exclusions
@@ -607,9 +608,18 @@ class OpenApiParameterSet(ParameterSet):
                 generation_config,
                 operation.schema.adapter.jsonschema_validator_cls,
             )
+
+            # For negative strategies, we need to handle GeneratedValue wrappers
+            is_negative = strategy_factory is make_negative_strategy
+
             serialize = operation.get_parameter_serializer(self.location)
             if serialize is not None:
-                strategy = strategy.map(serialize)
+                if is_negative:
+                    # Apply serialize only to the value part of GeneratedValue
+                    strategy = strategy.map(lambda x: GeneratedValue(serialize(x.value), x.meta))
+                else:
+                    strategy = strategy.map(serialize)
+
             filter_func = {
                 ParameterLocation.PATH: is_valid_path,
                 ParameterLocation.HEADER: is_valid_header,
@@ -618,15 +628,28 @@ class OpenApiParameterSet(ParameterSet):
             }[self.location]
             # Headers with special format do not need filtration
             if not (self.location.is_in_header and _can_skip_header_filter(schema)):
-                strategy = strategy.filter(filter_func)
+                if is_negative:
+                    # Apply filter only to the value part of GeneratedValue
+                    strategy = strategy.filter(lambda x: filter_func(x.value))
+                else:
+                    strategy = strategy.filter(filter_func)
+
             # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
             # `True` / `False` / `None` improves chances of them passing validation in apps
             # that expect boolean / null types
             # and not aware of Python-specific representation of those types
             if self.location == ParameterLocation.PATH:
-                strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
+                if is_negative:
+                    strategy = strategy.map(
+                        lambda x: GeneratedValue(quote_all(jsonify_python_specific_types(x.value)), x.meta)
+                    )
+                else:
+                    strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
             elif self.location == ParameterLocation.QUERY:
-                strategy = strategy.map(jsonify_python_specific_types)
+                if is_negative:
+                    strategy = strategy.map(lambda x: GeneratedValue(jsonify_python_specific_types(x.value), x.meta))
+                else:
+                    strategy = strategy.map(jsonify_python_specific_types)
 
         self._strategy_cache[cache_key] = strategy
         return strategy

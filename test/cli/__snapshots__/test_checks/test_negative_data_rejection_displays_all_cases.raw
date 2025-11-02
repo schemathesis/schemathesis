@@ -68,7 +68,7 @@ Reproduce with:
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 422, 428, 5xx
-    Invalid component: parameter `$lang` in query (incorrect type)
+    Invalid component: parameter `$lang` in query - incorrect type
 
 [200] OK:
 

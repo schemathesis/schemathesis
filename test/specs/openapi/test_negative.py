@@ -15,7 +15,7 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.generation import GenerationMode
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
-from schemathesis.specs.openapi.negative import mutated, negative_schema
+from schemathesis.specs.openapi.negative import GeneratedValue, mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
     MutationContext,
     MutationResult,
@@ -76,7 +76,7 @@ def test_top_level_strategy(data, location, schema):
         schema["additionalProperties"] = False
     validate_schema(schema)
     validator = Draft4Validator(schema)
-    instance = data.draw(
+    result = data.draw(
         negative_schema(
             schema,
             operation_name="GET /users/",
@@ -87,6 +87,8 @@ def test_top_level_strategy(data, location, schema):
             validator_cls=Draft4Validator,
         )
     )
+    assert isinstance(result, GeneratedValue)
+    instance = result.value
     assert not validator.is_valid(instance)
     if location.is_in_header:
         assert is_valid_header(instance)
@@ -136,14 +138,13 @@ def test_failing_mutations(data, mutation, schema, location, validate):
     original_schema = deepclone(schema)
     # When mutation can't be applied
     # Then it returns "failure"
-    assert (
-        mutation(
-            MutationContext(keywords=schema, non_keywords={}, location=location, media_type="application/json"),
-            data.draw,
-            schema,
-        )
-        == MutationResult.FAILURE
+    result, metadata = mutation(
+        MutationContext(keywords=schema, non_keywords={}, location=location, media_type="application/json"),
+        data.draw,
+        schema,
     )
+    assert result == MutationResult.FAILURE
+    assert metadata is None
     # And doesn't mutate the input schema
     assert schema == original_schema
 
@@ -161,7 +162,9 @@ def test_change_type_urlencoded(data):
         media_type="application/x-www-form-urlencoded",
     )
     # Then it should not be mutated
-    assert change_type(context, data.draw, schema) == MutationResult.FAILURE
+    result, metadata = change_type(context, data.draw, schema)
+    assert result == MutationResult.FAILURE
+    assert metadata is None
     # And doesn't mutate the input schema
     assert schema == original_schema
 
@@ -206,16 +209,15 @@ def test_successful_mutations(data, mutation, schema):
     schema = deepclone(schema)
     # When mutation can be applied
     # Then it returns "success"
-    assert (
-        mutation(
-            MutationContext(
-                keywords=schema, non_keywords={}, location=ParameterLocation.BODY, media_type="application/json"
-            ),
-            data.draw,
-            schema,
-        )
-        == MutationResult.SUCCESS
+    result, metadata = mutation(
+        MutationContext(
+            keywords=schema, non_keywords={}, location=ParameterLocation.BODY, media_type="application/json"
+        ),
+        data.draw,
+        schema,
     )
+    assert result == MutationResult.SUCCESS
+    assert metadata is not None
     # And the mutated schema is a valid JSON Schema
     validate_schema(schema)
     # And instances valid for this schema are not valid for the original one
@@ -254,7 +256,7 @@ def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
     new_schema = deepclone(schema)
     # When path parameters are mutated
-    new_schema = data.draw(mutated(new_schema, {}, ParameterLocation.PATH, None))
+    new_schema, _ = data.draw(mutated(new_schema, {}, ParameterLocation.PATH, None))
     assert new_schema["type"] == "object"
     # Then mutated schema is a valid JSON Schema
     validate_schema(new_schema)
@@ -278,7 +280,7 @@ def test_custom_fields_are_intact(data, key):
         "additionalProperties": False,
     }
     # Then they should not be negated
-    new_schema = data.draw(mutated(schema, {key: {}}, ParameterLocation.BODY, "application/json"))
+    new_schema, _ = data.draw(mutated(schema, {key: {}}, ParameterLocation.BODY, "application/json"))
     assert key in new_schema
 
 
@@ -327,7 +329,7 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
-    mutated_schema = data.draw(mutated(schema, {}, location=ParameterLocation.BODY, media_type="application/json"))
+    mutated_schema, _ = data.draw(mutated(schema, {}, location=ParameterLocation.BODY, media_type="application/json"))
     assert canonicalish(mutated_schema) != FALSEY
 
 

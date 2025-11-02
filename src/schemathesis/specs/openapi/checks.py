@@ -14,7 +14,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, TestPhase
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -229,21 +229,30 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     ):
         extra_info = ""
         phase = case.meta.phase
-        if phase and phase.name == TestPhase.COVERAGE and isinstance(phase.data, CoveragePhaseData):
+        if phase.data.description:
             parts: list[str] = []
-            if "Missing" in phase.data.description:
+            # Special case: CoveragePhaseData descriptions for "Missing" scenarios are already complete
+            if isinstance(phase.data, CoveragePhaseData) and phase.data.scenario in (
+                CoverageScenario.MISSING_PARAMETER,
+                CoverageScenario.OBJECT_MISSING_REQUIRED_PROPERTY,
+            ):
                 extra_info = f"\nInvalid component: {phase.data.description}"
             else:
-                if phase.data.parameter:
-                    parts.append(f"parameter `{phase.data.parameter}`")
+                # Build structured message: parameter `name` in location - description
+                # For body, don't show parameter name (it's the media type, not useful)
                 location = phase.data.parameter_location
+                if phase.data.parameter and location != ParameterLocation.BODY:
+                    parts.append(f"parameter `{phase.data.parameter}`")
                 if location:
                     parts.append(f"in {location.name.lower()}")
-                description = phase.data.description.lower()
+                # Lowercase first letter of description for consistency
+                description = phase.data.description
+                if description:
+                    description = description[0].lower() + description[1:] if len(description) > 0 else description
                 if parts:
-                    parts.append(f"({description})")
+                    parts.append(f"- {description}")
                 else:
-                    parts.append(f"{description}")
+                    parts.append(description)
                 extra_info = "\nInvalid component: " + " ".join(parts)
         raise AcceptedNegativeData(
             operation=case.operation.label,
