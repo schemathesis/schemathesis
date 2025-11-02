@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.18...HEAD) - TBD
 
+### :bug: Fixed
+
+- Curl commands with non-printable characters now use shell-aware escaping and display warnings for unknown shells. [#2159](https://github.com/schemathesis/schemathesis/issues/2159)
+
 ## [4.3.18](https://github.com/schemathesis/schemathesis/compare/v4.3.17...v4.3.18) - 2025-11-02
 
 ### :bug: Fixed

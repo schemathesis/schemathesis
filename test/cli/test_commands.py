@@ -15,6 +15,7 @@ import yaml
 from _pytest.main import ExitCode
 from flask import Flask, jsonify, redirect, url_for
 
+from schemathesis.core.shell import ShellType
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps._graphql._flask import create_app as create_graphql_app
@@ -1325,6 +1326,70 @@ def test_explicit_example_failure_output(ctx, cli, openapi3_base_url, snapshot_c
             "/failure": {
                 "get": {
                     "parameters": [{"in": "query", "name": "key", "example": "foo", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--output-sanitize=false", "-c not_a_server_error")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.operations("failure")
+def test_curl_with_non_printable_characters(ctx, cli, openapi3_base_url, snapshot_cli, monkeypatch):
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
+
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/failure": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "text/plain": {
+                                "schema": {"type": "string"},
+                                "example": "line1\nline2\ttab\x1fcontrol",
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--output-sanitize=false", "-c not_a_server_error")
+        == snapshot_cli
+    )
+
+
+@pytest.mark.operations("failure")
+def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, openapi3_base_url, snapshot_cli, monkeypatch):
+    monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.UNKNOWN)
+
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/failure": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "header",
+                            "name": "X-Custom",
+                            "schema": {"type": "string"},
+                            "example": "test\x00value",
+                        }
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "text/plain": {
+                                "schema": {"type": "string"},
+                                "example": "data\x1f",
+                            }
+                        },
+                    },
                     "responses": {"200": {"description": "OK"}},
                 }
             },
