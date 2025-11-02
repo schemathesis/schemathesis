@@ -5,12 +5,13 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Sequence, TypeVar
+from typing import Any, Callable, Optional, Sequence, TypeVar
 
 from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
+from typing_extensions import TypeAlias
 
 from schemathesis.core.jsonschema import get_type
 from schemathesis.core.jsonschema.types import JsonSchemaObject
@@ -21,6 +22,17 @@ from .types import Draw, Schema
 from .utils import can_negate
 
 T = TypeVar("T")
+
+
+@dataclass
+class MutationMetadata:
+    """Metadata about a mutation that was applied."""
+
+    parameter: str | None
+    description: str
+    location: str | None
+
+    __slots__ = ("parameter", "description", "location")
 
 
 class MutationResult(int, enum.Enum):
@@ -45,7 +57,7 @@ class MutationResult(int, enum.Enum):
         return other
 
 
-Mutation = Callable[["MutationContext", Draw, Schema], MutationResult]
+Mutation: TypeAlias = Callable[["MutationContext", Draw, Schema], tuple[MutationResult, Optional[MutationMetadata]]]
 ANY_TYPE_KEYS = {"$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type"}
 TYPE_SPECIFIC_KEYS = {
     "number": ("multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum"),
@@ -100,7 +112,7 @@ class MutationContext:
     def is_query_location(self) -> bool:
         return self.location == ParameterLocation.QUERY
 
-    def mutate(self, draw: Draw) -> Schema:
+    def mutate(self, draw: Draw) -> tuple[Schema, MutationMetadata | None]:
         # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
         # taken as-is. Therefore, we can only apply mutations that won't change the Open API semantics of the schema.
         mutations: list[Mutation]
@@ -131,10 +143,14 @@ class MutationContext:
         # Always apply at least one mutation, otherwise everything is rejected, and we'd like to avoid it
         # for performance reasons
         always_applied_mutation = draw(st.sampled_from(mutations))
-        result = always_applied_mutation(self, draw, new_schema)
+        result, metadata = always_applied_mutation(self, draw, new_schema)
         for mutation in mutations:
             if mutation is not always_applied_mutation and enabled_mutations.is_enabled(mutation.__name__):
-                result |= mutation(self, draw, new_schema)
+                mut_result, mut_metadata = mutation(self, draw, new_schema)
+                result |= mut_result
+                # Keep first successful mutation's metadata
+                if metadata is None and mut_metadata is not None:
+                    metadata = mut_metadata
         if result == MutationResult.FAILURE:
             # If we failed to apply anything, then reject the whole case
             reject()  # type: ignore
@@ -159,7 +175,7 @@ class MutationContext:
             and "minProperties" not in new_schema.get("not", {})
         ):
             new_schema.setdefault("minProperties", 1)
-        return new_schema
+        return new_schema, metadata
 
 
 def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
@@ -168,11 +184,11 @@ def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
 
     def wrapper(mutation: Mutation) -> Mutation:
         @wraps(mutation)
-        def inner(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+        def inner(ctx: MutationContext, draw: Draw, schema: Schema) -> tuple[MutationResult, MutationMetadata | None]:
             types = get_type(schema)
             if _allowed_types & set(types):
                 return mutation(ctx, draw, schema)
-            return MutationResult.FAILURE
+            return MutationResult.FAILURE, None
 
         return inner
 
@@ -180,7 +196,9 @@ def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
 
 
 @for_types("object")
-def remove_required_property(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def remove_required_property(
+    ctx: MutationContext, draw: Draw, schema: Schema
+) -> tuple[MutationResult, MutationMetadata | None]:
     """Remove a required property.
 
     Effect: Some property won't be generated.
@@ -188,7 +206,7 @@ def remove_required_property(ctx: MutationContext, draw: Draw, schema: Schema) -
     required = schema.get("required")
     if not required:
         # No required properties - can't mutate
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     if len(required) == 1:
         property_name = draw(st.sampled_from(sorted(required)))
     else:
@@ -210,47 +228,61 @@ def remove_required_property(ctx: MutationContext, draw: Draw, schema: Schema) -
     # This property still can be generated via `patternProperties`, but this implementation doesn't cover this case
     # Its probability is relatively low, and the complete solution compatible with Draft 4 will require extra complexity
     # The output filter covers cases like this
-    return MutationResult.SUCCESS
+    metadata = MutationMetadata(
+        parameter=property_name,
+        description="Required property removed",
+        location=f"/properties/{property_name}",
+    )
+    return MutationResult.SUCCESS, metadata
 
 
-def change_type(ctx: MutationContext, draw: Draw, schema: JsonSchemaObject) -> MutationResult:
+def change_type(
+    ctx: MutationContext, draw: Draw, schema: JsonSchemaObject
+) -> tuple[MutationResult, MutationMetadata | None]:
     """Change type of values accepted by a schema."""
     if "type" not in schema:
         # The absence of this keyword means that the schema values can be of any type;
         # Therefore, we can't choose a different type
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     if ctx.media_type == "application/x-www-form-urlencoded":
         # Form data should be an object, do not change it
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     # For headers, query and path parameters, if the current type is string, then it already
     # includes all possible values as those parameters will be stringified before sending,
     # therefore it can't be negated.
-    types = get_type(schema)
-    if "string" in types and (ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location):
-        return MutationResult.FAILURE
+    old_types = get_type(schema)
+    if "string" in old_types and (ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location):
+        return MutationResult.FAILURE, None
     candidates = _get_type_candidates(ctx, schema)
     if not candidates:
         # Schema covers all possible types, not possible to choose something else
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     if len(candidates) == 1:
         new_type = candidates.pop()
         schema["type"] = new_type
         _ensure_query_serializes_to_non_empty(ctx, schema)
         prevent_unsatisfiable_schema(schema, new_type)
-        return MutationResult.SUCCESS
-    # Choose one type that will be present in the final candidates list
-    candidate = draw(st.sampled_from(sorted(candidates)))
-    candidates.remove(candidate)
-    enabled_types = draw(st.shared(FeatureStrategy(), key="types"))  # type: ignore
-    remaining_candidates = [
-        candidate,
-        *sorted([candidate for candidate in candidates if enabled_types.is_enabled(candidate)]),
-    ]
-    new_type = draw(st.sampled_from(remaining_candidates))
-    schema["type"] = new_type
-    _ensure_query_serializes_to_non_empty(ctx, schema)
-    prevent_unsatisfiable_schema(schema, new_type)
-    return MutationResult.SUCCESS
+    else:
+        # Choose one type that will be present in the final candidates list
+        candidate = draw(st.sampled_from(sorted(candidates)))
+        candidates.remove(candidate)
+        enabled_types = draw(st.shared(FeatureStrategy(), key="types"))  # type: ignore
+        remaining_candidates = [
+            candidate,
+            *sorted([candidate for candidate in candidates if enabled_types.is_enabled(candidate)]),
+        ]
+        new_type = draw(st.sampled_from(remaining_candidates))
+        schema["type"] = new_type
+        _ensure_query_serializes_to_non_empty(ctx, schema)
+        prevent_unsatisfiable_schema(schema, new_type)
+
+    old_type_str = " | ".join(sorted(old_types)) if len(old_types) > 1 else old_types[0]
+    metadata = MutationMetadata(
+        parameter=None,
+        description=f"Invalid type {new_type} (expected {old_type_str})",
+        location=None,
+    )
+    return MutationResult.SUCCESS, metadata
 
 
 def _ensure_query_serializes_to_non_empty(ctx: MutationContext, schema: Schema) -> None:
@@ -291,7 +323,9 @@ def drop_not_type_specific_keywords(schema: Schema, new_type: str) -> None:
 
 
 @for_types("object")
-def change_properties(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def change_properties(
+    ctx: MutationContext, draw: Draw, schema: Schema
+) -> tuple[MutationResult, MutationMetadata | None]:
     """Mutate individual object schema properties.
 
     Effect: Some properties will not validate the original schema
@@ -299,15 +333,17 @@ def change_properties(ctx: MutationContext, draw: Draw, schema: Schema) -> Mutat
     properties = sorted(schema.get("properties", {}).items())
     if not properties:
         # No properties to mutate
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
     # one property
     ordered_properties = [
         (name, canonicalish(subschema) if isinstance(subschema, bool) else subschema)
         for name, subschema in draw(ordered(properties, unique_by=lambda x: x[0]))
     ]
+    nested_metadata = None
     for property_name, property_schema in ordered_properties:
-        if apply_until_success(ctx, draw, property_schema) == MutationResult.SUCCESS:
+        result, nested_metadata = apply_until_success(ctx, draw, property_schema)
+        if result == MutationResult.SUCCESS:
             # It is still possible to generate "positive" cases, for example, when this property is optional.
             # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
             # so the generated samples are less likely to be "positive"
@@ -321,7 +357,7 @@ def change_properties(ctx: MutationContext, draw: Draw, schema: Schema) -> Mutat
             break
     else:
         # No successful mutations
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
     enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
     for name, property_schema in properties:
@@ -334,18 +370,33 @@ def change_properties(ctx: MutationContext, draw: Draw, schema: Schema) -> Mutat
             for mutation in get_mutations(draw, property_schema):
                 if enabled_mutations.is_enabled(mutation.__name__):
                     mutation(ctx, draw, property_schema)
-    return MutationResult.SUCCESS
+
+    # Use nested metadata description if available, otherwise use generic description
+    if nested_metadata and nested_metadata.description:
+        description = nested_metadata.description
+    else:
+        description = "Property constraint violated"
+
+    metadata = MutationMetadata(
+        parameter=property_name,
+        description=description,
+        location=f"/properties/{property_name}",
+    )
+    return MutationResult.SUCCESS, metadata
 
 
-def apply_until_success(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def apply_until_success(
+    ctx: MutationContext, draw: Draw, schema: Schema
+) -> tuple[MutationResult, MutationMetadata | None]:
     for mutation in get_mutations(draw, schema):
-        if mutation(ctx, draw, schema) == MutationResult.SUCCESS:
-            return MutationResult.SUCCESS
-    return MutationResult.FAILURE
+        result, metadata = mutation(ctx, draw, schema)
+        if result == MutationResult.SUCCESS:
+            return MutationResult.SUCCESS, metadata
+    return MutationResult.FAILURE, None
 
 
 @for_types("array")
-def change_items(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def change_items(ctx: MutationContext, draw: Draw, schema: Schema) -> tuple[MutationResult, MutationMetadata | None]:
     """Mutate individual array items.
 
     Effect: Some items will not validate the original schema
@@ -353,7 +404,7 @@ def change_items(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationRe
     items = schema.get("items", {})
     if not items:
         # No items to mutate
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     # For query/path/header/cookie, string items cannot be meaningfully mutated
     # because all types serialize to strings anyway
     if ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location:
@@ -361,47 +412,76 @@ def change_items(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationRe
         if isinstance(items, dict):
             items_types = get_type(items)
             if "string" in items_types:
-                return MutationResult.FAILURE
+                return MutationResult.FAILURE, None
     if isinstance(items, dict):
         return _change_items_object(ctx, draw, schema, items)
     if isinstance(items, list):
         return _change_items_array(ctx, draw, schema, items)
-    return MutationResult.FAILURE
+    return MutationResult.FAILURE, None
 
 
-def _change_items_object(ctx: MutationContext, draw: Draw, schema: Schema, items: Schema) -> MutationResult:
+def _change_items_object(
+    ctx: MutationContext, draw: Draw, schema: Schema, items: Schema
+) -> tuple[MutationResult, MutationMetadata | None]:
     result = MutationResult.FAILURE
+    metadata = None
     for mutation in get_mutations(draw, items):
-        result |= mutation(ctx, draw, items)
+        mut_result, mut_metadata = mutation(ctx, draw, items)
+        result |= mut_result
+        if metadata is None and mut_metadata is not None:
+            metadata = mut_metadata
     if result == MutationResult.FAILURE:
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     min_items = schema.get("minItems", 0)
     schema["minItems"] = max(min_items, 1)
-    return MutationResult.SUCCESS
+    # Use nested metadata description if available, update location to show it's in array items
+    if metadata:
+        metadata = MutationMetadata(
+            parameter=None,
+            description=f"Array item: {metadata.description}",
+            location="/items",
+        )
+    return MutationResult.SUCCESS, metadata
 
 
-def _change_items_array(ctx: MutationContext, draw: Draw, schema: Schema, items: list) -> MutationResult:
+def _change_items_array(
+    ctx: MutationContext, draw: Draw, schema: Schema, items: list
+) -> tuple[MutationResult, MutationMetadata | None]:
     latest_success_index = None
+    metadata = None
     for idx, item in enumerate(items):
         result = MutationResult.FAILURE
         for mutation in get_mutations(draw, item):
-            result |= mutation(ctx, draw, item)
+            mut_result, mut_metadata = mutation(ctx, draw, item)
+            result |= mut_result
+            if metadata is None and mut_metadata is not None:
+                metadata = mut_metadata
         if result == MutationResult.SUCCESS:
             latest_success_index = idx
     if latest_success_index is None:
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     min_items = schema.get("minItems", 0)
     schema["minItems"] = max(min_items, latest_success_index + 1)
-    return MutationResult.SUCCESS
+    # Use nested metadata description if available, update location to show specific array index
+    if metadata:
+        metadata = MutationMetadata(
+            parameter=None,
+            description=f"Array item at index {latest_success_index}: {metadata.description}",
+            location=f"/items/{latest_success_index}",
+        )
+    return MutationResult.SUCCESS, metadata
 
 
-def negate_constraints(ctx: MutationContext, draw: Draw, schema: Schema) -> MutationResult:
+def negate_constraints(
+    ctx: MutationContext, draw: Draw, schema: Schema
+) -> tuple[MutationResult, MutationMetadata | None]:
     """Negate schema constrains while keeping the original type."""
     if not can_negate(schema):
-        return MutationResult.FAILURE
+        return MutationResult.FAILURE, None
     copied = schema.copy()
     schema.clear()
     is_negated = False
+    negated_keys = []
 
     def is_mutation_candidate(k: str, v: Any) -> bool:
         # Should we negate this key?
@@ -431,6 +511,7 @@ def negate_constraints(ctx: MutationContext, draw: Draw, schema: Schema) -> Muta
         if is_mutation_candidate(key, value):
             if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
+                negated_keys.append(key)
                 negated = schema.setdefault("not", {})
                 negated[key] = value
                 if key in DEPENDENCIES:
@@ -441,8 +522,26 @@ def negate_constraints(ctx: MutationContext, draw: Draw, schema: Schema) -> Muta
         else:
             schema[key] = value
     if is_negated:
-        return MutationResult.SUCCESS
-    return MutationResult.FAILURE
+        # Build concise description from negated constraints
+        descriptions = []
+        for key in negated_keys:
+            value = copied[key]
+            # Special case: format required properties list nicely with quoted names
+            if key == "required" and isinstance(value, list) and len(value) <= 3:
+                props = ", ".join(f"`{prop}`" for prop in value)
+                descriptions.append(f"`{key}` ({props})")
+            else:
+                # Default: show `key` (value) for all constraints
+                descriptions.append(f"`{key}` ({value})")
+
+        constraint_desc = ", ".join(descriptions)
+        metadata = MutationMetadata(
+            parameter=None,
+            description=f"Violates {constraint_desc}",
+            location=None,
+        )
+        return MutationResult.SUCCESS, metadata
+    return MutationResult.FAILURE, None
 
 
 DEPENDENCIES = {"exclusiveMaximum": "maximum", "exclusiveMinimum": "minimum"}

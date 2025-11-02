@@ -9,7 +9,7 @@ import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
-from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
+from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import jsonify_python_specific_types, quote_all
@@ -84,7 +84,17 @@ def test_get_examples(location, swagger_20):
     assert strategies[0].example() == operation.Case(
         media_type=media_type,
         _meta=CaseMetadata(
-            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.fuzzing()
+            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE),
+            components={},
+            phase=PhaseInfo(
+                name=TestPhase.FUZZING,
+                data=FuzzingPhaseData(
+                    description="",
+                    parameter=None,
+                    parameter_location=None,
+                    location=None,
+                ),
+            ),
         ),
         **{container: expected},
     )

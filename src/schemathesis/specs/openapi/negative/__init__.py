@@ -14,10 +14,24 @@ from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 
-from .mutations import MutationContext
+from .mutations import MutationContext, MutationMetadata
 
 if TYPE_CHECKING:
     from .types import Draw, Schema
+
+
+@dataclass
+class GeneratedValue:
+    """Wrapper for generated values with optional mutation metadata.
+
+    This allows us to pass both the value and metadata through the generation pipeline
+    without using tuples, making the code cleaner and type-safe.
+    """
+
+    value: Any
+    meta: MutationMetadata | None
+
+    __slots__ = ("value", "meta")
 
 
 @dataclass
@@ -74,6 +88,8 @@ def negative_schema(
     """A strategy for instances that DO NOT match the input schema.
 
     It is used to cover the input space that is not possible to cover with the "positive" strategy.
+
+    Returns a strategy that produces GeneratedValue instances with mutation metadata.
     """
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
@@ -91,11 +107,20 @@ def negative_schema(
         def filter_values(value: dict[str, Any]) -> bool:
             return not validator.is_valid(value)
 
-    return mutated(keywords, non_keywords, location, media_type).flatmap(
-        lambda s: from_schema(
-            s, custom_formats=custom_formats, allow_x00=generation_config.allow_x00, codec=generation_config.codec
-        ).filter(filter_values)
-    )
+    def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
+        schema, metadata = value
+        return (
+            from_schema(
+                schema,
+                custom_formats=custom_formats,
+                allow_x00=generation_config.allow_x00,
+                codec=generation_config.codec,
+            )
+            .filter(filter_values)
+            .map(lambda value: GeneratedValue(value, metadata))
+        )
+
+    return mutated(keywords, non_keywords, location, media_type).flatmap(generate_value_with_metadata)
 
 
 def is_non_empty_query(query: dict[str, Any]) -> bool:

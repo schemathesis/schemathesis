@@ -5,38 +5,38 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
- ❌  Coverage (in 0.00s)
+ ❌  Fuzzing (in 0.00s)
 
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-_________________________________ GET /success _________________________________
+________________________________ POST /settings ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - API accepted schema-violating request
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 406, 422, 428, 5xx
-    Invalid component: parameter `page_num` in query - value greater than maximum
+    Invalid component: in body - violates `maxProperties` (10), `minProperties` (2)
 
 [200] OK:
 
-    `{"success": true}`
+    `{"result":"ok"}`
 
 Reproduce with:
 
-    curl -X GET 'http://127.0.0.1/api/success?page_num=1000'
+    <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 
@@ -46,15 +46,15 @@ API Operations:
 
 Test Phases:
   ⏭  Examples (disabled)
-  ❌ Coverage
-  ⏭  Fuzzing (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
   ⏭  Stateful (disabled)
 
 Failures:
   ❌ API accepted schema-violating request: 1
 
 Test cases:
-  N generated, N found N unique failures, N skipped
+  N generated, N found N unique failures
 
 Seed: 42
 

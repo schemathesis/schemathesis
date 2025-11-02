@@ -96,23 +96,38 @@ class ComponentInfo:
 
 @dataclass
 class FuzzingPhaseData:
-    """Metadata specific to generate phase."""
+    """Metadata specific to fuzzing phase."""
 
-    __slots__ = ()
+    description: str
+    parameter: str | None
+    parameter_location: ParameterLocation | None
+    location: str | None
+
+    __slots__ = ("description", "parameter", "parameter_location", "location")
 
 
 @dataclass
 class StatefulPhaseData:
     """Metadata specific to stateful phase."""
 
-    __slots__ = ()
+    description: str | None
+    parameter: str | None
+    parameter_location: ParameterLocation | None
+    location: str | None
+
+    __slots__ = ("description", "parameter", "parameter_location", "location")
 
 
 @dataclass
 class ExamplesPhaseData:
     """Metadata specific to examples phase."""
 
-    __slots__ = ()
+    description: str | None
+    parameter: str | None
+    parameter_location: ParameterLocation | None
+    location: str | None
+
+    __slots__ = ("description", "parameter", "parameter_location", "location")
 
 
 @dataclass
@@ -156,10 +171,6 @@ class PhaseInfo:
                 parameter_location=parameter_location,
             ),
         )
-
-    @classmethod
-    def fuzzing(cls) -> PhaseInfo:
-        return cls(name=TestPhase.FUZZING, data=FuzzingPhaseData())
 
 
 @dataclass

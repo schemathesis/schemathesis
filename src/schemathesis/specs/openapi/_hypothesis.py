@@ -31,6 +31,7 @@ from schemathesis.generation.meta import (
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 
 from ... import auths
 from ...generation import GenerationMode
@@ -43,7 +44,7 @@ from .formats import (
     header_values,
 )
 from .media_types import MEDIA_TYPES
-from .negative import negative_schema
+from .negative import GeneratedValue, negative_schema
 from .negative.utils import can_negate
 
 SLASH = "/"
@@ -82,7 +83,6 @@ def openapi_cases(
     as it works with `body`.
     """
     start = time.monotonic()
-    strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
     generation_config = operation.schema.config.generation_for(operation=operation, phase=phase.value)
 
@@ -110,14 +110,11 @@ def openapi_cases(
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
-                    strategy_factory = make_positive_strategy
                     body_generator = GenerationMode.POSITIVE
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
-            strategy = _get_body_strategy(
-                parameter, strategy_factory, operation, generation_config, draw, body_generator
-            )
+            strategy = _get_body_strategy(parameter, operation, generation_config, draw, body_generator)
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
             possible_media_types = sorted(
@@ -141,17 +138,31 @@ def openapi_cases(
                 "application",
                 "x-www-form-urlencoded",
             ):
-                strategy = strategy.map(prepare_urlencoded).filter(is_valid_urlencoded)
-            body_ = ValueContainer(value=draw(strategy), location="body", generator=body_generator)
+                if body_generator.is_negative:
+                    # For negative strategies, unwrap GeneratedValue, apply transformation, then rewrap
+                    strategy = strategy.map(
+                        lambda x: GeneratedValue(prepare_urlencoded(x.value), x.meta)
+                        if isinstance(x, GeneratedValue)
+                        else prepare_urlencoded(x)
+                    ).filter(lambda x: is_valid_urlencoded(x.value if isinstance(x, GeneratedValue) else x))
+                else:
+                    strategy = strategy.map(prepare_urlencoded).filter(is_valid_urlencoded)
+            body_result = draw(strategy)
+            body_metadata = None
+            # Negative strategy returns GeneratedValue, positive returns just value
+            if isinstance(body_result, GeneratedValue):
+                body_metadata = body_result.meta
+                body_result = body_result.value
+            body_ = ValueContainer(value=body_result, location="body", generator=body_generator, meta=body_metadata)
         else:
-            body_ = ValueContainer(value=body, location="body", generator=None)
+            body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
     else:
         # This explicit body payload comes for a media type that has a custom strategy registered
         # Such strategies only support binary payloads, otherwise they can't be serialized
         if not isinstance(body, bytes) and media_type in MEDIA_TYPES:
             all_media_types = operation.get_request_payload_content_types()
             raise SerializationNotPossible.from_media_types(*all_media_types)
-        body_ = ValueContainer(value=body, location="body", generator=None)
+        body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
 
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
@@ -160,12 +171,89 @@ def openapi_cases(
         else:
             reject()
 
-    _phase_data = {
-        TestPhase.EXAMPLES: ExamplesPhaseData(),
-        TestPhase.FUZZING: FuzzingPhaseData(),
-        TestPhase.STATEFUL: StatefulPhaseData(),
-    }[phase]
-    phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+    # Extract mutation metadata from negated values and create phase-appropriate data
+    if generation_mode.is_negative:
+        negated_container = None
+        for container in [query_, cookies_, headers_, path_parameters_, body_]:
+            if container.generator == GenerationMode.NEGATIVE and container.meta is not None:
+                negated_container = container
+                break
+
+        if negated_container and negated_container.meta:
+            metadata = negated_container.meta
+            location_map = {
+                "query": ParameterLocation.QUERY,
+                "path_parameters": ParameterLocation.PATH,
+                "headers": ParameterLocation.HEADER,
+                "cookies": ParameterLocation.COOKIE,
+                "body": ParameterLocation.BODY,
+            }
+            parameter_location = location_map.get(negated_container.location)
+            _phase_data = {
+                TestPhase.EXAMPLES: ExamplesPhaseData(
+                    description=metadata.description,
+                    parameter=metadata.parameter,
+                    parameter_location=parameter_location,
+                    location=metadata.location,
+                ),
+                TestPhase.FUZZING: FuzzingPhaseData(
+                    description=metadata.description,
+                    parameter=metadata.parameter,
+                    parameter_location=parameter_location,
+                    location=metadata.location,
+                ),
+                TestPhase.STATEFUL: StatefulPhaseData(
+                    description=metadata.description,
+                    parameter=metadata.parameter,
+                    parameter_location=parameter_location,
+                    location=metadata.location,
+                ),
+            }[phase]
+            phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+        else:
+            _phase_data = {
+                TestPhase.EXAMPLES: ExamplesPhaseData(
+                    description="Schema mutated",
+                    parameter=None,
+                    parameter_location=None,
+                    location=None,
+                ),
+                TestPhase.FUZZING: FuzzingPhaseData(
+                    description="Schema mutated",
+                    parameter=None,
+                    parameter_location=None,
+                    location=None,
+                ),
+                TestPhase.STATEFUL: StatefulPhaseData(
+                    description="Schema mutated",
+                    parameter=None,
+                    parameter_location=None,
+                    location=None,
+                ),
+            }[phase]
+            phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+    else:
+        _phase_data = {
+            TestPhase.EXAMPLES: ExamplesPhaseData(
+                description="Positive test case",
+                parameter=None,
+                parameter_location=None,
+                location=None,
+            ),
+            TestPhase.FUZZING: FuzzingPhaseData(
+                description="Positive test case",
+                parameter=None,
+                parameter_location=None,
+                location=None,
+            ),
+            TestPhase.STATEFUL: StatefulPhaseData(
+                description="Positive test case",
+                parameter=None,
+                parameter_location=None,
+                location=None,
+            ),
+        }[phase]
+        phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
 
     instance = operation.Case(
         media_type=media_type,
@@ -206,7 +294,6 @@ OPTIONAL_BODY_RATE = 0.05
 
 def _get_body_strategy(
     parameter: OpenApiBody,
-    strategy_factory: StrategyFactory,
     operation: APIOperation,
     generation_config: GenerationConfig,
     draw: st.DrawFn,
@@ -237,7 +324,7 @@ def get_parameters_value(
     hooks: HookDispatcher | None,
     generation_mode: GenerationMode,
     generation_config: GenerationConfig,
-) -> dict[str, Any] | None:
+) -> tuple[dict[str, Any] | None, Any]:
     """Get the final value for the specified location.
 
     If the value is not set, then generate it from the relevant strategy. Otherwise, check what is missing in it and
@@ -246,15 +333,23 @@ def get_parameters_value(
     if value is None:
         strategy = get_parameters_strategy(operation, generation_mode, location, generation_config)
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
-        return draw(strategy)
+        result = draw(strategy)
+        # Negative strategy returns GeneratedValue, positive returns just value
+        if isinstance(result, GeneratedValue):
+            return result.value, result.meta
+        return result, None
     strategy = get_parameters_strategy(operation, generation_mode, location, generation_config, exclude=value.keys())
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = draw(strategy)
+    metadata = None
+    # Negative strategy returns GeneratedValue, positive returns just value
+    if isinstance(new, GeneratedValue):
+        new, metadata = new.value, new.meta
     if new is not None:
         copied = dict(value)
         copied.update(new)
-        return copied
-    return value
+        return copied, metadata
+    return value, metadata
 
 
 @dataclass
@@ -264,8 +359,9 @@ class ValueContainer:
     value: Any
     location: str
     generator: GenerationMode | None
+    meta: MutationMetadata | None
 
-    __slots__ = ("value", "location", "generator")
+    __slots__ = ("value", "location", "generator", "meta")
 
     @property
     def is_generated(self) -> bool:
@@ -299,7 +395,9 @@ def generate_parameter(
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
         generator = GenerationMode.POSITIVE
-    value = get_parameters_value(explicit, location, draw, operation, ctx, hooks, generator, generation_config)
+    value, metadata = get_parameters_value(
+        explicit, location, draw, operation, ctx, hooks, generator, generation_config
+    )
     used_generator: GenerationMode | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
@@ -307,7 +405,7 @@ def generate_parameter(
         if value is not None and location == ParameterLocation.PATH:
             value = quote_all(value)
         used_generator = None
-    return ValueContainer(value=value, location=location, generator=used_generator)
+    return ValueContainer(value=value, location=location, generator=used_generator, meta=metadata)
 
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
