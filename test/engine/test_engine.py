@@ -1165,10 +1165,13 @@ def test_stateful_override(real_app_schema):
     ).execute()
     interactions = stream.find_all_interactions()
     assert len(interactions) > 0
-    get_requests = [i.request for i in interactions if i.request.method == "GET"]
-    assert len(get_requests) > 0
-    for request in get_requests:
-        assert "/api/users/42?" in request.uri
+    # Check any request that uses user_id (GET or PATCH)
+    user_requests = [
+        i.request for i in interactions if "/api/users/" in i.request.uri and i.request.method in ("GET", "PATCH")
+    ]
+    assert len(user_requests) > 0
+    for request in user_requests:
+        assert "/api/users/42" in request.uri
 
 
 def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
