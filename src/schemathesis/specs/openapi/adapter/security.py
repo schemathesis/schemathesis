@@ -95,15 +95,18 @@ def extract_security_parameters_v3(
 
 
 def make_auth_header_schema(definition: dict[str, Any]) -> dict[str, str]:
+    """Build schema dict for Authorization header based on auth scheme."""
     schema = definition.get("scheme", "basic").lower()
     return {"type": "string", "format": f"_{schema}_auth"}
 
 
 def make_auth_header(**kwargs: Any) -> dict[str, Any]:
+    """Build Authorization header security parameter."""
     return {"name": "Authorization", "in": "header", "required": True, **kwargs}
 
 
 def make_api_key_schema(definition: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+    """Build API key security parameter from security definition."""
     return {"name": definition["name"], "required": True, "in": definition["in"], **kwargs}
 
 

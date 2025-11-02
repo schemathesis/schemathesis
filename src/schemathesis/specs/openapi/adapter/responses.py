@@ -108,10 +108,13 @@ class OpenApiResponses:
 
     @classmethod
     def from_definition(
-        cls, definition: types.v3.Responses, resolver: RefResolver, scope: str, adapter: SpecificationAdapter
+        cls,
+        definition: types.v3.Responses | types.v2.Responses,
+        resolver: RefResolver,
+        scope: str,
+        adapter: SpecificationAdapter,
     ) -> OpenApiResponses:
         """Build new collection of responses from their raw definition."""
-        # TODO: Add also `v2` type
         return cls(
             dict(_iter_resolved_responses(definition=definition, resolver=resolver, scope=scope, adapter=adapter)),
             resolver=resolver,
@@ -173,8 +176,12 @@ class OpenApiResponses:
 
 
 def _iter_resolved_responses(
-    definition: types.v3.Responses, resolver: RefResolver, scope: str, adapter: SpecificationAdapter
+    definition: types.v3.Responses | types.v2.Responses,
+    resolver: RefResolver,
+    scope: str,
+    adapter: SpecificationAdapter,
 ) -> Iterator[tuple[str, OpenApiResponse]]:
+    """Iterate and resolve response definitions."""
     for key, response in definition.items():
         status_code = str(key)
         new_scope, resolved = maybe_resolve(response, resolver, scope)
@@ -189,6 +196,7 @@ def _iter_resolved_responses(
 def extract_response_schema_v2(
     response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
 ) -> JsonSchema | None:
+    """Extract and prepare response schema for Swagger 2.0."""
     schema = extract_raw_response_schema_v2(response)
     if schema is not None:
         return _prepare_schema(schema, resolver, scope, nullable_keyword)
@@ -196,6 +204,7 @@ def extract_response_schema_v2(
 
 
 def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | None:
+    """Extract raw schema from Swagger 2.0 response (schema is at top level)."""
     return response.get("schema")
 
 
@@ -297,8 +306,12 @@ class OpenApiResponseHeader:
 
 
 def _iter_resolved_headers(
-    definition: types.v3.Headers, resolver: RefResolver, scope: str, adapter: SpecificationAdapter
+    definition: types.v3.Headers | types.v2.Headers,
+    resolver: RefResolver,
+    scope: str,
+    adapter: SpecificationAdapter,
 ) -> Iterator[tuple[str, OpenApiResponseHeader]]:
+    """Iterate and resolve header definitions."""
     for name, header in definition.items():
         new_scope, resolved = maybe_resolve(header, resolver, scope)
         yield (
