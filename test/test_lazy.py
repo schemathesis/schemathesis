@@ -784,3 +784,61 @@ def test_checks_are_loaded(case):
     )
 
     assert result.returncode == 0, f"Test failed:\n{result.stdout}\n{result.stderr}"
+
+
+def test_operations_disabled_via_config_with_from_fixture(testdir):
+    # Given a schemathesis.toml that disables a specific operation
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[[operations]]
+include-name = "POST /users"
+enabled = false
+""",
+    )
+
+    # And a schema with multiple operations
+    testdir.make_test(
+        """
+import pytest
+import schemathesis
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                },
+                "post": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            },
+            "/products": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        }
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+def test_api(case):
+    pass
+"""
+    )
+
+    result = testdir.runpytest("-v")
+
+    # Then `POST /users` should be excluded, only `GET /users` and `GET /products` should be tested
+    # With pytest-subtests, the main test passes once, with 2 subtests (not 3)
+    result.assert_outcomes(passed=1)
+
+    assert "POST /users" not in result.stdout.str()
+    assert "GET /users" in result.stdout.str()
+    assert "GET /products" in result.stdout.str()
