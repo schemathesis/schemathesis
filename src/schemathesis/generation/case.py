@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any
 
 from schemathesis import transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, load_all_checks, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
+from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transport import Response
-from schemathesis.generation import generate_random_case_id
-from schemathesis.generation.meta import CaseMetadata
+from schemathesis.generation import GenerationMode, generate_random_case_id
+from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
@@ -28,6 +30,9 @@ def _default_headers() -> CaseInsensitiveDict:
     from requests.structures import CaseInsensitiveDict
 
     return CaseInsensitiveDict()
+
+
+_NOTSET_HASH = 0x7F3A9B2C
 
 
 @dataclass
@@ -56,10 +61,12 @@ class Case:
     media_type: str | None
     """Media type from OpenAPI schema (e.g., "multipart/form-data")"""
 
-    meta: CaseMetadata | None
+    _meta: CaseMetadata | None
 
     _auth: requests.auth.AuthBase | None
     _has_explicit_auth: bool
+    _components: dict
+    _freeze_metadata: bool
 
     __slots__ = (
         "operation",
@@ -72,10 +79,11 @@ class Case:
         "query",
         "body",
         "media_type",
-        "meta",
+        "_meta",
         "_auth",
         "_has_explicit_auth",
         "_components",
+        "_freeze_metadata",
     )
 
     def __init__(
@@ -95,21 +103,26 @@ class Case:
         _auth: requests.auth.AuthBase | None = None,
         _has_explicit_auth: bool = False,
     ) -> None:
-        self.operation = operation
-        self.method = method
-        self.path = path
+        # Use object.__setattr__ to bypass __setattr__ tracking during initialization
+        object.__setattr__(self, "operation", operation)
+        object.__setattr__(self, "method", method)
+        object.__setattr__(self, "path", path)
+        object.__setattr__(self, "id", id if id is not None else generate_random_case_id())
+        object.__setattr__(self, "path_parameters", path_parameters if path_parameters is not None else {})
+        object.__setattr__(self, "headers", headers if headers is not None else _default_headers())
+        object.__setattr__(self, "cookies", cookies if cookies is not None else {})
+        object.__setattr__(self, "query", query if query is not None else {})
+        object.__setattr__(self, "body", body)
+        object.__setattr__(self, "media_type", media_type)
+        object.__setattr__(self, "_meta", meta)
+        object.__setattr__(self, "_auth", _auth)
+        object.__setattr__(self, "_has_explicit_auth", _has_explicit_auth)
+        object.__setattr__(self, "_components", store_components(self))
+        object.__setattr__(self, "_freeze_metadata", False)
 
-        self.id = id if id is not None else generate_random_case_id()
-        self.path_parameters = path_parameters if path_parameters is not None else {}
-        self.headers = headers if headers is not None else _default_headers()
-        self.cookies = cookies if cookies is not None else {}
-        self.query = query if query is not None else {}
-        self.body = body
-        self.media_type = media_type
-        self.meta = meta
-        self._auth = _auth
-        self._has_explicit_auth = _has_explicit_auth
-        self._components = store_components(self)
+        # Initialize hash tracking if we have metadata
+        if self._meta is not None:
+            self._init_hashes()
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Case):
@@ -126,6 +139,18 @@ class Case:
             and self.body == other.body
             and self.media_type == other.media_type
         )
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Track modifications to containers for metadata revalidation."""
+        # Set the value
+        object.__setattr__(self, name, value)
+
+        # Mark as dirty if we modified a tracked container and have metadata
+        if name in CONTAINER_TO_LOCATION and self._meta is not None:
+            location = CONTAINER_TO_LOCATION[name]
+            self._meta.mark_dirty(location)
+            # Update hash immediately so future in-place modifications can be detected
+            self._meta.update_validated_hash(location, self._hash_container(value))
 
     @property
     def _override(self) -> Override:
@@ -150,6 +175,109 @@ class Case:
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
+    def _init_hashes(self) -> None:
+        """Initialize hash tracking in metadata for generated components only."""
+        assert self._meta is not None
+        # Only track components that were actually generated
+        for location in self._meta.components.keys():
+            value = getattr(self, location.container_name)
+            hash_value = self._hash_container(value)
+            self._meta.update_validated_hash(location, hash_value)
+
+    def _check_modifications(self) -> None:
+        """Detect in-place modifications by comparing container hashes."""
+        if self._meta is None:
+            return
+
+        # Only check components that were actually generated
+        for location in self._meta.components.keys():
+            last_hash = self._meta._last_validated_hashes[location]
+            value = getattr(self, location.container_name)
+            current_hash = self._hash_container(value)
+
+            if current_hash != last_hash:
+                # Container was modified in-place
+                self._meta.mark_dirty(location)
+
+    def _revalidate_metadata(self) -> None:
+        """Revalidate dirty components and update metadata."""
+        assert self._meta and self._meta.is_dirty()
+
+        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
+        # Only works for OpenAPI schemas
+        if not isinstance(self.operation.schema, BaseOpenAPISchema):
+            # Can't validate, just clear dirty flags
+            for location in list(self._meta._dirty):
+                self._meta.clear_dirty(location)
+            return
+
+        validator_cls = self.operation.schema.adapter.jsonschema_validator_cls
+
+        for location in list(self._meta._dirty):
+            # Get current value
+            value = getattr(self, location.container_name)
+
+            # Validate against schema
+            is_valid = self._validate_component(location, value, validator_cls)
+
+            # Update component metadata
+            if location in self._meta.components:
+                new_mode = GenerationMode.POSITIVE if is_valid else GenerationMode.NEGATIVE
+                self._meta.components[location] = ComponentInfo(mode=new_mode)
+
+            # Update hash and clear dirty flag
+            self._meta.update_validated_hash(location, self._hash_container(value))
+            self._meta.clear_dirty(location)
+
+        # Recompute overall generation mode
+        if self._meta.components:
+            if all(info.mode.is_positive for info in self._meta.components.values()):
+                self._meta.generation.mode = GenerationMode.POSITIVE
+            else:
+                self._meta.generation.mode = GenerationMode.NEGATIVE
+
+    def _validate_component(
+        self,
+        location: ParameterLocation,
+        value: Any,
+        validator_cls: type,
+    ) -> bool:
+        """Validate a component value against its schema."""
+        if location == ParameterLocation.BODY:
+            # Validate body against media type schema
+            if isinstance(value, NotSet) or value is None:
+                return False
+            for alternative in self.operation.body:
+                if alternative.media_type == self.media_type:
+                    return validator_cls(alternative.optimized_schema).is_valid(value)
+        # Validate other locations against container schema
+        container = getattr(self.operation, location.container_name)
+        return validator_cls(container.schema).is_valid(value)
+
+    def _hash_container(self, value: Any) -> int:
+        """Create a hash representing the current state of a container.
+
+        Recursively hashes nested dicts/lists/tuples and primitives to detect modifications.
+        """
+        if isinstance(value, Mapping):
+            return hash((type(value), tuple(sorted((k, self._hash_container(v)) for k, v in value.items()))))
+        elif isinstance(value, (list, tuple)):
+            return hash((type(value), tuple(self._hash_container(item) for item in value)))
+        elif isinstance(value, NotSet):
+            return _NOTSET_HASH
+        return hash((type(value), value))
+
+    @property
+    def meta(self) -> CaseMetadata | None:
+        """Get metadata, revalidating if components were modified."""
+        # Skip revalidation if metadata is frozen (e.g., during request preparation)
+        if not self._freeze_metadata:
+            self._check_modifications()
+            if self._meta and self._meta.is_dirty():
+                self._revalidate_metadata()
+        return self._meta
 
     @property
     def formatted_path(self) -> str:
@@ -201,6 +329,15 @@ class Case:
         """
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self, _with_dual_style_kwargs=True, **kwargs)
+
+        # Revalidate metadata if dirty before freezing (captures user modifications)
+        if self._meta and self._meta.is_dirty():
+            self._check_modifications()
+            self._revalidate_metadata()
+
+        # Freeze metadata to prevent revalidation after request preparation transforms the body
+        object.__setattr__(self, "_freeze_metadata", True)
+
         if self.operation.app is not None:
             kwargs.setdefault("app", self.operation.app)
         if "app" in kwargs:

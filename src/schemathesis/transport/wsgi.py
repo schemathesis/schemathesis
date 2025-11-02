@@ -115,6 +115,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
                 headers=kwargs.get("headers") or {},
                 cookies=kwargs.get("cookies") or {},
                 path_parameters={},
+                body={},
             ),
         )
 

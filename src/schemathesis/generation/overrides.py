@@ -21,8 +21,9 @@ class Override:
     headers: dict[str, str]
     cookies: dict[str, str]
     path_parameters: dict[str, str]
+    body: dict[str, str]
 
-    __slots__ = ("query", "headers", "cookies", "path_parameters")
+    __slots__ = ("query", "headers", "cookies", "path_parameters", "body")
 
     def items(self) -> Iterator[tuple[ParameterLocation, dict[str, str]]]:
         for key, value in (
@@ -47,7 +48,7 @@ class Override:
 def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override:
     operation_config = config.operations.get_for_operation(operation)
 
-    output = Override(query={}, headers={}, cookies={}, path_parameters={})
+    output = Override(query={}, headers={}, cookies={}, path_parameters={}, body={})
     groups = [
         (output.query, operation.query),
         (output.headers, operation.headers),
@@ -81,25 +82,32 @@ def _get_override_value(param: OperationParameter, parameters: dict[str, Any]) -
 
 @dataclass
 class StoredValue:
-    value: dict[str, Any] | None
+    value: Any
     is_generated: bool
 
     __slots__ = ("value", "is_generated")
 
 
-def store_original_state(value: dict[str, Any] | None) -> dict[str, Any] | None:
+def store_original_state(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return value.copy()
+        return dict(value)
     return value
 
 
-def get_component_diff(stored: StoredValue, current: dict[str, Any] | None) -> dict[str, Any]:
+def get_component_diff(stored: StoredValue, current: Any) -> dict[str, Any]:
     """Calculate difference between stored and current components."""
     if not (current and stored.value):
         return {}
     if stored.is_generated:
-        return diff(stored.value, current)
-    return current
+        # Only compute diff for mapping types (dicts)
+        # Non-mapping bodies (e.g., GraphQL strings) are not tracked
+        if isinstance(stored.value, Mapping) and isinstance(current, Mapping):
+            return diff(stored.value, current)
+        return {}
+    # For non-generated components, return current if it's a dict, otherwise empty
+    if isinstance(current, Mapping):
+        return dict(current)
+    return {}
 
 
 def store_components(case: Case) -> dict[ParameterLocation, StoredValue]:
@@ -107,12 +115,13 @@ def store_components(case: Case) -> dict[ParameterLocation, StoredValue]:
     return {
         kind: StoredValue(
             value=store_original_state(getattr(case, kind.container_name)),
-            is_generated=bool(case.meta and kind in case.meta.components),
+            is_generated=bool(case._meta and kind in case._meta.components),
         )
         for kind in [
             ParameterLocation.QUERY,
             ParameterLocation.HEADER,
             ParameterLocation.COOKIE,
             ParameterLocation.PATH,
+            ParameterLocation.BODY,
         ]
     }

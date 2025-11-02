@@ -191,7 +191,11 @@ class CaseMetadata:
     components: dict[ParameterLocation, ComponentInfo]
     phase: PhaseInfo
 
-    __slots__ = ("generation", "components", "phase")
+    # Dirty tracking for revalidation
+    _dirty: set[ParameterLocation]
+    _last_validated_hashes: dict[ParameterLocation, int]
+
+    __slots__ = ("generation", "components", "phase", "_dirty", "_last_validated_hashes")
 
     def __init__(
         self,
@@ -202,3 +206,22 @@ class CaseMetadata:
         self.generation = generation
         self.components = components
         self.phase = phase
+        # Initialize dirty tracking
+        self._dirty = set()
+        self._last_validated_hashes = {}
+
+    def mark_dirty(self, location: ParameterLocation) -> None:
+        """Mark a component as modified and needing revalidation."""
+        self._dirty.add(location)
+
+    def clear_dirty(self, location: ParameterLocation) -> None:
+        """Clear dirty flag for a component after revalidation."""
+        self._dirty.discard(location)
+
+    def is_dirty(self) -> bool:
+        """Check if any component needs revalidation."""
+        return len(self._dirty) > 0
+
+    def update_validated_hash(self, location: ParameterLocation, value: int) -> None:
+        """Store hash after validation to detect future changes."""
+        self._last_validated_hashes[location] = value

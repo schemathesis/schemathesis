@@ -35,3 +35,11 @@ class ParameterLocation(str, Enum):
 
 
 HEADER_LOCATIONS = frozenset([ParameterLocation.HEADER, ParameterLocation.COOKIE])
+
+CONTAINER_TO_LOCATION = {
+    "path_parameters": ParameterLocation.PATH,
+    "query": ParameterLocation.QUERY,
+    "headers": ParameterLocation.HEADER,
+    "cookies": ParameterLocation.COOKIE,
+    "body": ParameterLocation.BODY,
+}

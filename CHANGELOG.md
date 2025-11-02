@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False positives in `negative_data_rejection` check when test cases are modified after generation by hooks, stateful testing, or auth providers. [#3073](https://github.com/schemathesis/schemathesis/issues/3073)
 - Ignored per-operation exclusion via a config file when using `schemathesis.pytest.from_fixture`.
 
 ### :wrench: Changed

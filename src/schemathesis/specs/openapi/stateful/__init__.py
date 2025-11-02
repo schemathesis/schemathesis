@@ -4,19 +4,17 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, Iterator
 
-import jsonschema
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
-from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import ComponentInfo, TestPhase
+from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
@@ -336,19 +334,6 @@ def into_step_input(
                 elif biased_coin(1 - BASE_EXPLORATION_RATE):
                     case.body = request_body
                     applied_parameters.append("body")
-
-                # Re-validate generation mode after merging body
-                if case.meta and case.meta.generation.mode == GenerationMode.NEGATIVE:
-                    # It is possible that the new body is now valid and the whole test case could be valid too
-                    for alternative in case.operation.body:
-                        if alternative.media_type == case.media_type:
-                            schema = alternative.optimized_schema
-                            if jsonschema.validators.validator_for(schema)(schema).is_valid(case.body):
-                                case.meta.components[ParameterLocation.BODY] = ComponentInfo(
-                                    mode=GenerationMode.POSITIVE
-                                )
-                                if all(info.mode == GenerationMode.POSITIVE for info in case.meta.components.values()):
-                                    case.meta.generation.mode = GenerationMode.POSITIVE
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)

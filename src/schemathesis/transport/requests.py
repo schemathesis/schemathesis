@@ -152,6 +152,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                     headers=kwargs.get("headers") or {},
                     cookies=kwargs.get("cookies") or {},
                     path_parameters={},
+                    body={},
                 ),
             )
         finally:
