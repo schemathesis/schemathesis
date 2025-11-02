@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.17...HEAD) - TBD
 
+### :bug: Fixed
+
+- Ignored per-operation exclusion via a config file when using `schemathesis.pytest.from_fixture`.
+
 ### :wrench: Changed
 
 - Show mutation metadata in `negative_data_rejection` check for all testing phases.

@@ -324,7 +324,11 @@ def get_schema(*, request: FixtureRequest, name: str, filter_set: FilterSet, tes
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
 
-    return schema.clone(filter_set=filter_set, test_function=test_function)
+    # Merge config-based operation filters with user-provided filters
+    # This ensures operations disabled in schemathesis.toml are respected
+    merged_filter_set = schema.config.operations.filter_set_with(include=filter_set)
+
+    return schema.clone(filter_set=merged_filter_set, test_function=test_function)
 
 
 def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: dict[str, Any]) -> dict[str, Any]:
