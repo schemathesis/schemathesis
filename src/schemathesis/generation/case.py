@@ -293,7 +293,7 @@ class Case:
 
         """
         request_data = prepare_request(self, headers, config=self.operation.schema.config.output.sanitization)
-        return curl.generate(
+        result = curl.generate(
             method=str(request_data.method),
             url=str(request_data.url),
             body=request_data.body,
@@ -301,6 +301,11 @@ class Case:
             headers=dict(request_data.headers),
             known_generated_headers=dict(self.headers or {}),
         )
+        # Include warnings if any exist
+        if result.warnings:
+            warnings_text = "\n\n".join(f"⚠️  {warning}" for warning in result.warnings)
+            return f"{result.command}\n\n{warnings_text}"
+        return result.command
 
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)

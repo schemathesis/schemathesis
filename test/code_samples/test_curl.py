@@ -3,6 +3,7 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.core.shell import ShellType
 from schemathesis.generation.modes import GenerationMode
 from test.apps.openapi._fastapi import create_app
 from test.apps.openapi._fastapi.app import app
@@ -125,3 +126,61 @@ def test_curl_command_validity(curl, loose_schema):
         curl.assert_valid(command)
 
     test()
+
+
+@pytest.mark.parametrize(
+    ("shell_type", "case_kwargs", "expected_command"),
+    [
+        # Bash/zsh: ANSI-C quoting for headers
+        pytest.param(
+            ShellType.BASH,
+            {"headers": {"X-Test": "value\x1f"}},
+            "curl -X GET -H $'X-Test: value\\x1f' http://localhost/users",
+            id="bash-header-control-char",
+        ),
+        # Fish: hex escaping in quotes for headers
+        pytest.param(
+            ShellType.FISH,
+            {"headers": {"X-Test": "value\x1f"}},
+            "curl -X GET -H 'X-Test: value\\x1f' http://localhost/users",
+            id="fish-header-control-char",
+        ),
+        # Bash: ANSI-C quoting for body with null byte
+        pytest.param(
+            ShellType.BASH,
+            {"body": "test\x00data", "media_type": "text/plain"},
+            "curl -X GET -H 'Content-Type: text/plain' -d $'test\\x00data' http://localhost/users",
+            id="bash-body-null-byte",
+        ),
+        # Bash: ANSI-C quoting for body with tab and newline
+        pytest.param(
+            ShellType.BASH,
+            {"body": "line1\nline2\ttab", "media_type": "text/plain"},
+            "curl -X GET -H 'Content-Type: text/plain' -d $'line1\\nline2\\ttab' http://localhost/users",
+            id="bash-body-tab-newline",
+        ),
+        # ZSH: same as bash (ANSI-C quoting)
+        pytest.param(
+            ShellType.ZSH,
+            {"headers": {"X-Test": "value\x1f"}},
+            "curl -X GET -H $'X-Test: value\\x1f' http://localhost/users",
+            id="zsh-header-control-char",
+        ),
+        # No monkeypatch: printable strings use standard quoting
+        pytest.param(
+            None,
+            {"headers": {"X-Test": "normal value"}},
+            "curl -X GET -H 'X-Test: normal value' http://localhost/users",
+            id="printable-header",
+        ),
+    ],
+)
+def test_shell_aware_escaping(curl, monkeypatch, shell_type, case_kwargs, expected_command):
+    if shell_type is not None:
+        monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", shell_type)
+
+    case = schema["/users"]["GET"].Case(**case_kwargs)
+    command = case.as_curl_command()
+
+    assert command == expected_command
+    curl.assert_valid(command)
