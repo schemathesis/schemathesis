@@ -369,8 +369,18 @@ def graphql_cases(
     query_ = _generate_parameter(ParameterLocation.QUERY, query, draw, operation, hook_context, hooks)
 
     _phase_data = {
-        TestPhase.EXAMPLES: ExamplesPhaseData(),
-        TestPhase.FUZZING: FuzzingPhaseData(),
+        TestPhase.EXAMPLES: ExamplesPhaseData(
+            description="Positive test case",
+            parameter=None,
+            parameter_location=None,
+            location=None,
+        ),
+        TestPhase.FUZZING: FuzzingPhaseData(
+            description="Positive test case",
+            parameter=None,
+            parameter_location=None,
+            location=None,
+        ),
     }[phase]
     phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData], _phase_data)
     instance = operation.Case(

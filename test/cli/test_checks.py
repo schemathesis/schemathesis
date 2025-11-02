@@ -809,3 +809,68 @@ def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, app_
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_fuzzing_phase_metadata(ctx, app_runner, cli, snapshot_cli):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "age": {
+                                            "type": "integer",
+                                            "minimum": 0,
+                                            "maximum": 120,
+                                        },
+                                        "name": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 100,
+                                        },
+                                        "tags": {
+                                            "type": "array",
+                                            "items": {"type": "string", "minLength": 2},
+                                            "minItems": 1,
+                                        },
+                                    },
+                                    "required": ["age", "name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        # Always return 200 to trigger negative_data_rejection check failure
+        return jsonify({"result": "ok"}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--max-examples=5",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
