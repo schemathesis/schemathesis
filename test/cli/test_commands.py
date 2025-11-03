@@ -1366,6 +1366,7 @@ def test_curl_with_non_printable_characters(ctx, cli, openapi3_base_url, snapsho
 
 
 @pytest.mark.operations("failure")
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires more complex setup")
 def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, openapi3_base_url, snapshot_cli, monkeypatch):
     monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.UNKNOWN)
 
