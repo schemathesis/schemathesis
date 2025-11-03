@@ -24,6 +24,7 @@ from schemathesis.config import (
     ReportFormat,
     SchemathesisConfig,
     SchemathesisWarning,
+    WarningsConfig,
 )
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -541,7 +542,9 @@ def run(
         request_cert=request_cert,
         request_cert_key=request_cert_key,
         proxy=request_proxy,
-        warnings=warnings,
+        warnings=WarningsConfig.from_value([w.value for w in warnings] if isinstance(warnings, list) else warnings)
+        if warnings is not None
+        else None,
     )
     # These are filters for what API operations should be tested
     filter_set = {

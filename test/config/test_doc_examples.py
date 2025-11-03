@@ -27,7 +27,11 @@ def extract_examples(path: str, format: str = "toml") -> list:
     return pattern.findall(markdown)
 
 
-ALL_CONFIGS = extract_examples("reference/configuration.md") + extract_examples("configuration.md")
+ALL_CONFIGS = (
+    extract_examples("reference/configuration.md")
+    + extract_examples("reference/warnings.md")
+    + extract_examples("configuration.md")
+)
 DEFAULT_CONFIG = SchemathesisConfig()
 
 

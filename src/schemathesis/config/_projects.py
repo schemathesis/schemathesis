@@ -17,7 +17,7 @@ from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._report import ReportsConfig
-from schemathesis.config._warnings import SchemathesisWarning, resolve_warnings
+from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, hooks
 from schemathesis.core.validation import validate_base_url
 
@@ -59,7 +59,7 @@ class ProjectConfig(DiffBase):
     request_cert: str | None
     request_cert_key: str | None
     parameters: dict[str, Any]
-    warnings: list[SchemathesisWarning] | None
+    warnings: WarningsConfig
     auth: AuthConfig
     checks: ChecksConfig
     phases: PhasesConfig
@@ -107,7 +107,7 @@ class ProjectConfig(DiffBase):
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
-        warnings: bool | list[SchemathesisWarning] | None = None,
+        warnings: WarningsConfig | None = None,
         auth: AuthConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
@@ -141,7 +141,7 @@ class ProjectConfig(DiffBase):
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
         self.parameters = parameters or {}
-        self._set_warnings(warnings)
+        self.warnings = warnings or WarningsConfig.from_value(None)
         self.auth = auth or AuthConfig()
         self.checks = checks or ChecksConfig()
         self.phases = phases or PhasesConfig()
@@ -167,7 +167,7 @@ class ProjectConfig(DiffBase):
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),
             auth=AuthConfig.from_dict(data.get("auth", {})),
-            warnings=resolve_warnings(data.get("warnings")),
+            warnings=WarningsConfig.from_value(data.get("warnings")),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {})),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
@@ -175,14 +175,6 @@ class ProjectConfig(DiffBase):
                 operations=[OperationConfig.from_dict(operation) for operation in data.get("operations", [])]
             ),
         )
-
-    def _set_warnings(self, warnings: bool | list[SchemathesisWarning] | None) -> None:
-        if warnings is False:
-            self.warnings = []
-        elif warnings is True:
-            self.warnings = list(SchemathesisWarning)
-        else:
-            self.warnings = warnings
 
     def update(
         self,
@@ -201,7 +193,7 @@ class ProjectConfig(DiffBase):
         parameters: dict[str, Any] | None = None,
         proxy: str | None = None,
         suppress_health_check: list[HealthCheck] | None = None,
-        warnings: bool | list[SchemathesisWarning] | None = None,
+        warnings: WarningsConfig | None = None,
     ) -> None:
         if base_url is not None:
             _validate_base_url(base_url)
@@ -252,7 +244,7 @@ class ProjectConfig(DiffBase):
             self.suppress_health_check = suppress_health_check
 
         if warnings is not None:
-            self._set_warnings(warnings)
+            self.warnings = warnings
 
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
         """Get auth credentials, prioritizing operation-specific configs."""
@@ -331,14 +323,12 @@ class ProjectConfig(DiffBase):
             return self.rate_limit
         return None
 
-    def warnings_for(self, *, operation: APIOperation | None = None) -> list[SchemathesisWarning]:
+    def warnings_for(self, *, operation: APIOperation | None = None) -> WarningsConfig:
         # Operation can be absent on some non-fatal errors due to schema parsing
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)
             if config.warnings is not None:
                 return config.warnings
-        if self.warnings is None:
-            return list(SchemathesisWarning)
         return self.warnings
 
     def phases_for(self, *, operation: APIOperation | None) -> PhasesConfig:

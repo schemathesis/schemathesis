@@ -1,0 +1,2 @@
+[warnings]
+fail-on = ["validation_mismatch"]

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.3.18...HEAD) - TBD
 
+### :rocket: Added
+
+- Option to make warnings cause test failures via `fail-on` in warnings configuration. [#2956](https://github.com/schemathesis/schemathesis/issues/2956)
+
 ### :bug: Fixed
 
 - Curl commands with non-printable characters now use shell-aware escaping and display warnings for unknown shells. [#2159](https://github.com/schemathesis/schemathesis/issues/2159)

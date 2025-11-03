@@ -85,6 +85,32 @@ By default, all warnings are enabled. You can disable them entirely or enable on
     ```toml
     # Disable all warnings
     warnings = false
+    ```
+
+    ```toml
     # Emit only `validation_mismatch`
     warnings = ["validation_mismatch"]
     ```
+
+### Advanced Configuration
+
+For more control, use the object format to display warnings while making specific ones cause test failure:
+
+```toml
+[warnings]
+# Control which warnings to display
+display = ["missing_auth", "missing_test_data", "validation_mismatch"]
+# Make specific warnings fail the test suite (exit code 1)
+fail-on = ["validation_mismatch"]
+```
+
+Set `fail-on = true` to fail on all displayed warnings:
+
+```toml
+[warnings]
+fail-on = true  # Fail on any warning
+```
+
+When `fail-on` is configured, Schemathesis will exit with code 1 if any of the specified warnings are encountered, even if all checks pass. This is useful for CI/CD pipelines that should fail when configuration or test data issues are detected.
+
+See [Configuration Reference](configuration.md#warnings) for complete details.

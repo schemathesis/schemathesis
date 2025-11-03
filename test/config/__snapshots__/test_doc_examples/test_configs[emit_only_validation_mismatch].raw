@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(warnings=WarningsConfig(display=[<SchemathesisWarning.VALIDATION_MISMATCH: 'validation_mismatch'>]))))

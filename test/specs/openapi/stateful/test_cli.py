@@ -272,7 +272,10 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
                             "application/json": {
                                 "schema": {
                                     "type": "object",
-                                    "properties": {"name": {"type": "string"}, "price": {"type": "number"}},
+                                    "properties": {
+                                        "name": {"type": "string", "enum": ["Product"]},
+                                        "price": {"type": "number", "enum": [9.99]},
+                                    },
                                     "required": ["name", "price"],
                                 }
                             }
@@ -358,10 +361,14 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
         nonlocal next_id
         data = request.get_json() or {}
         if not isinstance(data, dict):
-            return {"error": "Invalid input"}
+            return {"error": "Invalid input"}, 400
+
+        name = data.get("name", "Product")
+        if not isinstance(name, str) or not name:
+            return {"error": "Invalid name"}, 400
 
         price = data.get("price", 9.99)
-        if not isinstance(price, float):
+        if not isinstance(price, (int, float)):
             return {"error": "Invalid price"}, 400
 
         product_id = str(next_id)
@@ -369,8 +376,8 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
 
         products[product_id] = {
             "id": product_id,
-            "name": str(data.get("name", "Product")),
-            "price": price,
+            "name": name,
+            "price": float(price),
         }
 
         return jsonify({"name": products[product_id]["name"], "price": products[product_id]["price"]}), 201
