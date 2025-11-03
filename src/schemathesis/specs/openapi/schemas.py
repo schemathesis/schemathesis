@@ -85,7 +85,7 @@ def get_template_fields(template: str) -> set[str]:
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
-    adapter: SpecificationAdapter = None  # type: ignore
+    adapter: SpecificationAdapter = None  # type: ignore[assignment]
 
     @property
     def specification(self) -> Specification:
@@ -136,9 +136,9 @@ class BaseOpenAPISchema(BaseSchema):
                 path="",
                 label="",
                 definition=OperationDefinition(raw=None),
-                schema=None,  # type: ignore
-                responses=None,  # type: ignore
-                security=None,  # type: ignore
+                schema=None,  # type: ignore[arg-type]
+                responses=None,
+                security=None,
             )
         ),
     ) -> bool:

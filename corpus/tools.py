@@ -12,7 +12,7 @@ import yaml
 try:
     from yaml import CSafeLoader as SafeLoader
 except ImportError:
-    from yaml import SafeLoader  # type: ignore
+    from yaml import SafeLoader  # type: ignore[assignment]
 
 try:
     import orjson
@@ -39,7 +39,7 @@ Loader.yaml_implicit_resolvers = {  # type: ignore[attr-defined]
     for key, mapping in Loader.yaml_implicit_resolvers.copy().items()  # type: ignore[attr-defined]
 }
 
-Loader.add_implicit_resolver(  # type: ignore
+Loader.add_implicit_resolver(  # type: ignore[attr-defined]
     "tag:yaml.org,2002:float",
     re.compile(
         r"""^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
@@ -56,18 +56,18 @@ Loader.add_implicit_resolver(  # type: ignore
 
 def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> dict[str, Any]:
     if isinstance(node, yaml.MappingNode):
-        self.flatten_mapping(node)  # type: ignore
+        self.flatten_mapping(node)
     mapping = {}
     for key_node, value_node in node.value:
         if key_node.tag != "tag:yaml.org,2002:str":
             key = key_node.value
         else:
-            key = self.construct_object(key_node, deep)  # type: ignore
-        mapping[key] = self.construct_object(value_node, deep)  # type: ignore
+            key = self.construct_object(key_node, deep)  # type: ignore[no-untyped-call]
+        mapping[key] = self.construct_object(value_node, deep)  # type: ignore[no-untyped-call]
     return mapping
 
 
-Loader.construct_mapping = construct_mapping  # type: ignore
+Loader.construct_mapping = construct_mapping  # type: ignore[attr-defined]
 
 
 def create_tar_gz(schemas: Dict[str, Dict[str, Any]], output_dir: pathlib.Path) -> None:

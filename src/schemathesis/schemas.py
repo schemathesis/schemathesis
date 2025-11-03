@@ -584,7 +584,7 @@ class APIOperation(Generic[P, R, S]):
     schema: BaseSchema
     responses: R
     security: S
-    label: str = None  # type: ignore
+    label: str = None  # type: ignore[assignment]
     app: Any = None
     base_url: str | None = None
     path_parameters: ParameterSet[P] = field(default_factory=ParameterSet)
@@ -595,7 +595,7 @@ class APIOperation(Generic[P, R, S]):
 
     def __post_init__(self) -> None:
         if self.label is None:
-            self.label = f"{self.method.upper()} {self.path}"  # type: ignore
+            self.label = f"{self.method.upper()} {self.path}"  # type: ignore[unreachable]
 
     def __deepcopy__(self, memo: dict) -> APIOperation[P, R, S]:
         return self

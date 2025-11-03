@@ -72,14 +72,14 @@ class DiffBase:
         if len(configs) == 1:
             return configs[0]
         output = cls()
-        for option in cls.__slots__:  # type: ignore
+        for option in cls.__slots__:  # type: ignore[attr-defined]
             if option.startswith("_"):
                 continue
             default = getattr(output, option)
             if hasattr(default, "__dataclass_fields__"):
                 # Sub-configs require merging of nested config options
                 sub_configs = [getattr(config, option) for config in configs]
-                merged = type(default).from_hierarchy(sub_configs)  # type: ignore[union-attr]
+                merged = type(default).from_hierarchy(sub_configs)
                 setattr(output, option, merged)
             else:
                 # Primitive config options can be compared directly and do not
@@ -91,7 +91,7 @@ class DiffBase:
                         # As we go from the highest priority to the lowest one,
                         # we can just stop on the first non-default value
                         break
-        return output  # type: ignore
+        return output  # type: ignore[return-value]
 
 
 def _repr(item: object) -> str:

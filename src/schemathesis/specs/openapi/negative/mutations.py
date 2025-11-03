@@ -139,7 +139,7 @@ class MutationContext:
             mutations = draw(ordered(get_mutations(draw, self.keywords)))
         # Deep copy all keywords to avoid modifying the original schema
         new_schema = deepclone(self.keywords)
-        enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
+        enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))
         # Always apply at least one mutation, otherwise everything is rejected, and we'd like to avoid it
         # for performance reasons
         always_applied_mutation = draw(st.sampled_from(mutations))
@@ -153,7 +153,7 @@ class MutationContext:
                     metadata = mut_metadata
         if result == MutationResult.FAILURE:
             # If we failed to apply anything, then reject the whole case
-            reject()  # type: ignore
+            reject()
         new_schema.update(self.non_keywords)
         if self.location.is_in_header:
             # All headers should have names that can be sent over network
@@ -211,7 +211,7 @@ def remove_required_property(
         property_name = draw(st.sampled_from(sorted(required)))
     else:
         candidate = draw(st.sampled_from(sorted(required)))
-        enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
+        enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))
         candidates = [candidate, *sorted([prop for prop in required if enabled_properties.is_enabled(prop)])]
         property_name = draw(st.sampled_from(candidates))
     required.remove(property_name)
@@ -266,7 +266,7 @@ def change_type(
         # Choose one type that will be present in the final candidates list
         candidate = draw(st.sampled_from(sorted(candidates)))
         candidates.remove(candidate)
-        enabled_types = draw(st.shared(FeatureStrategy(), key="types"))  # type: ignore
+        enabled_types = draw(st.shared(FeatureStrategy(), key="types"))
         remaining_candidates = [
             candidate,
             *sorted([candidate for candidate in candidates if enabled_types.is_enabled(candidate)]),
@@ -358,8 +358,8 @@ def change_properties(
     else:
         # No successful mutations
         return MutationResult.FAILURE, None
-    enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))  # type: ignore
-    enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
+    enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))
+    enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))
     for name, property_schema in properties:
         # Skip already mutated property
         if name == property_name:
@@ -497,7 +497,7 @@ def negate_constraints(
             or (k == "additionalProperties" and ctx.location.is_in_header)
         )
 
-    enabled_keywords = draw(st.shared(FeatureStrategy(), key="keywords"))  # type: ignore
+    enabled_keywords = draw(st.shared(FeatureStrategy(), key="keywords"))
     candidates = []
     mutation_candidates = [key for key, value in copied.items() if is_mutation_candidate(key, value)]
     if mutation_candidates:

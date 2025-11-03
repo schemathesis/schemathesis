@@ -53,8 +53,8 @@ def should_try_more(exc: LoaderError) -> bool:
 def detect_loader(location: str, module: Any) -> Callable:
     """Detect API schema loader."""
     if file_exists(location):
-        return module.from_path  # type: ignore
-    return module.from_url  # type: ignore
+        return module.from_path
+    return module.from_url
 
 
 def _try_load_schema(location: str, config: ProjectConfig, first_module: Any, second_module: Any) -> BaseSchema:

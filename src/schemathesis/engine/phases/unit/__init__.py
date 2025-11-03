@@ -81,7 +81,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                             status = Status.INTERRUPTED
                             engine.stop()
                         if engine.has_to_stop:
-                            break  # type: ignore[unreachable]
+                            break
                     except queue.Empty:
                         if all(not worker.is_alive() for worker in pool.workers):
                             break

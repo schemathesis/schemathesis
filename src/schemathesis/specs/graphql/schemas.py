@@ -168,7 +168,7 @@ class GraphQLSchema(BaseSchema):
             schema=self,
             responses=GraphQLResponses(),
             security=None,
-            definition=None,  # type: ignore
+            definition=None,  # type: ignore[arg-type, var-annotated]
         )
 
         for type_name in ("queryType", "mutationType"):
@@ -321,7 +321,7 @@ class FieldMap(Mapping):
             raise KeyError(message) from exc
 
 
-@st.composite  # type: ignore
+@st.composite  # type: ignore[misc]
 def graphql_cases(
     draw: Callable,
     *,
@@ -353,7 +353,7 @@ def graphql_cases(
         operation.schema.client_schema,  # type: ignore[attr-defined]
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
-        print_ast=_noop,  # type: ignore
+        print_ast=_noop,
         allow_x00=generation.allow_x00,
         allow_null=generation.graphql_allow_null,
         codec=generation.codec,
@@ -408,7 +408,7 @@ def graphql_cases(
             },
         ),
         media_type=media_type or "application/json",
-    )  # type: ignore
+    )
     context = auths.AuthContext(
         operation=operation,
         app=operation.app,

@@ -25,7 +25,7 @@ def ignore(_: str) -> None:
 
 @contextmanager
 def ignore_hypothesis_output() -> Generator:
-    with with_reporter(ignore):  # type: ignore
+    with with_reporter(ignore):
         yield
 
 
@@ -128,7 +128,7 @@ def unbundle_schema_refs(schema: JsonSchema | list[JsonSchema], name_to_uri: dic
                 result[key] = value
         return result
     elif isinstance(schema, list):
-        return [unbundle_schema_refs(item, name_to_uri) for item in schema]  # type: ignore
+        return [unbundle_schema_refs(item, name_to_uri) for item in schema]  # type: ignore[return-value]
     return schema
 
 

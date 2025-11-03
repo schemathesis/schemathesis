@@ -42,4 +42,4 @@ def open_text_output(output: TextOutput) -> Generator[IO[str]]:
             f.close()
     else:
         # Assume it's already a file-like object
-        yield output  # type: ignore[misc]
+        yield output

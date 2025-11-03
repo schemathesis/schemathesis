@@ -54,7 +54,7 @@ StrategyFactory = Callable[
 ]
 
 
-@st.composite  # type: ignore
+@st.composite  # type: ignore[misc]
 def openapi_cases(
     draw: st.DrawFn,
     *,
@@ -132,7 +132,7 @@ def openapi_cases(
                 event_text = f"Can't serialize data to `{parameter.media_type}`."
                 note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
                 event(event_text)
-                reject()  # type: ignore
+                reject()
             media_type, _ = draw(st.sampled_from(possible_media_types))
             if media_type is not None and media_types.parse(media_type) == (
                 "application",

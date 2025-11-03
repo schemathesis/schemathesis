@@ -261,8 +261,8 @@ class LazySchema:
             _copy_marks(test_func, wrapped_func)
 
             # Needed to prevent a failure when settings are applied to the test function
-            wrapped_func.is_hypothesis_test = True  # type: ignore
-            wrapped_func.hypothesis = HypothesisHandle(test_func, wrapped_func, given_kwargs)  # type: ignore
+            wrapped_func.is_hypothesis_test = True
+            wrapped_func.hypothesis = HypothesisHandle(test_func, wrapped_func, given_kwargs)
 
             return wrapped_test if "self" in sig.parameters else wrapped_func
 
@@ -275,7 +275,7 @@ class LazySchema:
 def _copy_marks(source: Callable, target: Callable) -> None:
     marks = getattr(source, "pytestmark", [])
     # Pytest adds this attribute in `usefixtures`
-    target.pytestmark.extend(marks)  # type: ignore
+    target.pytestmark.extend(marks)  # type: ignore[attr-defined]
 
 
 def _get_capturemanager(request: FixtureRequest) -> Generator | Type[nullcontext]:

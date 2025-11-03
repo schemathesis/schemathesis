@@ -43,12 +43,12 @@ def add_single_example(
     if suppress_health_check is not None:
         applied_settings = settings(applied_settings, suppress_health_check=suppress_health_check)
 
-    @given(strategy)  # type: ignore
-    @applied_settings  # type: ignore
+    @given(strategy)  # type: ignore[misc]
+    @applied_settings  # type: ignore[misc]
     def example_generating_inner_function(ex: T) -> None:
         examples.append(ex)
 
-    example_generating_inner_function._hypothesis_internal_database_key = b""  # type: ignore
+    example_generating_inner_function._hypothesis_internal_database_key = b""
 
     if SCHEMATHESIS_BENCHMARK_SEED is not None:
         example_generating_inner_function = seed(SCHEMATHESIS_BENCHMARK_SEED)(example_generating_inner_function)

@@ -641,7 +641,7 @@ def _contains_auth(
         return AuthKind.EXPLICIT
     request = response.request
     parsed = urlparse(request.url)
-    query = parse_qs(parsed.query)  # type: ignore
+    query = parse_qs(parsed.query)  # type: ignore[type-var]
     # Load the `Cookie` header separately, because it is possible that `request._cookies` and the header are out of sync
     header_cookies: SimpleCookie = SimpleCookie()
     raw_cookie = request.headers.get("Cookie")
@@ -655,7 +655,7 @@ def _contains_auth(
         return p["in"] == "query" and p["name"] in query
 
     def has_cookie(p: Mapping[str, Any]) -> bool:
-        cookies = cast(RequestsCookieJar, request._cookies)  # type: ignore
+        cookies = cast(RequestsCookieJar, request._cookies)  # type: ignore[attr-defined]
         return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
 
     for parameter in security_parameters:
