@@ -78,3 +78,35 @@ def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi
     schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
 
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli
+
+
+def test_malformed_registered_media_type_is_skipped(ctx):
+    # Register a malformed media type (no slash, so it can't be parsed)
+    schemathesis.specs.openapi.media_types.MEDIA_TYPES["invalid"] = st.binary()
+
+    # Create schema with valid content type that would trigger wildcard search
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {"schema": {"type": "object"}},
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+
+    # Should not crash when encountering the malformed registered type
+    strategy = schema["/data"]["post"].as_strategy()
+
+    @given(strategy)
+    def test(case):
+        assert case.media_type == "application/json"
+
+    test()

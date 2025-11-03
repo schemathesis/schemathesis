@@ -260,6 +260,12 @@ class OpenApiBody(OpenApiComponent):
         """Return default type if body is a form type."""
         return "object" if self.media_type in FORM_MEDIA_TYPES else None
 
+    def get_property_content_type(self, property_name: str) -> str | None:
+        """Get custom contentType for a form property from `encoding` definition."""
+        encoding = self.definition.get("encoding", {})
+        property_encoding = encoding.get(property_name, {})
+        return property_encoding.get("contentType")
+
     def get_strategy(
         self,
         operation: APIOperation,

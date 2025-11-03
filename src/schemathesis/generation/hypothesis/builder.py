@@ -519,6 +519,7 @@ def _iter_coverage_cases(
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
 ) -> Generator[Case, None, None]:
+    from schemathesis.openapi.generation.filters import is_valid_urlencoded
     from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.examples import find_matching_in_responses
     from schemathesis.specs.openapi.media_types import MEDIA_TYPES
@@ -625,7 +626,11 @@ def _iter_coverage_cases(
                 schema,
             )
             value = next(gen, NOT_SET)
-            if isinstance(value, NotSet):
+            if isinstance(value, NotSet) or (
+                body.media_type == "application/x-www-form-urlencoded"
+                and isinstance(value.value, (list, tuple))
+                and not is_valid_urlencoded(value.value)
+            ):
                 continue
             elapsed = instant.elapsed
             if "body" not in template:
@@ -654,6 +659,12 @@ def _iter_coverage_cases(
                 instant = Instant()
                 try:
                     next_value = next(iterator)
+                    if (
+                        body.media_type == "application/x-www-form-urlencoded"
+                        and isinstance(next_value.value, (list, tuple))
+                        and not is_valid_urlencoded(next_value.value)
+                    ):
+                        continue
                     data = template.with_body(value=next_value, media_type=body.media_type)
                     yield operation.Case(
                         **data.kwargs,
