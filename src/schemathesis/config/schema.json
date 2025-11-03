@@ -584,6 +584,44 @@
               "validation_mismatch"
             ]
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "display": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "missing_auth",
+                  "missing_test_data",
+                  "validation_mismatch"
+                ]
+              }
+            },
+            "fail-on": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "missing_auth",
+                      "missing_test_data",
+                      "validation_mismatch"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
         }
       ]
     },

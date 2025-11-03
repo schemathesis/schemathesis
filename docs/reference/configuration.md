@@ -130,10 +130,12 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
 !!! note ""
 
-    **Type**: `Boolean` or `Array[String]`  
-    **Default**: `true` (all warnings enabled)  
+    **Type**: `Boolean`, `Array[String]`, or `Object`
+    **Default**: `true` (all warnings enabled)
 
-    Warnings flag conditions that may keep tests from exercising core logic. Set `false` to disable all, or list specific warnings to enable only those.
+    Warnings flag conditions that may keep tests from exercising core logic.
+
+    **Simple formats:**
 
     ```toml
     # Disable all warnings
@@ -144,6 +146,31 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     # Enable specific warnings only
     warnings = ["missing_auth", "validation_mismatch"]
     ```
+
+    **Object format** (for advanced control):
+
+    ```toml
+    [warnings]
+    # Control which warnings to display
+    display = ["missing_auth", "missing_test_data", "validation_mismatch"]
+
+    # Make specific warnings cause test failure (exit code 1)
+    fail-on = ["validation_mismatch"]
+    ```
+
+    ```toml
+    [warnings]
+    # Fail on all displayed warnings (exit code 1)
+    fail-on = true
+    ```
+
+    When `fail-on` is configured, Schemathesis will exit with code 1 if any of the specified warnings are encountered, even if all checks pass. This is useful for CI/CD pipelines that should fail when configuration or test data issues are detected.
+
+    Available warnings:
+
+    - `missing_auth`: API returns only 401/403 responses, suggesting missing or invalid authentication
+    - `missing_test_data`: API returns mostly 404 responses, suggesting test data doesn't match existing resources
+    - `validation_mismatch`: API rejects most generated data with 4xx errors, suggesting schema/validation mismatch
 
 ### Reporting
 
