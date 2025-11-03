@@ -1085,11 +1085,14 @@ class OutputHandler(EventHandler):
                 and case.meta.phase.data.parameter_location == ParameterLocation.HEADER
             )
 
-        if SchemathesisWarning.MISSING_AUTH in warnings:
+        if warnings.should_display(SchemathesisWarning.MISSING_AUTH):
             if not (len(event.recorder.cases) == 1 and has_only_missing_auth_case()):
                 for status_code in (401, 403):
                     if statistic.ratio_for(status_code) >= AUTH_ERRORS_THRESHOLD:
                         self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
+                        # Check if this warning should cause test failure
+                        if warnings.should_fail(SchemathesisWarning.MISSING_AUTH):
+                            ctx.exit_code = 1
 
         # Warn if all positive test cases got 4xx in return and no failure was found
         def all_positive_are_rejected(recorder: ScenarioRecorder) -> bool:
@@ -1111,18 +1114,28 @@ class OutputHandler(EventHandler):
         if (
             event.status == Status.SUCCESS
             and (
-                SchemathesisWarning.MISSING_TEST_DATA in warnings or SchemathesisWarning.VALIDATION_MISMATCH in warnings
+                warnings.should_display(SchemathesisWarning.MISSING_TEST_DATA)
+                or warnings.should_display(SchemathesisWarning.VALIDATION_MISMATCH)
             )
             and GenerationMode.POSITIVE in self.config.generation_for(operation=operation, phase=event.phase.name).modes
             and all_positive_are_rejected(event.recorder)
         ):
-            if SchemathesisWarning.MISSING_TEST_DATA in warnings and statistic.should_warn_about_missing_test_data():
-                self.warnings.missing_test_data.add(event.recorder.label)
             if (
-                SchemathesisWarning.VALIDATION_MISMATCH in warnings
+                warnings.should_display(SchemathesisWarning.MISSING_TEST_DATA)
+                and statistic.should_warn_about_missing_test_data()
+            ):
+                self.warnings.missing_test_data.add(event.recorder.label)
+                # Check if this warning should cause test failure
+                if warnings.should_fail(SchemathesisWarning.MISSING_TEST_DATA):
+                    ctx.exit_code = 1
+            if (
+                warnings.should_display(SchemathesisWarning.VALIDATION_MISMATCH)
                 and statistic.should_warn_about_validation_mismatch()
             ):
                 self.warnings.validation_mismatch.add(event.recorder.label)
+                # Check if this warning should cause test failure
+                if warnings.should_fail(SchemathesisWarning.VALIDATION_MISMATCH):
+                    ctx.exit_code = 1
 
     def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
