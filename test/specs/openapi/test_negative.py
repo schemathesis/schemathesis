@@ -2,6 +2,7 @@ from urllib.parse import urlparse
 
 import pytest
 import requests
+from flask import Flask, jsonify
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -462,3 +463,56 @@ def test_non_default_styles(ctx, location, schema, style, explode):
         assert_requests_call(case)
 
     test()
+
+
+@pytest.mark.snapshot()
+def test_bundled_references(ctx, app_runner, cli, snapshot_cli):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/groups/migrations": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"multipart/form-data": {"schema": {"$ref": "#/components/schemas/Object"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Object": {
+                    "properties": {
+                        "migration_type": {"$ref": "#/components/schemas/SupportedMigrations"},
+                        "archive": {},
+                    },
+                    "type": "object",
+                    "required": ["migration_type", "archive"],
+                },
+                "SupportedMigrations": {},
+            }
+        },
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/api/groups/migrations", methods=["POST"])
+    def create_migration():
+        return jsonify({"result": "error"}), 400
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=not_a_server_error",
+            "--phases=fuzzing",
+            "--mode=negative",
+            "--suppress-health-check=filter_too_much",
+        )
+        == snapshot_cli
+    )
