@@ -37,6 +37,9 @@ from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.specs.openapi import media_types
+from schemathesis.transport.asgi import ASGI_TRANSPORT
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
 from .apps import _graphql as graphql
 from .apps import openapi
@@ -69,11 +72,15 @@ def reset_hooks():
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
     auths.unregister()
+    for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
+        transport.unregister_serializer(*media_types.MEDIA_TYPES.keys())
     media_types.unregister_all()
     yield
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
     auths.unregister()
+    for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
+        transport.unregister_serializer(*media_types.MEDIA_TYPES.keys())
     media_types.unregister_all()
 
 

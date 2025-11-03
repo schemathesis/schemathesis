@@ -61,7 +61,7 @@ def csv_serializer(ctx, value):
     # Handle binary data from external examples
     if isinstance(value, bytes):
         return value
-    
+
     # Handle unexpected types in negative testing  
     if not isinstance(value, list) or \
       not all(isinstance(item, dict) for item in value):
@@ -76,7 +76,7 @@ def csv_serializer(ctx, value):
     writer = csv.DictWriter(output, field_names)
     writer.writeheader()
     writer.writerows(value)
-    
+
     return output.getvalue().encode('utf-8')  # Must return bytes or None
 ```
 

@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -9,13 +8,6 @@ from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
 HERE = Path(__file__).absolute().parent
-
-
-@pytest.fixture(autouse=True)
-def cleanup():
-    yield
-    schemathesis.specs.openapi.media_types.unregister_all()
-    assert MEDIA_TYPE not in schemathesis.specs.openapi.media_types.MEDIA_TYPES
 
 
 SAMPLE_PDF = (HERE / "blank.pdf").read_bytes()
@@ -110,3 +102,73 @@ def test_malformed_registered_media_type_is_skipped(ctx):
         assert case.media_type == "application/json"
 
     test()
+
+
+def test_coverage_phase(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+schemathesis.openapi.media_type("image/jpeg", st.just(b""))
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+@schema.include(path_regex="success").parametrize()
+def test(case):
+    case.call()
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {"format": "base64", "type": "string"},
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
+def test_non_serializable_example(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+@schema.include(path_regex="success").parametrize()
+@settings(phases=[Phase.explicit])
+def test(case):
+    case.call()
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {"format": "base64", "type": "string"},
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(skipped=1)
