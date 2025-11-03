@@ -888,7 +888,7 @@ schema.config.update(base_url="{openapi3_base_url}")
 @settings(phases=[{phases}])
 def test(case):
     pass
-""",
+ """,
         paths={
             "/success": {
                 "post": {
@@ -910,6 +910,41 @@ def test(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     assert "Failed to generate test cases from examples for this API" in result.stdout.str()
+
+
+def test_coverage_phase(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+schemathesis.openapi.media_type("image/jpeg", st.just(b""))
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+@schema.include(path_regex="success").parametrize()
+def test(case):
+    case.call()
+""",
+        paths={
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {"format": "base64", "type": "string"},
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
 
 
 def test_non_serializable_example(testdir, openapi3_base_url):
