@@ -230,7 +230,7 @@ def create_base_test(
     funcobj = hypothesis.given(*args, **{**kwargs, "case": strategy})(test_wrapper)
 
     if inspect.iscoroutinefunction(test_function):
-        funcobj.hypothesis.inner_test = make_async_test(test_function)  # type: ignore
+        funcobj.hypothesis.inner_test = make_async_test(test_function)
     return funcobj
 
 

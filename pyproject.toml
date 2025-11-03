@@ -130,6 +130,7 @@ select = [
   "T201",  # flake8-print
   "I",     # isort
   "FURB",  # refurb
+  "PGH003", # blanket-type-ignore
 ]
 ignore = [
   "E501", # Line too long

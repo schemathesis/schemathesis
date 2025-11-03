@@ -38,9 +38,7 @@ class BaseCsvChoice(click.Choice):
 
 
 class CsvChoice(BaseCsvChoice):
-    def convert(  # type: ignore[return]
-        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
-    ) -> list[str]:
+    def convert(self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None) -> list[str]:
         selected, invalid_options = self.parse_value(value)
         if not invalid_options and selected:
             return selected
@@ -76,9 +74,7 @@ class RegistryChoice(BaseCsvChoice):
             choices.append("all")
         return choices
 
-    def convert(  # type: ignore[return]
-        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
-    ) -> list[str]:
+    def convert(self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None) -> list[str]:
         selected, invalid_options = self.parse_value(value)
         if not invalid_options and selected:
             return selected

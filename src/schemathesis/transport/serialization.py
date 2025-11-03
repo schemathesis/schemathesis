@@ -63,7 +63,7 @@ def serialize_yaml(value: Any) -> dict[str, Any]:
     try:
         from yaml import CSafeDumper as SafeDumper
     except ImportError:
-        from yaml import SafeDumper  # type: ignore
+        from yaml import SafeDumper  # type: ignore[assignment]
 
     if isinstance(value, bytes):
         return {"data": value}
