@@ -7,7 +7,7 @@ Generate valid payloads for media types that Schemathesis doesn't recognize by d
 Use custom media type strategies when your API accepts content that Schemathesis can't generate automatically:
 
 - **Binary formats** - PDFs, images, audio files, or proprietary formats
-- **Specialized text formats** - Custom configuration files, or domain-specific formats  
+- **Specialized text formats** - Custom configuration files, or domain-specific formats
 
 ## Quick Start: PDF File Upload
 
@@ -74,12 +74,52 @@ zip_strategy = st.just(create_test_zip())
 schemathesis.openapi.media_type("application/zip", zip_strategy)
 ```
 
+## Wildcard Patterns
+
+Register strategies using wildcard patterns to match multiple media types:
+
+```python
+# Register a single strategy for all image types
+image_strategy = st.sampled_from([
+    b"\x89PNG\r\n\x1a\n...",  # PNG
+    b"\xff\xd8\xff\xe0...",   # JPEG
+])
+schemathesis.openapi.media_type("image/*", image_strategy)
+```
+
+This works everywhere in your OpenAPI schema:
+
+```yaml
+# Regular requestBody
+requestBody:
+  content:
+    image/png:          # Matches registered image/*
+      schema:
+        type: string
+        format: binary
+
+# Multipart encoding
+requestBody:
+  content:
+    multipart/form-data:
+      schema:
+        properties:
+          avatar:
+            type: string
+            format: binary
+      encoding:
+        avatar:
+          contentType: image/jpeg  # Matches registered image/*
+```
+
+Wildcards work bidirectionally - you can register `image/*` and use `image/png` in your schema, or register `image/png` and use `image/*` in your schema.
+
 ## Media Type Aliases
 
 ```python
 # Register PDF strategy with common aliases
 schemathesis.openapi.media_type(
-    "application/pdf", 
+    "application/pdf",
     pdf_strategy,
     aliases=["application/x-pdf", "application/acrobat"]
 )
@@ -101,8 +141,60 @@ def dynamic_xml(draw):
         )
     )
     content = draw(st.text(min_size=1, max_size=50))
-    
+
     return f"<?xml version='1.0'?><{tag_name}>{content}</{tag_name}>".encode()
 
 schemathesis.openapi.media_type("application/xml", dynamic_xml())
+```
+
+## Multipart Form Fields
+
+When using `multipart/form-data`, you can specify custom content types for individual form fields using the `encoding` property. Schemathesis will automatically use your registered strategies for those fields:
+
+```python
+# Register strategies for specific content types
+pdf_strategy = st.just(b"%PDF-1.4\n...")
+xml_strategy = st.just(b"<?xml version='1.0'?><root/>")
+
+schemathesis.openapi.media_type("application/pdf", pdf_strategy)
+schemathesis.openapi.media_type("text/xml", xml_strategy)
+```
+
+```yaml
+# Your OpenAPI schema
+requestBody:
+  content:
+    multipart/form-data:
+      schema:
+        type: object
+        properties:
+          document:
+            type: string
+            format: binary
+          metadata:
+            type: string
+            format: binary
+      encoding:
+        document:
+          contentType: application/pdf    # Uses PDF strategy
+        metadata:
+          contentType: text/xml            # Uses XML strategy
+```
+
+The `encoding.{field}.contentType` tells Schemathesis which registered strategy to use for each form field. Fields without custom encoding use default generation.
+
+### Multiple Content Types
+
+You can specify multiple acceptable content types for a field. Schemathesis will randomly choose between registered strategies:
+
+```python
+# Register strategies for different image formats
+schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG\r\n\x1a\n..."))
+schemathesis.openapi.media_type("image/jpeg", st.just(b"\xff\xd8\xff\xe0..."))
+```
+
+```yaml
+encoding:
+  avatar:
+    contentType: "image/png, image/jpeg"  # Randomly uses PNG or JPEG
 ```

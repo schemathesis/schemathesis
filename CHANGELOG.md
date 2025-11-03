@@ -4,11 +4,16 @@
 
 ### :rocket: Added
 
+- Support for custom content types in `multipart/form-data` encoding via OpenAPI's `encoding` property. [#697](https://github.com/schemathesis/schemathesis/issues/697)
 - Option to make warnings cause test failures via `fail-on` in warnings configuration. [#2956](https://github.com/schemathesis/schemathesis/issues/2956)
 
 ### :bug: Fixed
 
 - Curl commands with non-printable characters now use shell-aware escaping and display warnings for unknown shells. [#2159](https://github.com/schemathesis/schemathesis/issues/2159)
+
+### :wrench: Changed
+
+- Custom media type strategies now support wildcard patterns (e.g., `image/*`) for all request body types, not just multipart encoding.
 
 ## [4.3.18](https://github.com/schemathesis/schemathesis/compare/v4.3.17...v4.3.18) - 2025-11-02
 

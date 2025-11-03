@@ -14,7 +14,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
+from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, MalformedMediaType, SerializationNotPossible
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import prepare_urlencoded
@@ -30,7 +30,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import FORM_MEDIA_TYPES, OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 
 from ... import auths
@@ -159,7 +159,7 @@ def openapi_cases(
     else:
         # This explicit body payload comes for a media type that has a custom strategy registered
         # Such strategies only support binary payloads, otherwise they can't be serialized
-        if not isinstance(body, bytes) and media_type in MEDIA_TYPES:
+        if not isinstance(body, bytes) and media_type and _find_media_type_strategy(media_type) is not None:
             all_media_types = operation.get_request_payload_content_types()
             raise SerializationNotPossible.from_media_types(*all_media_types)
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
@@ -292,6 +292,117 @@ def openapi_cases(
 OPTIONAL_BODY_RATE = 0.05
 
 
+def _find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | None:
+    """Find a registered strategy for a content type, supporting wildcard patterns."""
+    # Try exact match first
+    if content_type in MEDIA_TYPES:
+        return MEDIA_TYPES[content_type]
+
+    try:
+        main, sub = media_types.parse(content_type)
+    except MalformedMediaType:
+        return None
+
+    # Check registered media types for wildcard matches
+    for registered_type, strategy in MEDIA_TYPES.items():
+        try:
+            target_main, target_sub = media_types.parse(registered_type)
+        except MalformedMediaType:
+            continue
+        # Match if both main and sub types are compatible
+        # "*" in either the requested or registered type acts as a wildcard
+        main_match = main == "*" or target_main == "*" or main == target_main
+        sub_match = sub == "*" or target_sub == "*" or sub == target_sub
+        if main_match and sub_match:
+            return strategy
+
+    return None
+
+
+def _build_form_strategy_with_encoding(
+    parameter: OpenApiBody,
+    operation: APIOperation,
+    generation_config: GenerationConfig,
+    generation_mode: GenerationMode,
+) -> st.SearchStrategy | None:
+    """Build a strategy for form bodies that have custom encoding contentType.
+
+    Supports wildcard media type matching (e.g., "image/*" matches "image/png").
+
+    Returns `None` if no custom encoding with registered strategies is found.
+    """
+    schema = parameter.optimized_schema
+    if not isinstance(schema, dict) or schema.get("type") != "object":
+        return None
+
+    properties = schema.get("properties", {})
+    if not properties:
+        return None
+
+    # Check which properties have custom content types with registered strategies
+    custom_property_strategies = {}
+    for property_name in properties:
+        content_type = parameter.get_property_content_type(property_name)
+
+        if content_type is not None and not isinstance(content_type, str):
+            # Happens in broken schemas
+            continue  # type: ignore[unreachable]
+
+        if content_type:
+            # Handle multiple content types (e.g., "image/png, image/jpeg")
+            content_types = [ct.strip() for ct in content_type.split(",")]
+            strategies_for_types = []
+            for ct in content_types:
+                strategy = _find_media_type_strategy(ct)
+                if strategy is not None:
+                    strategies_for_types.append(strategy)
+
+            if strategies_for_types:
+                custom_property_strategies[property_name] = st.one_of(*strategies_for_types)
+
+    if not custom_property_strategies:
+        return None
+
+    # Build strategies for properties
+    property_strategies = {}
+    for property_name, subschema in properties.items():
+        if property_name in custom_property_strategies:
+            property_strategies[property_name] = custom_property_strategies[property_name]
+        else:
+            from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
+            assert isinstance(operation.schema, BaseOpenAPISchema)
+            strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
+            property_strategies[property_name] = strategy_factory(
+                subschema,
+                operation.label,
+                ParameterLocation.BODY,
+                parameter.media_type,
+                generation_config,
+                operation.schema.adapter.jsonschema_validator_cls,
+            )
+
+    # Build fixed dictionary strategy with optional properties
+    required = set(schema.get("required", []))
+    required_strategies = {k: v for k, v in property_strategies.items() if k in required}
+    optional_strategies = {k: st.just(NOT_SET) | v for k, v in property_strategies.items() if k not in required}
+
+    @st.composite  # type: ignore[misc]
+    def build_body(draw: st.DrawFn) -> dict[str, Any]:
+        body: dict[str, Any] = {}
+        # Generate required properties
+        for key, strategy in required_strategies.items():
+            body[key] = draw(strategy)
+        # Generate optional properties, filtering out NOT_SET
+        for key, strategy in optional_strategies.items():
+            value = draw(strategy)
+            if value is not NOT_SET:
+                body[key] = value
+        return body
+
+    return build_body()
+
+
 def _get_body_strategy(
     parameter: OpenApiBody,
     operation: APIOperation,
@@ -299,8 +410,16 @@ def _get_body_strategy(
     draw: st.DrawFn,
     generation_mode: GenerationMode,
 ) -> st.SearchStrategy:
-    if parameter.media_type in MEDIA_TYPES:
-        return MEDIA_TYPES[parameter.media_type]
+    # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
+    if parameter.media_type in FORM_MEDIA_TYPES:
+        custom_strategy = _build_form_strategy_with_encoding(parameter, operation, generation_config, generation_mode)
+        if custom_strategy is not None:
+            return custom_strategy
+
+    # Check for custom media type strategy
+    custom_strategy = _find_media_type_strategy(parameter.media_type)
+    if custom_strategy is not None:
+        return custom_strategy
 
     # Use the cached strategy from the parameter
     strategy = parameter.get_strategy(operation, generation_config, generation_mode)
