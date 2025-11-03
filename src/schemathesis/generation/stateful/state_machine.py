@@ -151,12 +151,12 @@ class APIStateMachine(RuleBasedStateMachine):
     # This is a convenience attribute, which happened to clash with `RuleBasedStateMachine` instance level attribute
     # They don't interfere, since it is properly overridden on the Hypothesis side, but it is likely that this
     # attribute will be renamed in the future
-    bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore
+    bundles: ClassVar[dict[str, CaseInsensitiveDict]]
     schema: BaseSchema
 
     def __init__(self) -> None:
         try:
-            super().__init__()  # type: ignore
+            super().__init__()
         except InvalidDefinition as exc:
             if "defines no rules" in str(exc):
                 if not self.schema.statistic.links.total:
@@ -186,7 +186,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
     def _new_name(self, target: str) -> str:
         target = _normalize_name(target)
-        return super()._new_name(target)  # type: ignore
+        return super()._new_name(target)
 
     def _get_target_for_result(self, result: StepOutput) -> str | None:
         raise NotImplementedError

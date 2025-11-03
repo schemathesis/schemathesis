@@ -10,6 +10,7 @@
 ### :bug: Fixed
 
 - Curl commands with non-printable characters now use shell-aware escaping and display warnings for unknown shells. [#2159](https://github.com/schemathesis/schemathesis/issues/2159)
+- Internal error when the coverage phase generates data not serializable into `application/x-www-form-urlencoded`.
 
 ### :wrench: Changed
 

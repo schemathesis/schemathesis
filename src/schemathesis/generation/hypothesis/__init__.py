@@ -33,7 +33,7 @@ def setup() -> None:
             return True
         return is_first_param_referenced_in_function(f)
 
-    core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function  # type: ignore
+    core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function
 
     class RepresentationPrinter(pretty.RepresentationPrinter):
         def pretty(self, obj: object) -> None:
@@ -54,7 +54,7 @@ def setup() -> None:
             self.schema = schema
             self.encoded = hash(json.dumps(schema, sort_keys=True))
 
-        def __eq__(self, other: "CacheableSchema") -> bool:  # type: ignore
+        def __eq__(self, other: "CacheableSchema") -> bool:  # type: ignore[override]
             return self.encoded == other.encoded
 
         def __hash__(self) -> int:
@@ -92,7 +92,7 @@ def setup() -> None:
             try:
                 return merged(
                     [_resolve_all_refs(s, resolver=resolver), _resolve_all_refs(deepclone(resolved), resolver=resolver)]
-                )  # type: ignore
+                )
             finally:
                 resolver.pop_scope()
 
@@ -108,14 +108,14 @@ def setup() -> None:
                 }
         return schema
 
-    root_core.RepresentationPrinter = RepresentationPrinter  # type: ignore
-    _resolve.deepcopy = deepclone  # type: ignore
-    _resolve.resolve_all_refs = resolve_all_refs  # type: ignore
-    _from_schema.deepcopy = deepclone  # type: ignore
-    _from_schema.get_type = _get_type  # type: ignore
-    _from_schema.resolve_all_refs = resolve_all_refs  # type: ignore
-    _canonicalise.get_type = _get_type  # type: ignore
-    _canonicalise.CacheableSchema = CacheableSchema  # type: ignore
-    root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore
+    root_core.RepresentationPrinter = RepresentationPrinter
+    _resolve.deepcopy = deepclone
+    _resolve.resolve_all_refs = resolve_all_refs
+    _from_schema.deepcopy = deepclone
+    _from_schema.get_type = _get_type
+    _from_schema.resolve_all_refs = resolve_all_refs
+    _canonicalise.get_type = _get_type
+    _canonicalise.CacheableSchema = CacheableSchema
+    root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
-    collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE  # type: ignore
+    collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE

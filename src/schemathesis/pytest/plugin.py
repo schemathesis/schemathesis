@@ -175,9 +175,9 @@ class SchemathesisCase(PyCollector):
                 if inspect.iscoroutinefunction(self.test_function):
                     # `pytest-trio` expects a coroutine function
                     if is_trio_test:
-                        funcobj.hypothesis.inner_test = self.test_function  # type: ignore
+                        funcobj.hypothesis.inner_test = self.test_function  # type: ignore[attr-defined]
                     else:
-                        funcobj.hypothesis.inner_test = make_async_test(self.test_function)  # type: ignore
+                        funcobj.hypothesis.inner_test = make_async_test(self.test_function)  # type: ignore[attr-defined]
             name = self._get_test_name(operation)
         else:
             error = result.err()
@@ -243,7 +243,7 @@ class SchemathesisCase(PyCollector):
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc
 
-    def collect(self) -> list[Function]:  # type: ignore
+    def collect(self) -> list[Function]:  # type: ignore[return]
         """Generate different test items for all API operations available in the given schema."""
         try:
             items = [item for operation in self.schema.get_all_operations() for item in self._gen_items(operation)]
@@ -254,7 +254,7 @@ class SchemathesisCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-@hookimpl(hookwrapper=True)  # type:ignore
+@hookimpl(hookwrapper=True)  # type: ignore[misc]
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
@@ -292,7 +292,7 @@ def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pyt
 
 
 @hookimpl(wrapper=True)
-def pytest_pyfunc_call(pyfuncitem):  # type:ignore
+def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
     """It is possible to have a Hypothesis exception in runtime.
 
     For example - kwargs validation is failed for some strategy.

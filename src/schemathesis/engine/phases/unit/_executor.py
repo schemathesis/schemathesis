@@ -312,7 +312,7 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
 
     It increases the effectiveness of the Hypothesis database in the CLI.
     """
-    test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore
+    test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore[attr-defined]
 
 
 def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> str | None:

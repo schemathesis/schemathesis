@@ -20,7 +20,7 @@ try:
 except ImportError:
     c_make_encoder = None
 
-from json.encoder import JSONEncoder, encode_basestring_ascii  # type: ignore
+from json.encoder import JSONEncoder, encode_basestring_ascii
 from typing import Any, Callable, Generator, Iterator, TypeVar, cast
 from urllib.parse import quote_plus
 

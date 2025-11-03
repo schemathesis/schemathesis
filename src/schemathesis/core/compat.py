@@ -7,9 +7,9 @@ if TYPE_CHECKING:
     from jsonschema import RefResolutionError, RefResolver
 
 try:
-    BaseExceptionGroup = BaseExceptionGroup  # type: ignore
+    BaseExceptionGroup = BaseExceptionGroup
 except NameError:
-    from exceptiongroup import BaseExceptionGroup  # type: ignore
+    from exceptiongroup import BaseExceptionGroup
 
 
 def __getattr__(name: str) -> type[RefResolutionError] | type[RefResolver] | type[BaseExceptionGroup]:

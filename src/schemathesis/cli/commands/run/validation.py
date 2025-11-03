@@ -58,7 +58,7 @@ def validate_url(value: str) -> None:
     from requests import PreparedRequest, RequestException
 
     try:
-        PreparedRequest().prepare_url(value, {})  # type: ignore
+        PreparedRequest().prepare_url(value, {})
     except RequestException as exc:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE) from exc
 

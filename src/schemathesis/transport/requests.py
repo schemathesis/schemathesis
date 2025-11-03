@@ -143,7 +143,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         try:
             rate_limit = config.rate_limit_for(operation=case.operation)
             with ratelimit(rate_limit, config.base_url):
-                response = session.request(**data)  # type: ignore
+                response = session.request(**data)
             return Response.from_requests(
                 response,
                 verify=verify,

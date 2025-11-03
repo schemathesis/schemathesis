@@ -19,7 +19,7 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
     try:
         from yaml import CSafeLoader as SafeLoader
     except ImportError:
-        from yaml import SafeLoader  # type: ignore
+        from yaml import SafeLoader  # type: ignore[assignment]
 
     cls: type[yaml.SafeLoader] = type("YAMLLoader", (SafeLoader,), {})
     cls.yaml_implicit_resolvers = {
@@ -29,7 +29,7 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
 
     # Fix pyyaml scientific notation parse bug
     # See PR: https://github.com/yaml/pyyaml/pull/174 for upstream fix
-    cls.add_implicit_resolver(  # type: ignore
+    cls.add_implicit_resolver(  # type: ignore[no-untyped-call]
         "tag:yaml.org,2002:float",
         re.compile(
             r"""^(?:[-+]?(?:[0-9][0-9_]*)\.[0-9_]*(?:[eE][-+]?[0-9]+)?
@@ -45,7 +45,7 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
 
     def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> dict[str, Any]:
         if isinstance(node, yaml.MappingNode):
-            self.flatten_mapping(node)  # type: ignore
+            self.flatten_mapping(node)
         mapping = {}
         for key_node, value_node in node.value:
             # If the key has a tag different from `str` - use its string value.
@@ -54,11 +54,11 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
             if key_node.tag != "tag:yaml.org,2002:str":
                 key = key_node.value
             else:
-                key = self.construct_object(key_node, deep)  # type: ignore
-            mapping[key] = self.construct_object(value_node, deep)  # type: ignore
+                key = self.construct_object(key_node, deep)  # type: ignore[no-untyped-call]
+            mapping[key] = self.construct_object(value_node, deep)  # type: ignore[no-untyped-call]
         return mapping
 
-    cls.construct_mapping = construct_mapping  # type: ignore
+    cls.construct_mapping = construct_mapping  # type: ignore[method-assign,assignment]
     return cls
 
 

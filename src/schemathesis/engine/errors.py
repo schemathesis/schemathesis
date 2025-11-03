@@ -128,7 +128,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
         ):
-            return self._error.message  # type: ignore
+            return self._error.message  # type: ignore[attr-defined]
 
         return str(self._error)
 

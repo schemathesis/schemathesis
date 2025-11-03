@@ -244,7 +244,7 @@ def execute_state_machine_loop(
         # yet have reproducible results
         seed += 1
         try:
-            with catch_warnings(), ignore_hypothesis_output():  # type: ignore
+            with catch_warnings(), ignore_hypothesis_output():
                 InstrumentedStateMachine.run(settings=hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code
@@ -264,14 +264,14 @@ def execute_state_machine_loop(
             # Here we need to either exit or re-run the state machine with this failure marked as known
             suite_status = Status.FAILURE
             if engine.has_reached_the_failure_limit:
-                break  # type: ignore[unreachable]
+                break
             for failure in exc.exceptions:
                 ctx.mark_as_seen_in_run(failure)
             continue
         except Flaky:
             # Ignore flakiness
             if engine.has_reached_the_failure_limit:
-                break  # type: ignore[unreachable]
+                break
             # Mark all failures in this suite as seen to prevent them being re-discovered
             ctx.mark_current_suite_as_seen_in_run()
             continue

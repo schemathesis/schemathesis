@@ -63,4 +63,4 @@ def validate_given_args(func: Callable, args: tuple, kwargs: dict[str, Any]) -> 
     from hypothesis.internal.reflection import get_signature
 
     signature = get_signature(func)
-    return is_invalid_test(func, signature, args, kwargs)  # type: ignore
+    return is_invalid_test(func, signature, args, kwargs)
