@@ -69,6 +69,16 @@ Runs random workflows:
 - Create user -> Create order for that user -> Get order
 - Create user -> Delete user -> Get user
 
+## Reusing Response Data in Non-Stateful Testing
+
+When fuzzing `GET /users/{id}` with random IDs, nearly every request returns 404. Error handling gets thoroughly tested, but success logic — response schema validation, data serialization, permission checks—remains largely untouched because valid IDs are astronomically rare in random generation.
+
+Schemathesis captures useful values from successful responses and reuses them when generating test cases. Dependency analysis identifies which operations produce resources and which consume them. For example, it recognizes that `POST /users` creates users with IDs, and `GET /users/{id}` needs those IDs.
+
+During fuzzing, captured values augment random generation. `GET /users/{id}` tests with both random IDs (finding 404 handling bugs) and real IDs from earlier `POST /users` calls (finding bugs in success paths).
+
+This works across non-stateful test phases and within them. The examples phase might create a user that the fuzzing phase later references. Within fuzzing itself, early test cases discover values that later cases use.
+
 ## Connecting Operations
 
 Stateful testing needs to know how operations relate. For example, `POST /users` creates a user, and `GET /users/{userId}` needs that user's ID.

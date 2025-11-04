@@ -11,7 +11,12 @@ import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import CoveragePhaseConfig, ExamplesPhaseConfig, FuzzingPhaseConfig, OperationOrdering
+from schemathesis.config import (
+    CoveragePhaseConfig,
+    ExamplesPhaseConfig,
+    FuzzingPhaseConfig,
+    OperationOrdering,
+)
 from schemathesis.core.errors import AuthenticationError, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
@@ -221,7 +226,7 @@ def worker_task(
                         or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
                     ):
                         continue
-                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation)
+                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation, phase=phase)
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
                     events_queue.put(scenario_started)
                     try:
@@ -259,7 +264,7 @@ def worker_task(
             events_queue.put(events.Interrupted(phase=phase))
 
 
-def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, Any]:
+def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> dict[str, Any]:
     kwargs = {}
     override = overrides.for_operation(ctx.config, operation=operation)
     for location in ("query", "headers", "cookies", "path_parameters"):
@@ -269,4 +274,10 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[
     headers = ctx.config.headers_for(operation=operation)
     if headers:
         kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
+
+    # If extra data sources are enabled, pass them to augment data generation
+    phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.name)
+    if isinstance(phase_config, FuzzingPhaseConfig) and phase_config.extra_data_sources.is_enabled:
+        kwargs["extra_data_source"] = ctx.extra_data_source
+
     return kwargs

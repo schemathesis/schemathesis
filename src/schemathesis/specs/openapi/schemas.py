@@ -33,6 +33,7 @@ from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.resources import ExtraDataSource
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
@@ -119,6 +120,15 @@ class OpenApiSchema(BaseSchema):
         if not configured_schemes:
             return False
         return self.security.apply_auth(case, context, configured_schemes)
+
+    def create_extra_data_source(self) -> ExtraDataSource | None:
+        """Create an extra data source for augmenting test generation with real data.
+
+        Returns:
+            OpenApiExtraDataSource if resource descriptors are available, None otherwise.
+
+        """
+        return self.analysis.extra_data_source
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
@@ -522,6 +532,7 @@ class OpenApiSchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
+        extra_data_source: ExtraDataSource | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
@@ -529,6 +540,7 @@ class OpenApiSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
+            extra_data_source=extra_data_source,
             **kwargs,
         )
 
