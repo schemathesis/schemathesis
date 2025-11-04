@@ -8,6 +8,7 @@
 - Option to make warnings cause test failures via `fail-on` in warnings configuration. [#2956](https://github.com/schemathesis/schemathesis/issues/2956)
 - The `generation.allow-extra-parameters` config option to control whether Schemathesis generates unexpected query, header, or cookie parameters in negative testing (set to `false` to skip them entirely).
 - Response deserializer hook for non-JSON schema conformance checks (`schemathesis.deserializer`). [#2934](https://github.com/schemathesis/schemathesis/issues/2934)
+- Automatic dependency inference in Python stateful tests via `schema.as_state_machine()`.
 
 ### :bug: Fixed
 
@@ -19,7 +20,7 @@
 
 - Custom media type strategies now support wildcard patterns (e.g., `image/*`) for all request body types, not just multipart encoding.
 - Improved the missing-links error message to point directly to the stateful testing guide.
-- Improve dependency inference.
+- Dependency inference now extracts fields from nested wrapper objects (`result`, `data`, `response`, `payload`).
 
 ### :memo: Documentation
 

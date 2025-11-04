@@ -511,6 +511,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         )
         if max_steps is not None:
             config.projects.override.phases.stateful.max_steps = max_steps
+        config.projects.override.phases.stateful.inference.algorithms = []
         config.projects.override.generation.update(
             modes=generation_modes or [GenerationMode.POSITIVE],
             unique_inputs=unique_inputs,

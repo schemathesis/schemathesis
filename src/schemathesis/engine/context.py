@@ -104,8 +104,10 @@ class EngineContext:
             and self.schema.config.phases.stateful.inference.is_algorithm_enabled(
                 InferenceAlgorithm.DEPENDENCY_ANALYSIS
             )
+            and not self.schema._inference_applied
         ):
             injected += dependencies.inject_links(self.schema)
+            self.schema._inference_applied = True
         return injected
 
     def stop(self) -> None:
