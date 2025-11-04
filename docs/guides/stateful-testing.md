@@ -2,6 +2,24 @@
 
 This guide shows how to customize Schemathesis's stateful testing to handle non-standard authentication scenarios, inject realistic test data, and adapt requests for your environment.
 
+!!! note "Need a refresher first?"
+    See [Understanding Stateful Testing](../explanations/stateful.md) for a conceptual overview before diving into customization.
+
+## Prerequisites
+
+Stateful testing only runs when Schemathesis can discover relationships between your operations.
+
+This can happen in three ways:
+
+- **Automatic analysis.** Schemathesis infers links from your response schemas and path parameters.
+- **`Location` headers.** When earlier phases (examples, coverage, fuzzing) encounter `Location` headers, the CLI learns new links and reuses them in the later stateful phase.
+- **Manual OpenAPI links.** You explicitly describe the relationship in your schema.
+
+If none of these mechanisms applies, the stateful phase has nothing to execute (see [Running stateful tests from the CLI](#running-stateful-tests-from-the-cli) for details). Add explicit links (see below) or adjust the schema so automatic inference becomes possible.
+
+!!! warning
+    Automatic analysis and `Location` header inference currently run only in the CLI. When you construct a state machine in Python or pytest (`schema.as_state_machine()`), ensure the schema already contains explicit links.
+
 ## Why Customize Stateful Testing?
 
 - **Data initialization:** Start scenarios with realistic data instead of random generation
@@ -60,6 +78,80 @@ The state machine automatically handles operation sequencing based on OpenAPI li
 
 !!! note "Reference Documentation"
     See the [APIStateMachine reference](../reference/python.md#stateful-testing) for all available customization methods and their parameters.
+
+## Defining OpenAPI Links
+
+When automatic inference is not enough, add links directly to your schema. Links connect a **producer** operation (e.g., `POST /users`) with a **consumer** operation (e.g., `GET /users/{userId}`).
+
+### Basic body-to-path link
+
+```yaml
+paths:
+  /users:
+    post:
+      operationId: createUser
+      responses:
+        '201':
+          description: A new user was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+          links:
+            GetUserById:
+              operationId: getUser
+              parameters:
+                userId: '$response.body#/id'
+
+  /users/{userId}:
+    get:
+      operationId: getUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+```
+
+Read the [OpenAPI Links specification](https://spec.openapis.org/oas/v3.1.0.html#link-object) for the full syntax.
+
+### Extracting data from a header
+
+Schemathesis extends link resolution with regex extraction. This is handy when responses return a `Location` header:
+
+```yaml
+paths:
+  /orders:
+    post:
+      operationId: createOrder
+      responses:
+        '201':
+          description: Order accepted
+          headers:
+            Location:
+              schema:
+                type: string
+          links:
+            GetOrder:
+              operationId: getOrder
+              parameters:
+                orderId: '$response.header.Location#regex:/orders/(.+)'
+```
+
+Here the single capturing group extracts the identifier from `/orders/42` and passes it to the `getOrder` call.
+
+### Checklist when links do not work
+
+If `schemathesis run` still reports `Missing Open API links`:
+
+1. Review the stateful phase summary (`API Links: ...`) to see how many links were discovered or filtered out.
+2. Fix any extraction errors Schemathesis reports (invalid expressions, missing parameters) and rerun.
+3. Confirm the producer response contains the referenced field or header—for regex extraction, test the pattern manually.
+4. Check endpoint filters (`--include-*`, `--exclude-*`) so both producer and consumer operations stay in scope.
 
 ## Per-Run Setup with pytest Fixtures
 
@@ -201,3 +293,11 @@ class APIWorkflow(schema.as_state_machine()):
         # Add auth to every request
         case.headers = {**case.headers, **self.auth_headers}
 ```
+
+## Running stateful tests from the CLI
+
+Stateful testing is enabled by default - `schemathesis run http://localhost:8000/openapi.yaml` executes examples, coverage, fuzzing, and finally the stateful phase. The summary (`API Links: ...`) shows whether any links were executed.
+
+If no links are available, Schemathesis skips the stateful phase in a default run. When you run only the stateful phase (`--phases=stateful`) and no links exist, it reports `Missing Open API links`. Provide the necessary links or disable the phase explicitly.
+
+Disabling earlier phases via `--phases` keeps dependency analysis active, but Schemathesis cannot learn additional links from observed `Location` headers. Manual links remain fully supported either way.
