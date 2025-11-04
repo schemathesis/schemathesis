@@ -88,8 +88,10 @@ class MutationContext:
     location: ParameterLocation
     # Payload media type, if available
     media_type: str | None
+    # Whether generating unexpected parameters is permitted
+    allow_extra_parameters: bool
 
-    __slots__ = ("keywords", "non_keywords", "location", "media_type")
+    __slots__ = ("keywords", "non_keywords", "location", "media_type", "allow_extra_parameters")
 
     def __init__(
         self,
@@ -98,11 +100,13 @@ class MutationContext:
         non_keywords: Schema,
         location: ParameterLocation,
         media_type: str | None,
+        allow_extra_parameters: bool,
     ) -> None:
         self.keywords = keywords
         self.non_keywords = non_keywords
         self.location = location
         self.media_type = media_type
+        self.allow_extra_parameters = allow_extra_parameters
 
     @property
     def is_path_location(self) -> bool:
@@ -174,7 +178,7 @@ class MutationContext:
                 sub_schema["type"] = "string"
                 if len(sub_schema) == 1:
                     sub_schema["format"] = "_header_value"
-            if draw(st.booleans()):
+            if self.allow_extra_parameters and draw(st.booleans()):
                 # In headers, `additionalProperties` are False by default, which means that Schemathesis won't generate
                 # any headers that are not defined. This change adds the possibility of generating valid extra headers
                 new_schema["additionalProperties"] = {"type": "string", "format": "_header_value"}
@@ -512,6 +516,12 @@ def negate_constraints(
             return False
         if ctx.is_path_location and k == "minLength" and v == 1:
             # Empty path parameter will be filtered out
+            return False
+        if (
+            not ctx.allow_extra_parameters
+            and k == "additionalProperties"
+            and ctx.location in (ParameterLocation.QUERY, ParameterLocation.HEADER, ParameterLocation.COOKIE)
+        ):
             return False
         return not (
             k in ("type", "properties", "items", "minItems")

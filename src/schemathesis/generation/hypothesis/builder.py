@@ -557,6 +557,7 @@ def _iter_coverage_cases(
                 is_required=parameter.is_required,
                 custom_formats=custom_formats,
                 validator_cls=validator_cls,
+                allow_extra_parameters=generation_config.allow_extra_parameters,
             ),
             schema,
         )
@@ -576,6 +577,7 @@ def _iter_coverage_cases(
                         is_required=parameter.is_required,
                         custom_formats=custom_formats,
                         validator_cls=validator_cls,
+                        allow_extra_parameters=generation_config.allow_extra_parameters,
                     ),
                     schema,
                 )
@@ -621,6 +623,7 @@ def _iter_coverage_cases(
                     is_required=body.is_required,
                     custom_formats=custom_formats,
                     validator_cls=validator_cls,
+                    allow_extra_parameters=generation_config.allow_extra_parameters,
                 ),
                 schema,
             )
@@ -871,6 +874,7 @@ def _iter_coverage_cases(
                         is_required=is_required,
                         custom_formats=custom_formats,
                         validator_cls=validator_cls,
+                        allow_extra_parameters=generation_config.allow_extra_parameters,
                     ),
                     subschema,
                 )
