@@ -390,6 +390,9 @@
         "allow-x00": {
           "type": "boolean"
         },
+        "allow-extra-parameters": {
+          "type": "boolean"
+        },
         "codec": {
           "type": "string"
         },

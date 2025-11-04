@@ -140,7 +140,13 @@ def test_failing_mutations(data, mutation, schema, location, validate):
     # When mutation can't be applied
     # Then it returns "failure"
     result, metadata = mutation(
-        MutationContext(keywords=schema, non_keywords={}, location=location, media_type="application/json"),
+        MutationContext(
+            keywords=schema,
+            non_keywords={},
+            location=location,
+            media_type="application/json",
+            allow_extra_parameters=True,
+        ),
         data.draw,
         schema,
     )
@@ -161,6 +167,7 @@ def test_change_type_urlencoded(data):
         non_keywords={},
         location=ParameterLocation.BODY,
         media_type="application/x-www-form-urlencoded",
+        allow_extra_parameters=True,
     )
     # Then it should not be mutated
     result, metadata = change_type(context, data.draw, schema)
@@ -212,7 +219,11 @@ def test_successful_mutations(data, mutation, schema):
     # Then it returns "success"
     result, metadata = mutation(
         MutationContext(
-            keywords=schema, non_keywords={}, location=ParameterLocation.BODY, media_type="application/json"
+            keywords=schema,
+            non_keywords={},
+            location=ParameterLocation.BODY,
+            media_type="application/json",
+            allow_extra_parameters=True,
         ),
         data.draw,
         schema,
@@ -257,7 +268,15 @@ def test_path_parameters_are_string(data, schema):
     validator = Draft4Validator(schema)
     new_schema = deepclone(schema)
     # When path parameters are mutated
-    new_schema, _ = data.draw(mutated(new_schema, {}, ParameterLocation.PATH, None))
+    new_schema, _ = data.draw(
+        mutated(
+            keywords=new_schema,
+            non_keywords={},
+            location=ParameterLocation.PATH,
+            media_type=None,
+            allow_extra_parameters=True,
+        )
+    )
     assert new_schema["type"] == "object"
     # Then mutated schema is a valid JSON Schema
     validate_schema(new_schema)
@@ -281,7 +300,15 @@ def test_custom_fields_are_intact(data, key):
         "additionalProperties": False,
     }
     # Then they should not be negated
-    new_schema, _ = data.draw(mutated(schema, {key: {}}, ParameterLocation.BODY, "application/json"))
+    new_schema, _ = data.draw(
+        mutated(
+            keywords=schema,
+            non_keywords={key: {}},
+            location=ParameterLocation.BODY,
+            media_type="application/json",
+            allow_extra_parameters=True,
+        )
+    )
     assert key in new_schema
 
 
@@ -316,7 +343,11 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
     schema = deepclone(schema)
     negate_constraints(
         MutationContext(
-            keywords=schema, non_keywords={}, location=ParameterLocation.BODY, media_type="application/json"
+            keywords=schema,
+            non_keywords={},
+            location=ParameterLocation.BODY,
+            media_type="application/json",
+            allow_extra_parameters=True,
         ),
         data.draw,
         schema,
@@ -330,7 +361,15 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_no_unsatisfiable_schemas(data):
     schema = {"type": "object", "required": ["foo"]}
-    mutated_schema, _ = data.draw(mutated(schema, {}, location=ParameterLocation.BODY, media_type="application/json"))
+    mutated_schema, _ = data.draw(
+        mutated(
+            keywords=schema,
+            non_keywords={},
+            location=ParameterLocation.BODY,
+            media_type="application/json",
+            allow_extra_parameters=True,
+        )
+    )
     assert canonicalish(mutated_schema) != FALSEY
 
 
@@ -395,6 +434,32 @@ def test_negating_multiple_query_params(ctx):
             assert "key2" in query, case.query
 
     test()
+
+
+@given(data=st.data())
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
+def test_negative_query_respects_allow_extra_parameter_toggle(data):
+    schema = {
+        "type": "object",
+        "properties": {"token": {"type": "string", "minLength": 5}},
+        "required": ["token"],
+        "additionalProperties": False,
+    }
+    result = data.draw(
+        negative_schema(
+            schema,
+            operation_name="GET /token",
+            location=ParameterLocation.QUERY,
+            media_type=None,
+            custom_formats=get_default_format_strategies(),
+            validator_cls=Draft4Validator,
+            generation_config=GenerationConfig(allow_extra_parameters=False),
+        )
+    )
+    assert isinstance(result, GeneratedValue)
+    value = result.value
+    if isinstance(value, dict):
+        assert "x-schemathesis-unknown-property" not in value
 
 
 @pytest.mark.parametrize(

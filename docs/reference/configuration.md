@@ -904,6 +904,20 @@ The following settings control how Schemathesis generates test data for your API
     allow-x00 = false
     ```
 
+#### `generation.allow-extra-parameters`
+
+!!! note ""
+
+    **Type:** `Boolean`  
+    **Default:** `true`  
+
+Controls whether Schemathesis produces unexpected query, header, or cookie parameters. Leave it enabled (default) to exercise `additionalProperties: false`; set it to `false` to skip generating those extras entirely.
+
+    ```toml
+    [generation]
+    allow-extra-parameters = false
+    ```
+
 
 #### `generation.exclude-header-characters`
 
