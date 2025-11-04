@@ -92,6 +92,28 @@ schemathesis run http://localhost:8000/openapi.json
 
 ## Essential Patterns
 
+### Reusing Built-in Serializers
+
+Reuse existing serializers (YAML, JSON, XML) for custom media types:
+
+```python
+import schemathesis
+
+# Reuse built-in YAML serializer for non-standard YAML variants
+schemathesis.serializer.alias("application/x-yaml-custom", "application/yaml")
+
+# Reuse JSON for internal company formats
+schemathesis.serializer.alias("application/vnd.company.internal", "application/json")
+
+# Register multiple aliases at once
+schemathesis.serializer.alias(
+    ["text/x-json", "application/jsonrequest"],
+    "application/json"
+)
+```
+
+**Note:** Media types with `+json` or `+xml` suffixes (like `application/vnd.api+json`) are automatically handled and don't need aliases.
+
 ### Multiple aliases for the same format
 
 ```python

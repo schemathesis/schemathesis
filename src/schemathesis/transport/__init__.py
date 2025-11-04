@@ -113,30 +113,112 @@ class BaseTransport(Generic[S]):
 _Serializer = Callable[[SerializationContext, Any], Union[bytes, None]]
 
 
-def serializer(*media_types: str) -> Callable[[_Serializer], None]:
-    """Register a serializer for specified media types on HTTP, ASGI, and WSGI transports.
+class SerializerRegistry:
+    """Registry for serializers with aliasing support."""
 
-    Args:
-        *media_types: One or more MIME types (e.g., "application/json") this serializer handles.
+    def __call__(self, *media_types: str) -> Callable[[_Serializer], None]:
+        """Register a serializer for specified media types on HTTP, ASGI, and WSGI transports.
 
-    Returns:
-        A decorator that wraps a function taking `(ctx: SerializationContext, value: Any)` and returning `bytes` for serialized body and `None` for omitting request body.
+        Args:
+            *media_types: One or more MIME types (e.g., "application/json") this serializer handles.
 
-    """
+        Returns:
+            A decorator that wraps a function taking `(ctx: SerializationContext, value: Any)` and returning `bytes` for serialized body and `None` for omitting request body.
 
-    def register(func: _Serializer) -> None:
+        Example:
+            ```python
+            @schemathesis.serializer("text/csv")
+            def csv_serializer(ctx, value):
+                # Convert value to CSV bytes
+                return csv_bytes
+            ```
+
+        """
+
+        def register(func: _Serializer) -> None:
+            from schemathesis.transport.asgi import ASGI_TRANSPORT
+            from schemathesis.transport.requests import REQUESTS_TRANSPORT
+            from schemathesis.transport.wsgi import WSGI_TRANSPORT
+
+            @ASGI_TRANSPORT.serializer(*media_types)
+            @REQUESTS_TRANSPORT.serializer(*media_types)
+            @WSGI_TRANSPORT.serializer(*media_types)
+            def inner(ctx: SerializationContext, value: Any) -> dict[str, bytes]:
+                result = {}
+                serialized = func(ctx, value)
+                if serialized is not None:
+                    result["data"] = serialized
+                return result
+
+        return register
+
+    def alias(self, target: str | list[str], source: str) -> None:
+        """Reuse an existing serializer for additional media types.
+
+        Register alias(es) for a built-in or previously registered serializer without
+        duplicating implementation.
+
+        Args:
+            target: Media type(s) to register as aliases
+            source: Existing media type whose serializer to reuse
+
+        Raises:
+            ValueError: If source media type has no registered serializer
+            ValueError: If target is empty
+
+        Example:
+            ```python
+            # Reuse built-in YAML serializer for custom media type
+            schemathesis.serializer.alias("application/custom+yaml", "application/yaml")
+
+            # Reuse built-in JSON serializer for vendor-specific type
+            schemathesis.serializer.alias("application/vnd.api+json", "application/json")
+
+            # Register multiple aliases at once
+            schemathesis.serializer.alias(
+                ["application/x-json", "text/json"],
+                "application/json"
+            )
+            ```
+
+        """
         from schemathesis.transport.asgi import ASGI_TRANSPORT
         from schemathesis.transport.requests import REQUESTS_TRANSPORT
         from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
-        @ASGI_TRANSPORT.serializer(*media_types)
-        @REQUESTS_TRANSPORT.serializer(*media_types)
-        @WSGI_TRANSPORT.serializer(*media_types)
-        def inner(ctx: SerializationContext, value: Any) -> dict[str, bytes]:
-            result = {}
-            serialized = func(ctx, value)
-            if serialized is not None:
-                result["data"] = serialized
-            return result
+        if not source:
+            raise ValueError("Source media type cannot be empty")
 
-    return register
+        targets = [target] if isinstance(target, str) else target
+
+        if not targets or any(not t for t in targets):
+            raise ValueError("Target media type cannot be empty")
+
+        # Get serializer from source (use requests transport as reference)
+        pair = REQUESTS_TRANSPORT.get_first_matching_media_type(source)
+        if pair is None:
+            raise ValueError(f"No serializer found for media type: {source}")
+
+        _, serializer_func = pair
+
+        # Register for all targets across all transports
+        for t in targets:
+            REQUESTS_TRANSPORT._serializers[t] = serializer_func
+            ASGI_TRANSPORT._serializers[t] = serializer_func
+            WSGI_TRANSPORT._serializers[t] = serializer_func
+
+
+serializer = SerializerRegistry()
+serializer.__doc__ = """Registry for serializers with decorator and aliasing support.
+
+Use as a decorator to register custom serializers:
+
+    @schemathesis.serializer("text/csv")
+    def csv_serializer(ctx, value):
+        # Convert value to CSV bytes
+        return csv_bytes
+
+Or use the alias method to reuse built-in serializers:
+
+    schemathesis.serializer.alias("application/custom+yaml", "application/yaml")
+"""
