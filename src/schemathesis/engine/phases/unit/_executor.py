@@ -72,12 +72,11 @@ def run_test(
     ctx: EngineContext,
     phase: PhaseName,
     suite_id: uuid.UUID,
+    scenario_id: uuid.UUID,
 ) -> events.EventGenerator:
     """A single test run with all error handling needed."""
     import hypothesis.errors
 
-    scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
-    yield scenario_started
     errors: list[Exception] = []
     skip_reason = None
     error: Exception
@@ -92,7 +91,7 @@ def run_test(
 
     def scenario_finished(status: Status) -> events.ScenarioFinished:
         return events.ScenarioFinished(
-            id=scenario_started.id,
+            id=scenario_id,
             suite_id=suite_id,
             phase=phase,
             label=operation.label,
