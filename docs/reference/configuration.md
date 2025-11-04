@@ -484,6 +484,26 @@ These settings can only be applied at the project level.
 
     CLI-only. Only available for non-stateful phases (examples, coverage, fuzzing).
 
+#### `phases.<phase>.extra-data-sources`
+
+!!! note ""
+
+    **Type**: `Object`
+    **Default**: `{ responses = true }`
+
+    Configure extra data sources to augment test generation. When enabled, Schemathesis uses data from previous API responses in addition to randomly generated values, producing test cases more likely to be accepted by the API.
+
+    ```toml
+    [phases.fuzzing.extra-data-sources]
+    responses = false  # Disable using response data
+    ```
+
+    CLI-only. Only available for fuzzing phase.
+
+    **Available sources:**
+
+    - `responses` (boolean, default: `true`): Use values from successful API responses for test generation
+
 #### `phases.examples.fill-missing`
 
 !!! note "" 

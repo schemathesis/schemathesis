@@ -12,6 +12,34 @@ from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
 DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace"}
 
 
+@dataclass(repr=False)
+class ExtraDataSourcesConfig(DiffBase):
+    """Configuration for extra data sources used to augment test generation."""
+
+    responses: bool
+
+    __slots__ = ("responses", "_is_default")
+
+    def __init__(
+        self,
+        *,
+        responses: bool = True,
+    ) -> None:
+        self.responses = responses
+        self._is_default = responses
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ExtraDataSourcesConfig:
+        return cls(
+            responses=data.get("responses", True),
+        )
+
+    @property
+    def is_enabled(self) -> bool:
+        """Extra data sources are enabled if any source is enabled."""
+        return self.responses
+
+
 class OperationOrdering(str, Enum):
     """Strategy for ordering API operations during test execution."""
 
@@ -28,8 +56,9 @@ class FuzzingPhaseConfig(DiffBase):
     generation: GenerationConfig
     checks: ChecksConfig
     operation_ordering: OperationOrdering
+    extra_data_sources: ExtraDataSourcesConfig
 
-    __slots__ = ("enabled", "generation", "checks", "operation_ordering", "_is_default")
+    __slots__ = ("enabled", "generation", "checks", "operation_ordering", "extra_data_sources", "_is_default")
 
     def __init__(
         self,
@@ -38,6 +67,7 @@ class FuzzingPhaseConfig(DiffBase):
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
         operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
+        extra_data_sources: ExtraDataSourcesConfig | None = None,
     ) -> None:
         self.enabled = enabled
         self.generation = generation or GenerationConfig()
@@ -45,8 +75,13 @@ class FuzzingPhaseConfig(DiffBase):
         self.operation_ordering = (
             OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
         )
+        self.extra_data_sources = extra_data_sources or ExtraDataSourcesConfig()
         self._is_default = (
-            enabled and generation is None and checks is None and self.operation_ordering == OperationOrdering.AUTO
+            enabled
+            and generation is None
+            and checks is None
+            and self.operation_ordering == OperationOrdering.AUTO
+            and extra_data_sources is None
         )
 
     @classmethod
@@ -56,6 +91,7 @@ class FuzzingPhaseConfig(DiffBase):
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
+            extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {})),
         )
 
 
@@ -67,7 +103,14 @@ class ExamplesPhaseConfig(DiffBase):
     checks: ChecksConfig
     operation_ordering: OperationOrdering
 
-    __slots__ = ("enabled", "fill_missing", "generation", "checks", "operation_ordering", "_is_default")
+    __slots__ = (
+        "enabled",
+        "fill_missing",
+        "generation",
+        "checks",
+        "operation_ordering",
+        "_is_default",
+    )
 
     def __init__(
         self,

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import base64
 import json
+import string
 from collections.abc import Mapping
+from itertools import product
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -222,3 +224,31 @@ class Response:
         if self._encoded_body is None and self.content:
             self._encoded_body = base64.b64encode(self.content).decode()
         return self._encoded_body
+
+
+def expand_status_code(status_code: str | int) -> list[int]:
+    """Expand OpenAPI status code patterns like '2XX' or 'default' into concrete codes.
+
+    Args:
+        status_code: Status code pattern ('200', '2XX', 'default', etc.)
+
+    Returns:
+        List of concrete status codes matching the pattern
+
+    """
+    chars = [list(string.digits) if digit == "X" else [digit] for digit in str(status_code).upper()]
+    return [int("".join(expanded)) for expanded in product(*chars)]
+
+
+def status_code_matches(pattern: str, response_code: int) -> bool:
+    """Check if a response status code matches an OpenAPI status code pattern.
+
+    Args:
+        pattern: OpenAPI status code pattern ('200', '2XX', 'default', etc.)
+        response_code: Actual HTTP status code from response
+
+    Returns:
+        True if the response code matches the pattern
+
+    """
+    return pattern == str(response_code) or pattern == "default" or response_code in expand_status_code(pattern)

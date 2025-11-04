@@ -8,12 +8,16 @@ from schemathesis.config import InferenceAlgorithm
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
+from schemathesis.resources import ExtraDataSource, ResourceRepository
+from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, build_parameter_requirements
+from schemathesis.specs.openapi.resources import build_descriptors
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 from schemathesis.specs.openapi.warnings import detect_missing_deserializers, detect_unused_openapi_auth
 
 if TYPE_CHECKING:
+    from schemathesis.resources import ResourceDescriptor
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -29,6 +33,8 @@ class OpenAPIAnalysis:
         "_links_injected",
         "_dependency_graph",
         "_dependency_layers",
+        "_resource_descriptors",
+        "_extra_data_source",
         "_inferencer",
         "_warnings_cache",
         "_schema_warnings_cache",
@@ -39,23 +45,25 @@ class OpenAPIAnalysis:
         self._links_injected = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
         self._dependency_layers: list[list[str]] | None | NotSet = NOT_SET
+        self._resource_descriptors: Sequence[ResourceDescriptor] | None = None
+        self._extra_data_source: ExtraDataSource | None | NotSet = NOT_SET
         self._inferencer: LinkInferencer | None = None
         self._warnings_cache: Mapping[str, Sequence[SchemaWarning]] | None = None
         self._schema_warnings_cache: Sequence[SchemaWarning] | None = None
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
-        """Lazily compute and cache the dependency graph."""
+        """Graph of API operations and their resource dependencies."""
         if self._dependency_graph is None:
             self._dependency_graph = dependencies.analyze(self.schema)
         return self._dependency_graph
 
     @property
     def dependency_layers(self) -> list[list[str]] | None:
-        """Lazily compute and cache operation layers based on dependencies.
+        """Operations grouped into layers based on dependencies.
 
-        Returns operations grouped into layers where each layer can execute in parallel,
-        but layers must execute sequentially. Returns None if no useful ordering exists.
+        Each layer can execute in parallel, but layers must execute sequentially.
+        Returns None if no useful ordering exists.
 
         Example:
             Layer 0: [POST /users, POST /products]  # No dependencies
@@ -69,8 +77,32 @@ class OpenAPIAnalysis:
         return self._dependency_layers
 
     @property
+    def resource_descriptors(self) -> Sequence[ResourceDescriptor]:
+        """Descriptors identifying resources that can be captured from API responses."""
+        if self._resource_descriptors is None:
+            self._resource_descriptors = build_descriptors(self.schema)
+        return self._resource_descriptors
+
+    @property
+    def extra_data_source(self) -> ExtraDataSource | None:
+        """Extra data source for augmenting test generation with captured API responses.
+
+        Returns None if no resource descriptors are available.
+        """
+        if self._extra_data_source is NOT_SET:
+            descriptors = self.resource_descriptors
+            if not descriptors:
+                self._extra_data_source = None
+            else:
+                repository = ResourceRepository(descriptors)
+                requirements = build_parameter_requirements(self.dependency_graph)
+                self._extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
+        assert not isinstance(self._extra_data_source, NotSet)
+        return self._extra_data_source
+
+    @property
     def inferencer(self) -> LinkInferencer:
-        """Lazily compute and cache the link inferencer with URL router."""
+        """Link inferencer for runtime operation matching via URL routing."""
         if self._inferencer is None:
             self._inferencer = LinkInferencer.from_schema(self.schema)
         return self._inferencer

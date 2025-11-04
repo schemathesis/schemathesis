@@ -50,6 +50,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.resources import ExtraDataSource
 
 
 @unique
@@ -138,6 +139,10 @@ class GraphQLSchema(BaseSchema):
 
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         return False
+
+    def create_extra_data_source(self) -> None:
+        """Extra data sources are not supported for GraphQL schemas."""
+        return None
 
     @property
     def client_schema(self) -> graphql.GraphQLSchema:
@@ -337,6 +342,8 @@ def graphql_cases(
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
+    # Not supported for GraphQL, passed here to unify interfaces
+    extra_data_source: ExtraDataSource | None = None,
 ) -> Any:
     import graphql
     from hypothesis_graphql import strategies as gql_st

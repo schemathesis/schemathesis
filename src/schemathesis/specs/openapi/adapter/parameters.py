@@ -17,6 +17,7 @@ from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.resources import ExtraDataSource
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
@@ -273,16 +274,20 @@ class OpenApiBody(OpenApiComponent):
         operation: APIOperation,
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
+        extra_data_source: ExtraDataSource | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
-        # Check cache based on generation mode
-        if generation_mode == GenerationMode.POSITIVE:
-            if self._positive_strategy_cache is not NOT_SET:
-                assert not isinstance(self._positive_strategy_cache, NotSet)
-                return self._positive_strategy_cache
-        elif self._negative_strategy_cache is not NOT_SET:
-            assert not isinstance(self._negative_strategy_cache, NotSet)
-            return self._negative_strategy_cache
+        use_cache = extra_data_source is None
+
+        # Check cache based on generation mode (only when extra data sources are not used)
+        if use_cache:
+            if generation_mode == GenerationMode.POSITIVE:
+                if self._positive_strategy_cache is not NOT_SET:
+                    assert not isinstance(self._positive_strategy_cache, NotSet)
+                    return self._positive_strategy_cache
+            elif self._negative_strategy_cache is not NOT_SET:
+                assert not isinstance(self._negative_strategy_cache, NotSet)
+                return self._negative_strategy_cache
 
         # Import here to avoid circular dependency
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
@@ -291,6 +296,8 @@ class OpenApiBody(OpenApiComponent):
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
         schema = self.optimized_schema
+        if extra_data_source is not None:
+            schema = extra_data_source.augment(operation=operation, location=ParameterLocation.BODY, schema=schema)
         assert isinstance(operation.schema, OpenApiSchema)
         strategy = strategy_factory(
             schema,
@@ -302,10 +309,11 @@ class OpenApiBody(OpenApiComponent):
         )
 
         # Cache the strategy
-        if generation_mode == GenerationMode.POSITIVE:
-            self._positive_strategy_cache = strategy
-        else:
-            self._negative_strategy_cache = strategy
+        if use_cache:
+            if generation_mode == GenerationMode.POSITIVE:
+                self._positive_strategy_cache = strategy
+            else:
+                self._negative_strategy_cache = strategy
 
         return strategy
 
@@ -590,12 +598,15 @@ class OpenApiParameterSet(ParameterSet):
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
         exclude: Iterable[str] = (),
+        extra_data_source: ExtraDataSource | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = frozenset(exclude)
         cache_key = (exclude_key, generation_mode)
 
-        if cache_key in self._strategy_cache:
+        use_cache = extra_data_source is None
+
+        if use_cache and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
 
         # Import here to avoid circular dependency
@@ -613,17 +624,25 @@ class OpenApiParameterSet(ParameterSet):
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         # Get schema with exclusions
-        schema = self.get_schema_with_exclusions(exclude)
+        schema: JsonSchema = self.get_schema_with_exclusions(exclude)
+        if extra_data_source is not None:
+            schema = extra_data_source.augment(operation=operation, location=self.location, schema=schema)
+
+        # `JsonSchema` can be boolean (`True` / `False`), normalize to an object schema for downstream usage.
+        if isinstance(schema, bool):
+            schema = {} if schema else {"not": {}}
+        assert isinstance(schema, dict)
+        schema_obj: JsonSchemaObject = schema
 
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
-        if not schema["properties"] and strategy_factory is make_negative_strategy:
+        if not schema_obj["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
             assert isinstance(operation.schema, OpenApiSchema)
             strategy = strategy_factory(
-                schema,
+                schema_obj,
                 operation.label,
                 self.location,
                 None,
@@ -673,7 +692,8 @@ class OpenApiParameterSet(ParameterSet):
                 else:
                     strategy = strategy.map(jsonify_python_specific_types)
 
-        self._strategy_cache[cache_key] = strategy
+        if use_cache:
+            self._strategy_cache[cache_key] = strategy
         return strategy
 
 
