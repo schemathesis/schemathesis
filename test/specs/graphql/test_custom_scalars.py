@@ -1,4 +1,5 @@
 import pytest
+from _pytest.main import ExitCode
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -73,7 +74,12 @@ type Query {
   getByUUID(value: UUID!): Int!
 }""",
     )
-    result = cli.run(str(schema_file), "--max-examples=5", f"--url={graphql_url}")
+    result = cli.run_and_assert(
+        str(schema_file),
+        "--max-examples=5",
+        f"--url={graphql_url}",
+        exit_code=ExitCode.TESTS_FAILED,
+    )
     # Queries can be constructed, but the backend does not implement the fields
     assert result.stdout.count("Cannot query field") == 18
 

@@ -21,6 +21,7 @@ import pytest
 import requests
 import tomli_w
 import yaml
+from _pytest.main import ExitCode
 from click.testing import CliRunner, Result
 from hypothesis import settings
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
@@ -619,6 +620,12 @@ def cli(tmp_path):
             result = cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
             if result.exception and not isinstance(result.exception, SystemExit):
                 raise result.exception
+            return result
+
+        @staticmethod
+        def run_and_assert(*args, exit_code: ExitCode = ExitCode.OK, **kwargs):
+            result = Runner.run(*args, **kwargs)
+            assert result.exit_code == exit_code, result.stdout
             return result
 
     return Runner()

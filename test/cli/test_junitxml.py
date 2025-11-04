@@ -11,15 +11,13 @@ from _pytest.main import ExitCode
 def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     # When option with a path to junit.xml is provided
     xml_path = tmp_path / "junit.xml"
-    result = cli.run(
+    cli.run_and_assert(
         schema_url,
         f"--report-junit-path={xml_path}",
         f"--max-examples={hypothesis_max_examples or 2}",
         "--checks=not_a_server_error",
         "--seed=1",
     )
-    # Command executed successfully
-    assert result.exit_code == ExitCode.OK, result.stdout
     # File is created
     assert xml_path.exists()
     # And contains valid xml
@@ -43,8 +41,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
         kwargs["config"] = {"reports": {"junit": {"path": str(xml_path)}}}
     else:
         args.append(f"--report-junit-path={xml_path}")
-    result = cli.run(schema_url, *args, **kwargs)
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    cli.run_and_assert(schema_url, *args, exit_code=ExitCode.TESTS_FAILED, **kwargs)
     tree = ElementTree.parse(xml_path)
     # Inspect root element `testsuites`
     root = tree.getroot()
@@ -222,7 +219,7 @@ def test_permission_denied(cli, tmp_path, schema_url, path):
     dir_path = tmp_path / "output"
     dir_path.mkdir(mode=0o555)
     xml_path = dir_path / path
-    result = cli.run(schema_url, f"--report-junit-path={xml_path}")
-    assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
+    result = cli.run_and_assert(schema_url, f"--report-junit-path={xml_path}", exit_code=ExitCode.INTERRUPTED)
+
     # Depends on the Click version (Python 3.9 tests have an older one)
     assert "Permission denied" in result.stdout or "Permission denied" in result.stderr

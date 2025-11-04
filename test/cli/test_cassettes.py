@@ -37,7 +37,7 @@ def load_response_body(cassette, idx):
 @pytest.mark.operations("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, mode):
     hypothesis_max_examples = hypothesis_max_examples or 2
-    result = cli.run(
+    cli.run_and_assert(
         schema_url,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples}",
@@ -46,7 +46,6 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         "--checks=not_a_server_error",
         *args,
     )
-    assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
     assert interactions[0]["status"] == "SUCCESS"
@@ -81,15 +80,15 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
 @pytest.mark.operations("slow")
 @pytest.mark.openapi_version("3.0")
 def test_store_timeout(cli, schema_url, cassette_path, format):
-    result = cli.run(
+    cli.run_and_assert(
         schema_url,
         f"--report-{format}-path={cassette_path}",
         "--max-examples=1",
         "--request-timeout=0.001",
         "--seed=1",
         "--mode=positive",
+        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if format == "vcr":
         cassette = load_cassette(cassette_path)
         assert cassette["http_interactions"][0]["status"] == "ERROR"
@@ -106,13 +105,13 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
 def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-695
     # When an API operation has responses with SUCCESS and FAILURE statuses
-    result = cli.run(
+    cli.run_and_assert(
         openapi3_schema_url,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 5}",
         "--seed=1",
+        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) >= 1
     # Then their statuses should be reflected in the "status" field
@@ -148,7 +147,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
         },
         format="yaml",
     )
-    result = cli.run(
+    result = cli.run_and_assert(
         str(schema_path),
         f"--url={openapi3_base_url}",
         f"--max-examples={hypothesis_max_examples or 1}",
@@ -156,8 +155,6 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
         "--checks=not_a_server_error",
         "--mode=positive",
     )
-    # Then the test run should be successful
-    assert result.exit_code == ExitCode.OK, result.stdout
     # And there should be no signs of encoding errors
     assert "UnicodeEncodeError" not in result.stdout
     # And the cassette should be correctly recorded
@@ -189,7 +186,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
 def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args, value):
     cassette_path = cassette_path.with_suffix(".har")
     auth = "secret"
-    result = cli.run(
+    result = cli.run_and_assert(
         schema_url,
         f"--report-har-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 1}",
@@ -198,8 +195,8 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
         f"-H Authorization: {auth}",
         f"--output-sanitize={value}",
         *args,
+        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert str(cassette_path) in result.stdout
     assert cassette_path.exists()
     with cassette_path.open(encoding="utf-8") as fd:
@@ -269,7 +266,7 @@ def request_args(request, tmp_path):
 @pytest.mark.operations("headers")
 def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
     auth = "secret-auth"
-    result = cli.run(
+    cli.run_and_assert(
         openapi2_schema_url,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 5}",
@@ -279,7 +276,6 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         "--checks=not_a_server_error",
         "--mode=positive",
     )
-    assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
 
     if value == "true":

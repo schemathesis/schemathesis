@@ -33,7 +33,7 @@ def test_default(cli, schema_url, snapshot_cli, workers):
 def test_sanitization(cli, schema_url, tmp_path):
     cassette_path = tmp_path / "output.yaml"
     token = "secret"
-    result = cli.run(
+    result = cli.run_and_assert(
         schema_url,
         "--phases=stateful",
         "--max-examples=80",
@@ -41,8 +41,8 @@ def test_sanitization(cli, schema_url, tmp_path):
         f"--header=Authorization: Bearer {token}",
         f"--report-vcr-path={cassette_path}",
         "--max-failures=1",
+        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert token not in result.stdout
 
 
@@ -106,15 +106,15 @@ def test_with_cassette_stateful_only(tmp_path, cli, schema_url):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_junit(tmp_path, cli, schema_url):
     junit_path = tmp_path / "junit.xml"
-    result = cli.run(
+    cli.run_and_assert(
         schema_url,
         "--phases=stateful",
         "--max-examples=80",
         "--max-failures=1",
         "-c not_a_server_error",
         f"--report-junit-path={junit_path}",
+        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert junit_path.exists()
     tree = ElementTree.parse(junit_path)
     root = tree.getroot()
