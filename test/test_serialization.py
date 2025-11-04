@@ -17,6 +17,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.transforms import deepclone
+from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
 from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
 from test.utils import assert_requests_call
@@ -829,3 +830,94 @@ def test_xml_root_tag_from_reference_openapi2(ctx):
     # Then the root XML tag should be derived from the reference name "UserProfile"
     data = REQUESTS_TRANSPORT.serialize_case(case)["data"]
     assert data == b"<UserProfile><name>John</name><age>30</age></UserProfile>"
+
+
+@pytest.mark.parametrize(
+    "target,source,body,expected_content",
+    [
+        ("application/custom+yaml", "application/yaml", {"key": "value"}, "key: value"),
+        ("application/x-yaml-custom", "text/yaml", {"foo": "bar"}, "foo: bar"),
+        ("text/vnd.custom.yaml", "application/yaml", {"name": "test"}, "name: test"),
+    ],
+)
+def test_serializer_alias_single(ctx, target, source, body, expected_content):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {target: {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schemathesis.serializer.alias(target, source)
+
+    try:
+        schema = schemathesis.openapi.from_dict(raw_schema)
+        case = schema["/test"]["POST"].Case(body=body, media_type=target)
+
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
+            data = transport.serialize_case(case)["data"]
+            data_str = data.decode() if isinstance(data, bytes) else data
+            assert expected_content in data_str
+    finally:
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
+            transport.unregister_serializer(target)
+
+
+def test_serializer_alias_multiple_targets(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/x-custom-yaml": {"schema": {"type": "object"}},
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schemathesis.serializer.alias(["application/x-custom-yaml", "text/vnd.yaml.custom"], "application/yaml")
+
+    try:
+        schema = schemathesis.openapi.from_dict(raw_schema)
+
+        for media_type in ["application/x-custom-yaml", "text/vnd.yaml.custom"]:
+            case = schema["/test"]["POST"].Case(body={"id": 42}, media_type=media_type)
+            for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
+                data = transport.serialize_case(case)["data"]
+                data_str = data.decode() if isinstance(data, bytes) else data
+                assert "id" in data_str and "42" in data_str
+    finally:
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
+            transport.unregister_serializer("application/x-custom-yaml", "text/vnd.yaml.custom")
+
+
+@pytest.mark.parametrize(
+    "target,source,expected_error",
+    [
+        (
+            "application/custom",
+            "application/nonexistent",
+            "No serializer found for media type: application/nonexistent",
+        ),
+        ("application/custom", "", "Source media type cannot be empty"),
+        ("", "application/json", "Target media type cannot be empty"),
+    ],
+)
+def test_serializer_alias_validation(target, source, expected_error):
+    with pytest.raises(ValueError, match=re.escape(expected_error)):
+        schemathesis.serializer.alias(target, source)
+
+
+def test_serializer_alias_empty_target_in_list():
+    with pytest.raises(ValueError, match="Target media type cannot be empty"):
+        schemathesis.serializer.alias(["application/custom", ""], "application/json")
