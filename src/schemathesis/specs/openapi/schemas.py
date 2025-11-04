@@ -38,6 +38,7 @@ from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, Open
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity, OpenApiSecurityParameters
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
+from schemathesis.specs.openapi.resources import build_descriptors
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.generation.stateful import APIStateMachine
+    from schemathesis.resources import ResourceDescriptor
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
@@ -80,6 +82,7 @@ class OpenApiSchema(BaseSchema):
         self.analysis = OpenAPIAnalysis(self)
         self._bundler = Bundler()
         self._bundle_cache: BundleCache = {}
+        self._resource_descriptors: Sequence[ResourceDescriptor] | None = None
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
@@ -196,6 +199,11 @@ class OpenApiSchema(BaseSchema):
         operation.definition.raw = definition
         operation.schema = self
         return not self.filter_set.match(_ctx_cache)
+
+    def get_resource_descriptors(self) -> Sequence[ResourceDescriptor]:
+        if self._resource_descriptors is None:
+            self._resource_descriptors = build_descriptors(self)
+        return self._resource_descriptors
 
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()

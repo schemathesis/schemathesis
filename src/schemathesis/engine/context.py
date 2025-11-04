@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -12,11 +13,10 @@ from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
 
 if TYPE_CHECKING:
-    import threading
-
     import requests
 
     from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.resources import ResourceRepository
 
 
 @dataclass
@@ -37,6 +37,7 @@ class EngineContext:
         "observations",
         "_session",
         "_transport_kwargs_cache",
+        "resource_repository",
     )
 
     def __init__(
@@ -54,6 +55,7 @@ class EngineContext:
         self.observations = observations
         self._session = session
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
+        self.resource_repository = self._create_resource_repository(schema)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -150,3 +152,17 @@ class EngineContext:
             kwargs["proxies"] = {"all": proxy}
         self._transport_kwargs_cache[key] = kwargs
         return kwargs
+
+    def _create_resource_repository(self, schema: BaseSchema) -> ResourceRepository | None:
+        """Create resource repository from schema descriptors.
+
+        Only schemas with resource tracking support (e.g., OpenAPI) will return
+        non-empty descriptors, enabling resource capture and reuse.
+        """
+        descriptors = schema.get_resource_descriptors()
+        if not descriptors:
+            return None
+
+        from schemathesis.resources import ResourceRepository
+
+        return ResourceRepository(descriptors)

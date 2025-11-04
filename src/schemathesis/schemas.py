@@ -12,6 +12,7 @@ from typing import (
     Generic,
     Iterator,
     NoReturn,
+    Sequence,
     TypeVar,
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext
     from schemathesis.core import Specification
     from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.resources import ResourceDescriptor
 
 
 @lru_cache
@@ -445,6 +447,19 @@ class BaseSchema(Mapping):
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
+
+    def get_resource_descriptors(self) -> Sequence[ResourceDescriptor]:
+        """Get resource descriptors for this schema.
+
+        Returns metadata about resources that can be captured from API responses
+        for use in subsequent test generation. Only schemas with dependency tracking
+        support return non-empty descriptors.
+
+        Returns:
+            Empty tuple by default. Subclasses with resource tracking return descriptors.
+
+        """
+        return ()
 
     def validate_response(
         self,

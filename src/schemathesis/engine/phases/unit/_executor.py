@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import time
 import unittest
 import uuid
@@ -302,6 +303,23 @@ def run_test(
 
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
+
+    if status == Status.SUCCESS and ctx.resource_repository is not None:
+        descriptors = ctx.resource_repository.descriptors_for_operation(operation.label)
+        if descriptors:
+            for interaction in recorder.interactions.values():
+                response = interaction.response
+                if response is None:
+                    continue
+                try:
+                    payload = response.json()
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+                ctx.resource_repository.ingest_response(
+                    operation_label=operation.label,
+                    status_code=response.status_code,
+                    payload=payload,
+                )
 
     yield scenario_finished(status)
 

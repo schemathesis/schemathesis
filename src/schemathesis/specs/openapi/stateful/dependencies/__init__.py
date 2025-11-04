@@ -105,7 +105,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
 
 def inject_links(schema: OpenApiSchema) -> int:
-    graph = analyze(schema)
+    graph = schema.analysis.dependency_graph
     return _inject_links(schema, graph)
 
 
