@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Generator
+from typing import Generator, Tuple
 
 from schemathesis.core.errors import MalformedMediaType
+
+YAML_MEDIA_TYPES: Tuple[str, ...] = (
+    "text/yaml",
+    "text/x-yaml",
+    "application/x-yaml",
+    "text/vnd.yaml",
+    "application/yaml",
+)
 
 
 def _parseparam(s: str) -> Generator[str]:
@@ -57,7 +65,7 @@ def is_json(value: str) -> bool:
 
 def is_yaml(value: str) -> bool:
     """Detect whether the content type is YAML-compatible."""
-    return value in ("text/yaml", "text/x-yaml", "application/x-yaml", "text/vnd.yaml", "application/yaml")
+    return value in YAML_MEDIA_TYPES
 
 
 def is_plain_text(value: str) -> bool:

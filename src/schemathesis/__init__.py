@@ -4,6 +4,7 @@ from schemathesis import errors, graphql, openapi, pytest
 from schemathesis.auths import AuthContext, AuthProvider, auth
 from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.config import SchemathesisConfig as Config
+from schemathesis.core.deserialization import DeserializationContext, deserializer
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationMode, stateful
@@ -46,6 +47,9 @@ __all__ = [
     "metric",
     "MetricContext",
     "MetricFunction",
+    # Response deserialization
+    "deserializer",
+    "DeserializationContext",
     # Serialization
     "serializer",
     "SerializationContext",

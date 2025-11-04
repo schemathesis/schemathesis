@@ -1,0 +1,78 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.0
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+__________________________________ GET /data ___________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    'notanumber' is not of type 'integer'
+
+    Schema at /properties/count:
+
+        {
+            "type": "integer"
+        }
+
+    Value:
+
+        "notanumber"
+
+[200] OK:
+
+    `count=notanumber
+    name=Alice`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ Response violates schema: 1
+
+Test cases:
+  N generated, N found N unique failures, N skipped
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

@@ -27,6 +27,9 @@ Generate valid binary content like PDFs or images when your API accepts speciali
 ### [Custom Serializers](custom-serializers.md)
 Transform test data into non-JSON formats like CSV, MessagePack, or XML for APIs that expect alternative serialization.
 
+### [Custom Response Deserializers](custom-response-deserializers.md)
+Decode non-JSON or vendor-specific responses back into Python objects so schema checks work with your API.
+
 ### [GraphQL Custom Scalars](graphql-custom-scalars.md)
 Configure domain-specific scalar types so Schemathesis generates appropriate test data for emails, phone numbers, or custom IDs.
 
