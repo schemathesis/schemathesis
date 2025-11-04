@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1balances/post",
+    {
+      "GetBalanceResponse": {
+        "operationRef": "#/paths/~1balances~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/result/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

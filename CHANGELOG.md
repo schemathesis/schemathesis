@@ -19,6 +19,7 @@
 
 - Custom media type strategies now support wildcard patterns (e.g., `image/*`) for all request body types, not just multipart encoding.
 - Improved the missing-links error message to point directly to the stateful testing guide.
+- Improve dependency inference.
 
 ### :memo: Documentation
 

@@ -417,6 +417,21 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
             if field_normalized == expected_field_normalized:
                 return field
 
+    # ID field synonym matching (for identifier parameters)
+    # Match parameter like 'conversation_id' or 'id' with fields like 'uuid', 'guid', 'uid'
+    parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
+    suffix_normalized = _normalize_for_matching(parameter_suffix)
+
+    # Common identifier field names in priority order (id, uuid, guid, uid)
+    ID_FIELD_NAMES = ["id", "uuid", "guid", "uid"]
+
+    if suffix_normalized in ID_FIELD_NAMES:
+        # Try to match with any identifier field, preferring exact match first
+        for id_name in ID_FIELD_NAMES:
+            for field in fields:
+                if _normalize_for_matching(field) == id_name:
+                    return field
+
     return None
 
 

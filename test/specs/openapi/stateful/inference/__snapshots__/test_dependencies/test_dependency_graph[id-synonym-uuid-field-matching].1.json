@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1conversations/get",
+    {
+      "DeleteConversation": {
+        "operationRef": "#/paths/~1conversations~1{conversation_id}~1members~1{member_id}/delete",
+        "parameters": {
+          "path.conversation_id": "$response.body#/_embedded/conversations/0/uuid"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]
