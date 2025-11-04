@@ -131,6 +131,19 @@ Reference for Schemathesis public Python API.
       - SerializationContext
       - serializer
 
+## Response Deserialization
+
+::: schemathesis
+    options:
+      heading_level: 3
+      show_root_toc_entry: false
+      show_symbol_type_heading: true
+      signature_crossrefs: true
+      show_labels: true
+      members:
+      - DeserializationContext
+      - deserializer
+
 ## Targeted Property-based Testing
 
 ::: schemathesis

@@ -505,7 +505,13 @@ class BaseOpenAPISchema(BaseSchema):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")
 
-    def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
+    def validate_response(
+        self,
+        operation: APIOperation,
+        response: Response,
+        *,
+        case: Case | None = None,
+    ) -> bool | None:
         __tracebackhide__ = True
         definition = operation.responses.find_by_status_code(response.status_code)
         if definition is None or definition.schema is None:
@@ -525,15 +531,17 @@ class BaseOpenAPISchema(BaseSchema):
         else:
             content_type = content_types[0]
 
+        context = deserialization.DeserializationContext(operation=operation, case=case)
+
         try:
-            data = deserialization.deserialize_response(response, content_type)
+            data = deserialization.deserialize_response(response, content_type, context=context)
         except JSONDecodeError as exc:
             failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
             _maybe_raise_one_or_more(failures)
             return None
         except NotImplementedError:
-            # If the content type is not supported, we cannot validate it
-            _maybe_raise_one_or_more(failures)
+            # No deserializer available for this media type - skip validation
+            # This is expected for many media types (images, binary formats, etc.)
             return None
         except Exception as exc:
             failures.append(

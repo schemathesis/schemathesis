@@ -434,7 +434,13 @@ class BaseSchema(Mapping):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
-    def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
+    def validate_response(
+        self,
+        operation: APIOperation,
+        response: Response,
+        *,
+        case: Case | None = None,
+    ) -> bool | None:
         raise NotImplementedError
 
     def as_strategy(
@@ -724,6 +730,42 @@ class APIOperation(Generic[P, R, S]):
             f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
         )
 
+    def validate_response(
+        self,
+        response: Response | httpx.Response | requests.Response | TestResponse,
+        *,
+        case: Case | None = None,
+    ) -> bool | None:
+        """Validate a response against the API schema.
+
+        Args:
+            response: The HTTP response to validate. Can be a `requests.Response`,
+                `httpx.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
+            case: The generated test case related to the provided response.
+
+        Raises:
+            FailureGroup: If the response does not conform to the schema.
+
+        """
+        return self.schema.validate_response(self, Response.from_any(response), case=case)
+
+    def is_valid_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool:
+        """Check if the provided response is valid against the API schema.
+
+        Args:
+            response: The HTTP response to validate. Can be a `requests.Response`,
+                `httpx.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
+
+        Returns:
+            `True` if response is valid, `False` otherwise.
+
+        """
+        try:
+            self.validate_response(response)
+            return True
+        except AssertionError:
+            return False
+
     def Case(
         self,
         *,
@@ -766,33 +808,3 @@ class APIOperation(Generic[P, R, S]):
     def operation_reference(self) -> str:
         path = self.path.replace("~", "~0").replace("/", "~1")
         return f"#/paths/{path}/{self.method}"
-
-    def validate_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool | None:
-        """Validate a response against the API schema.
-
-        Args:
-            response: The HTTP response to validate. Can be a `requests.Response`,
-                `httpx.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
-
-        Raises:
-            FailureGroup: If the response does not conform to the schema.
-
-        """
-        return self.schema.validate_response(self, Response.from_any(response))
-
-    def is_valid_response(self, response: Response | httpx.Response | requests.Response | TestResponse) -> bool:
-        """Check if the provided response is valid against the API schema.
-
-        Args:
-            response: The HTTP response to validate. Can be a `requests.Response`,
-                `httpx.Response`, `werkzeug.test.TestResponse`, or `schemathesis.Response`.
-
-        Returns:
-            `True` if response is valid, `False` otherwise.
-
-        """
-        try:
-            self.validate_response(response)
-            return True
-        except AssertionError:
-            return False

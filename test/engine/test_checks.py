@@ -792,6 +792,48 @@ def test_response_schema_conformance_references_valid(complex_schema, value, res
     test()
 
 
+def test_response_schema_conformance_custom_deserializer(openapi_30, response_factory):
+    media_type = "application/vnd.custom"
+    definition = {
+        "responses": {
+            "200": {
+                "description": "OK",
+                "content": {
+                    media_type: {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"name": {"type": "string"}, "count": {"type": "integer", "minimum": 1}},
+                            "required": ["name", "count"],
+                        }
+                    }
+                },
+            }
+        }
+    }
+    case = make_case(openapi_30, definition)
+    # Response content that violates the schema
+    response = Response.from_requests(
+        response_factory.requests(content=b"name=Alice&count=0", content_type=media_type),
+        True,
+    )
+
+    assert case.operation.validate_response(response) is None
+
+    @schemathesis.deserializer(media_type)
+    def _custom_deserializer(_ctx, http_response):
+        text = http_response.content.decode("utf-8")
+        result = {}
+        for pair in text.split("&"):
+            key, value = pair.split("=", 1)
+            # Convert count to integer for schema validation
+            result[key] = int(value) if key == "count" else value
+        return result
+
+    # With deserializer, should fail validation
+    with pytest.raises(AssertionError):
+        case.operation.validate_response(response)
+
+
 def test_deduplication(ctx, response_factory):
     # See GH-1394
     schema = ctx.openapi.build_schema(

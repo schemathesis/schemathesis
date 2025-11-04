@@ -33,6 +33,7 @@ import schemathesis.cli
 from schemathesis import auths, hooks
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
 from schemathesis.cli.commands.run.handlers import output
+from schemathesis.core import deserialization
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -69,6 +70,9 @@ output.SCHEMATHESIS_VERSION = "dev"
 
 @pytest.fixture(autouse=True)
 def reset_hooks():
+    # Store built-in deserializers to restore after test
+    builtin_deserializers = deserialization.deserializers().copy()
+
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
     auths.unregister()
@@ -82,6 +86,11 @@ def reset_hooks():
     for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
         transport.unregister_serializer(*media_types.MEDIA_TYPES.keys())
     media_types.unregister_all()
+    # Restore built-in deserializers
+    current = list(deserialization.deserializers().keys())
+    deserialization.unregister_deserializer(*current)
+    for media_type, func in builtin_deserializers.items():
+        deserialization.register_deserializer(func, media_type)
 
 
 @pytest.fixture(scope="session")
