@@ -40,6 +40,7 @@ class OpenApiLink:
     body: dict[str, Any] | NotSet
     merge_body: bool
     is_inferred: bool
+    server: dict[str, Any] | None
 
     __slots__ = (
         "name",
@@ -50,6 +51,7 @@ class OpenApiLink:
         "body",
         "merge_body",
         "is_inferred",
+        "server",
         "_cached_extract",
     )
 
@@ -82,6 +84,8 @@ class OpenApiLink:
         self.body = definition.get("requestBody", NOT_SET)
         self.merge_body = extension.get("merge_body", True) if extension else True
         self.is_inferred = extension.get("is_inferred", False) if extension else False
+        # Store link-specific server if present (OpenAPI 3.0+ feature)
+        self.server = definition.get("server")
 
         if errors:
             raise InvalidTransition(
@@ -97,6 +101,25 @@ class OpenApiLink:
     @property
     def full_name(self) -> str:
         return format_transition(self.source.label, self.status_code, self.name, self.target.label)
+
+    def get_target_base_url(self) -> str | None:
+        """Get the base URL for the target operation, respecting link server override.
+
+        According to OpenAPI 3.0+, a Link object can specify a server that overrides
+        the target operation's server configuration.
+
+        Returns:
+            The base URL to use for the target operation, or None to use default
+
+        """
+        if self.server:
+            # Link has its own server - format and return it
+            from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
+            assert isinstance(self.source.schema, BaseOpenAPISchema)
+            return self.source.schema._format_server_url(self.server)
+        # Otherwise use target operation's base_url
+        return self.target.base_url
 
     def _normalize_parameters(
         self, parameters: dict[str, str], errors: list[TransitionValidationError]

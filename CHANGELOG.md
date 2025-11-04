@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- OpenAPI 3.0+ server overriding at operation, path, and link levels with variable substitution. [#603](https://github.com/schemathesis/schemathesis/issues/603)
 - Support for custom content types in `multipart/form-data` encoding via OpenAPI's `encoding` property. [#697](https://github.com/schemathesis/schemathesis/issues/697)
 - Option to make warnings cause test failures via `fail-on` in warnings configuration. [#2956](https://github.com/schemathesis/schemathesis/issues/2956)
 

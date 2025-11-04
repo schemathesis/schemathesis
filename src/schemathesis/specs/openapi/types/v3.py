@@ -14,6 +14,22 @@ class Example(TypedDict):
     externalValue: NotRequired[str]
 
 
+class ServerVariable(TypedDict):
+    """OpenAPI 3.x server variable with default value."""
+
+    default: str
+    enum: NotRequired[list[str]]
+    description: NotRequired[str]
+
+
+class Server(TypedDict):
+    """OpenAPI 3.x server definition."""
+
+    url: str
+    description: NotRequired[str]
+    variables: NotRequired[dict[str, ServerVariable]]
+
+
 class MediaType(TypedDict):
     schema: SchemaOrRef
     example: NotRequired[Any]
@@ -24,7 +40,7 @@ class Link(TypedDict):
     operationRef: NotRequired[str]
     parameters: NotRequired[dict[str, Any]]
     requestBody: NotRequired[Any]
-    server: NotRequired[Any]
+    server: NotRequired[Server]
 
 
 class Header(TypedDict):
@@ -121,6 +137,24 @@ class Operation(TypedDict):
     responses: Responses
     requestBody: NotRequired[RequestBodyOrRef]
     parameters: NotRequired[list[Parameter]]
+    servers: NotRequired[list[Server]]
+
+
+class PathItem(TypedDict, total=False):
+    """OpenAPI 3.x path item with optional server overrides."""
+
+    summary: str
+    description: str
+    servers: list[Server]
+    parameters: list[Parameter]
+    get: Operation
+    put: Operation
+    post: Operation
+    delete: Operation
+    options: Operation
+    head: Operation
+    patch: Operation
+    trace: Operation
 
 
 # Security parameter types

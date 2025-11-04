@@ -18,7 +18,7 @@ from typing import (
     Sequence,
     cast,
 )
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import jsonschema
 from packaging import version
@@ -100,6 +100,24 @@ class BaseOpenAPISchema(BaseSchema):
 
     @cached_property
     def default_media_types(self) -> list[str]:
+        raise NotImplementedError
+
+    def _format_server_url(self, server: dict[str, Any]) -> str:
+        """Format server URL with variable substitution.
+
+        To be implemented by subclasses.
+        """
+        raise NotImplementedError
+
+    def _resolve_operation_base_url(
+        self,
+        operation_definition: Mapping[str, Any],
+        path_item: Mapping[str, Any],
+    ) -> str | None:
+        """Resolve base URL following server override precedence.
+
+        To be implemented by subclasses.
+        """
         raise NotImplementedError
 
     def _get_operation_map(self, path: str) -> APIOperationMap:
@@ -294,6 +312,7 @@ class BaseOpenAPISchema(BaseSchema):
                                 parameters,
                                 entry,
                                 scope,
+                                path_item,
                             )
                             yield Ok(operation)
                         except SCHEMA_PARSING_ERRORS as exc:
@@ -376,9 +395,14 @@ class BaseOpenAPISchema(BaseSchema):
         parameters: list[OperationParameter],
         definition: dict[str, Any],
         scope: str,
+        path_item: Mapping[str, Any] | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
-        base_url = self.get_base_url()
+        # Resolve base URL with server override precedence (operation > path > schema)
+        if path_item is not None:
+            base_url = self._resolve_operation_base_url(definition, path_item)
+        else:
+            base_url = self.get_base_url()
         responses = self._parse_responses(definition, scope)
         security = self._parse_security(definition)
         operation: APIOperation[OperationParameter, ResponsesContainer, OpenApiSecurityParameters] = APIOperation(
@@ -619,7 +643,7 @@ class MethodMap(Mapping):
                 parameters = schema._iter_parameters(operation, self._path_item.get("parameters", []))
             except SCHEMA_PARSING_ERRORS as exc:
                 schema._raise_invalid_schema(exc, path, method)
-        return schema.make_operation(path, method, parameters, operation, scope)
+        return schema.make_operation(path, method, parameters, operation, scope, self._path_item)
 
     def __getitem__(self, item: str) -> APIOperation:
         try:
@@ -651,6 +675,27 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
+
+    def _format_server_url(self, server: dict[str, Any]) -> str:
+        """Format server URL with variable substitution.
+
+        Swagger 2.0 doesn't use server objects, so this is a no-op placeholder
+        that will be overridden by OpenAPI 3.0.
+        """
+        return self.get_base_url()
+
+    def _resolve_operation_base_url(
+        self,
+        operation_definition: Mapping[str, Any],
+        path_item: Mapping[str, Any],
+    ) -> str | None:
+        """Resolve base URL for operation.
+
+        Swagger 2.0 doesn't support server overrides at operation or path level,
+        so this just returns the schema-level base URL. OpenAPI 3.0 overrides
+        this method to implement the server override hierarchy.
+        """
+        return self.get_base_url()
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -772,6 +817,93 @@ class OpenApi30(SwaggerV20):
             url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
             return urlsplit(url).path
         return "/"
+
+    def _format_server_url(self, server: dict[str, Any]) -> str:
+        """Format server URL with variable substitution.
+
+        Args:
+            server: Server object from OpenAPI spec with 'url' and optional 'variables'
+
+        Returns:
+            Formatted server URL with variables replaced by their defaults
+
+        """
+        url = server["url"]
+        if "variables" in server:
+            try:
+                url = url.format(**{k: v["default"] for k, v in server["variables"].items()})
+            except KeyError as e:
+                from schemathesis.core.errors import InvalidSchema
+
+                raise InvalidSchema(
+                    f"Server variable '{e.args[0]}' is missing required 'default' field in server: {server['url']}"
+                ) from e
+        return url
+
+    def _resolve_operation_base_url(
+        self,
+        operation_definition: Mapping[str, Any],
+        path_item: Mapping[str, Any],
+    ) -> str | None:
+        """Resolve base URL following OpenAPI server override precedence.
+
+        Precedence: Config > Operation servers > Path servers > Location-based > Schema servers
+
+        When a schema is loaded from a URL (via from_url), the location is used to derive
+        the base URL before falling back to schema-level servers. This ensures that tests
+        loading schemas from local servers work correctly.
+
+        Args:
+            operation_definition: The operation object from the OpenAPI spec
+            path_item: The path item object containing this operation
+
+        Returns:
+            Resolved base URL or None to use default
+
+        """
+        # 0. Check if config explicitly sets base_url (highest priority)
+        if self.config.base_url is not None:
+            return self.config.base_url.rstrip("/")
+
+        # 1. Check operation-level servers
+        if "servers" in operation_definition:
+            servers = operation_definition["servers"]
+            if servers:
+                return self._format_server_url(servers[0])
+
+        # 2. Check path-level servers
+        if "servers" in path_item:
+            servers = path_item["servers"]
+            if servers:
+                return self._format_server_url(servers[0])
+
+        # 3. Check location-based URL (from from_url/from_path)
+        # When schema is loaded from a URL, use that URL's host/port but preserve
+        # the path from schema servers if present. This supports test servers that
+        # differ from production servers in the schema.
+        if self.location:
+            # For OpenAPI 3.0+, check if schema has servers with a path component
+            schema_servers = self.raw_schema.get("servers", [])
+            if schema_servers:
+                # Extract path from first schema server URL
+                server_url = self._format_server_url(schema_servers[0])
+                server_parts = urlsplit(server_url)
+                path = server_parts.path or "/"
+            else:
+                # No schema servers, use base path
+                path = self._get_base_path()
+
+            # Combine location's scheme/netloc with path from schema
+            parts = urlsplit(self.location)[:2] + (path, "", "")
+            return urlunsplit(parts)
+
+        # 4. Check schema-level servers
+        schema_servers = self.raw_schema.get("servers", [])
+        if schema_servers:
+            return self._format_server_url(schema_servers[0])
+
+        # 5. Fall back to default base URL construction
+        return self.get_base_url()
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
