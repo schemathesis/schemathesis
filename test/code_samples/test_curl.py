@@ -1,4 +1,5 @@
 import pytest
+from _pytest.main import ExitCode
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
@@ -76,7 +77,7 @@ def test_explicit_headers(curl):
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
 def test_cli_output(cli, base_url, schema_url, curl):
-    result = cli.run(schema_url)
+    result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
     lines = result.stdout.splitlines()
     assert "Reproduce with: " in lines
     line = f"    curl -X GET {base_url}/failure"
@@ -88,7 +89,7 @@ def test_cli_output(cli, base_url, schema_url, curl):
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
 def test_cli_output_includes_insecure(cli, base_url, schema_url, curl):
-    result = cli.run(schema_url, "--tls-verify=false")
+    result = cli.run_and_assert(schema_url, "--tls-verify=false", exit_code=ExitCode.TESTS_FAILED)
     lines = result.stdout.splitlines()
     line = f"    curl -X GET --insecure {base_url}/failure"
     assert line in lines

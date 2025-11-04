@@ -35,7 +35,7 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
             }
         }
     )
-    result = cli.run(
+    cli.run_and_assert(
         str(schema_path),
         f"--url={openapi3_base_url}",
         "--checks",
@@ -43,8 +43,8 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
         "--mode",
         "negative",
         "--max-examples=5",
+        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert result.exit_code == ExitCode.TESTS_FAILED
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

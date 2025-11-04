@@ -14,10 +14,7 @@ fail-on = true
     monkeypatch.chdir(tmp_path)
 
     # When running tests without proper auth (will trigger missing_auth warning)
-    result = cli.run(schema_url)
-
-    # Then the test should fail (exit code 1)
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
     # And warnings should be displayed
     assert "WARNINGS" in result.stdout
     assert "Authentication failed" in result.stdout
@@ -35,10 +32,7 @@ fail-on = ["missing_auth"]
     monkeypatch.chdir(tmp_path)
 
     # When running tests without proper auth (will trigger missing_auth warning)
-    result = cli.run(schema_url)
-
-    # Then the test should fail (exit code 1)
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
     # And warnings should be displayed
     assert "WARNINGS" in result.stdout
     assert "Authentication failed" in result.stdout
