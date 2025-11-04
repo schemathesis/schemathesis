@@ -146,6 +146,7 @@ class CoverageContext:
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema.protocols.Validator]
     _resolver: RefResolver | None
+    allow_extra_parameters: bool
 
     __slots__ = (
         "root_schema",
@@ -157,6 +158,7 @@ class CoverageContext:
         "custom_formats",
         "validator_cls",
         "_resolver",
+        "allow_extra_parameters",
     )
 
     def __init__(
@@ -171,6 +173,7 @@ class CoverageContext:
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema.protocols.Validator],
         _resolver: RefResolver | None = None,
+        allow_extra_parameters: bool = True,
     ) -> None:
         self.root_schema = root_schema
         self.location = location
@@ -181,6 +184,7 @@ class CoverageContext:
         self.custom_formats = custom_formats
         self.validator_cls = validator_cls
         self._resolver = _resolver
+        self.allow_extra_parameters = allow_extra_parameters
 
     @property
     def resolver(self) -> RefResolver:
@@ -217,6 +221,7 @@ class CoverageContext:
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
             _resolver=self._resolver,
+            allow_extra_parameters=self.allow_extra_parameters,
         )
 
     def with_negative(self) -> CoverageContext:
@@ -230,6 +235,7 @@ class CoverageContext:
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
             _resolver=self._resolver,
+            allow_extra_parameters=self.allow_extra_parameters,
         )
 
     def is_valid_for_location(self, value: Any) -> bool:
@@ -737,6 +743,12 @@ def cover_schema_iter(
                     and "pattern" not in schema
                     and schema.get("type") in ["object", None]
                 ):
+                    if not ctx.allow_extra_parameters and ctx.location in (
+                        ParameterLocation.QUERY,
+                        ParameterLocation.HEADER,
+                        ParameterLocation.COOKIE,
+                    ):
+                        continue
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield NegativeValue(
                         {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},

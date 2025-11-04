@@ -18,6 +18,8 @@ class GenerationConfig(DiffBase):
     deterministic: bool
     # Allow generating `\x00` bytes in strings
     allow_x00: bool
+    # Allow generating unexpected parameters in generated requests
+    allow_extra_parameters: bool
     # Generate strings using the given codec
     codec: str | None
     maximize: list[MetricFunction]
@@ -35,6 +37,7 @@ class GenerationConfig(DiffBase):
         "no_shrink",
         "deterministic",
         "allow_x00",
+        "allow_extra_parameters",
         "codec",
         "maximize",
         "with_security_parameters",
@@ -52,6 +55,7 @@ class GenerationConfig(DiffBase):
         no_shrink: bool = False,
         deterministic: bool = False,
         allow_x00: bool = True,
+        allow_extra_parameters: bool = True,
         codec: str | None = "utf-8",
         maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool = True,
@@ -67,6 +71,7 @@ class GenerationConfig(DiffBase):
         self.no_shrink = no_shrink
         self.deterministic = deterministic
         self.allow_x00 = allow_x00
+        self.allow_extra_parameters = allow_extra_parameters
         self.codec = codec
         self.maximize = maximize or []
         self.with_security_parameters = with_security_parameters
@@ -91,6 +96,7 @@ class GenerationConfig(DiffBase):
             no_shrink=data.get("no-shrink", False),
             deterministic=data.get("deterministic", False),
             allow_x00=data.get("allow-x00", True),
+            allow_extra_parameters=data.get("allow-extra-parameters", True),
             codec=data.get("codec", "utf-8"),
             maximize=maximize,
             with_security_parameters=data.get("with-security-parameters", True),
@@ -108,6 +114,7 @@ class GenerationConfig(DiffBase):
         no_shrink: bool | None = None,
         deterministic: bool | None = None,
         allow_x00: bool | None = None,
+        allow_extra_parameters: bool | None = None,
         codec: str | None = None,
         maximize: list[MetricFunction] | None = None,
         with_security_parameters: bool | None = None,
@@ -123,6 +130,7 @@ class GenerationConfig(DiffBase):
         self.no_shrink = no_shrink or False
         self.deterministic = deterministic or False
         self.allow_x00 = allow_x00 if allow_x00 is not None else True
+        self.allow_extra_parameters = allow_extra_parameters if allow_extra_parameters is not None else True
         if codec is not None:
             self.codec = codec
         if maximize is not None:

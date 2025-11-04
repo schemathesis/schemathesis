@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from unittest.mock import ANY
 
@@ -8,6 +10,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.coverage import (
     CoverageContext,
+    CoverageScenario,
     GeneratedValue,
     _positive_number,
     _positive_string,
@@ -66,41 +69,41 @@ def assert_not_conform(values: list, schema: dict):
 
 
 @pytest.fixture
-def ctx():
-    return CoverageContext(
-        root_schema={},
-        location=ParameterLocation.QUERY,
-        media_type=None,
-        is_required=True,
-        custom_formats=get_default_format_strategies(),
-        validator_cls=jsonschema.validators.Draft202012Validator,
-    )
+def ctx_factory():
+    def _factory(
+        *,
+        location: ParameterLocation = ParameterLocation.QUERY,
+        generation_modes: list[GenerationMode] | None = None,
+        is_required: bool = True,
+        allow_extra_parameters: bool = True,
+    ) -> CoverageContext:
+        return CoverageContext(
+            root_schema={},
+            location=location,
+            media_type=None,
+            generation_modes=generation_modes,
+            is_required=is_required,
+            custom_formats=get_default_format_strategies(),
+            validator_cls=jsonschema.validators.Draft202012Validator,
+            allow_extra_parameters=allow_extra_parameters,
+        )
+
+    return _factory
 
 
 @pytest.fixture
-def pctx():
-    return CoverageContext(
-        root_schema={},
-        location=ParameterLocation.QUERY,
-        media_type=None,
-        generation_modes=[GenerationMode.POSITIVE],
-        is_required=True,
-        custom_formats=get_default_format_strategies(),
-        validator_cls=jsonschema.validators.Draft202012Validator,
-    )
+def ctx(ctx_factory):
+    return ctx_factory()
 
 
 @pytest.fixture
-def nctx():
-    return CoverageContext(
-        root_schema={},
-        location=ParameterLocation.QUERY,
-        media_type=None,
-        generation_modes=[GenerationMode.NEGATIVE],
-        is_required=True,
-        custom_formats=get_default_format_strategies(),
-        validator_cls=jsonschema.validators.Draft202012Validator,
-    )
+def pctx(ctx_factory):
+    return ctx_factory(generation_modes=[GenerationMode.POSITIVE])
+
+
+@pytest.fixture
+def nctx(ctx_factory):
+    return ctx_factory(generation_modes=[GenerationMode.NEGATIVE])
 
 
 @pytest.mark.parametrize(
@@ -170,6 +173,22 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         assert covered == expected
     assert_unique(covered)
     assert_not_conform(covered, schema)
+
+
+@pytest.mark.parametrize("allow_extra_parameters", [True, False])
+def test_query_unexpected_parameters_control(ctx_factory, allow_extra_parameters):
+    schema = {
+        "type": "object",
+        "properties": {"token": {"type": "string"}},
+        "required": ["token"],
+        "additionalProperties": False,
+    }
+    ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE], allow_extra_parameters=allow_extra_parameters)
+    scenarios = {value.scenario for value in cover_schema_iter(ctx, schema) if isinstance(value, GeneratedValue)}
+    if allow_extra_parameters:
+        assert CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES in scenarios
+    else:
+        assert CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES not in scenarios
 
 
 @pytest.mark.parametrize(

@@ -120,7 +120,13 @@ def negative_schema(
             .map(lambda value: GeneratedValue(value, metadata))
         )
 
-    return mutated(keywords, non_keywords, location, media_type).flatmap(generate_value_with_metadata)
+    return mutated(
+        keywords=keywords,
+        non_keywords=non_keywords,
+        location=location,
+        media_type=media_type,
+        allow_extra_parameters=generation_config.allow_extra_parameters,
+    ).flatmap(generate_value_with_metadata)
 
 
 def is_non_empty_query(query: dict[str, Any]) -> bool:
@@ -142,8 +148,18 @@ def is_non_empty_query(query: dict[str, Any]) -> bool:
 
 @st.composite  # type: ignore[misc]
 def mutated(
-    draw: Draw, keywords: Schema, non_keywords: Schema, location: ParameterLocation, media_type: str | None
+    draw: Draw,
+    *,
+    keywords: Schema,
+    non_keywords: Schema,
+    location: ParameterLocation,
+    media_type: str | None,
+    allow_extra_parameters: bool,
 ) -> Any:
     return MutationContext(
-        keywords=keywords, non_keywords=non_keywords, location=location, media_type=media_type
+        keywords=keywords,
+        non_keywords=non_keywords,
+        location=location,
+        media_type=media_type,
+        allow_extra_parameters=allow_extra_parameters,
     ).mutate(draw)
