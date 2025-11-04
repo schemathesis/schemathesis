@@ -29,6 +29,8 @@ Missing Open API links
 
 All link definitions required for stateful testing are excluded by filters
 
+Learn how to define links: https://schemathesis.readthedocs.io/en/stable/guides/stateful-testing/
+
 Tip: Review your endpoint filters to include linked operations
 
 Need more help?

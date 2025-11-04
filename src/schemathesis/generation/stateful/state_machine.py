@@ -11,7 +11,7 @@ from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
-from schemathesis.core.errors import NoLinksFound
+from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
 from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -163,6 +163,7 @@ class APIStateMachine(RuleBasedStateMachine):
                     message = "Schema contains no link definitions required for stateful testing"
                 else:
                     message = "All link definitions required for stateful testing are excluded by filters"
+                message += f"\n\nLearn how to define links: {STATEFUL_TESTING_GUIDE_URL}"
                 raise NoLinksFound(message) from None
             raise
         self.setup()
