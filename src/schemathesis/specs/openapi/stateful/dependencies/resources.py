@@ -94,12 +94,17 @@ def iter_resources_from_response(
     parent_ref = schema.get("$ref")
     _, resolved = maybe_resolve(schema, resolver, "")
 
-    # Sometimes data is wrapped in `data` field
+    # Sometimes data is wrapped in a single wrapper field
+    # Common patterns: {data: {...}}, {result: {...}}, {response: {...}}
     pointer = None
     properties = resolved.get("properties", {})
-    if properties and list(properties) == ["data"]:
-        pointer = "/data"
-        resolved = properties["data"]
+    if properties and len(properties) == 1:
+        wrapper_field = list(properties)[0]
+        # Check if it's a known wrapper field name
+        common_wrappers = {"data", "result", "response", "payload"}
+        if wrapper_field.lower() in common_wrappers:
+            pointer = f"/{wrapper_field}"
+            resolved = properties[wrapper_field]
 
     resolved = try_unwrap_composition(resolved, resolver)
 

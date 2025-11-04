@@ -1,0 +1,68 @@
+{
+  "operations": {
+    "DELETE /conversations/{conversation_id}/members/{member_id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "conversation_id",
+          "resource": "Conversation",
+          "resource_field": "uuid"
+        },
+        {
+          "parameter_location": "path",
+          "parameter_name": "member_id",
+          "resource": "Member",
+          "resource_field": "member_id"
+        }
+      ],
+      "outputs": []
+    },
+    "GET /conversations": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/_embedded/conversations",
+          "resource": "Conversation",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Conversation": {
+      "fields": [
+        "_links",
+        "name",
+        "uuid"
+      ],
+      "types": {
+        "_links": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "name": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "uuid": [
+          "string"
+        ]
+      }
+    },
+    "Member": {
+      "fields": [
+        "member_id"
+      ],
+      "types": {}
+    }
+  }
+}
