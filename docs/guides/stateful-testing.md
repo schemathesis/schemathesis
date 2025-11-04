@@ -17,8 +17,8 @@ This can happen in three ways:
 
 If none of these mechanisms applies, the stateful phase has nothing to execute (see [Running stateful tests from the CLI](#running-stateful-tests-from-the-cli) for details). Add explicit links (see below) or adjust the schema so automatic inference becomes possible.
 
-!!! warning
-    Automatic analysis and `Location` header inference currently run only in the CLI. When you construct a state machine in Python or pytest (`schema.as_state_machine()`), ensure the schema already contains explicit links.
+!!! info
+    Automatic dependency analysis runs automatically when you call `schema.as_state_machine()` in Python or pytest, respecting your configuration settings. `Location` header inference still requires the CLI, as it needs to collect headers from test runs.
 
 ## Why Customize Stateful Testing?
 
