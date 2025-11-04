@@ -170,6 +170,8 @@ def worker_task(
                     ):
                         continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation)
+                    scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
+                    events_queue.put(scenario_started)
                     try:
                         test_function = create_test(
                             operation=operation,
@@ -190,7 +192,12 @@ def worker_task(
                     # executing. However, as we set a stop event, it will be checked before the next network request.
                     # However, this is still suboptimal, as there could be slow requests and they will block for longer
                     for event in run_test(
-                        operation=operation, test_function=test_function, ctx=ctx, phase=phase, suite_id=suite_id
+                        operation=operation,
+                        test_function=test_function,
+                        ctx=ctx,
+                        phase=phase,
+                        suite_id=suite_id,
+                        scenario_id=scenario_started.id,
                     ):
                         events_queue.put(event)
                 else:

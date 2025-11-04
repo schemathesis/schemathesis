@@ -15,6 +15,7 @@
 - Curl commands with non-printable characters now use shell-aware escaping and display warnings for unknown shells. [#2159](https://github.com/schemathesis/schemathesis/issues/2159)
 - Internal error when the coverage phase generates data not serializable into media type registered via `schemathesis.openapi.media_type`.
 - Internal error when negative testing encounters schemas with bundled references.
+- CLI now starts displaying the current operation as soon as execution begins, preventing the blank progress window most noticeable during the coverage phase.
 
 ### :wrench: Changed
 
