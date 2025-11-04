@@ -19,6 +19,7 @@ nav:
       - guides/python-apps.md
       - guides/custom-media-types.md
       - guides/custom-serializers.md
+      - guides/custom-response-deserializers.md
       - guides/graphql-custom-scalars.md
       - guides/extending.md
       - guides/extending-cli.md

@@ -205,7 +205,7 @@ def response_schema_conformance(ctx: CheckContext, response: Response, case: Cas
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
-    return case.operation.validate_response(response)
+    return case.operation.validate_response(response, case=case)
 
 
 @schemathesis.check

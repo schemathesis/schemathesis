@@ -7,6 +7,7 @@
 - Support for custom content types in `multipart/form-data` encoding via OpenAPI's `encoding` property. [#697](https://github.com/schemathesis/schemathesis/issues/697)
 - Option to make warnings cause test failures via `fail-on` in warnings configuration. [#2956](https://github.com/schemathesis/schemathesis/issues/2956)
 - The `generation.allow-extra-parameters` config option to control whether Schemathesis generates unexpected query, header, or cookie parameters in negative testing (set to `false` to skip them entirely).
+- Response deserializer hook for non-JSON schema conformance checks (`schemathesis.deserializer`). [#2934](https://github.com/schemathesis/schemathesis/issues/2934)
 
 ### :bug: Fixed
 
