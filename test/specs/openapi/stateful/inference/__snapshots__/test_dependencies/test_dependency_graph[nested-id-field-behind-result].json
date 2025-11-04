@@ -1,0 +1,49 @@
+{
+  "operations": {
+    "GET /balances/{id}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "BalanceResponse",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/result",
+          "resource": "BalanceResponse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /balances": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/result",
+          "resource": "BalanceResponse",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "BalanceResponse": {
+      "fields": [
+        "amount",
+        "id"
+      ],
+      "types": {
+        "amount": [
+          "number"
+        ],
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

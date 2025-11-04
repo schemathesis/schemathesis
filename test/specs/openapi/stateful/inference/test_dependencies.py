@@ -1435,6 +1435,75 @@ def snapshot_json(snapshot):
             None,
             id="query-parameter-consumer",
         ),
+        pytest.param(
+            {
+                **operation(
+                    "get",
+                    "/conversations",
+                    "200",
+                    {
+                        "properties": {
+                            "_embedded": {
+                                "properties": {
+                                    "conversations": {
+                                        "items": {
+                                            "properties": {
+                                                "_links": {},
+                                                "name": {},
+                                                "uuid": {"type": "string"},
+                                            }
+                                        },
+                                        "type": "array",
+                                    }
+                                }
+                            }
+                        }
+                    },
+                ),
+                **operation(
+                    "delete",
+                    "/conversations/{conversation_id}/members/{member_id}",
+                    "200",
+                    parameters=[
+                        path_param("conversation_id"),
+                        path_param("member_id"),
+                    ],
+                ),
+            },
+            None,
+            id="id-synonym-uuid-field-matching",
+        ),
+        pytest.param(
+            {
+                **operation("post", "/balances", "201", component_ref("BalanceResponse")),
+                **operation(
+                    "get",
+                    "/balances/{id}",
+                    "200",
+                    component_ref("BalanceResponse"),
+                    [path_param("id")],
+                ),
+            },
+            {
+                "schemas": {
+                    "BalanceResponse": {
+                        "type": "object",
+                        "properties": {
+                            "result": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "amount": {"type": "number"},
+                                },
+                                "required": ["id"],
+                            }
+                        },
+                        "required": ["result"],
+                    }
+                }
+            },
+            id="nested-id-field-behind-result",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):
