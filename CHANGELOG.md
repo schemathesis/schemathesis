@@ -9,6 +9,7 @@
 - The `generation.allow-extra-parameters` config option to control whether Schemathesis generates unexpected query, header, or cookie parameters in negative testing (set to `false` to skip them entirely).
 - Response deserializer hook for non-JSON schema conformance checks (`schemathesis.deserializer`). [#2934](https://github.com/schemathesis/schemathesis/issues/2934)
 - Automatic dependency inference in Python stateful tests via `schema.as_state_machine()`.
+- `schemathesis.serializer.alias()` to reuse built-in serializers (YAML, JSON, XML) for custom media types without reimplementing them. [#2952](https://github.com/schemathesis/schemathesis/issues/2952)
 
 ### :bug: Fixed
 
