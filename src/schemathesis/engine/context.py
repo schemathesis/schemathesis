@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -12,11 +13,10 @@ from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
 
 if TYPE_CHECKING:
-    import threading
-
     import requests
 
     from schemathesis.engine.recorder import ScenarioRecorder
+    from schemathesis.resources import ExtraDataSource
 
 
 @dataclass
@@ -37,6 +37,8 @@ class EngineContext:
         "observations",
         "_session",
         "_transport_kwargs_cache",
+        "_extra_data_source",
+        "_extra_data_source_lock",
     )
 
     def __init__(
@@ -54,6 +56,8 @@ class EngineContext:
         self.observations = observations
         self._session = session
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
+        self._extra_data_source: ExtraDataSource | None = None
+        self._extra_data_source_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -150,3 +154,17 @@ class EngineContext:
             kwargs["proxies"] = {"all": proxy}
         self._transport_kwargs_cache[key] = kwargs
         return kwargs
+
+    @property
+    def extra_data_source(self) -> ExtraDataSource | None:
+        """Extra data source for augmenting test generation with real data.
+
+        Lazily initialized to support per-operation configuration overrides.
+        """
+        # First check without lock (fast path for already initialized)
+        if self._extra_data_source is None:
+            with self._extra_data_source_lock:
+                # Double-check pattern: another thread might have initialized it while we waited for the lock
+                if self._extra_data_source is None:
+                    self._extra_data_source = self.schema.create_extra_data_source()
+        return self._extra_data_source

@@ -304,6 +304,26 @@ def run_test(
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
 
+    # Collect successful responses to use in subsequent test generation
+    # In the future, collecting unsuccessful responses also could be useful
+    # to understand if some generated data is always rejected
+    phases_config = ctx.config.phases_for(operation=operation)
+    fuzzing_config = phases_config.fuzzing
+    # Record responses from ALL phases (examples, coverage, fuzzing) when fuzzing uses extra data sources.
+    # This creates a feedback loop: earlier phases discover valid IDs/tokens, fuzzing reuses them to test
+    # dependent operations. For example, POST /users creates user IDs that GET /users/{id} can reference.
+    extra_data_source = (
+        ctx.extra_data_source if fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled else None
+    )
+    if status == Status.SUCCESS and extra_data_source is not None:
+        if extra_data_source.should_record(operation=operation.label):
+            for case_id, interaction in recorder.interactions.items():
+                response = interaction.response
+                if response is None:
+                    continue
+                case = recorder.cases[case_id].value
+                extra_data_source.record_response(operation=operation, response=response, case=case)
+
     yield scenario_finished(status)
 
 

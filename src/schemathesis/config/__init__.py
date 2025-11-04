@@ -23,6 +23,7 @@ from schemathesis.config._output import OutputConfig, SanitizationConfig, Trunca
 from schemathesis.config._phases import (
     CoveragePhaseConfig,
     ExamplesPhaseConfig,
+    ExtraDataSourcesConfig,
     FuzzingPhaseConfig,
     InferenceAlgorithm,
     OperationOrdering,
@@ -60,6 +61,7 @@ __all__ = [
     "CoveragePhaseConfig",
     "ExamplesPhaseConfig",
     "StatefulPhaseConfig",
+    "ExtraDataSourcesConfig",
     "InferenceAlgorithm",
     "OperationOrdering",
     "ProjectsConfig",

@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - **CLI**: Dependency-based operation ordering in non-stateful tests.
+- **CLI**: Capture and reuse of successful API responses in the fuzzing phase.
 
 ## [4.5.4](https://github.com/schemathesis/schemathesis/compare/v4.5.3...v4.5.4) - 2025-11-18
 

@@ -9,6 +9,7 @@ from typing import Any, TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer
+from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 
@@ -240,13 +241,6 @@ class NormalizedLink:
     request_body: Any
 
     __slots__ = ("path", "method", "parameters", "request_body")
-
-
-class Cardinality(str, enum.Enum):
-    """Whether there is one or many resources in a slot."""
-
-    ONE = "ONE"
-    MANY = "MANY"
 
 
 @dataclass

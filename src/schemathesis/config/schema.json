@@ -375,6 +375,9 @@
         "operation-ordering": {
           "type": "string",
           "enum": ["auto", "none"]
+        },
+        "extra-data-sources": {
+          "$ref": "#/$defs/ExtraDataSourcesConfig"
         }
       }
     },
@@ -463,6 +466,15 @@
         "operation-ordering": {
           "type": "string",
           "enum": ["auto", "none"]
+        }
+      }
+    },
+    "ExtraDataSourcesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "responses": {
+          "type": "boolean"
         }
       }
     },

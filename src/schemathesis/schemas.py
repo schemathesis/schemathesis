@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext
     from schemathesis.core import Specification
     from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.resources import ExtraDataSource
 
 
 @lru_cache
@@ -442,6 +443,15 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
+        raise NotImplementedError
+
+    def create_extra_data_source(self) -> ExtraDataSource | None:
+        """Create an extra data source for augmenting test generation with real data.
+
+        Returns:
+            ExtraDataSource instance or None if not supported by this schema type.
+
+        """
         raise NotImplementedError
 
     def validate_response(

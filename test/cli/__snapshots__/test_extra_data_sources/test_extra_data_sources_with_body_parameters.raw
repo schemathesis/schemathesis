@@ -1,0 +1,89 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+     Configuration:    /tmp/config.toml
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ 1 passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+_________________________________ POST /tasks __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    'title' is a required property
+
+    Schema:
+
+        {
+            "required": [
+                "id",
+                "project_id",
+                "title"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "project_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        }
+
+    Value:
+
+        {
+            "id": "e32ab85ed4634c38a320eb0b22460da9",
+            "project_id": "e32ab85ed4634c38a320eb0b22460da9"
+        }
+
+[201] Created:
+
+    `{"id":"e32ab85ed4634c38a320eb0b22460da9","project_id":"e32ab85ed4634c38a320eb0b22460da9"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Response violates schema: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================
