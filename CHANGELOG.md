@@ -17,6 +17,11 @@
 ### :wrench: Changed
 
 - Custom media type strategies now support wildcard patterns (e.g., `image/*`) for all request body types, not just multipart encoding.
+- Improved the missing-links error message to point directly to the stateful testing guide.
+
+### :memo: Documentation
+
+- Expanded the stateful testing guide with detailed link examples, troubleshooting tips, and CLI behaviour notes.
 
 ## [4.3.18](https://github.com/schemathesis/schemathesis/compare/v4.3.17...v4.3.18) - 2025-11-02
 
