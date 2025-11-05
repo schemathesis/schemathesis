@@ -11,7 +11,7 @@ def test_missing_deserializer_warning_properties():
     )
 
     assert warning.kind == SchemathesisWarning.MISSING_DESERIALIZER
-    assert warning.message == "Response 200 with structured schema has no deserializer for application/msgpack"
+    assert warning.message == "Cannot validate response 200: no deserializer registered for application/msgpack"
 
 
 def test_detect_missing_deserializers_with_custom_media_type(ctx):
@@ -180,6 +180,41 @@ def test_detect_missing_deserializers_array_type(ctx):
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["GET"]
 
+    warnings = detect_missing_deserializers(operation)
+
+    assert len(warnings) == 1
+    assert warnings[0].content_type == "application/msgpack"
+
+
+def test_detect_missing_deserializers_with_malformed_media_type(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                # Malformed media type (missing subtype)
+                                "invalid-media-type": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                },
+                                # Valid media type without deserializer
+                                "application/msgpack": {
+                                    "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/users"]["GET"]
+
+    # Should not raise exception and should only warn about the valid media type
     warnings = detect_missing_deserializers(operation)
 
     assert len(warnings) == 1

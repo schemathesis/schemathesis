@@ -1308,7 +1308,7 @@ class OutputHandler(EventHandler):
             suffix = "" if total == 1 else "s"
             click.echo(
                 _style(
-                    f"Missing deserializer: {total} operation{suffix} with structured schemas lack deserializers for custom media types\n",
+                    f"Schema validation skipped: {total} operation{suffix} cannot validate responses due to missing deserializers\n",
                     fg="yellow",
                 )
             )
@@ -1329,7 +1329,9 @@ class OutputHandler(EventHandler):
                 click.echo(_style(f"  + {extra_count} more", fg="yellow"))
 
             click.echo()
-            click.echo(_style("💡 Register a deserializer with @schemathesis.deserializer()", fg="yellow"))
+            click.echo(
+                _style("💡 Register a deserializer with @schemathesis.deserializer() to enable validation", fg="yellow")
+            )
             click.echo()
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
@@ -1633,7 +1635,7 @@ class OutputHandler(EventHandler):
                 suffix = "" if count == 1 else "s"
                 click.echo(
                     _style(
-                        f"  ⚠️ Missing deserializer: {bold(str(count))} operation{suffix} with structured schemas lack deserializers",
+                        f"  ⚠️ Schema validation skipped: {bold(str(count))} operation{suffix} cannot validate responses",
                         fg="yellow",
                     )
                 )
