@@ -10,6 +10,10 @@
 
 - Faster CLI startup by lazy-loading Hypothesis only when running tests, not during help display or schema validation.
 
+### :wrench: Changed
+
+- Colorized the help output for `schemathesis` and `schemathesis run` to improve readability in terminals.
+
 ## [4.4.0](https://github.com/schemathesis/schemathesis/compare/v4.3.18...v4.4.0) - 2025-11-05
 
 ### :rocket: Added

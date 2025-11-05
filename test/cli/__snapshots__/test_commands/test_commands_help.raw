@@ -8,8 +8,9 @@ Usage: schemathesis [OPTIONS] COMMAND [ARGS]...
 Options:
   --config-file PATH  The path to `schemathesis.toml` file to use for
                       configuration
+  --no-color          Disable colored output
   --version           Show the version and exit.
-  -h, --help          Show this message and exit.
+  -h, --help          Show this message and exit
 
 Commands:
   run  Execute automated tests based on API specifications
