@@ -1,8 +1,6 @@
 # Schemathesis
 
-> **Catch API bugs before your users do.** 
-
-Schemathesis automatically generates thousands of test cases from your OpenAPI or GraphQL schema and finds the edge cases that break your API.
+Schemathesis automatically generates property-based tests from your OpenAPI or GraphQL schema and exercises the edge cases that break your API.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
@@ -22,29 +20,13 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 This command will immediately find real bugs in a demo API and show you exactly how to reproduce them.
 
-**Bugs Schemathesis finds cause real problems**:
+## Why teams choose Schemathesis
 
-- Registration forms that crash on legitimate international names
-- Shopping carts accepting negative quantities or invalid product IDs
-- User profiles returning incomplete data that breaks mobile apps
-
-## Why developers choose Schemathesis
-
-Immediate results:
-
- - **🎯 Find 5-15 real bugs** in a typical API within the first test run
-
- - **⏱️ 1-minute setup** - Just point it at your OpenAPI schema
-
- - **🔄 Zero maintenance** - Automatically tests new endpoints as you add them
-
-Easy integration:
-
- - **🔌 Works with existing tools** - Supports variety of export formats like JUnit and HAR
-
- - **📑 Uses your existing docs** - Reads OpenAPI/GraphQL schemas you already have
-
- - **🐍 Has a flexible Python API** - Integrates with `pytest` directly
+- 🎯 Find real bugs on the first run (commonly 5–15 in production schemas).
+- ⏱️ Point it at your schema—no per-endpoint tests to maintain.
+- 🔄 Keeps pace with the spec; new endpoints are covered automatically.
+- 🔌 Exports JUnit, HAR, and integrates with `pytest` or CI/CD.
+- 📑 Uses your OpenAPI or GraphQL schema as the single source of truth.
 
 !!! quote "Developer feedback"
     "The tool is amazing as it can test negative scenarios instead of me and much faster!" 
@@ -99,7 +81,7 @@ Easy integration:
 
 
 !!! important
-    **Upgrading from older versions?** Check our [Migration Guide](migration.md) for key changes.
+    **Upgrading from older versions?** See the [Migration Guide](migration.md) for key changes.
 
 ## Need help?
 

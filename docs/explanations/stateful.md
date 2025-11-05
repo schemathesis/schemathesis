@@ -26,12 +26,6 @@ DELETE /users/789 → Uses actual ID from POST → 200 OK ✓
 
 Operations chained together. Real IDs from real responses.
 
-**Why this matters:**
-
-- Tests realistic workflows (create -> read -> update -> delete)
-- Finds bugs that only appear when operations interact
-- Validates your API works as a whole, not just individual endpoints
-
 ## How It Works
 
 Schemathesis analyzes your OpenAPI schema to understand how operations connect.
@@ -74,8 +68,6 @@ Runs random workflows:
 - Create user -> Get user -> Update user -> Delete user
 - Create user -> Create order for that user -> Get order
 - Create user -> Delete user -> Get user
-
-**This happens automatically** when you enable stateful testing.
 
 ## Connecting Operations
 
@@ -123,9 +115,6 @@ Schemathesis detects the following relationships:
 - Pagination: `{"data": [...]}`, `{"items": [...]}`
 - Schema composition: `allOf`, `oneOf`, `anyOf`
 
-!!! warning "Current limitation"
-    Only path parameters and body payloads are supported as inputs to API operations; query and header are coming soon.
-
 ### 2. Location Header Learning
 
 While running tests, Schemathesis can also learn new connections dynamically by observing `Location` headers in responses.
@@ -163,7 +152,6 @@ This explicitly tells Schemathesis that the `userId` parameter in the `getUser` 
 **Use manual links when**:
 
 - Automatic schema analysis misses a connection
-- You need to map query, header, or body parameters
 - You want precise, explicit control over operation relationships
 
 !!! note "All Three Work Together"
