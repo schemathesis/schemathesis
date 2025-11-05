@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 
-from hypothesis import HealthCheck
-
 from schemathesis import errors
 from schemathesis.core.errors import (
     AuthenticationError,
@@ -26,7 +24,6 @@ from schemathesis.core.errors import (
     get_request_error_message,
     split_traceback,
 )
-from schemathesis.generation.hypothesis.reporting import HEALTH_CHECK_ACTIONS, HEALTH_CHECK_TITLES
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -215,6 +212,8 @@ def scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str:
 
 
 def extract_health_check_error(error: hypothesis.errors.FailedHealthCheck) -> hypothesis.HealthCheck | None:
+    from schemathesis.generation.hypothesis.reporting import HEALTH_CHECK_TITLES
+
     for key, title in HEALTH_CHECK_TITLES.items():
         if title in str(error):
             return key
@@ -223,6 +222,9 @@ def extract_health_check_error(error: hypothesis.errors.FailedHealthCheck) -> hy
 
 def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[str], str] = str) -> str | None:
     """Get a user-friendly suggestion for handling the error."""
+    from hypothesis import HealthCheck
+
+    from schemathesis.generation.hypothesis.reporting import HEALTH_CHECK_ACTIONS
 
     def _format_health_check_suggestion(label: str) -> str:
         base = {

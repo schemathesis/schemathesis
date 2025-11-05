@@ -16,8 +16,6 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
-from hypothesis import strategies as st
-
 from schemathesis import transport
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
@@ -460,6 +458,8 @@ class BaseSchema(Mapping):
             Combined Hypothesis strategy for all valid operations in the schema.
 
         """
+        from hypothesis import strategies as st
+
         _strategies = [
             operation.ok().as_strategy(generation_mode=generation_mode, **kwargs)
             for operation in self.get_all_operations()
@@ -504,6 +504,8 @@ class APIOperationMap(Mapping):
             Combined Hypothesis strategy for all valid operations in the schema.
 
         """
+        from hypothesis import strategies as st
+
         _strategies = [
             operation.as_strategy(generation_mode=generation_mode, **kwargs) for operation in self._data.values()
         ]
