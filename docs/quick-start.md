@@ -4,12 +4,11 @@
 
 Schemathesis automatically finds bugs in your APIs by generating thousands of test cases from your OpenAPI or GraphQL schema. It catches edge cases that manual testing typically misses.
 
-**Core benefits:**
+During the quick-start run Schemathesis:
 
-- 🔍 **Discovers edge cases** that break your API with unexpected input
-- ⚡ **Zero test maintenance** - adapts as your schema evolves  
-- 🛡️ **Prevents regressions** by testing API contracts
-- 📊 **Validates specification compliance** between implementation and documentation
+- Generates property-based inputs for each operation defined in your schema
+- Runs core checks such as status-code conformance, response validation, and server error detection
+- Reports reproduction-ready commands for any failing cases
 
 ## Try the demo
 
@@ -65,11 +64,11 @@ Reproduce with:
 ## What's next?
 
 !!! tip "Ready to dive deeper?"
-    **[Complete Tutorial](tutorials/cli.md)** - 15-20 minute hands-on workflow with a realistic booking API
+    **[Complete Tutorial](tutorials/cli.md)** – a 15–20 minute workflow against a realistic booking API
 
-For release testing and security assessments, see [Optimizing for Maximum Bug Detection](guides/config-optimization.md)
+Runs scale with schema size and server performance. For thorough release testing, see [Optimizing for Maximum Bug Detection](guides/config-optimization.md) to run longer, higher-coverage sessions.
 
 **Reference guides:**
 
-- **[CLI Reference](reference/cli.md)** - All available CLI options
-- **[Configuration Reference](reference/configuration.md)** - Complete configuration reference
+- **[CLI Reference](reference/cli.md)** – full list of options and checks
+- **[Configuration Reference](reference/configuration.md)** – how to keep settings in `schemathesis.toml`

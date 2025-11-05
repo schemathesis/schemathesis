@@ -642,3 +642,11 @@ These options control how Schemathesis generates test data for API testing:
     ```console
     $ st run openapi.yaml --generation-unique-inputs
     ```
+
+## Exit codes
+
+Schemathesis uses predictable exit codes so automation can interpret results:
+
+- `0` — All configured checks passed
+- `1` — At least one check failed or a bug was reported
+- `2` — The run was aborted due to configuration or schema errors

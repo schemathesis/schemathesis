@@ -1,6 +1,6 @@
 # CI/CD Integration Guide
 
-Add Schemathesis to your CI pipeline to automatically test your API against its schema on every code change.
+Run Schemathesis in CI to verify your API against its schema on every change.
 
 ## Schema Access
 
@@ -109,12 +109,4 @@ Then run with just:
 schemathesis run http://localhost:8080/openapi.json
 ```
 
-## Exit Codes
-
-Schemathesis returns standard exit codes that CI systems can interpret:
-
-- `0` - All tests passed
-- `1` - Tests failed (bugs found)  
-- `2` - Configuration or schema errors
-
-Most CI systems automatically fail the build on non-zero exit codes.
+See the [CLI reference](../reference/cli.md#exit-codes) for the complete list of exit codes.
