@@ -34,7 +34,7 @@ Schemathesis automatically generates thousands of test cases from your OpenAPI o
 ## Try it now
 
 ```console
-# Test a demo API - finds real bugs instantly
+# Test a demo API - finds real bugs in 30 seconds
 uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 # Test your own API
@@ -45,9 +45,10 @@ uvx schemathesis run https://your-api.com/openapi.json
 ## What problems does it solve?
 
 - 💥 **500 errors** that crash your API on edge case inputs
-- 📋 **Schema violations** where your API returns different data than documented  
+- 📋 **Schema violations** where your API returns different data than documented
 - 🚪 **Validation bypasses** where invalid data gets accepted
 - 🔗 **Integration failures** when responses don't match client expectations
+- 🔄 **Stateful bugs** where operations work individually but fail in realistic workflows
 
 
 > ⚠️ **Upgrading from older versions?** Check our [Migration Guide](https://github.com/schemathesis/schemathesis/blob/master/MIGRATION.md) for key changes.
@@ -68,7 +69,13 @@ schema = schemathesis.openapi.from_url("https://your-api.com/openapi.json")
 
 @schema.parametrize()
 def test_api(case):
-    case.call_and_validate()  # Finds bugs automatically
+    # Tests with random data, edge cases, and invalid inputs
+    case.call_and_validate()
+
+# Stateful testing: Tests workflows like: create user -> get user -> delete user
+APIWorkflow = schema.as_state_machine()
+# Creates a test class for pytest/unittest
+TestAPI = APIWorkflow.TestCase
 ```
 
 **CI/CD:**
@@ -80,14 +87,14 @@ def test_api(case):
 
 ## Who uses it
 
-Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordPress](https://github.com/WordPress/openverse)**, **JetBrains**, **Red Hat** and dozens other companies.
+Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordPress](https://github.com/WordPress/openverse)**, **JetBrains**, **Red Hat**, and dozens of other companies.
 
 
-> "_Schemathesis is the best tool for fuzz testing of REST API on the market. We are at Red Hat use it for examining our applications in functional and integrations testing levels._" - Dmitry Misharov, RedHat
+> "_Schemathesis is the best tool for fuzz testing of REST APIs on the market. We at Red Hat use it for examining our applications in functional and integration testing levels._" - Dmitry Misharov, RedHat
 
 ## Documentation
 
-📚 **[Complete documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference.
+📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference.
 
 ## Get Help
 
