@@ -1840,3 +1840,68 @@ def test_negative_bundled_schema_refs(nctx, schema, expected):
     assert covered == expected
     assert_unique(covered)
     assert_not_conform(covered, schema)
+
+
+@pytest.mark.parametrize(
+    ("schema", "min_expected_negative_count", "should_have_positive"),
+    [
+        # "not" schema: anything except strings with maxLength=10
+        # Negative cases are values that MATCH the inner schema (strings ≤10 chars)
+        ({"not": {"type": "string", "maxLength": 10}}, 1, True),
+        # "not" schema: anything except null
+        # Negative case is null (matches inner schema)
+        ({"not": {"type": "null"}}, 1, True),
+        # "not" schema with empty inner schema (nothing is valid)
+        # All values match the empty schema, so all are negative for "not"
+        # No positive cases possible (can't violate an empty schema)
+        ({"not": {}}, 1, False),
+        # "not" schema with type constraint
+        # Negative case is an integer (matches inner schema)
+        ({"not": {"type": "integer"}}, 1, True),
+    ],
+    ids=["maxLength", "null", "empty", "integer"],
+)
+def test_not_schema_generation_modes_consistency(
+    ctx_factory, schema, min_expected_negative_count, should_have_positive
+):
+    # Test with NEGATIVE mode only
+    nctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE])
+    negative_mode_values = list(cover_schema_iter(nctx, schema))
+
+    negative_only_negative = [v for v in negative_mode_values if v.generation_mode == GenerationMode.NEGATIVE]
+    negative_only_positive = [v for v in negative_mode_values if v.generation_mode == GenerationMode.POSITIVE]
+
+    # Test with ALL modes (both POSITIVE and NEGATIVE)
+    all_ctx = ctx_factory(generation_modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
+    all_mode_values = list(cover_schema_iter(all_ctx, schema))
+
+    all_negative = [v for v in all_mode_values if v.generation_mode == GenerationMode.NEGATIVE]
+    all_positive = [v for v in all_mode_values if v.generation_mode == GenerationMode.POSITIVE]
+
+    # NEGATIVE mode should generate the same negative cases as ALL mode
+    negative_only_count = len(negative_only_negative)
+    all_negative_count = len(all_negative)
+
+    # Both should have at least the minimum expected negative count
+    assert negative_only_count >= min_expected_negative_count, (
+        f"Expected at least {min_expected_negative_count} negative cases in negative mode, "
+        f"but got {negative_only_count}"
+    )
+    assert all_negative_count >= min_expected_negative_count, (
+        f"Expected at least {min_expected_negative_count} negative cases in all mode, but got {all_negative_count}"
+    )
+
+    # The number of negative cases should be equal (the main bug we're testing)
+    assert negative_only_count == all_negative_count, (
+        f"Negative mode generated {negative_only_count} negative cases, "
+        f"but all mode generated {all_negative_count} negative cases. "
+    )
+
+    # ALL mode should have additional positive cases when expected
+    if should_have_positive:
+        assert len(all_positive) > 0, "All mode should generate positive cases for 'not' schemas"
+
+    # NEGATIVE mode should not generate positive cases when only negative mode is requested
+    assert len(negative_only_positive) == 0, (
+        f"Negative mode should not generate positive cases, but got {len(negative_only_positive)}"
+    )
