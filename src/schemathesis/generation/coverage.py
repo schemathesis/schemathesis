@@ -479,8 +479,10 @@ def _cover_positive_for_type(
         elif "properties" in schema or "required" in schema:
             yield from _positive_object(ctx, schema, cast(dict, template))
         elif "not" in schema and isinstance(schema["not"], (dict, bool)):
+            # For 'not' schemas: generate negative cases of inner schema (violations)
+            # These violations are positive for the outer schema, so flip the mode
             nctx = ctx.with_negative()
-            yield from cover_schema_iter(nctx, schema["not"], seen)
+            yield from _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen))
 
 
 @contextmanager
@@ -784,8 +786,10 @@ def cover_schema_iter(
                                 if is_invalid_for_oneOf(value.value, idx, validators):
                                     yield value
                 elif key == "not" and isinstance(value, (dict, bool)):
+                    # For 'not' schemas: generate positive cases of inner schema (valid values)
+                    # These valid values are negative for the outer schema, so flip the mode
                     pctx = ctx.with_positive()
-                    yield from cover_schema_iter(pctx, value, seen)
+                    yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen))
 
 
 def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema.Validator]) -> bool:
@@ -1485,6 +1489,29 @@ def _negative_type(
             yield NegativeValue(
                 value, scenario=CoverageScenario.INCORRECT_TYPE, description="Incorrect type", location=ctx.current_path
             )
+
+
+def _flip_generation_mode_for_not(
+    values: Generator[GeneratedValue, None, None],
+) -> Generator[GeneratedValue, None, None]:
+    """Flip generation mode for values from 'not' schemas.
+
+    For 'not' schemas, the semantic is inverted:
+    - Positive values for the inner schema are negative for the outer schema
+    - Negative values for the inner schema are positive for the outer schema
+    """
+    for value in values:
+        flipped_mode = (
+            GenerationMode.NEGATIVE if value.generation_mode == GenerationMode.POSITIVE else GenerationMode.POSITIVE
+        )
+        yield GeneratedValue(
+            value=value.value,
+            generation_mode=flipped_mode,
+            scenario=value.scenario,
+            description=value.description,
+            location=value.location,
+            parameter=value.parameter,
+        )
 
 
 def push_examples_to_properties(schema: dict[str, Any]) -> None:

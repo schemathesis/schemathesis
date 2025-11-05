@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Extracting incomplete schema-level and property-level examples when parent schema with `allOf` has its own complete example. [#3268](https://github.com/schemathesis/schemathesis/issues/3268)
+- Coverage phase generating different negative cases for `not` schemas in `--mode=all` vs `--mode=negative`.
 
 ### :racing_car: Performance
 
