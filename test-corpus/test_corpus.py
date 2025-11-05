@@ -366,28 +366,10 @@ def combined_check(ctx, response, case):
 
 def test_default(corpus, filename):
     schema = _load_schema(corpus, filename)
-    try:
-        schema.as_state_machine()()
-    except (
-        RefResolutionError,
-        IncorrectUsage,
-        LoaderError,
-        InvalidSchema,
-        InvalidStateMachine,
-        BundleError,
-        MalformedMediaType,
-        OperationNotFound,
-    ):
-        pass
-
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
     schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])
-
-    graph = dependencies.analyze(schema)
-    for _ in graph.iter_links():
-        pass
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
@@ -423,6 +405,30 @@ def test_coverage_phase(corpus, filename):
                 generation_config=schema.config.generation,
             ):
                 pass
+
+
+def test_stateful(corpus, filename):
+    schema = _load_schema(corpus, filename)
+
+    # Test state machine creation and execution
+    try:
+        schema.as_state_machine()()
+    except (
+        RefResolutionError,
+        IncorrectUsage,
+        LoaderError,
+        InvalidSchema,
+        InvalidStateMachine,
+        BundleError,
+        MalformedMediaType,
+        OperationNotFound,
+    ):
+        pass
+
+    # Test dependency graph analysis and link iteration
+    graph = dependencies.analyze(schema)
+    for _ in graph.iter_links():
+        pass
 
 
 def _load_schema(corpus, filename):
