@@ -278,6 +278,33 @@ def _expand_subschemas(
                         else:
                             subschema[key] = value
 
+            # Merge parent schema's fields with the merged allOf result
+            # Parent's fields take precedence as they are more specific
+            parent_has_example = "example" in schema or "examples" in schema
+
+            # If parent has examples, remove examples from merged allOf to avoid duplicates
+            # The parent's examples were already yielded from the parent schema itself
+            if parent_has_example:
+                subschema.pop("example", None)
+                subschema.pop("examples", None)
+
+            for key, value in schema.items():
+                if key == "allOf":
+                    # Skip the allOf itself, we already processed it
+                    continue
+                elif key in ("example", "examples"):
+                    # Skip parent's examples - they were already yielded
+                    continue
+                elif key == "properties":
+                    # Merge parent properties (parent overrides allOf)
+                    subschema.setdefault("properties", {}).update(value)
+                elif key == "required":
+                    # Extend required list
+                    subschema.setdefault("required", []).extend(value)
+                else:
+                    # For other fields, parent value overrides
+                    subschema[key] = value
+
             yield subschema, expanded_path
 
 
@@ -367,12 +394,24 @@ def extract_from_schema(
     except InfiniteRecursiveReference:
         return
 
-    if "properties" in schema:
+    # If schema has allOf, we need to get merged properties from allOf items
+    # to extract property-level examples from all schemas, not just the parent
+    properties_to_process = schema.get("properties", {})
+    if "allOf" in schema and "properties" in schema:
+        # Get the merged allOf schema which includes properties from all allOf items
+        for expanded_schema, _ in _expand_subschemas(schema=schema, resolver=resolver, reference_path=current_path):
+            if expanded_schema is not schema and isinstance(expanded_schema, dict):
+                # This is the merged allOf result with combined properties
+                if "properties" in expanded_schema:
+                    properties_to_process = expanded_schema["properties"]
+                break
+
+    if properties_to_process:
         variants = {}
         required = schema.get("required", [])
         to_generate: dict[str, Any] = {}
 
-        for name, subschema in schema["properties"].items():
+        for name, subschema in properties_to_process.items():
             values = []
             for expanded_schema, expanded_path in _expand_subschemas(
                 schema=subschema, resolver=resolver, reference_path=current_path

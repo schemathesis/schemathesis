@@ -1406,6 +1406,314 @@ def test_property_examples_with_all_of():
     ]
 
 
+@pytest.mark.parametrize(
+    ("parent_example_field", "parent_example_value", "base_example", "expected_count", "expected_values"),
+    [
+        # Parent has 'example' field - should take precedence
+        (
+            "example",
+            {"name": "example-name", "numeric_field": 42},
+            {"name": "example-name"},
+            1,
+            [{"name": "example-name", "numeric_field": 42}],
+        ),
+        # Parent has 'examples' array - should take precedence
+        (
+            "examples",
+            [
+                {"name": "example-1", "numeric_field": 10},
+                {"name": "example-2", "numeric_field": 20},
+            ],
+            {"name": "base-example"},
+            2,
+            [
+                {"name": "example-1", "numeric_field": 10},
+                {"name": "example-2", "numeric_field": 20},
+            ],
+        ),
+    ],
+)
+def test_parent_example_takes_precedence_over_allof(
+    ctx, parent_example_field, parent_example_value, base_example, expected_count, expected_values
+):
+    # See GH-3268
+    # When a parent schema has allOf with a base schema that has an example,
+    # and the parent has its own example, only the parent's example should be used.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/resource": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/resource"}}},
+                    },
+                    "responses": {"204": {"description": "Done"}},
+                }
+            }
+        },
+        version="3.0.3",
+        components={
+            "schemas": {
+                "resource": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/base_resource"}],
+                    "required": ["numeric_field"],
+                    "properties": {
+                        "numeric_field": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 0,
+                            "maximum": 100,
+                        }
+                    },
+                    parent_example_field: parent_example_value,
+                },
+                "base_resource": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string", "minLength": 1}},
+                    "example": base_example,
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/resource"]["POST"]
+
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
+
+    # Should only get parent's examples, not base's incomplete example
+    assert len(extracted) == expected_count
+    for expected_value in expected_values:
+        assert any(e["value"] == expected_value for e in extracted), f"Expected {expected_value} in extracted examples"
+    # Ensure base example is NOT included
+    assert not any(e["value"] == base_example for e in extracted), "Base example should not be extracted"
+
+
+def test_multiple_allof_items_with_parent_example(ctx):
+    # See GH-3268
+    # When allOf contains multiple schemas with their own examples,
+    # parent's example should still take precedence over all of them.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/resource": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/resource"}}},
+                    },
+                    "responses": {"204": {"description": "Done"}},
+                }
+            }
+        },
+        version="3.0.3",
+        components={
+            "schemas": {
+                "resource": {
+                    "type": "object",
+                    "allOf": [
+                        {"$ref": "#/components/schemas/base_resource"},
+                        {
+                            "type": "object",
+                            "properties": {"age": {"type": "integer"}},
+                            "example": {"age": 25},  # Partial example in allOf item
+                        },
+                    ],
+                    "required": ["id"],
+                    "properties": {"id": {"type": "integer"}},
+                    # Complete example for the merged schema
+                    "example": {"name": "John", "age": 30, "id": 123},
+                },
+                "base_resource": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "example": {"name": "Base"},
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/resource"]["POST"]
+
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
+
+    # Should only get parent's complete example, not the partial ones from allOf items
+    assert len(extracted) == 1
+    assert extracted[0]["value"] == {"name": "John", "age": 30, "id": 123}
+
+
+def test_allof_without_parent_example_preserves_existing_behavior(ctx):
+    # See GH-3268
+    # When parent has NO example, allOf examples should still be used.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/resource": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/resource"}}},
+                    },
+                    "responses": {"204": {"description": "Done"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "resource": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/base_resource"}],
+                    "required": ["numeric_field"],
+                    "properties": {"numeric_field": {"type": "integer"}},
+                    # NO example in parent schema
+                },
+                "base_resource": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "example": {"name": "example-name"},
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/resource"]["POST"]
+
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
+
+    # When parent has no example, should use example from allOf item (existing behavior)
+    assert len(extracted) == 1
+    assert extracted[0]["value"] == {"name": "example-name"}
+
+
+@pytest.mark.parametrize(
+    ("components", "expected_value"),
+    [
+        # Single allOf item with property examples in both parent and base
+        (
+            {
+                "schemas": {
+                    "resource": {
+                        "type": "object",
+                        "allOf": [{"$ref": "#/components/schemas/base_resource"}],
+                        "required": ["id", "status"],
+                        "properties": {
+                            "id": {"type": "integer", "example": 42},
+                            "status": {"type": "string", "example": "active"},
+                        },
+                    },
+                    "base_resource": {
+                        "type": "object",
+                        "required": ["name"],
+                        "properties": {
+                            "name": {"type": "string", "example": "John Doe"},
+                            "email": {"type": "string", "format": "email", "example": "john@example.com"},
+                        },
+                    },
+                }
+            },
+            {
+                "name": "John Doe",
+                "email": "john@example.com",
+                "id": 42,
+                "status": "active",
+            },
+        ),
+        # Multiple allOf items with property examples
+        (
+            {
+                "schemas": {
+                    "resource": {
+                        "type": "object",
+                        "allOf": [
+                            {"$ref": "#/components/schemas/base_entity"},
+                            {"$ref": "#/components/schemas/timestamped"},
+                        ],
+                        "required": ["username"],
+                        "properties": {
+                            "username": {"type": "string", "example": "jdoe"},
+                            "role": {"type": "string", "example": "admin"},
+                        },
+                    },
+                    "base_entity": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer", "example": 100},
+                        },
+                    },
+                    "timestamped": {
+                        "type": "object",
+                        "properties": {
+                            "created_at": {"type": "string", "format": "date-time", "example": "2025-01-01T00:00:00Z"},
+                            "updated_at": {"type": "string", "format": "date-time", "example": "2025-01-02T00:00:00Z"},
+                        },
+                    },
+                }
+            },
+            {
+                "id": 100,
+                "created_at": "2025-01-01T00:00:00Z",
+                "updated_at": "2025-01-02T00:00:00Z",
+                "username": "jdoe",
+                "role": "admin",
+            },
+        ),
+        # Parent has property examples, but allOf base has no examples
+        (
+            {
+                "schemas": {
+                    "resource": {
+                        "type": "object",
+                        "allOf": [{"$ref": "#/components/schemas/base"}],
+                        "properties": {
+                            "name": {"type": "string", "example": "Widget"},
+                            "price": {"type": "number", "example": 19.99},
+                        },
+                    },
+                    "base": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "created": {"type": "string", "format": "date-time"},
+                        },
+                    },
+                }
+            },
+            {
+                "name": "Widget",
+                "price": 19.99,
+            },
+        ),
+    ],
+)
+def test_property_level_examples_with_allof_and_parent_properties(ctx, components, expected_value):
+    # Tests the code block that handles property-level example extraction
+    # when a schema has both 'allOf' and its own 'properties'.
+    # This ensures we extract property examples from ALL schemas (parent + allOf items).
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/resource": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/resource"}}},
+                    },
+                    "responses": {"204": {"description": "Done"}},
+                }
+            }
+        },
+        components=components,
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/resource"]["POST"]
+
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
+
+    # Should extract property-level examples from BOTH parent and allOf schemas
+    assert len(extracted) == 1
+    assert extracted[0] == {
+        "media_type": "application/json",
+        "value": expected_value,
+    }
+
+
 def content(schema, **kwargs):
     return {
         "description": "",

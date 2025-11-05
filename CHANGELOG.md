@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Extracting incomplete schema-level and property-level examples when parent schema with `allOf` has its own complete example. [#3268](https://github.com/schemathesis/schemathesis/issues/3268)
+
 ## [4.4.0](https://github.com/schemathesis/schemathesis/compare/v4.3.18...v4.4.0) - 2025-11-05
 
 ### :rocket: Added
