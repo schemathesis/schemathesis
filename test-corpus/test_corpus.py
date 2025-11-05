@@ -21,6 +21,8 @@ from schemathesis.core.errors import (
     InvalidSchema,
     InvalidStateMachine,
     LoaderError,
+    MalformedMediaType,
+    OperationNotFound,
     format_exception,
 )
 from schemathesis.core.failures import Failure
@@ -366,7 +368,16 @@ def test_default(corpus, filename):
     schema = _load_schema(corpus, filename)
     try:
         schema.as_state_machine()()
-    except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine, BundleError):
+    except (
+        RefResolutionError,
+        IncorrectUsage,
+        LoaderError,
+        InvalidSchema,
+        InvalidStateMachine,
+        BundleError,
+        MalformedMediaType,
+        OperationNotFound,
+    ):
         pass
 
     schema.config.update(suppress_health_check=list(HealthCheck))

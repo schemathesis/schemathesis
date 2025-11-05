@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     extract_inputs,
@@ -166,10 +167,15 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
 
 
 def _resolve_link_operation(link: dict, schema: BaseOpenAPISchema) -> APIOperation:
-    """Resolve link to operation, handling both operationRef and operationId."""
+    """Resolve link to operation."""
     if "operationRef" in link:
         return schema.get_operation_by_reference(link["operationRef"])
-    return schema.get_operation_by_id(link["operationId"])
+    if "operationId" in link:
+        return schema.get_operation_by_id(link["operationId"])
+    raise InvalidSchema(
+        "Link definition is missing both 'operationRef' and 'operationId'. "
+        "At least one of these fields must be present to identify the target operation."
+    )
 
 
 def _resolve_link_name_collision(proposed_name: str, existing_links: dict[str, Any]) -> str:

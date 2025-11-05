@@ -7,6 +7,7 @@ from flask import Flask, jsonify, request
 from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies import analyze, naming
 from test.utils import flaky
@@ -2941,3 +2942,34 @@ def test_inject_links_deduplication(ctx, schema, expected):
     raw_schema = ctx.openapi.build_schema(schema)
     schema = schemathesis.openapi.from_dict(raw_schema)
     assert dependencies.inject_links(schema) == expected
+
+
+def test_inject_links_invalid_link_missing_operation_ref_and_id(ctx):
+    # Schema with an invalid link definition (missing both operationRef and operationId)
+    schema_dict = {
+        "/users": {
+            "post": {
+                "operationId": "createUser",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                        "links": {"InvalidLink": {}},
+                    }
+                },
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+
+    raw_schema = ctx.openapi.build_schema(schema_dict)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    with pytest.raises(InvalidSchema, match="Link definition is missing both.*operationRef.*operationId"):
+        dependencies.inject_links(schema)
