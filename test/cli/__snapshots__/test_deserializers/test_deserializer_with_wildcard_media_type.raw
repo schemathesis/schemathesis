@@ -30,15 +30,15 @@ Schemathesis dev
 
 =================================== WARNINGS ===================================
 
-Missing deserializer: 2 operations with structured schemas lack deserializers for custom media types
+Schema validation skipped: 2 operations cannot validate responses due to missing deserializers
 
   - GET /data1
-    Response 200 with structured schema has no deserializer for application/vnd.api+custom
+    Cannot validate response 200: no deserializer registered for application/vnd.api+custom
 
   - GET /data2
-    Response 200 with structured schema has no deserializer for application/vnd.other+custom
+    Cannot validate response 200: no deserializer registered for application/vnd.other+custom
 
-💡 Register a deserializer with @schemathesis.deserializer()
+💡 Register a deserializer with @schemathesis.deserializer() to enable validation
 
 =================================== SUMMARY ====================================
 
@@ -53,7 +53,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Warnings:
-  ⚠️ Missing deserializer: 2 operations with structured schemas lack deserializers
+  ⚠️ Schema validation skipped: 2 operations cannot validate responses
 
 Test cases:
   N generated, N passed, N skipped

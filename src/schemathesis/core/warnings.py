@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.config._warnings import SchemathesisWarning
 from schemathesis.core import deserialization
+from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema.types import get_type
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ class MissingDeserializerWarning:
     @property
     def message(self) -> str:
         """Human-readable description of the warning."""
-        return f"Response {self.status_code} with structured schema has no deserializer for {self.content_type}"
+        return f"Cannot validate response {self.status_code}: no deserializer registered for {self.content_type}"
 
 
 def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeserializerWarning]:
@@ -77,7 +78,14 @@ def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeseria
 
         for content_type in content_types:
             # Check if we have a deserializer for this media type
-            if not deserialization.has_deserializer(content_type):
+            # Skip malformed media types - we don't care about checking for deserializers
+            # or emitting warnings for content types that aren't valid
+            try:
+                has_deserializer = deserialization.has_deserializer(content_type)
+            except MalformedMediaType:
+                continue
+
+            if not has_deserializer:
                 warnings.append(
                     MissingDeserializerWarning(
                         operation_label=operation.label,

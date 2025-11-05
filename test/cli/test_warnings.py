@@ -59,19 +59,17 @@ def test_missing_deserializer_warning_displayed(cli, ctx, openapi3_base_url):
         }
     )
 
-    # When running tests
     result = cli.run(str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1")
 
     # Then the warning should be displayed in both summary and detailed sections
-    assert "⚠️ Missing deserializer: 1 operation with structured schemas lack deserializers" in result.stdout
+    assert "⚠️ Schema validation skipped: 1 operation cannot validate responses" in result.stdout
     assert "WARNINGS" in result.stdout
     assert (
-        "Missing deserializer: 1 operation with structured schemas lack deserializers for custom media types"
-        in result.stdout
+        "Schema validation skipped: 1 operation cannot validate responses due to missing deserializers" in result.stdout
     )
     assert "GET /users" in result.stdout
-    assert "Response 200 with structured schema has no deserializer for application/msgpack" in result.stdout
-    assert "💡 Register a deserializer with @schemathesis.deserializer()" in result.stdout
+    assert "Cannot validate response 200: no deserializer registered for application/msgpack" in result.stdout
+    assert "💡 Register a deserializer with @schemathesis.deserializer() to enable validation" in result.stdout
 
 
 def test_missing_deserializer_warning_with_fail_on(cli, ctx, openapi3_base_url, tmp_path, monkeypatch):
@@ -102,11 +100,10 @@ fail-on = ["missing_deserializer"]
 """)
     monkeypatch.chdir(tmp_path)
 
-    # When running tests
     result = cli.run_and_assert(
         str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1", exit_code=ExitCode.TESTS_FAILED
     )
 
     # Then the warning should be displayed and test should fail
     assert "WARNINGS" in result.stdout
-    assert "Missing deserializer" in result.stdout
+    assert "Schema validation skipped" in result.stdout
