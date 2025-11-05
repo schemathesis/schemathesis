@@ -48,6 +48,9 @@ API Operations:
   Selected: 2/2
   Tested: 2
 
+Responses: N total
+  ✅ N (X%) success   ⛔ N (X%) client error
+
 Test Phases:
   ⏭  Examples
   ✅ Coverage

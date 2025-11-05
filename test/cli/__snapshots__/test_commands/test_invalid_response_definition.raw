@@ -54,6 +54,9 @@ API Operations:
   Tested: 0
   Errored: 1
 
+Responses: N total
+  ✅ N (X%) success   ⛔ N (X%) client error
+
 Test Phases:
   ⏭  Examples
   🚫 Coverage

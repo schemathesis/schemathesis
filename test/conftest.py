@@ -358,6 +358,13 @@ class CliSnapshotConfig:
                 "Test cases:\n  N generated, N found N unique failures",
                 data,
             )
+        # Response statistics cleanup
+        if "Responses:" in data:
+            # Replace total count on same line as "Responses:"
+            data = re.sub(r"Responses: (\d+) total", "Responses: N total", data)
+            # Replace bucket counts and percentages: emoji number (percentage%) label
+            # Matches any of: ✅ ⛔ 🚫 ℹ️ ↪️ ❔ [1XX] [2XX] [3XX] [4XX] [5XX] [OTHER]
+            data = re.sub(r"(\S+) (\d+) \((\d+)%\) (\w+(?: \w+)?)", r"\1 N (X%) \4", data)
         if self.replace_server_host:
             used_fixtures = self.request.fixturenames
             for fixture in ("graphql_server_host", "server_host"):

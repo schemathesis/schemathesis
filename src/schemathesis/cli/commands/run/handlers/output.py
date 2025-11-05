@@ -14,6 +14,7 @@ import click
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.commands.run.responses import ResponseStatistic
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
@@ -825,6 +826,7 @@ class OutputHandler(EventHandler):
         default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
     )
     console: Console = field(default_factory=_default_console)
+    responses: ResponseStatistic | None = None
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.PhaseStarted):
@@ -852,6 +854,7 @@ class OutputHandler(EventHandler):
 
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
+        self.responses = ctx.responses
 
     def shutdown(self, ctx: ExecutionContext) -> None:
         if self.unit_tests_manager is not None:
@@ -1513,6 +1516,35 @@ class OutputHandler(EventHandler):
                 click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
         click.echo()
 
+    def display_response_statistics(self) -> None:
+        """Display HTTP response status code statistics.
+
+        Shows a summary of response codes grouped by category (1xx, 2xx, 3xx, 4xx, 5xx)
+        with percentage breakdown.
+        """
+        if self.responses is None or self.responses.total == 0:
+            return
+
+        # Determine if we should use emoji based on terminal capabilities
+        # Rich Console automatically respects NO_COLOR and --no-color
+        use_emoji = not self.console.no_color
+
+        click.echo(_style(f"Responses: {click.style(str(self.responses.total), bold=True)} total", bold=True))
+
+        buckets = list(self.responses.iter_nonzero_buckets(use_emoji=use_emoji))
+
+        if buckets:
+            parts = []
+            for bucket in buckets:
+                percentage = (bucket.total / self.responses.total) * 100
+                part = click.style(
+                    f"{bucket.icon} {bucket.total} ({percentage:.0f}%) {bucket.label}",
+                    fg=bucket.color,
+                )
+                parts.append(part)
+            click.echo("  " + "   ".join(parts))
+        click.echo()
+
     def display_test_cases(self, ctx: ExecutionContext) -> None:
         if ctx.statistic.total_cases == 0:
             click.echo(_style("Test cases:", bold=True))
@@ -1663,6 +1695,7 @@ class OutputHandler(EventHandler):
         if self.statistic:
             self.display_api_operations(ctx)
 
+        self.display_response_statistics()
         self.display_phases()
 
         if ctx.statistic.failures:

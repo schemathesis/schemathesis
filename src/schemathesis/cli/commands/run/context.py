@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Generator
 
 from schemathesis.cli.commands.run.events import LoadingFinished
+from schemathesis.cli.commands.run.responses import ResponseStatistic
 from schemathesis.config import ProjectConfig
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
@@ -208,6 +209,7 @@ class ExecutionContext:
     exit_code: int = 0
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
+    responses: ResponseStatistic = field(default_factory=ResponseStatistic)
 
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)
@@ -220,6 +222,9 @@ class ExecutionContext:
             self.find_operation_by_label = event.find_operation_by_label
         if isinstance(event, events.ScenarioFinished):
             self.statistic.on_scenario_finished(event.recorder)
+            for interaction in event.recorder.interactions.values():
+                if interaction.response is not None and hasattr(interaction.response, "status_code"):
+                    self.responses.record(interaction.response.status_code)
         elif isinstance(event, events.NonFatalError) or (
             isinstance(event, events.PhaseFinished)
             and event.phase.is_enabled
