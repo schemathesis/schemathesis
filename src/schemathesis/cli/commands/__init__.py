@@ -11,7 +11,7 @@ from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.commands.run.handlers.output import display_header
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption
+from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption, StyledGroup, should_use_color
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.core.errors import HookError, format_exception
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -22,9 +22,26 @@ else:
     from tomllib import TOMLDecodeError
 
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+ROOT_CONTEXT_SETTINGS: dict[str, Any] = {"help_option_names": []}
 
 
-@click.group(context_settings=CONTEXT_SETTINGS)  # type: ignore[misc]
+def _set_no_color(ctx: click.Context, param: click.Parameter, value: bool) -> bool:
+    """Eager callback to set color context before help is displayed."""
+    if value:
+        ctx.color = False
+    return value
+
+
+def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """Show help after processing color flags."""
+    if value:
+        if ctx.color is None:
+            ctx.color = should_use_color(ctx)
+        click.echo(ctx.get_help(), color=ctx.color)
+        ctx.exit()
+
+
+@click.group(context_settings=ROOT_CONTEXT_SETTINGS, cls=StyledGroup)  # type: ignore[misc]
 @click.option(  # type: ignore[misc]
     "--config-file",
     "config_file",
@@ -32,8 +49,25 @@ CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
     metavar="PATH",
     type=str,
 )
+@click.option(  # type: ignore[misc]
+    "--no-color",
+    is_flag=True,
+    help="Disable colored output",
+    is_eager=True,
+    callback=_set_no_color,
+    expose_value=False,
+)
 @click.pass_context  # type: ignore[misc]
 @click.version_option()  # type: ignore[misc]
+@click.option(  # type: ignore[misc]
+    "-h",
+    "--help",
+    is_flag=True,
+    help="Show this message and exit",
+    is_eager=True,
+    callback=_show_help,
+    expose_value=False,
+)
 def schemathesis(ctx: click.Context, config_file: str | None) -> None:
     """Property-based API testing for OpenAPI and GraphQL."""
     try:
