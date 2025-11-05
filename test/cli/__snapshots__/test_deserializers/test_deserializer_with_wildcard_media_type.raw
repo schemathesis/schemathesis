@@ -28,6 +28,18 @@ Schemathesis dev
 
      ✅ 2 passed
 
+=================================== WARNINGS ===================================
+
+Missing deserializer: 2 operations with structured schemas lack deserializers for custom media types
+
+  - GET /data1
+    Response 200 with structured schema has no deserializer for application/vnd.api+custom
+
+  - GET /data2
+    Response 200 with structured schema has no deserializer for application/vnd.other+custom
+
+💡 Register a deserializer with @schemathesis.deserializer()
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -39,6 +51,9 @@ Test Phases:
   ✅ Coverage
   ✅ Fuzzing
   ⏭  Stateful (not applicable)
+
+Warnings:
+  ⚠️ Missing deserializer: 2 operations with structured schemas lack deserializers
 
 Test cases:
   N generated, N passed, N skipped

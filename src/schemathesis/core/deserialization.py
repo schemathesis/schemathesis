@@ -53,6 +53,25 @@ def _iter_matching_deserializers(media_type: str) -> Iterator[tuple[str, Respons
                 yield registered_media_type, deserializer
 
 
+def has_deserializer(media_type: str) -> bool:
+    """Check if a deserializer is registered or built-in for the given media type.
+
+    Args:
+        media_type: The media type to check (e.g., "application/msgpack")
+
+    Returns:
+        True if a deserializer is available (either registered or built-in like JSON/YAML/XML)
+
+    """
+    return (
+        media_types.is_json(media_type)
+        or media_types.is_yaml(media_type)
+        or media_types.is_xml(media_type)
+        or media_types.is_plain_text(media_type)
+        or any(_iter_matching_deserializers(media_type))
+    )
+
+
 def register_deserializer(func: ResponseDeserializer, *media_types: str) -> ResponseDeserializer:
     for media_type in media_types:
         _DESERIALIZERS[media_type] = func
