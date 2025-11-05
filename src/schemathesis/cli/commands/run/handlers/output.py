@@ -328,22 +328,27 @@ class WarningData:
     missing_auth: dict[int, set[str]]
     missing_test_data: set[str]
     validation_mismatch: set[str]
+    missing_deserializer: dict[str, set[str]]
 
-    __slots__ = ("missing_auth", "missing_test_data", "validation_mismatch")
+    __slots__ = ("missing_auth", "missing_test_data", "validation_mismatch", "missing_deserializer")
 
     def __init__(
         self,
         missing_auth: dict[int, set[str]] | None = None,
         missing_test_data: set[str] | None = None,
         validation_mismatch: set[str] | None = None,
+        missing_deserializer: dict[str, set[str]] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
         self.validation_mismatch = validation_mismatch or set()
+        self.missing_deserializer = missing_deserializer or {}
 
     @property
     def is_empty(self) -> bool:
-        return not bool(self.missing_auth or self.missing_test_data or self.validation_mismatch)
+        return not bool(
+            self.missing_auth or self.missing_test_data or self.validation_mismatch or self.missing_deserializer
+        )
 
 
 @dataclass
@@ -1137,6 +1142,14 @@ class OutputHandler(EventHandler):
                 if warnings.should_fail(SchemathesisWarning.VALIDATION_MISMATCH):
                     ctx.exit_code = 1
 
+        # Collect static warnings about missing deserializers
+        if warnings.should_display(SchemathesisWarning.MISSING_DESERIALIZER):
+            for warning in event.recorder.warnings:
+                self.warnings.missing_deserializer.setdefault(warning.operation_label, set()).add(warning.message)
+                # Check if this warning should cause test failure
+                if warnings.should_fail(SchemathesisWarning.MISSING_DESERIALIZER):
+                    ctx.exit_code = 1
+
     def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
         # warnings, then remove them from warnings
@@ -1289,6 +1302,35 @@ class OutputHandler(EventHandler):
                 operation_suffix=" mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation",
                 tips=["💡 Check your schema constraints - API validation may be stricter than documented"],
             )
+
+        if self.warnings.missing_deserializer:
+            total = len(self.warnings.missing_deserializer)
+            suffix = "" if total == 1 else "s"
+            click.echo(
+                _style(
+                    f"Missing deserializer: {total} operation{suffix} with structured schemas lack deserializers for custom media types\n",
+                    fg="yellow",
+                )
+            )
+
+            # Show up to 3 operations with their warnings
+            displayed_operations = sorted(self.warnings.missing_deserializer.keys())[:3]
+            for idx, operation_label in enumerate(displayed_operations):
+                messages = self.warnings.missing_deserializer[operation_label]
+                click.echo(_style(f"  - {operation_label}", fg="yellow"))
+                for message in sorted(messages):
+                    click.echo(_style(f"    {message}", fg="yellow"))
+                # Add empty line between operations
+                if idx < len(displayed_operations) - 1:
+                    click.echo()
+
+            extra_count = len(self.warnings.missing_deserializer) - 3
+            if extra_count > 0:
+                click.echo(_style(f"  + {extra_count} more", fg="yellow"))
+
+            click.echo()
+            click.echo(_style("💡 Register a deserializer with @schemathesis.deserializer()", fg="yellow"))
+            click.echo()
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
@@ -1582,6 +1624,16 @@ class OutputHandler(EventHandler):
                 click.echo(
                     _style(
                         f"  ⚠️ Schema validation mismatch: {bold(str(count))} operation{suffix} mostly rejected generated data",
+                        fg="yellow",
+                    )
+                )
+
+            if self.warnings.missing_deserializer:
+                count = len(self.warnings.missing_deserializer)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Missing deserializer: {bold(str(count))} operation{suffix} with structured schemas lack deserializers",
                         fg="yellow",
                     )
                 )

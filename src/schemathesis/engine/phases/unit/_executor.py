@@ -31,6 +31,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
+from schemathesis.core.warnings import detect_missing_deserializers
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import (
@@ -82,6 +83,7 @@ def run_test(
     error: Exception
     test_start_time = time.monotonic()
     recorder = ScenarioRecorder(label=operation.label)
+    recorder.record_warnings(detect_missing_deserializers(operation))
     state = TestingState()
 
     def non_fatal_error(error: Exception, code_sample: str | None = None) -> events.NonFatalError:

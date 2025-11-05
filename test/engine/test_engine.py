@@ -12,6 +12,7 @@ from py import sys
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.config._warnings import SchemathesisWarning
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events, from_schema
@@ -1221,3 +1222,136 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
                     if header:
                         assert set(header) == {"a"}
             break
+
+
+def test_missing_deserializer_warnings_collected(ctx, openapi3_base_url):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/msgpack": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.update(base_url=openapi3_base_url)
+    stream = EventStream(schema, max_examples=1).execute()
+
+    scenario = stream.find(events.ScenarioFinished, label="GET /users")
+    assert len(scenario.recorder.warnings) == 1
+    warning = scenario.recorder.warnings[0]
+    assert warning.kind == SchemathesisWarning.MISSING_DESERIALIZER
+    assert warning.operation_label == "GET /users"
+    assert warning.status_code == "200"
+    assert warning.content_type == "application/msgpack"
+
+
+def test_no_warnings_for_json(ctx, openapi3_base_url):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.update(base_url=openapi3_base_url)
+    stream = EventStream(schema, max_examples=1).execute()
+
+    scenario = stream.find(events.ScenarioFinished, label="GET /users")
+    assert len(scenario.recorder.warnings) == 0
+
+
+def test_stateful_phase_missing_deserializer_warnings(ctx, openapi3_base_url):
+    """Verify warnings are detected in stateful-only phase execution."""
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/msgpack": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                            "links": {
+                                "GetUser": {
+                                    "operationId": "getUser",
+                                    "parameters": {"userId": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/users/{userId}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/msgpack": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.update(base_url=openapi3_base_url)
+
+    # Run only stateful phase
+    stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
+
+    # Verify warnings were detected in stateful phase
+    stateful_scenarios = [e for e in stream.events if isinstance(e, events.ScenarioFinished)]
+    assert len(stateful_scenarios) > 0
+
+    # Check that warnings are present - all stateful scenarios share the same static warnings
+    for scenario in stateful_scenarios:
+        warnings = scenario.recorder.warnings
+        assert len(warnings) == 2
+
+        # Verify both operations have warnings
+        warning_messages = {(w.operation_label, w.status_code, w.content_type) for w in warnings}
+        assert ("POST /users", "201", "application/msgpack") in warning_messages
+        assert ("GET /users/{userId}", "200", "application/msgpack") in warning_messages

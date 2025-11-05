@@ -584,7 +584,8 @@
             "enum": [
               "missing_auth",
               "missing_test_data",
-              "validation_mismatch"
+              "validation_mismatch",
+              "missing_deserializer"
             ]
           }
         },
@@ -602,7 +603,8 @@
                 "enum": [
                   "missing_auth",
                   "missing_test_data",
-                  "validation_mismatch"
+                  "validation_mismatch",
+                  "missing_deserializer"
                 ]
               }
             },
@@ -618,7 +620,8 @@
                     "enum": [
                       "missing_auth",
                       "missing_test_data",
-                      "validation_mismatch"
+                      "validation_mismatch",
+                      "missing_deserializer"
                     ]
                   }
                 }
