@@ -185,6 +185,10 @@ def _iter_resolved_responses(
     for key, response in definition.items():
         status_code = str(key)
         new_scope, resolved = maybe_resolve(response, resolver, scope)
+        # Resolve one more level to support slightly malformed schemas with nested $ref chains
+        # Some real-world schemas use: response -> $ref to definition -> $ref to actual schema
+        # While technically not spec-compliant, this pattern is common enough to warrant leniency
+        new_scope, resolved = maybe_resolve(resolved, resolver, new_scope)
         yield (
             status_code,
             OpenApiResponse(
