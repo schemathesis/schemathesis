@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from itertools import groupby
 from json.decoder import JSONDecodeError
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Generator, Iterable
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
 
 import click
 
@@ -822,6 +822,8 @@ class OutputHandler(EventHandler):
             self._on_scenario_started(event)
         elif isinstance(event, events.ScenarioFinished):
             self._on_scenario_finished(ctx, event)
+        elif isinstance(event, events.SchemaAnalysisWarnings):
+            self._on_schema_warnings(ctx, event)
         if isinstance(event, events.EngineFinished):
             self._on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
@@ -1125,30 +1127,36 @@ class OutputHandler(EventHandler):
             and GenerationMode.POSITIVE in self.config.generation_for(operation=operation, phase=event.phase.name).modes
             and all_positive_are_rejected(event.recorder)
         ):
-            if (
-                warnings.should_display(SchemathesisWarning.MISSING_TEST_DATA)
-                and statistic.should_warn_about_missing_test_data()
-            ):
-                self.warnings.missing_test_data.add(event.recorder.label)
-                # Check if this warning should cause test failure
-                if warnings.should_fail(SchemathesisWarning.MISSING_TEST_DATA):
-                    ctx.exit_code = 1
-            if (
-                warnings.should_display(SchemathesisWarning.VALIDATION_MISMATCH)
-                and statistic.should_warn_about_validation_mismatch()
-            ):
-                self.warnings.validation_mismatch.add(event.recorder.label)
-                # Check if this warning should cause test failure
-                if warnings.should_fail(SchemathesisWarning.VALIDATION_MISMATCH):
-                    ctx.exit_code = 1
+            if statistic.should_warn_about_missing_test_data():
+                self._handle_warning(
+                    ctx,
+                    SchemathesisWarning.MISSING_TEST_DATA,
+                    lambda: self.warnings.missing_test_data.add(event.recorder.label),
+                )
+            if statistic.should_warn_about_validation_mismatch():
+                self._handle_warning(
+                    ctx,
+                    SchemathesisWarning.VALIDATION_MISMATCH,
+                    lambda: self.warnings.validation_mismatch.add(event.recorder.label),
+                )
 
-        # Collect static warnings about missing deserializers
-        if warnings.should_display(SchemathesisWarning.MISSING_DESERIALIZER):
-            for warning in event.recorder.warnings:
-                self.warnings.missing_deserializer.setdefault(warning.operation_label, set()).add(warning.message)
-                # Check if this warning should cause test failure
-                if warnings.should_fail(SchemathesisWarning.MISSING_DESERIALIZER):
-                    ctx.exit_code = 1
+    def _handle_warning(
+        self, ctx: ExecutionContext, kind: SchemathesisWarning, record_callback: Callable[[], None]
+    ) -> None:
+        """Handle a warning by checking display/fail config and recording it."""
+        if not self.config.warnings.should_display(kind):
+            return
+        record_callback()
+        if self.config.warnings.should_fail(kind):
+            ctx.exit_code = 1
+
+    def _record_missing_deserializer_warning(self, operation_label: str, message: str) -> Callable[[], None]:
+        """Create a callback that records a missing deserializer warning."""
+
+        def record() -> None:
+            self.warnings.missing_deserializer.setdefault(operation_label, set()).add(message)
+
+        return record
 
     def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
@@ -1161,6 +1169,16 @@ class OutputHandler(EventHandler):
                 if response is not None and response.status_code < 300:
                     self.warnings.missing_test_data.remove(node.value.operation.label)
                     continue
+
+    def _on_schema_warnings(self, ctx: ExecutionContext, event: events.SchemaAnalysisWarnings) -> None:
+        """Process schema-level warnings emitted outside of scenarios."""
+        for warning in event.warnings:
+            if warning.kind is SchemathesisWarning.MISSING_DESERIALIZER:
+                self._handle_warning(
+                    ctx,
+                    warning.kind,
+                    self._record_missing_deserializer_warning(warning.operation_label, warning.message),
+                )
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
         from rich.padding import Padding
@@ -1418,8 +1436,8 @@ class OutputHandler(EventHandler):
         click.echo(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
-            if phase == PhaseName.PROBING:
-                # It is not a test phase
+            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
+                # Internal phases are not part of the test phase summary
                 continue
             status, skip_reason = self.phases[phase]
 

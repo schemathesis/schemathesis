@@ -19,6 +19,7 @@ NOT_SET = NotSet()
 class SpecificationFeature(str, enum.Enum):
     """Features that Schemathesis can provide for different specifications."""
 
+    SCHEMA_ANALYSIS = "schema_analysis"
     STATEFUL_TESTING = "stateful_testing"
     COVERAGE = "coverage_tests"
     EXAMPLES = "example_tests"
@@ -48,6 +49,7 @@ class Specification:
         """Check if Schemathesis supports a given feature for this specification."""
         if self.kind == SpecificationKind.OPENAPI:
             return feature in {
+                SpecificationFeature.SCHEMA_ANALYSIS,
                 SpecificationFeature.STATEFUL_TESTING,
                 SpecificationFeature.COVERAGE,
                 SpecificationFeature.EXAMPLES,

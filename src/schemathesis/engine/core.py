@@ -45,6 +45,11 @@ class Engine:
         phases = [
             self.get_phase_config(PhaseName.PROBING, is_supported=True, requires_links=False),
             self.get_phase_config(
+                PhaseName.SCHEMA_ANALYSIS,
+                is_supported=self.schema.specification.supports_feature(SpecificationFeature.SCHEMA_ANALYSIS),
+                requires_links=False,
+            ),
+            self.get_phase_config(
                 PhaseName.EXAMPLES,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.EXAMPLES),
                 requires_links=False,

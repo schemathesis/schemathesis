@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Iterator, cast
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
-from schemathesis.core.warnings import MissingDeserializerWarning
 from schemathesis.engine import Status
 from schemathesis.generation.case import Case
 
@@ -33,17 +32,13 @@ class ScenarioRecorder:
     checks: dict[str, list[CheckNode]]
     # Network interactions by test case ID
     interactions: dict[str, Interaction]
-    # Static warnings detected during schema analysis
-    warnings: list[MissingDeserializerWarning]
-
-    __slots__ = ("label", "status", "roots", "cases", "checks", "interactions", "warnings")
+    __slots__ = ("label", "status", "roots", "cases", "checks", "interactions")
 
     def __init__(self, *, label: str) -> None:
         self.label = label
         self.cases = {}
         self.checks = {}
         self.interactions = {}
-        self.warnings = []
 
     def record_case(
         self, *, parent_id: str | None, case: Case, transition: Transition | None, is_transition_applied: bool
@@ -78,10 +73,6 @@ class ScenarioRecorder:
     def record_check_success(self, *, name: str, case_id: str) -> None:
         """Record a successful pass of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(CheckNode(name=name, status=Status.SUCCESS, failure_info=None))
-
-    def record_warnings(self, warnings: list[MissingDeserializerWarning]) -> None:
-        """Record static warnings detected during schema analysis."""
-        self.warnings.extend(warnings)
 
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData:
         """Retrieve the relevant test case & interaction data for a failure.
