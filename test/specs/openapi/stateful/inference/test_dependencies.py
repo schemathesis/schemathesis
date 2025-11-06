@@ -1521,10 +1521,10 @@ def test_dependency_graph(request, ctx, paths, components, snapshot_json):
 
     data = list(graph.iter_links())
     for response_links in data:
-        source = schema.get_operation_by_reference(response_links.producer_operation_ref)
+        source = schema.find_operation_by_reference(response_links.producer_operation_ref)
         assert response_links.status_code in source.responses.status_codes
         for link in response_links.links.values():
-            _ = schema.get_operation_by_reference(link.operation_ref)
+            _ = schema.find_operation_by_reference(link.operation_ref)
 
     assert [[entry.status_code, entry.producer_operation_ref, entry.to_openapi()] for entry in data] == snapshot_json
 

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.config import InferenceAlgorithm
 from schemathesis.specs.openapi.stateful import dependencies
+from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -16,12 +17,13 @@ class OpenAPIAnalysis:
     downstream features share cached results instead of recomputing them.
     """
 
-    __slots__ = ("schema", "_links_injected", "_dependency_graph")
+    __slots__ = ("schema", "_links_injected", "_dependency_graph", "_inferencer")
 
     def __init__(self, schema: BaseOpenAPISchema) -> None:
         self.schema = schema
         self._links_injected = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
+        self._inferencer: LinkInferencer | None = None
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
@@ -29,6 +31,13 @@ class OpenAPIAnalysis:
         if self._dependency_graph is None:
             self._dependency_graph = dependencies.analyze(self.schema)
         return self._dependency_graph
+
+    @property
+    def inferencer(self) -> LinkInferencer:
+        """Lazily compute and cache the link inferencer with URL router."""
+        if self._inferencer is None:
+            self._inferencer = LinkInferencer.from_schema(self.schema)
+        return self._inferencer
 
     def should_inject_links(self) -> bool:
         """Check if dependency-based link injection should be applied.

@@ -65,10 +65,10 @@ class OpenApiLink:
         get_operation: Callable[[str], APIOperation]
         if "operationId" in definition:
             operation_reference = definition["operationId"]
-            get_operation = source.schema.get_operation_by_id
+            get_operation = source.schema.find_operation_by_id
         else:
             operation_reference = definition["operationRef"]
-            get_operation = source.schema.get_operation_by_reference
+            get_operation = source.schema.find_operation_by_reference
 
         try:
             self.target = get_operation(operation_reference)

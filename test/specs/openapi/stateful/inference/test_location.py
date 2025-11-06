@@ -14,9 +14,9 @@ def assert_links_work(response_factory, location, results, schema):
     output = StepOutput(response=response, case=None)
     for result in results:
         if "operationRef" in result:
-            operation = schema.get_operation_by_reference(result["operationRef"])
+            operation = schema.find_operation_by_reference(result["operationRef"])
         else:
-            operation = schema.get_operation_by_id(result["operationId"])
+            operation = schema.find_operation_by_id(result["operationId"])
         assert operation is not None
         for expr in result.get("parameters", {}).values():
             expressions.evaluate(expr, output)
