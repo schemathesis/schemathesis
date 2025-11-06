@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.compat import RefResolver
+    from schemathesis.core.jsonschema import BundleCache, Bundler
     from schemathesis.core.jsonschema.types import JsonSchema
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
@@ -19,7 +20,15 @@ ExtractSecurityParameters = Callable[
     Iterator[Mapping[str, Any]],
 ]
 IterParameters = Callable[
-    [Mapping[str, Any], Sequence[Mapping[str, Any]], list[str], "RefResolver", "SpecificationAdapter"],
+    [
+        Mapping[str, Any],
+        Sequence[Mapping[str, Any]],
+        list[str],
+        "RefResolver",
+        "SpecificationAdapter",
+        "Bundler",
+        "BundleCache",
+    ],
     Iterable["OperationParameter"],
 ]
 BuildPathParameter = Callable[[Mapping[str, Any]], "OperationParameter"]
