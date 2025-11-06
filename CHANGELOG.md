@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.1...HEAD) - TBD
 
+### :rocket: Added
+
+- `schema.find_operation_by_path(method, path)` to match actual request paths to API operations.
+
 ### :bug: Fixed
 
 - Response schema validation not working for schemas with nested `$ref` chains in response definitions.

@@ -112,7 +112,7 @@ def inject_links(schema: BaseOpenAPISchema) -> int:
 def _inject_links(schema: BaseOpenAPISchema, graph: DependencyGraph) -> int:
     injected = 0
     for response_links in graph.iter_links():
-        operation = schema.get_operation_by_reference(response_links.producer_operation_ref)
+        operation = schema.find_operation_by_reference(response_links.producer_operation_ref)
         response = operation.responses.get(response_links.status_code)
         links = response.definition.setdefault(schema.adapter.links_keyword, {})
 
@@ -174,9 +174,9 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
 def _resolve_link_operation(link: dict, schema: BaseOpenAPISchema) -> APIOperation:
     """Resolve link to operation."""
     if "operationRef" in link:
-        return schema.get_operation_by_reference(link["operationRef"])
+        return schema.find_operation_by_reference(link["operationRef"])
     if "operationId" in link:
-        return schema.get_operation_by_id(link["operationId"])
+        return schema.find_operation_by_id(link["operationId"])
     raise InvalidSchema(
         "Link definition is missing both 'operationRef' and 'operationId'. "
         "At least one of these fields must be present to identify the target operation."
