@@ -169,6 +169,31 @@ def test_no_paths_on_openapi_3_1():
     assert list(schema.get_all_operations()) == []
 
 
+def test_operation_lookup_without_paths_on_openapi_3_1():
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+        # No `paths`, but webhook-only schemas are valid in 3.1+
+        "webhooks": {
+            "UserCreated": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    with pytest.raises(OperationNotFound, match="/users"):
+        schema["/users"]
+
+
 def test_schema_error_on_path(simple_schema):
     # When there is an error that affects only a subset of paths
     simple_schema["paths"] = {None: "", "/foo": {"post": RESPONSES}}

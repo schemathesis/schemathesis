@@ -91,14 +91,27 @@ class BaseOpenAPISchema(BaseSchema):
         return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.raw_schema.get("paths", {}))
+        paths = self._get_paths()
+        if paths is None:
+            return iter(())
+        return iter(paths)
 
     @cached_property
     def default_media_types(self) -> list[str]:
         raise NotImplementedError
 
+    def _get_paths(self) -> Mapping[str, Any] | None:
+        paths = self.raw_schema.get("paths")
+        if paths is None:
+            return None
+        assert isinstance(paths, Mapping)
+        return cast(Mapping[str, Any], paths)
+
     def _get_operation_map(self, path: str) -> APIOperationMap:
-        path_item = self.raw_schema.get("paths", {})[path]
+        paths = self._get_paths()
+        if paths is None:
+            raise KeyError(path)
+        path_item = paths[path]
         with in_scope(self.resolver, self.location or ""):
             scope, path_item = self._resolve_path_item(path_item)
         self.dispatch_hook("before_process_path", HookContext(), path, path_item)
@@ -152,9 +165,8 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
-        try:
-            paths = self.raw_schema["paths"]
-        except KeyError:
+        paths = self._get_paths()
+        if paths is None:
             return statistic
 
         resolve = self.resolver.resolve
@@ -219,9 +231,8 @@ class BaseOpenAPISchema(BaseSchema):
         return statistic
 
     def _operation_iter(self) -> Iterator[tuple[str, str, dict[str, Any]]]:
-        try:
-            paths = self.raw_schema["paths"]
-        except KeyError:
+        paths = self._get_paths()
+        if paths is None:
             return
         resolve = self.resolver.resolve
         should_skip = self._should_skip
@@ -253,14 +264,11 @@ class BaseOpenAPISchema(BaseSchema):
         operations and show errors for invalid ones.
         """
         __tracebackhide__ = True
-        try:
-            paths = self.raw_schema["paths"]
-        except KeyError as exc:
-            # This field is optional in Open API 3.1
+        paths = self._get_paths()
+        if paths is None:
             if version.parse(self.specification.version) >= version.parse("3.1"):
                 return
-            # Missing `paths` is not recoverable
-            self._raise_invalid_schema(exc)
+            self._raise_invalid_schema(KeyError("paths"))
 
         context = HookContext()
         # Optimization: local variables are faster than attribute access
@@ -435,7 +443,11 @@ class BaseOpenAPISchema(BaseSchema):
         """Find an `APIOperation` instance by its `operationId`."""
         resolve = self.resolver.resolve
         default_scope = self.resolver.resolution_scope
-        for path, path_item in self.raw_schema.get("paths", {}).items():
+        paths = self._get_paths()
+        if paths is None:
+            self._on_missing_operation(operation_id, None, [])
+        assert paths is not None
+        for path, path_item in paths.items():
             # If the path is behind a reference we have to keep the scope
             # The scope is used to resolve nested components later on
             if "$ref" in path_item:
