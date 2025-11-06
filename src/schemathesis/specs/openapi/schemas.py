@@ -431,8 +431,8 @@ class BaseOpenAPISchema(BaseSchema):
         """Get examples from the API operation."""
         raise NotImplementedError
 
-    def get_operation_by_id(self, operation_id: str) -> APIOperation:
-        """Get an `APIOperation` instance by its `operationId`."""
+    def find_operation_by_id(self, operation_id: str) -> APIOperation:
+        """Find an `APIOperation` instance by its `operationId`."""
         resolve = self.resolver.resolve
         default_scope = self.resolver.resolution_scope
         for path, path_item in self.raw_schema.get("paths", {}).items():
@@ -450,8 +450,8 @@ class BaseOpenAPISchema(BaseSchema):
                     return self.make_operation(path, method, parameters, operation, scope)
         self._on_missing_operation(operation_id, None, [])
 
-    def get_operation_by_reference(self, reference: str) -> APIOperation:
-        """Get local or external `APIOperation` instance by reference.
+    def find_operation_by_reference(self, reference: str) -> APIOperation:
+        """Find local or external `APIOperation` instance by reference.
 
         Reference example: #/paths/~1users~1{user_id}/patch
         """
@@ -463,6 +463,26 @@ class BaseOpenAPISchema(BaseSchema):
         with in_scope(self.resolver, scope):
             parameters = self._iter_parameters(operation, path_item.get("parameters", []))
         return self.make_operation(path, method, parameters, operation, scope)
+
+    def find_operation_by_path(self, method: str, path: str) -> APIOperation | None:
+        """Find an `APIOperation` by matching an actual request path.
+
+        Matches path templates with parameters, e.g., /users/42 matches /users/{user_id}.
+        Returns None if no operation matches.
+        """
+        from werkzeug.exceptions import MethodNotAllowed, NotFound
+
+        from schemathesis.specs.openapi.stateful.inference import OperationById
+
+        # Match path and method using werkzeug router
+        try:
+            operation_ref, _ = self.analysis.inferencer._adapter.match(path, method=method.upper())
+        except (NotFound, MethodNotAllowed):
+            return None
+
+        if isinstance(operation_ref, OperationById):
+            return self.find_operation_by_id(operation_ref.value)
+        return self.find_operation_by_reference(operation_ref.value)
 
     def get_case_strategy(
         self,

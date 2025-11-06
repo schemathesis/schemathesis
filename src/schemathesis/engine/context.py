@@ -89,14 +89,11 @@ class EngineContext:
 
         injected = 0
         if self.observations is not None and self.observations.location_headers:
-            from schemathesis.specs.openapi.stateful.inference import LinkInferencer
-
             assert isinstance(self.schema, BaseOpenAPISchema)
 
             # Generate links from collected Location headers
-            inferencer = LinkInferencer.from_schema(self.schema)
             for operation, entries in self.observations.location_headers.items():
-                injected += inferencer.inject_links(operation.responses, entries)
+                injected += self.schema.analysis.inferencer.inject_links(operation.responses, entries)
         if isinstance(self.schema, BaseOpenAPISchema) and self.schema.analysis.should_inject_links():
             injected += self.schema.analysis.inject_links()
         return injected

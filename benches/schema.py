@@ -146,8 +146,8 @@ def test_get_operation(benchmark, schema, key):
     ],
     ids=("bbci", "vmware"),
 )
-def test_get_operation_by_id(benchmark, schema, key):
-    benchmark(schema.get_operation_by_id, key)
+def test_find_operation_by_id(benchmark, schema, key):
+    benchmark(schema.find_operation_by_id, key)
 
 
 @pytest.mark.benchmark
@@ -159,8 +159,8 @@ def test_get_operation_by_id(benchmark, schema, key):
     ],
     ids=("bbci", "vmware"),
 )
-def test_get_operation_by_reference(benchmark, schema, key):
-    benchmark(schema.get_operation_by_reference, key)
+def test_find_operation_by_reference(benchmark, schema, key):
+    benchmark(schema.find_operation_by_reference, key)
 
 
 def _optimized_schema(operations):

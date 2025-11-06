@@ -207,13 +207,13 @@ SCHEMA = {
 )
 def test_get_operation(operation_id, reference, path, method):
     schema = schemathesis.openapi.from_dict(SCHEMA)
-    for getter, key in ((schema.get_operation_by_id, operation_id), (schema.get_operation_by_reference, reference)):
+    for getter, key in ((schema.find_operation_by_id, operation_id), (schema.find_operation_by_reference, reference)):
         operation = getter(key)
         assert operation.path == path
         assert operation.method.upper() == method
 
 
-def test_get_operation_by_id_in_referenced_path(ctx):
+def test_find_operation_by_id_in_referenced_path(ctx):
     # When a path entry is behind a reference
     # it should be resolved correctly
     schema = ctx.openapi.build_schema(
@@ -225,12 +225,12 @@ def test_get_operation_by_id_in_referenced_path(ctx):
         },
     )
     schema = schemathesis.openapi.from_dict(schema)
-    operation = schema.get_operation_by_id("getFoo")
+    operation = schema.find_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
 
 
-def test_get_operation_by_id_in_referenced_path_shared_parameters(ctx):
+def test_find_operation_by_id_in_referenced_path_shared_parameters(ctx):
     # When a path entry is behind a reference
     # and it shares parameters with the parent path
     # it should be resolved correctly
@@ -248,19 +248,19 @@ def test_get_operation_by_id_in_referenced_path_shared_parameters(ctx):
         },
     )
     schema = schemathesis.openapi.from_dict(schema)
-    operation = schema.get_operation_by_id("getFoo")
+    operation = schema.find_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
 
 
-def test_get_operation_by_id_no_paths_on_openapi_3_1():
+def test_find_operation_by_id_no_paths_on_openapi_3_1():
     raw_schema = {
         "openapi": "3.1.0",
         "info": {"title": "Test", "version": "0.1.0"},
     }
     schema = schemathesis.openapi.from_dict(raw_schema)
     with pytest.raises(OperationNotFound):
-        schema.get_operation_by_id("getFoo")
+        schema.find_operation_by_id("getFoo")
 
 
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
