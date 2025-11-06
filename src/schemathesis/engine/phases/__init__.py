@@ -14,6 +14,7 @@ class PhaseName(str, enum.Enum):
     """Available execution phases."""
 
     PROBING = "API probing"
+    SCHEMA_ANALYSIS = "Schema analysis"
     EXAMPLES = "Examples"
     COVERAGE = "Coverage"
     FUZZING = "Fuzzing"
@@ -27,6 +28,7 @@ class PhaseName(str, enum.Enum):
     def name(self) -> str:
         return {
             PhaseName.PROBING: "probing",
+            PhaseName.SCHEMA_ANALYSIS: "schema analysis",
             PhaseName.EXAMPLES: "examples",
             PhaseName.COVERAGE: "coverage",
             PhaseName.FUZZING: "fuzzing",
@@ -37,6 +39,7 @@ class PhaseName(str, enum.Enum):
     def from_str(cls, value: str) -> PhaseName:
         return {
             "probing": cls.PROBING,
+            "schema analysis": cls.SCHEMA_ANALYSIS,
             "examples": cls.EXAMPLES,
             "coverage": cls.COVERAGE,
             "fuzzing": cls.FUZZING,
@@ -86,13 +89,15 @@ class Phase:
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
-    from . import probes, stateful, unit
+    from . import analysis, probes, stateful, unit
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
 
         if phase.name == PhaseName.PROBING:
             yield from probes.execute(ctx, phase)
+        elif phase.name == PhaseName.SCHEMA_ANALYSIS:
+            yield from analysis.execute(ctx, phase)
         elif phase.name == PhaseName.EXAMPLES:
             yield from unit.execute(ctx, phase)
         elif phase.name == PhaseName.COVERAGE:

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections import defaultdict
+from typing import TYPE_CHECKING, Iterator
 
 from schemathesis.config import InferenceAlgorithm
+from schemathesis.core.result import Ok
+from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
+from schemathesis.specs.openapi.warnings import detect_missing_deserializers
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -17,13 +21,14 @@ class OpenAPIAnalysis:
     downstream features share cached results instead of recomputing them.
     """
 
-    __slots__ = ("schema", "_links_injected", "_dependency_graph", "_inferencer")
+    __slots__ = ("schema", "_links_injected", "_dependency_graph", "_inferencer", "_warnings_cache")
 
     def __init__(self, schema: BaseOpenAPISchema) -> None:
         self.schema = schema
         self._links_injected = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
         self._inferencer: LinkInferencer | None = None
+        self._warnings_cache: dict[str, list[SchemaWarning]] | None = None
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
@@ -70,3 +75,22 @@ class OpenAPIAnalysis:
     def links_injected(self) -> bool:
         """Check if links have been injected into the schema."""
         return self._links_injected
+
+    def iter_warnings(self) -> Iterator[SchemaWarning]:
+        """Iterate over all cached schema warnings."""
+        warnings_map = self._get_warnings_map()
+        for warnings in warnings_map.values():
+            yield from warnings
+
+    def _get_warnings_map(self) -> dict[str, list[SchemaWarning]]:
+        if self._warnings_cache is None:
+            self._warnings_cache = self._collect_warnings()
+        return self._warnings_cache
+
+    def _collect_warnings(self) -> dict[str, list[SchemaWarning]]:
+        warnings_map: dict[str, list[SchemaWarning]] = defaultdict(list)
+        for result in self.schema.get_all_operations():
+            if isinstance(result, Ok):
+                operation = result.ok()
+                warnings_map[operation.label].extend(detect_missing_deserializers(operation))
+        return warnings_map

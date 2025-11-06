@@ -11,7 +11,6 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
-from schemathesis.core.warnings import detect_missing_deserializers
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -33,12 +32,9 @@ FilterFunction = Callable[["StepOutput"], bool]
 class OpenAPIStateMachine(APIStateMachine):
     _response_matchers: dict[str, Callable[[StepOutput], str | None]]
     _transitions: ApiTransitions
-    _static_warnings: list
 
     def __init__(self) -> None:
         self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL)
-        # Copy pre-detected warnings from class attribute (detected once in create_state_machine)
-        self.recorder.record_warnings(self._static_warnings)
         self.control = TransitionController(self._transitions)
         super().__init__()
 
@@ -125,10 +121,6 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
 
     # Detect warnings once for all operations tested in stateful phase
     # Store them as a class attribute to avoid re-detection for each scenario
-    _static_warnings = []
-    for operation in operations:
-        _static_warnings.extend(detect_missing_deserializers(operation))
-
     # Create bundles and matchers
     for operation in operations:
         all_status_codes = operation.responses.status_codes
@@ -218,7 +210,6 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             "bundles": bundles,
             "_response_matchers": _response_matchers,
             "_transitions": transitions,
-            "_static_warnings": _static_warnings,
             **rules,
         },
     )

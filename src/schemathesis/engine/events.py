@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
 
 from schemathesis.core.result import Result
+from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import Phase, PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -82,6 +83,21 @@ class PhaseFinished(PhaseEvent):
         self.phase = phase
         self.status = status
         self.payload = payload
+
+
+@dataclass
+class SchemaAnalysisWarnings(PhaseEvent):
+    """Schema analysis discovered warnings."""
+
+    warnings: list[SchemaWarning]
+
+    __slots__ = ("id", "timestamp", "phase", "warnings")
+
+    def __init__(self, *, phase: Phase, warnings: list[SchemaWarning]) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.warnings = warnings
 
 
 @dataclass

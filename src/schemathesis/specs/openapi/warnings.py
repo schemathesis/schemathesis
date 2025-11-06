@@ -1,11 +1,11 @@
-"""Schema analysis warnings."""
+"""OpenAPI-specific static schema warnings."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from schemathesis.config._warnings import SchemathesisWarning
+from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema.types import get_type
@@ -41,45 +41,23 @@ class MissingDeserializerWarning:
 
 
 def detect_missing_deserializers(operation: APIOperation) -> list[MissingDeserializerWarning]:
-    """Detect responses with structured schemas but no registered deserializer.
-
-    Args:
-        operation: The API operation to analyze
-
-    Returns:
-        List of warnings for responses with structured schemas (object/array types)
-        that have custom media types with no deserializer registered.
-
-    """
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
-
+    """Detect responses with structured schemas but no registered deserializer."""
     warnings: list[MissingDeserializerWarning] = []
 
-    # Only applicable to OpenAPI schemas
-    if not isinstance(operation.schema, BaseOpenAPISchema):
-        return warnings
-
     for status_code, response in operation.responses.items():
-        # Use raw schema to avoid resolution errors
         raw_schema = getattr(response, "get_raw_schema", lambda: None)()
         if raw_schema is None:
             continue
 
         schema_types = get_type(raw_schema)
-
-        # Only warn for structured types that need deserialization for validation
         is_structured = any(t in ("object", "array") for t in schema_types)
 
         if not is_structured:
             continue
 
-        # Get content types for this response
         content_types = response.definition.get("content", {}).keys() if response.definition else []
 
         for content_type in content_types:
-            # Check if we have a deserializer for this media type
-            # Skip malformed media types - we don't care about checking for deserializers
-            # or emitting warnings for content types that aren't valid
             try:
                 has_deserializer = deserialization.has_deserializer(content_type)
             except MalformedMediaType:

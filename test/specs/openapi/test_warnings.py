@@ -1,6 +1,6 @@
 import schemathesis
-from schemathesis.config._warnings import SchemathesisWarning
-from schemathesis.core.warnings import MissingDeserializerWarning, detect_missing_deserializers
+from schemathesis.config import SchemathesisWarning
+from schemathesis.specs.openapi.warnings import MissingDeserializerWarning, detect_missing_deserializers
 
 
 def test_missing_deserializer_warning_properties():
