@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Response schema validation not working for schemas with nested `$ref` chains in response definitions.
+
 ## [4.4.1](https://github.com/schemathesis/schemathesis/compare/v4.4.0...v4.4.1) - 2025-11-06
 
 ### :bug: Fixed
