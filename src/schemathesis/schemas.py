@@ -280,11 +280,16 @@ class BaseSchema(Mapping):
         parts = urlsplit(self.location or "")[:2] + (path, "", "")
         return urlunsplit(parts)
 
+    @cached_property
+    def _cached_base_url(self) -> str:
+        """Cached base URL computation since schema doesn't change."""
+        return self._build_base_url()
+
     def get_base_url(self) -> str:
         base_url = self.config.base_url
         if base_url is not None:
             return base_url.rstrip("/")
-        return self._build_base_url()
+        return self._cached_base_url
 
     def validate(self) -> None:
         raise NotImplementedError
