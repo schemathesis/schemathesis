@@ -7,24 +7,13 @@ from difflib import get_close_matches
 from functools import cached_property, lru_cache
 from json import JSONDecodeError
 from types import SimpleNamespace
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Generator,
-    Iterator,
-    Mapping,
-    NoReturn,
-    Sequence,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterator, Mapping, NoReturn, Sequence, cast
 from urllib.parse import urlsplit
 
 import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.config import InferenceAlgorithm
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
@@ -51,7 +40,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
 )
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
-from schemathesis.specs.openapi.stateful import dependencies
+from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -91,8 +80,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        # Track whether dependency inference has been applied to avoid duplicate work
-        self._inference_applied: bool = False
+        self.analysis = OpenAPIAnalysis(self)
 
     @property
     def specification(self) -> Specification:
@@ -508,22 +496,9 @@ class BaseOpenAPISchema(BaseSchema):
 
     def as_state_machine(self) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
-        if self._should_apply_inference():
-            self._apply_dependency_inference()
+        if self.analysis.should_inject_links():
+            self.analysis.inject_links()
         return create_state_machine(self)
-
-    def _should_apply_inference(self) -> bool:
-        """Check if dependency inference should be applied."""
-        return (
-            not self._inference_applied
-            and self.config.phases.stateful.enabled
-            and self.config.phases.stateful.inference.is_algorithm_enabled(InferenceAlgorithm.DEPENDENCY_ANALYSIS)
-        )
-
-    def _apply_dependency_inference(self) -> None:
-        """Apply dependency analysis to infer links between operations."""
-        dependencies.inject_links(self)
-        self._inference_applied = True
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")

@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "analyze",
+    "inject_links",
     "DependencyGraph",
     "InputSlot",
     "OutputSlot",
@@ -104,8 +105,12 @@ def analyze(schema: BaseOpenAPISchema) -> DependencyGraph:
 
 
 def inject_links(schema: BaseOpenAPISchema) -> int:
-    injected = 0
     graph = analyze(schema)
+    return _inject_links(schema, graph)
+
+
+def _inject_links(schema: BaseOpenAPISchema, graph: DependencyGraph) -> int:
+    injected = 0
     for response_links in graph.iter_links():
         operation = schema.get_operation_by_reference(response_links.producer_operation_ref)
         response = operation.responses.get(response_links.status_code)
