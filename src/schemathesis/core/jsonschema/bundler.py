@@ -15,9 +15,6 @@ if TYPE_CHECKING:
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
 
-# Cache for bundled parameters: parameter object id -> (bundled definition, name_to_uri mapping)
-BundleCache = dict[int, tuple[dict[str, Any], dict[str, str]]]
-
 
 class BundleError(Exception):
     def __init__(self, reference: str, value: Any) -> None:
