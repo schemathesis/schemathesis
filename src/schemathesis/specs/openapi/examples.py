@@ -30,7 +30,7 @@ from .formats import STRING_FORMATS
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 @dataclass
@@ -103,9 +103,9 @@ def extract_top_level(
     operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
 ) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
-    from .schemas import BaseOpenAPISchema
+    from .schemas import OpenApiSchema
 
-    assert isinstance(operation.schema, BaseOpenAPISchema)
+    assert isinstance(operation.schema, OpenApiSchema)
 
     responses = list(operation.responses.iter_examples())
     for parameter in operation.iter_parameters():
@@ -308,7 +308,7 @@ def _expand_subschemas(
             yield subschema, expanded_path
 
 
-def extract_inner_examples(examples: dict[str, Any] | list, schema: BaseOpenAPISchema) -> Generator[Any, None, None]:
+def extract_inner_examples(examples: dict[str, Any] | list, schema: OpenApiSchema) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
     if isinstance(examples, dict):
         for example in examples.values():

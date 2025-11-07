@@ -284,12 +284,12 @@ class OpenApiBody(OpenApiComponent):
 
         # Import here to avoid circular dependency
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
-        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
         schema = self.optimized_schema
-        assert isinstance(operation.schema, BaseOpenAPISchema)
+        assert isinstance(operation.schema, OpenApiSchema)
         strategy = strategy_factory(
             schema,
             operation.label,
@@ -594,7 +594,7 @@ class OpenApiParameterSet(ParameterSet):
             quote_all,
         )
         from schemathesis.specs.openapi.negative import GeneratedValue
-        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         # Get schema with exclusions
         schema = self.get_schema_with_exclusions(exclude)
@@ -605,7 +605,7 @@ class OpenApiParameterSet(ParameterSet):
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
-            assert isinstance(operation.schema, BaseOpenAPISchema)
+            assert isinstance(operation.schema, OpenApiSchema)
             strategy = strategy_factory(
                 schema,
                 operation.label,

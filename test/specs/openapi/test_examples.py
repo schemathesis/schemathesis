@@ -25,7 +25,7 @@ from test.utils import assert_requests_call
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 @pytest.fixture(scope="module")
@@ -199,12 +199,12 @@ def dict_with_property_examples() -> dict[str, Any]:
 
 
 @pytest.fixture(scope="module")
-def schema_with_examples(dict_with_examples) -> BaseOpenAPISchema:
+def schema_with_examples(dict_with_examples) -> OpenApiSchema:
     return schemathesis.openapi.from_dict(dict_with_examples)
 
 
 @pytest.fixture(scope="module")
-def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISchema:
+def schema_with_property_examples(dict_with_property_examples) -> OpenApiSchema:
     return schemathesis.openapi.from_dict(dict_with_property_examples)
 
 

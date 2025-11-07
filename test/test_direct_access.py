@@ -25,7 +25,7 @@ def test_iter(swagger_20):
 
 
 def test_repr(swagger_20):
-    assert str(swagger_20) == "<SwaggerV20 for Sample API 1.0.0>"
+    assert str(swagger_20) == "<OpenApiSchema for Sample API 1.0.0>"
 
 
 @pytest.mark.parametrize("method", ["GET", "get"])

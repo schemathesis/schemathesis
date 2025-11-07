@@ -204,10 +204,10 @@ class Case:
         """Revalidate dirty components and update metadata."""
         assert self._meta and self._meta.is_dirty()
 
-        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         # Only works for OpenAPI schemas
-        if not isinstance(self.operation.schema, BaseOpenAPISchema):
+        if not isinstance(self.operation.schema, OpenApiSchema):
             # Can't validate, just clear dirty flags
             for location in list(self._meta._dirty):
                 self._meta.clear_dirty(location)

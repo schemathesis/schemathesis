@@ -522,7 +522,7 @@ def _iter_coverage_cases(
     from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.examples import find_matching_in_responses
     from schemathesis.specs.openapi.media_types import MEDIA_TYPES
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
     from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
     generators: dict[tuple[ParameterLocation, str], Generator[coverage.GeneratedValue, None, None]] = {}
@@ -535,7 +535,7 @@ def _iter_coverage_cases(
 
     seen_negative = coverage.HashSet()
     seen_positive = coverage.HashSet()
-    assert isinstance(operation.schema, BaseOpenAPISchema)
+    assert isinstance(operation.schema, OpenApiSchema)
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
 
     for parameter in operation.iter_parameters():

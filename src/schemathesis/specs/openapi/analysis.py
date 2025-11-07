@@ -11,7 +11,7 @@ from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 from schemathesis.specs.openapi.warnings import detect_missing_deserializers
 
 if TYPE_CHECKING:
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 class OpenAPIAnalysis:
@@ -23,7 +23,7 @@ class OpenAPIAnalysis:
 
     __slots__ = ("schema", "_links_injected", "_dependency_graph", "_inferencer", "_warnings_cache")
 
-    def __init__(self, schema: BaseOpenAPISchema) -> None:
+    def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
         self._links_injected = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
