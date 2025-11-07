@@ -40,3 +40,69 @@ def test_is_json_media_type(value, expected):
 )
 def test_is_plain_text_media_type(value, expected):
     assert media_types.is_plain_text(value) is expected
+
+
+@pytest.mark.parametrize(
+    ("expected", "actual", "should_match"),
+    [
+        # Exact matches
+        ("application/json", "application/json", True),
+        ("text/plain", "text/plain", True),
+        ("application/problem+json", "application/problem+json", True),
+        # Different media types
+        ("application/json", "application/xml", False),
+        ("text/plain", "text/html", False),
+        ("application/json", "text/plain", False),
+        # Wildcard main type
+        ("*/json", "application/json", True),
+        ("*/json", "text/json", True),
+        ("*/xml", "application/json", False),
+        # Wildcard subtype
+        ("application/*", "application/json", True),
+        ("application/*", "application/xml", True),
+        ("application/*", "text/plain", False),
+        ("text/*", "text/plain", True),
+        ("text/*", "application/json", False),
+        # Full wildcard
+        ("*/*", "application/json", True),
+        ("*/*", "text/plain", True),
+        ("*/*", "image/png", True),
+        # Parameters should not affect matching (handled by parse)
+        ("application/json", "application/json;charset=utf-8", True),
+        # Complex subtypes
+        ("application/problem+json", "application/problem+json", True),
+        ("application/vnd.api+json", "application/vnd.api+json", True),
+        ("application/*", "application/problem+json", True),
+    ],
+)
+def test_matches(expected, actual, should_match):
+    assert media_types.matches(expected, actual) == should_match
+
+
+@pytest.mark.parametrize(
+    ("expected", "actual", "should_match"),
+    [
+        # Exact matches
+        (("application", "json"), ("application", "json"), True),
+        (("text", "plain"), ("text", "plain"), True),
+        # Different media types
+        (("application", "json"), ("application", "xml"), False),
+        (("text", "plain"), ("application", "json"), False),
+        # Wildcard main type
+        (("*", "json"), ("application", "json"), True),
+        (("*", "json"), ("text", "json"), True),
+        (("*", "xml"), ("application", "json"), False),
+        # Wildcard subtype
+        (("application", "*"), ("application", "json"), True),
+        (("application", "*"), ("application", "xml"), True),
+        (("application", "*"), ("text", "plain"), False),
+        # Full wildcard
+        (("*", "*"), ("application", "json"), True),
+        (("*", "*"), ("text", "plain"), True),
+        # Asymmetry: wildcard only in expected
+        (("application", "*"), ("application", "json"), True),
+        (("application", "json"), ("application", "*"), False),
+    ],
+)
+def test_matches_parts(expected, actual, should_match):
+    assert media_types.matches_parts(expected, actual) == should_match

@@ -597,22 +597,42 @@ class OpenApiSchema(BaseSchema):
     ) -> bool | None:
         __tracebackhide__ = True
         definition = operation.responses.find_by_status_code(response.status_code)
-        if definition is None or definition.schema is None:
-            # No definition for the given HTTP response, or missing "schema" in the matching definition
+        if definition is None:
             return None
+
+        documented_media_types = self.get_content_types(operation, response)
 
         failures: list[Failure] = []
 
         content_types = response.headers.get("content-type")
-        if content_types is None:
-            all_media_types = self.get_content_types(operation, response)
-            formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
+        resolved_content_type = content_types[0] if content_types else None
+
+        resolved = definition.get_schema(resolved_content_type)
+        if resolved.schema is None:
+            return None
+
+        try:
+            validator = definition.get_validator_for_schema(resolved.media_type, resolved.schema)
+        except jsonschema.SchemaError as exc:
+            raise InvalidSchema.from_jsonschema_error(
+                exc,
+                path=operation.path,
+                method=operation.method,
+                config=self.config.output,
+                location=SchemaLocation.response_schema(self.specification.version),
+            ) from exc
+        if validator is None:
+            return None
+
+        if resolved_content_type is None:
+            formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
-            failures.append(MissingContentType(operation=operation.label, message=message, media_types=all_media_types))
-            # Default content type
-            content_type = "application/json"
+            failures.append(
+                MissingContentType(operation=operation.label, message=message, media_types=documented_media_types)
+            )
+            content_type = resolved.media_type or "application/json"
         else:
-            content_type = content_types[0]
+            content_type = resolved_content_type
 
         context = deserialization.DeserializationContext(operation=operation, case=case)
 
@@ -638,7 +658,7 @@ class OpenApiSchema(BaseSchema):
             return None
 
         try:
-            definition.validator.validate(data)
+            validator.validate(data)
         except jsonschema.SchemaError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc,

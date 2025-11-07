@@ -27,7 +27,13 @@ if TYPE_CHECKING:
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
 ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
+PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "RefResolver", str, str], "JsonSchema"]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
+GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], Union[str, None]]
+ResolveResponseMediaType = Callable[[Mapping[str, Any], Union[str, None]], Union[str, None]]
+ExtractSchemaForMediaType = Callable[
+    [Mapping[str, Any], Union[str, None], "RefResolver", str, str], Union["JsonSchema", None]
+]
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
     [Mapping[str, Any], Mapping[str, Any], "RefResolver"],
@@ -69,6 +75,11 @@ class SpecificationAdapter(Protocol):
     # Function to extract response schema from specification
     extract_raw_response_schema: ExtractRawResponseSchema
     extract_response_schema: ExtractResponseSchema
+    prepare_response_media_type_schema: PrepareResponseMediaTypeSchema
+    # Functions for handling multiple media types in responses
+    get_default_response_media_type: GetDefaultResponseMediaType
+    resolve_response_media_type: ResolveResponseMediaType
+    extract_schema_for_media_type: ExtractSchemaForMediaType
     # Function to extract header schema from specification
     extract_header_schema: ExtractHeaderSchema
     # Function to iterate over API operation parameters
