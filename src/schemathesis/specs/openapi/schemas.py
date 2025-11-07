@@ -14,7 +14,7 @@ import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
@@ -33,11 +33,7 @@ from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.adapter.parameters import (
-    COMBINED_FORM_DATA_MARKER,
-    OpenApiParameter,
-    OpenApiParameterSet,
-)
+from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
@@ -706,37 +702,7 @@ class SwaggerV20(BaseOpenAPISchema):
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
-        files, data = [], {}
-        # If there is no content types specified for the request or "application/x-www-form-urlencoded" is specified
-        # explicitly, then use it., but if "multipart/form-data" is specified, then use it
-        content_types = self.get_request_payload_content_types(operation)
-        is_multipart = "multipart/form-data" in content_types
-
-        known_fields: dict[str, dict] = {}
-
-        for parameter in operation.body:
-            if COMBINED_FORM_DATA_MARKER in parameter.definition:
-                known_fields.update(parameter.definition["schema"].get("properties", {}))
-
-        def add_file(name: str, value: Any) -> None:
-            if isinstance(value, list):
-                for item in value:
-                    files.append((name, (None, item)))
-            else:
-                files.append((name, value))
-
-        for name, value in form_data.items():
-            param_def = known_fields.get(name)
-            if param_def:
-                if param_def.get("type") == "file" or is_multipart:
-                    add_file(name, value)
-                else:
-                    data[name] = value
-            else:
-                # Unknown field — treat it as a file (safe default under multipart/form-data)
-                add_file(name, value)
-        # `None` is the default value for `files` and `data` arguments in `requests.request`
-        return files or None, data or None
+        return self.adapter.prepare_multipart(operation, form_data)
 
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         return self._get_consumes_for_operation(operation.definition.raw)
@@ -830,27 +796,4 @@ class OpenApi30(SwaggerV20):
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
-        files = []
-        # Open API 3.0 requires media types to be present. We can get here only if the schema defines
-        # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
-        schema = {}
-        for body in operation.body:
-            main, sub = media_types.parse(body.media_type)
-            if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
-                schema = body.definition.get("schema")
-                break
-        for name, value in form_data.items():
-            property_schema = (schema or {}).get("properties", {}).get(name)
-            if property_schema:
-                if isinstance(value, list):
-                    files.extend([(name, item) for item in value])
-                elif property_schema.get("format") in ("binary", "base64"):
-                    files.append((name, value))
-                else:
-                    files.append((name, (None, value)))
-            elif isinstance(value, list):
-                files.extend([(name, item) for item in value])
-            else:
-                files.append((name, (None, value)))
-        # `None` is the default value for `files` and `data` arguments in `requests.request`
-        return files or None, None
+        return self.adapter.prepare_multipart(operation, form_data)

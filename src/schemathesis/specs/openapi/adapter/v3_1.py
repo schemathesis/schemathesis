@@ -1,6 +1,6 @@
 from jsonschema import Draft202012Validator
 
-from schemathesis.specs.openapi.adapter import parameters, responses, security
+from schemathesis.specs.openapi.adapter import formdata, parameters, responses, security
 from schemathesis.specs.openapi.adapter.protocol import (
     BuildPathParameter,
     ExtractHeaderSchema,
@@ -10,6 +10,7 @@ from schemathesis.specs.openapi.adapter.protocol import (
     ExtractSecurityParameters,
     IterParameters,
     IterResponseExamples,
+    PrepareMultipart,
 )
 
 nullable_keyword = "nullable"
@@ -26,5 +27,6 @@ iter_parameters: IterParameters = parameters.iter_parameters_v3
 build_path_parameter: BuildPathParameter = parameters.build_path_parameter_v3_1
 iter_response_examples: IterResponseExamples = responses.iter_response_examples_v3
 extract_security_parameters: ExtractSecurityParameters = security.extract_security_parameters_v3
+prepare_multipart: PrepareMultipart = formdata.prepare_multipart_v3
 
 jsonschema_validator_cls = Draft202012Validator

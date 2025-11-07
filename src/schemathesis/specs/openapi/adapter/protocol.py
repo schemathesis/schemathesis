@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Mapping, Protocol, Sequence, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 if TYPE_CHECKING:
     from jsonschema.protocols import Validator
@@ -8,6 +21,7 @@ if TYPE_CHECKING:
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.compat import RefResolver
     from schemathesis.core.jsonschema.types import JsonSchema
+    from schemathesis.schemas import APIOperation
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
@@ -17,6 +31,10 @@ ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
     [Mapping[str, Any], Mapping[str, Any], "RefResolver"],
     Iterator[Mapping[str, Any]],
+]
+PrepareMultipart = Callable[
+    ["APIOperation", dict[str, Any]],
+    Tuple[Optional[List[Tuple[str, Any]]], Optional[dict[str, Any]]],
 ]
 IterParameters = Callable[
     [Mapping[str, Any], Sequence[Mapping[str, Any]], list[str], "RefResolver", "SpecificationAdapter"],
@@ -54,6 +72,7 @@ class SpecificationAdapter(Protocol):
     iter_response_examples: IterResponseExamples
     # Function to extract security parameters for an API operation
     extract_security_parameters: ExtractSecurityParameters
+    prepare_multipart: PrepareMultipart
 
     # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[Validator]
