@@ -1,6 +1,15 @@
 from jsonschema import Draft4Validator
 
-from schemathesis.specs.openapi.adapter import formdata, parameters, responses, security
+from schemathesis.specs.openapi.adapter import (
+    base_paths,
+    content_types,
+    formdata,
+    parameter_serializers,
+    parameters,
+    responses,
+    security,
+    validators,
+)
 from schemathesis.specs.openapi.adapter.protocol import (
     BuildPathParameter,
     ExtractHeaderSchema,
@@ -8,9 +17,15 @@ from schemathesis.specs.openapi.adapter.protocol import (
     ExtractRawResponseSchema,
     ExtractResponseSchema,
     ExtractSecurityParameters,
+    GetBasePath,
+    GetDefaultMediaTypes,
+    GetParameterSerializer,
+    GetRequestPayloadContentTypes,
+    GetResponseContentTypes,
     IterParameters,
     IterResponseExamples,
     PrepareMultipart,
+    ValidateSchema,
 )
 
 nullable_keyword = "nullable"
@@ -28,5 +43,11 @@ build_path_parameter: BuildPathParameter = parameters.build_path_parameter_v3_0
 iter_response_examples: IterResponseExamples = responses.iter_response_examples_v3
 extract_security_parameters: ExtractSecurityParameters = security.extract_security_parameters_v3
 prepare_multipart: PrepareMultipart = formdata.prepare_multipart_v3
+get_response_content_types: GetResponseContentTypes = content_types.response_content_types_v3
+get_request_payload_content_types: GetRequestPayloadContentTypes = content_types.request_content_types_v3
+get_default_media_types: GetDefaultMediaTypes = content_types.default_media_types_v3
+get_base_path: GetBasePath = base_paths.base_path_v3
+validate_schema: ValidateSchema = validators.validate_v3
+get_parameter_serializer: GetParameterSerializer = parameter_serializers.serializer_v3
 
 jsonschema_validator_cls = Draft4Validator

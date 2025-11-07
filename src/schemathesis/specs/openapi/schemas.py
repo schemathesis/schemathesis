@@ -8,7 +8,6 @@ from functools import cached_property, lru_cache
 from json import JSONDecodeError
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterator, Mapping, NoReturn, Sequence, cast
-from urllib.parse import urlsplit
 
 import jsonschema
 from packaging import version
@@ -41,9 +40,7 @@ from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
-from . import serialization
 from ._hypothesis import openapi_cases
-from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .references import ReferenceResolver
 from .stateful import create_state_machine
@@ -94,7 +91,10 @@ class BaseOpenAPISchema(BaseSchema):
 
     @cached_property
     def default_media_types(self) -> list[str]:
-        raise NotImplementedError
+        return self.adapter.get_default_media_types(self.raw_schema)
+
+    def _get_base_path(self) -> str:
+        return self.adapter.get_base_path(self.raw_schema)
 
     def _get_paths(self) -> Mapping[str, Any] | None:
         paths = self.raw_schema.get("paths")
@@ -335,7 +335,7 @@ class BaseOpenAPISchema(BaseSchema):
             self._validate()
 
     def _validate(self) -> None:
-        raise NotImplementedError
+        self.adapter.validate_schema(self.raw_schema)
 
     def _iter_parameters(
         self, definition: dict[str, Any], shared_parameters: Sequence[dict[str, Any]]
@@ -429,7 +429,10 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         """Content types available for this API operation."""
-        raise NotImplementedError
+        return self.adapter.get_response_content_types(operation, response)
+
+    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
+        return self.adapter.get_request_payload_content_types(operation)
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -520,7 +523,7 @@ class BaseOpenAPISchema(BaseSchema):
         return None
 
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
-        raise NotImplementedError
+        return self.adapter.get_parameter_serializer(definitions)
 
     def as_state_machine(self) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
@@ -530,6 +533,11 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")
+
+    def prepare_multipart(
+        self, form_data: dict[str, Any], operation: APIOperation
+    ) -> tuple[list | None, dict[str, Any] | None]:
+        return self.adapter.prepare_multipart(operation, form_data)
 
     def validate_response(
         self,
@@ -676,36 +684,9 @@ class SwaggerV20(BaseOpenAPISchema):
         version = self.raw_schema.get("swagger", "2.0")
         return Specification.openapi(version=version)
 
-    @cached_property
-    def default_media_types(self) -> list[str]:
-        return self.raw_schema.get("consumes", [])
-
-    def _validate(self) -> None:
-        SWAGGER_20_VALIDATOR.validate(self.raw_schema)
-
-    def _get_base_path(self) -> str:
-        return self.raw_schema.get("basePath", "/")
-
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
-
-    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
-        produces = operation.definition.raw.get("produces", None)
-        if produces:
-            return produces
-        return self.raw_schema.get("produces", [])
-
-    def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
-        return serialization.serialize_swagger2_parameters(definitions)
-
-    def prepare_multipart(
-        self, form_data: dict[str, Any], operation: APIOperation
-    ) -> tuple[list | None, dict[str, Any] | None]:
-        return self.adapter.prepare_multipart(operation, form_data)
-
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        return self._get_consumes_for_operation(operation.definition.raw)
 
     def make_case(
         self,
@@ -736,13 +717,6 @@ class SwaggerV20(BaseOpenAPISchema):
             meta=meta,
         )
 
-    def _get_consumes_for_operation(self, definition: dict[str, Any]) -> list[str]:
-        global_consumes = self.raw_schema.get("consumes", [])
-        consumes = definition.get("consumes", [])
-        if not consumes:
-            consumes = global_consumes
-        return consumes
-
 
 class OpenApi30(SwaggerV20):
     def __post_init__(self) -> None:
@@ -757,43 +731,6 @@ class OpenApi30(SwaggerV20):
         version = self.raw_schema["openapi"]
         return Specification.openapi(version=version)
 
-    @cached_property
-    def default_media_types(self) -> list[str]:
-        return []
-
-    def _validate(self) -> None:
-        if self.specification.version.startswith("3.1"):
-            # Currently we treat Open API 3.1 as 3.0 in some regard
-            OPENAPI_31_VALIDATOR.validate(self.raw_schema)
-        else:
-            OPENAPI_30_VALIDATOR.validate(self.raw_schema)
-
-    def _get_base_path(self) -> str:
-        servers = self.raw_schema.get("servers", [])
-        if servers:
-            # assume we're the first server in list
-            server = servers[0]
-            url = server["url"].format(**{k: v["default"] for k, v in server.get("variables", {}).items()})
-            return urlsplit(url).path
-        return "/"
-
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
-
-    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
-        definition = operation.responses.find_by_status_code(response.status_code)
-        if definition is None:
-            return []
-        return list(definition.definition.get("content", {}).keys())
-
-    def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
-        return serialization.serialize_openapi3_parameters(definitions)
-
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        return [body.media_type for body in operation.body]
-
-    def prepare_multipart(
-        self, form_data: dict[str, Any], operation: APIOperation
-    ) -> tuple[list | None, dict[str, Any] | None]:
-        return self.adapter.prepare_multipart(operation, form_data)
