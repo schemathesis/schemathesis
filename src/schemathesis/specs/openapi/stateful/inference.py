@@ -26,7 +26,7 @@ from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSIO
 
 if TYPE_CHECKING:
     from schemathesis.engine.observations import LocationHeaderEntry
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 @dataclass(unsafe_hash=True)
@@ -87,7 +87,7 @@ class LinkInferencer:
     __slots__ = ("_adapter", "_operations", "_base_url", "_base_path", "_links_keyword")
 
     @classmethod
-    def from_schema(cls, schema: BaseOpenAPISchema) -> LinkInferencer:
+    def from_schema(cls, schema: OpenApiSchema) -> LinkInferencer:
         # NOTE: Use `matchit` for routing in the future
         rules = []
         operations = []
