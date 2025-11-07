@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import enum
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from typing import Any, Iterator, Mapping
 
@@ -45,54 +46,71 @@ class DependencyGraph:
         consume them. For example: `POST /users` (creates `User`) -> `GET /users/{id}`
         (needs `User.id` parameter).
         """
-        # Connect each producer output to matching consumer inputs
+        encoded_paths = {id(op): encode_pointer(op.path) for op in self.operations.values()}
+
+        # Index consumers by resource
+        consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]] = defaultdict(dict)
+        for consumer in self.operations.values():
+            consumer_id = id(consumer)
+            for input_slot in consumer.inputs:
+                resource_id = id(input_slot.resource)
+                if consumer_id not in consumers_by_resource[resource_id]:
+                    consumers_by_resource[resource_id][consumer_id] = (consumer, [])
+                consumers_by_resource[resource_id][consumer_id][1].append(input_slot)
+
         for producer in self.operations.values():
-            producer_path = encode_pointer(producer.path)
+            producer_path = encoded_paths[id(producer)]
+            producer_id = id(producer)
+
             for output_slot in producer.outputs:
-                for consumer in self.operations.values():
+                # Only iterate over consumers that match this resource
+                relevant_consumers = consumers_by_resource.get(id(output_slot.resource), {})
+
+                for consumer_id, (consumer, input_slots) in relevant_consumers.items():
                     # Skip self-references
-                    if producer is consumer:
+                    if consumer_id == producer_id:
                         continue
 
-                    consumer_path = encode_pointer(consumer.path)
+                    consumer_path = encoded_paths[consumer_id]
                     links: dict[str, LinkDefinition] = {}
-                    for input_slot in consumer.inputs:
-                        if input_slot.resource is output_slot.resource:
-                            if input_slot.resource_field is not None:
-                                body_pointer = extend_pointer(
-                                    output_slot.pointer, input_slot.resource_field, output_slot.cardinality
-                                )
-                            else:
-                                # No resource field means use the whole resource
-                                body_pointer = output_slot.pointer
-                            link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
-                            parameters = {}
-                            request_body: dict[str, Any] | list = {}
-                            # Data is extracted from response body
-                            if input_slot.parameter_location == ParameterLocation.BODY:
-                                if isinstance(input_slot.parameter_name, int):
-                                    request_body = [f"$response.body#{body_pointer}"]
-                                else:
-                                    request_body = {
-                                        input_slot.parameter_name: f"$response.body#{body_pointer}",
-                                    }
-                            else:
-                                parameters = {
-                                    f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
-                                }
-                            existing = links.get(link_name)
-                            if existing is not None:
-                                existing.parameters.update(parameters)
-                                if isinstance(existing.request_body, dict) and isinstance(request_body, dict):
-                                    existing.request_body.update(request_body)
-                                else:
-                                    existing.request_body = request_body
-                                continue
-                            links[link_name] = LinkDefinition(
-                                operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
-                                parameters=parameters,
-                                request_body=request_body,
+
+                    for input_slot in input_slots:
+                        if input_slot.resource_field is not None:
+                            body_pointer = extend_pointer(
+                                output_slot.pointer, input_slot.resource_field, output_slot.cardinality
                             )
+                        else:
+                            # No resource field means use the whole resource
+                            body_pointer = output_slot.pointer
+                        link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
+                        parameters = {}
+                        request_body: dict[str, Any] | list = {}
+                        # Data is extracted from response body
+                        if input_slot.parameter_location == ParameterLocation.BODY:
+                            if isinstance(input_slot.parameter_name, int):
+                                request_body = [f"$response.body#{body_pointer}"]
+                            else:
+                                request_body = {
+                                    input_slot.parameter_name: f"$response.body#{body_pointer}",
+                                }
+                        else:
+                            parameters = {
+                                f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
+                            }
+                        existing = links.get(link_name)
+                        if existing is not None:
+                            existing.parameters.update(parameters)
+                            if isinstance(existing.request_body, dict) and isinstance(request_body, dict):
+                                existing.request_body.update(request_body)
+                            else:
+                                existing.request_body = request_body
+                            continue
+                        links[link_name] = LinkDefinition(
+                            operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
+                            parameters=parameters,
+                            request_body=request_body,
+                        )
+
                     if links:
                         yield ResponseLinks(
                             producer_operation_ref=f"#/paths/{producer_path}/{producer.method}",
