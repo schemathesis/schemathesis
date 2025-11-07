@@ -25,7 +25,6 @@ from schemathesis.core.errors import (
     SchemaLocation,
 )
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
-from schemathesis.core.jsonschema import BundleCache, Bundler
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transport import Response
@@ -82,10 +81,6 @@ class BaseOpenAPISchema(BaseSchema):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.analysis = OpenAPIAnalysis(self)
-        # Schema-level bundler shared across all operations for better cache utilization
-        self._bundler = Bundler()
-        # Cache for bundled schemas to avoid re-bundling the same schema references
-        self._bundle_cache: BundleCache = {}
 
     @property
     def specification(self) -> Specification:
@@ -295,7 +290,7 @@ class BaseOpenAPISchema(BaseSchema):
                         try:
                             if should_skip(path, method, entry):
                                 continue
-                            parameters = iter_parameters(entry, shared_parameters, self._bundler, self._bundle_cache)
+                            parameters = iter_parameters(entry, shared_parameters)
                             operation = make_operation(
                                 path,
                                 method,
@@ -347,21 +342,11 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def _iter_parameters(
-        self,
-        definition: dict[str, Any],
-        shared_parameters: Sequence[dict[str, Any]],
-        bundler: Bundler,
-        bundle_cache: BundleCache,
+        self, definition: dict[str, Any], shared_parameters: Sequence[dict[str, Any]]
     ) -> list[OperationParameter]:
         return list(
             self.adapter.iter_parameters(
-                definition,
-                shared_parameters,
-                self.default_media_types,
-                self.resolver,
-                self.adapter,
-                bundler,
-                bundle_cache,
+                definition, shared_parameters, self.default_media_types, self.resolver, self.adapter
             )
         )
 
@@ -473,9 +458,7 @@ class BaseOpenAPISchema(BaseSchema):
                 if method not in HTTP_METHODS:
                     continue
                 if "operationId" in operation and operation["operationId"] == operation_id:
-                    parameters = self._iter_parameters(
-                        operation, path_item.get("parameters", []), self._bundler, self._bundle_cache
-                    )
+                    parameters = self._iter_parameters(operation, path_item.get("parameters", []))
                     return self.make_operation(path, method, parameters, operation, scope)
         self._on_missing_operation(operation_id, None, [])
 
@@ -490,9 +473,7 @@ class BaseOpenAPISchema(BaseSchema):
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = self.resolver.resolve(parent_ref)
         with in_scope(self.resolver, scope):
-            parameters = self._iter_parameters(
-                operation, path_item.get("parameters", []), self._bundler, self._bundle_cache
-            )
+            parameters = self._iter_parameters(operation, path_item.get("parameters", []))
         return self.make_operation(path, method, parameters, operation, scope)
 
     def find_operation_by_path(self, method: str, path: str) -> APIOperation | None:
@@ -673,9 +654,7 @@ class MethodMap(Mapping):
         scope = self._scope
         with in_scope(schema.resolver, scope):
             try:
-                parameters = schema._iter_parameters(
-                    operation, self._path_item.get("parameters", []), schema._bundler, schema._bundle_cache
-                )
+                parameters = schema._iter_parameters(operation, self._path_item.get("parameters", []))
             except SCHEMA_PARSING_ERRORS as exc:
                 schema._raise_invalid_schema(exc, path, method)
         return schema.make_operation(path, method, parameters, operation, scope)
