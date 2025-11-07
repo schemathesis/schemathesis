@@ -1,10 +1,14 @@
 import platform
 
 import pytest
+import requests
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
+from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
+from schemathesis.core.transport import Response as HTTPResponse
+from schemathesis.openapi.checks import JsonSchemaError
 from schemathesis.specs.openapi.schemas import ReferenceResolver
 
 
@@ -210,6 +214,142 @@ def test_schema_error_on_path(simple_schema):
     assert len(oks) == 1
     assert oks[0].ok().path == "/foo"
     assert oks[0].ok().method == "post"
+
+
+def test_response_validation_selects_media_type(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/value": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["id"],
+                                        "properties": {"id": {"type": "integer"}},
+                                    }
+                                },
+                                "application/problem+json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["title"],
+                                        "properties": {"title": {"type": "string"}},
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/value"]["GET"]
+    request = requests.Request("GET", "http://example.com/value").prepare()
+
+    def make_response(content_type: str, payload: str) -> HTTPResponse:
+        return HTTPResponse(
+            status_code=200,
+            headers={"content-type": [content_type]},
+            content=payload.encode(),
+            request=request,
+            elapsed=0.0,
+            verify=False,
+        )
+
+    # application/json schema requires "id"
+    schema.validate_response(operation, make_response("application/json", '{"id": 1}'))
+
+    # application/problem+json schema requires "title"
+    with pytest.raises(JsonSchemaError):
+        schema.validate_response(operation, make_response("application/problem+json", '{"id": 1}'))
+    schema.validate_response(operation, make_response("application/problem+json", '{"title": "Oops"}'))
+
+
+@pytest.mark.parametrize(
+    ("content_type", "payload", "expect_error"),
+    [
+        # Exact match to application/json (first schema - requires "id")
+        ("application/json", '{"id": 1}', None),
+        ("application/json; charset=utf-8", '{"id": 1}', None),
+        ("application/json;charset=utf-8", '{"id": 1}', None),
+        ("application/json", '{"id": 42}', None),
+        ("application/json", '{"wrong": "data"}', JsonSchemaError),
+        # Wildcard match to application/* (second schema - requires "data" as string)
+        ("application/xml", '{"data": "test"}', None),
+        # Exact match to application/vnd.api+json (third schema - requires "data" as array)
+        ("application/vnd.api+json", '{"data": []}', None),
+        ("application/vnd.api+json", '{"id": 42}', JsonSchemaError),
+        # Unmatched content types fall back to first schema (application/json)
+        # Note: Non-JSON content types may skip validation if no deserializer exists
+        ("text/plain", '{"id": 1}', None),
+        ("image/png", '{"id": 1}', None),
+        ("text/html", '{"id": 1}', None),
+        # Malformed Content-Type causes deserialization error
+        ("invalid", '{"id": 1}', Failure),
+        ("application", '{"id": 1}', Failure),
+    ],
+)
+def test_response_validation_media_type_edge_cases(ctx, content_type, payload, expect_error):
+    # Schema with multiple media types and different validation rules
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/value": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["id"],
+                                        "properties": {"id": {"type": "integer"}},
+                                    }
+                                },
+                                "application/*": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["data"],
+                                        "properties": {"data": {"type": "string"}},
+                                    }
+                                },
+                                "application/vnd.api+json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["data"],
+                                        "properties": {"data": {"type": "array"}},
+                                    }
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/value"]["GET"]
+    request = requests.Request("GET", "http://example.com/value").prepare()
+
+    headers = {"content-type": [content_type]}
+    response = HTTPResponse(
+        status_code=200,
+        headers=headers,
+        content=payload.encode(),
+        request=request,
+        elapsed=0.0,
+        verify=False,
+    )
+
+    if expect_error:
+        with pytest.raises(expect_error):
+            schema.validate_response(operation, response)
+    else:
+        schema.validate_response(operation, response)
 
 
 RESPONSES = {"responses": {"200": {"description": "OK"}}}

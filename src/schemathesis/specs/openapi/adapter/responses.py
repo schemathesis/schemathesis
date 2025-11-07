@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ItemsView, Iterator, Mapping, cast
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError, RefResolver
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema.bundler import bundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.specs.openapi import types
@@ -16,6 +16,29 @@ from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
     from jsonschema.protocols import Validator
+
+# Cache key when no Content-Type header is present
+_NO_MEDIA_TYPE = ""
+
+
+@dataclass
+class ResolvedSchema:
+    """Schema and media type resolved for a specific response."""
+
+    __slots__ = ("schema", "media_type")
+
+    schema: JsonSchema | None
+    media_type: str | None
+
+
+@dataclass
+class CachedValidation:
+    """Cached schema and validator for a media type."""
+
+    __slots__ = ("schema", "validator")
+
+    schema: JsonSchema | None
+    validator: Validator | None
 
 
 @dataclass
@@ -28,48 +51,90 @@ class OpenApiResponse:
     scope: str
     adapter: SpecificationAdapter
 
-    __slots__ = ("status_code", "definition", "resolver", "scope", "adapter", "_schema", "_validator", "_headers")
+    __slots__ = (
+        "status_code",
+        "definition",
+        "resolver",
+        "scope",
+        "adapter",
+        "_validation_cache",
+        "_headers",
+        "_default_media_type",
+    )
 
     def __post_init__(self) -> None:
-        self._schema: JsonSchema | None | NotSet = NOT_SET
-        self._validator: Validator | NotSet = NOT_SET
+        self._validation_cache: dict[str, CachedValidation] = {}
         self._headers: OpenApiResponseHeaders | NotSet = NOT_SET
+        self._default_media_type = self._detect_default_media_type()
 
-    @property
-    def schema(self) -> JsonSchema | None:
-        """The response body schema extracted from its definition.
+    def _get_cache_key(self, media_type: str | None) -> str:
+        """Convert media type to cache key, using sentinel for None."""
+        return media_type if media_type is not None else _NO_MEDIA_TYPE
 
-        Returns `None` if the response has no schema.
+    def _detect_default_media_type(self) -> str | None:
+        return self.adapter.get_default_response_media_type(self.definition)
+
+    def get_schema(self, media_type: str | None = None) -> ResolvedSchema:
+        """Return the schema for the given media type (or the default one).
+
+        Schema may be None if the media type has no schema defined.
         """
-        if self._schema is NOT_SET:
-            self._schema = self.adapter.extract_response_schema(
-                self.definition, self.resolver, self.scope, self.adapter.nullable_keyword
+        resolved_media_type = self.adapter.resolve_response_media_type(self.definition, media_type)
+        cache_key = self._get_cache_key(resolved_media_type)
+
+        if cache_key not in self._validation_cache:
+            schema = self.adapter.extract_schema_for_media_type(
+                self.definition, resolved_media_type, self.resolver, self.scope, self.adapter.nullable_keyword
             )
-        assert not isinstance(self._schema, NotSet)
-        return self._schema
+            # Create cache entry with schema but no validator yet (lazy validator creation)
+            self._validation_cache[cache_key] = CachedValidation(schema=schema, validator=None)
 
-    def get_raw_schema(self) -> JsonSchema | None:
-        """Raw and unresolved response schema."""
-        return self.adapter.extract_raw_response_schema(self.definition)
+        cached = self._validation_cache[cache_key]
+        return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type)
 
-    @property
-    def validator(self) -> Validator | None:
-        """JSON Schema validator for this response."""
+    def _build_validator(self, schema: JsonSchema) -> Validator | None:
         from jsonschema import Draft202012Validator
 
-        schema = self.schema
+        self.adapter.jsonschema_validator_cls.check_schema(schema)
+        return self.adapter.jsonschema_validator_cls(
+            schema,
+            # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
+            format_checker=Draft202012Validator.FORMAT_CHECKER,
+            resolver=RefResolver.from_schema(schema),
+        )
+
+    def get_validator_for_schema(self, resolved_media_type: str | None, schema: JsonSchema | None) -> Validator | None:
+        """Get or build validator for a schema corresponding to a specific media type.
+
+        This method is primarily used by the validation logic in schemas.py.
+        Validators are cached per media type.
+        """
         if schema is None:
             return None
-        if self._validator is NOT_SET:
-            self.adapter.jsonschema_validator_cls.check_schema(schema)
-            self._validator = self.adapter.jsonschema_validator_cls(
-                schema,
-                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
-                format_checker=Draft202012Validator.FORMAT_CHECKER,
-                resolver=RefResolver.from_schema(schema),
-            )
-        assert not isinstance(self._validator, NotSet)
-        return self._validator
+
+        cache_key = self._get_cache_key(resolved_media_type)
+
+        # Ensure cache entry exists
+        if cache_key not in self._validation_cache:
+            self._validation_cache[cache_key] = CachedValidation(schema=schema, validator=None)
+
+        cached = self._validation_cache[cache_key]
+
+        # Build validator lazily on first access
+        if cached.validator is None and cached.schema is not None:
+            cached.validator = self._build_validator(cached.schema)
+
+        return cached.validator
+
+    def get_raw_schema(self) -> JsonSchema | None:
+        """Raw and unresolved response schema.
+
+        For OpenAPI 3.x with multiple content types, returns the schema for the first/default media type.
+        Used primarily for stateful testing where we analyze schema structure rather than validate responses.
+
+        TODO: Extend stateful testing to support multiple content types properly.
+        """
+        return self.adapter.extract_raw_response_schema(self.definition)
 
     @property
     def headers(self) -> OpenApiResponseHeaders:
@@ -234,6 +299,100 @@ def _prepare_schema(schema: JsonSchema, resolver: RefResolver, scope: str, nulla
     schema = _bundle_in_scope(schema, resolver, scope)
     # Do not clone the schema, as bundling already does it
     return to_json_schema(schema, nullable_keyword, is_response_schema=True, update_quantifiers=False, clone=False)
+
+
+def prepare_response_media_type_schema(
+    schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str
+) -> JsonSchema:
+    """Prepare schema for a specific media type entry."""
+    return _prepare_schema(schema, resolver, scope, nullable_keyword)
+
+
+def get_default_response_media_type_v2(response: Mapping[str, Any]) -> str | None:
+    """Swagger 2.0 has no default media type in response definition."""
+    return None
+
+
+def resolve_response_media_type_v2(response: Mapping[str, Any], media_type: str | None) -> str | None:
+    """Swagger 2.0 has no media type resolution - all handled via produces."""
+    return None
+
+
+def extract_schema_for_media_type_v2(
+    response: Mapping[str, Any], media_type: str | None, resolver: RefResolver, scope: str, nullable_keyword: str
+) -> JsonSchema | None:
+    """Swagger 2.0 has single schema regardless of media type."""
+    return extract_response_schema_v2(response, resolver, scope, nullable_keyword)
+
+
+def get_default_response_media_type_v3(response: Mapping[str, Any]) -> str | None:
+    """Get first/default media type from OpenAPI 3.x response content."""
+    content = response.get("content")
+    if isinstance(content, dict) and content:
+        return next(iter(content.keys()))
+    return None
+
+
+def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str | None) -> str | None:
+    """Resolve actual media type to schema definition for OpenAPI 3.x.
+
+    Resolution order:
+      1. None -> first/default media type
+      2. Exact match (e.g., "application/json")
+      3. Wildcard match (e.g., "application/*" matches "application/xml")
+      4. Fallback to first/default media type (for unmatched or malformed Content-Types)
+    """
+    content = response.get("content")
+    if not isinstance(content, dict) or not content:
+        return None
+
+    default = next(iter(content.keys()))
+
+    if media_type is None:
+        return default
+
+    # Strip parameters (e.g., "; charset=utf-8")
+    sanitized = media_type.split(";", 1)[0].strip()
+
+    # Exact match
+    if sanitized in content:
+        return sanitized
+
+    # Wildcard matching
+    try:
+        received = media_types.parse(sanitized)
+    except MalformedMediaType:
+        return default
+
+    for candidate in content:
+        try:
+            expected = media_types.parse(candidate)
+        except MalformedMediaType:
+            continue
+        if media_types.matches_parts(expected, received):
+            return candidate
+
+    return default
+
+
+def extract_schema_for_media_type_v3(
+    response: Mapping[str, Any], media_type: str | None, resolver: RefResolver, scope: str, nullable_keyword: str
+) -> JsonSchema | None:
+    """Extract schema for specific media type from OpenAPI 3.x response."""
+    content = response.get("content")
+    if media_type is None or not isinstance(content, dict) or not content:
+        # Fall back to old behavior
+        return extract_response_schema_v3(response, resolver, scope, nullable_keyword)
+
+    media_type_object = content.get(media_type)
+    if not isinstance(media_type_object, dict):
+        return None
+
+    schema = media_type_object.get("schema")
+    if schema is None:
+        return None
+
+    return prepare_response_media_type_schema(schema, resolver, scope, nullable_keyword)
 
 
 def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> JsonSchema:

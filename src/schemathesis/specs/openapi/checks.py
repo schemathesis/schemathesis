@@ -144,12 +144,7 @@ def content_type_conformance(ctx: CheckContext, response: Response, case: Case) 
             received_main, received_sub = media_types.parse(content_type)
         except ValueError:
             _reraise_malformed_media_type(case, "Response", content_type, option)
-        if (
-            (expected_main == "*" and expected_sub == "*")
-            or (expected_main == received_main and expected_sub == "*")
-            or (expected_main == "*" and expected_sub == received_sub)
-            or (expected_main == received_main and expected_sub == received_sub)
-        ):
+        if media_types.matches_parts((expected_main, expected_sub), (received_main, received_sub)):
             return None
     raise UndefinedContentType(
         operation=case.operation.label,

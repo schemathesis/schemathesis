@@ -22,6 +22,7 @@
 
 ### :bug: Fixed
 
+- Respect multiple OpenAPI 3.x response content types by matching schemas to the actual `Content-Type` header instead of always validating against the first declared media type.
 - Handle OpenAPI 3.1 schemas that omit `paths` (e.g., webhook-only specs) by making path lookups resilient when `paths` is absent.
 - Response schema validation not working for schemas with nested `$ref` chains in response definitions.
 - Internal error when extracting examples from schemas with nested `allOf` structures.
