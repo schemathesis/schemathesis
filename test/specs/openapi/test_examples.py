@@ -2234,3 +2234,37 @@ def test_multiple_hops_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def test_nested_allof_with_property_refs():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"title": "Test", "version": "1.0.0"},
+        "paths": {
+            "/items": {
+                "put": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "schema": {"$ref": "#/definitions/HostingEnvironment"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        "definitions": {
+            "HostingEnvironment": {
+                "allOf": [{"$ref": "#/definitions/Resource"}],
+                "properties": {"key": {"properties": {"key": {"$ref": "#/definitions/WorkerPool"}}}},
+            },
+            "Resource": {},
+            "WorkerPool": {
+                "allOf": [{"$ref": "#/definitions/Resource"}],
+                "properties": {"sku": {}},
+            },
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items"]["PUT"]
+    assert operation.get_strategies_from_examples() == []

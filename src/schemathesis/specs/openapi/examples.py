@@ -411,7 +411,7 @@ def extract_from_schema(
         required = schema.get("required", [])
         to_generate: dict[str, Any] = {}
 
-        for name, subschema in properties_to_process.items():
+        for name, subschema in list(properties_to_process.items()):
             values = []
             for expanded_schema, expanded_path in _expand_subschemas(
                 schema=subschema, resolver=resolver, reference_path=current_path
