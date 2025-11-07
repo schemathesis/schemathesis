@@ -1973,6 +1973,38 @@ def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_refer
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="May behave differently on Windows")
+def test_empty_reference_does_not_cause_infinite_recursion(ctx, cli, openapi3_base_url, snapshot_cli):
+    # Empty $ref should be gracefully skipped during bundling, not cause RecursionError
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "put": {
+                    "parameters": [{"in": "body", "name": "body", "schema": {"$ref": "#/definitions/Connection"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+        definitions={
+            "Connection": {
+                "allOf": [{"$ref": "#/definitions/Resource"}],
+                "properties": {
+                    "key": {
+                        "properties": {
+                            "key": {
+                                "$ref": ""  # Empty reference - should be skipped
+                            }
+                        }
+                    }
+                },
+            },
+            "Resource": {},
+        },
+    )
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
+
+
 def test_nullable_reference(ctx, cli, openapi3_base_url, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
