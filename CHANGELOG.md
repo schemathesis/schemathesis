@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.3...HEAD) - TBD
 
+### :wrench: Changed
+
+- Replace archived `backoff` with `tenacity`. [#3286](https://github.com/schemathesis/schemathesis/issues/3286)
+
 ## [4.4.3](https://github.com/schemathesis/schemathesis/compare/v4.4.2...v4.4.3) - 2025-11-07
 
 ### :bug: Fixed
