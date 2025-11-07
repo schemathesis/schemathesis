@@ -7,6 +7,13 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 !!! note ""
     Percentages are computed for each individual operation after all scenarios finish, so warnings fire per-endpoint when its error rate crosses the threshold
 
+| Warning | Signals | Quick fix |
+| --- | --- | --- |
+| `missing_auth` | Most interactions returned 401/403 | Provide valid credentials via `--auth`, custom headers, or config |
+| `missing_test_data` | Generated parameters hit non-existent resources (404) | Seed known IDs / payloads in your config file |
+| `validation_mismatch` | Schema constraints differ from real validation (lots of 4xx) | Tighten schema or extend generators to match runtime rules |
+| `missing_deserializer` | Structured responses lack a registered deserializer | Register one via `@schemathesis.deserializer` or align `content` types with actual formats |
+
 ## Available Warnings
 
 ### `missing_auth`
@@ -67,6 +74,26 @@ As Schemathesis uses API schema to generate data, the most probable cause is tha
 
 To mitigate it, re-check the real validation rules and update your API schema so they match. Alternatively you can [extend](../guides/extending.md) Schemathesis so it generates data which is more likely to pass validation.
 
+### `missing_deserializer`
+
+```
+Schema validation skipped: 1 operation cannot validate responses due to missing deserializers
+
+  - GET /reports
+    Cannot validate response 200: no deserializer registered for application/xml
+```
+
+!!! tip
+    Register a deserializer with [@schemathesis.deserializer](../guides/extending.md#custom-deserializers) to enable validation
+
+**Trigger**: Operation responses declare structured schemas (objects / arrays) for a media type, but Schemathesis has no deserializer registered for that `content-type`.
+
+When this warning appears, Schemathesis skips validation because it cannot deserialize the response body. Restore validation by:
+
+- Registering a deserializer for the media type via `@schemathesis.deserializer()` (or `schemathesis.deserializer.register`) so the payload is converted into Python data.
+- Updating the schema to advertise the actual media type (for example `application/json`) if the server already returns JSON.
+- Omitting structured schemas for truly binary responses; without a schema, Schemathesis won’t expect to validate those payloads.
+
 ## Configuring Warnings
 
 By default, all warnings are enabled. You can disable them entirely or enable only a subset via the CLI or your config file:
@@ -99,7 +126,7 @@ For more control, use the object format to display warnings while making specifi
 ```toml
 [warnings]
 # Control which warnings to display
-display = ["missing_auth", "missing_test_data", "validation_mismatch"]
+display = ["missing_auth", "missing_test_data", "validation_mismatch", "missing_deserializer"]
 # Make specific warnings fail the test suite (exit code 1)
 fail-on = ["validation_mismatch"]
 ```
