@@ -364,8 +364,14 @@ class Case:
             if not hasattr(exc, "__notes__"):
                 exc.__notes__ = []  # type: ignore[attr-defined]
             verify = kwargs.get("verify", True)
-            curl = self.as_curl_command(headers=headers, verify=verify)
-            exc.__notes__.append(f"\nReproduce with: \n\n    {curl}")  # type: ignore[attr-defined]
+            try:
+                curl = self.as_curl_command(headers=headers, verify=verify)
+                exc.__notes__.append(f"\nReproduce with: \n\n    {curl}")  # type: ignore[attr-defined]
+            except Exception:
+                # Curl generation can fail for the same reason as the original error
+                # (e.g., malformed path template). Skip adding curl command to avoid
+                # replacing the original exception with a secondary error.
+                pass
             raise
         dispatch("after_call", hook_context, self, response)
         return response
