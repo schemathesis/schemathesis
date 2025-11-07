@@ -10,9 +10,10 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BundleError, Bundler
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, ParameterSet
@@ -343,9 +344,17 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
 
 
 def _bundle_parameter(
-    parameter: Mapping, resolver: RefResolver, bundler: Bundler
+    parameter: Mapping,
+    resolver: RefResolver,
+    bundler: Bundler,
+    bundle_cache: dict[int, tuple[dict[str, Any], dict[str, str]]],
 ) -> tuple[dict[str, Any], dict[str, str]]:
     """Bundle a parameter definition to make it self-contained."""
+    param_id = id(parameter)
+    if param_id in bundle_cache:
+        cached_definition, cached_name_to_uri = bundle_cache[param_id]
+        return deepclone(cached_definition), dict(cached_name_to_uri)
+
     _, definition = maybe_resolve(parameter, resolver, "")
     schema = definition.get("schema")
     name_to_uri = {}
@@ -359,7 +368,11 @@ def _bundle_parameter(
             location = parameter.get("in", "")
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
-    return cast(dict, definition), name_to_uri
+
+    definition_ = cast(dict, definition)
+    result = definition_, name_to_uri
+    bundle_cache[param_id] = (deepclone(definition_), dict(name_to_uri))
+    return result
 
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
@@ -372,6 +385,8 @@ def iter_parameters_v2(
     default_media_types: list[str],
     resolver: RefResolver,
     adapter: SpecificationAdapter,
+    bundler: Bundler,
+    bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
     media_types = definition.get("consumes", default_media_types)
     # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
@@ -383,9 +398,8 @@ def iter_parameters_v2(
 
     form_parameters = []
     form_name_to_uri = {}
-    bundler = Bundler()
     for parameter in chain(definition.get("parameters", []), shared_parameters):
-        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
+        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
         if parameter["in"] in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
@@ -428,14 +442,15 @@ def iter_parameters_v3(
     default_media_types: list[str],
     resolver: RefResolver,
     adapter: SpecificationAdapter,
+    bundler: Bundler,
+    bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
     # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
     # TODO: Typing
     operation = definition
 
-    bundler = Bundler()
     for parameter in chain(definition.get("parameters", []), shared_parameters):
-        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
+        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
         if parameter["in"] in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 

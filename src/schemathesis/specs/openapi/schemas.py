@@ -24,6 +24,8 @@ from schemathesis.core.errors import (
     SchemaLocation,
 )
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
+from schemathesis.core.jsonschema import Bundler
+from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transport import Response
@@ -76,6 +78,8 @@ class OpenApiSchema(BaseSchema):
         self._initialize_adapter()
         super().__post_init__()
         self.analysis = OpenAPIAnalysis(self)
+        self._bundler = Bundler()
+        self._bundle_cache: BundleCache = {}
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
@@ -362,7 +366,13 @@ class OpenApiSchema(BaseSchema):
     ) -> list[OperationParameter]:
         return list(
             self.adapter.iter_parameters(
-                definition, shared_parameters, self.default_media_types, self.resolver, self.adapter
+                definition,
+                shared_parameters,
+                self.default_media_types,
+                self.resolver,
+                self.adapter,
+                self._bundler,
+                self._bundle_cache,
             )
         )
 

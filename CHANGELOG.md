@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.3...HEAD) - TBD
 
+### :racing_car: Performance
+
+- 10-50% faster schema iteration through parameter bundling cache.
+
 ### :wrench: Changed
 
 - Replace archived `backoff` with `tenacity`. [#3286](https://github.com/schemathesis/schemathesis/issues/3286)
