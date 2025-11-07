@@ -83,18 +83,19 @@ def load_from_url(
     **kwargs: Any,
 ) -> requests.Response:
     """Load schema from URL with retries."""
-    import backoff
     import requests
 
     kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
     prepare_request_kwargs(kwargs)
 
     if wait_for_schema is not None:
-        func = backoff.on_exception(
-            backoff.constant,
-            requests.exceptions.ConnectionError,
-            max_time=wait_for_schema,
-            interval=WAIT_FOR_SCHEMA_INTERVAL,
+        from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_fixed
+
+        func = retry(
+            wait=wait_fixed(WAIT_FOR_SCHEMA_INTERVAL),
+            stop=stop_after_delay(wait_for_schema),
+            retry=retry_if_exception_type(requests.exceptions.ConnectionError),
+            reraise=True,
         )(func)
 
     return make_request(func, url, **kwargs)
