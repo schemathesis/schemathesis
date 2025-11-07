@@ -12,6 +12,7 @@ from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
+from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
@@ -23,7 +24,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
     format_exception,
 )
-from schemathesis.core.failures import FailureGroup
+from schemathesis.core.failures import FailureGroup, get_origin
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.generation import overrides
@@ -273,6 +274,24 @@ def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pyt
             # Hypothesis adds quite a lot of additional debug information which is not that helpful in Schemathesis
             call.excinfo.value.__notes__.clear()
             report.longrepr = "".join(format_exception(call.excinfo.value))
+        # Deduplicate identical exceptions in exception groups
+        if isinstance(call.excinfo.value, BaseExceptionGroup):
+            # Use exception origin (type + traceback + context) as deduplication key
+            origins: dict[tuple, BaseException] = {}
+            for exc in call.excinfo.value.exceptions:
+                origin = get_origin(exc)
+                if origin not in origins:
+                    origins[origin] = exc
+
+            if len(origins) < len(call.excinfo.value.exceptions):
+                deduplicated = list(origins.values())
+                message = call.excinfo.value.message.replace(
+                    f"{len(call.excinfo.value.exceptions)} distinct failures",
+                    f"{len(deduplicated)} distinct failures",
+                )
+                group = BaseExceptionGroup(message, deduplicated)
+                report.longrepr = "".join(format_exception(group, with_traceback=True))
+
         if call.excinfo.type is FailureGroup:
             tb_entries = list(call.excinfo.traceback)
             total_frames = len(tb_entries)

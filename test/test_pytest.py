@@ -1317,3 +1317,122 @@ def test(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_identical_exceptions_are_deduplicated(testdir):
+    # When a malformed schema causes identical exceptions across multiple test cases
+    testdir.makefile(
+        ".yaml",
+        schema="""
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test/{id}}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      responses:
+        '200':
+          description: OK
+""",
+    )
+    testdir.make_test(
+        """
+schema = schemathesis.openapi.from_path("schema.yaml")
+
+@schema.parametrize()
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest("-v")
+    # Then the test should fail
+    result.assert_outcomes(failed=1)
+    # And identical exceptions should be deduplicated in output
+    result.stdout.re_match_lines([r".*Hypothesis found 1 distinct failures.*"])
+
+
+def test_distinct_exceptions_not_deduplicated(testdir):
+    # When different errors occur, they should not be deduplicated
+    testdir.make_test(
+        """
+from hypothesis import Phase, settings
+
+@schema.parametrize()
+@settings(phases=[Phase.explicit])
+def test(case):
+    # Raise different errors for different methods to verify they're not deduplicated
+    if case.method == "GET":
+        raise ValueError("GET error")
+    elif case.method == "POST":
+        raise TypeError("POST error")
+    else:
+        raise RuntimeError("Other error")
+""",
+        paths={
+            "/users": {
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+                "put": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(failed=3)
+    # Should show multiple distinct failures
+    output = result.stdout.str()
+    assert "test[GET /users] FAILED" in output
+    assert "test[POST /users] FAILED" in output
+    assert "test[PUT /users] FAILED" in output
+    assert output.count("ValueError: GET error") == 1
+    assert output.count("TypeError: POST error") == 1
+    # This one happens in all 3 tests
+    assert output.count("RuntimeError: Other error") == 3
+
+
+def test_curl_generation_does_not_hide_main_error(testdir):
+    # When curl generation fails, main error should still be shown (not replaced by curl error)
+    testdir.makefile(
+        ".yaml",
+        schema="""
+openapi: 3.0.0
+info:
+  title: Test
+  version: 1.0.0
+paths:
+  /test/{id}}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      responses:
+        '200':
+          description: OK
+""",
+    )
+    testdir.make_test(
+        """
+schema = schemathesis.openapi.from_path("schema.yaml")
+
+@schema.parametrize()
+def test(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(failed=1)
+    output = result.stdout.str()
+    # Should show the main error (malformed path template)
+    assert "InvalidSchema" in output
+    assert "Malformed path template" in output
+    # Should NOT show "Reproduce with:" since curl generation failed
+    assert "Reproduce with:" not in output
