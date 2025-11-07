@@ -77,6 +77,9 @@ class Bundler:
             if isinstance(current, dict):
                 reference = current.get("$ref")
                 if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
+                    # Empty references resolve to the current scope and are not useful for test generation
+                    if not reference.strip():
+                        return {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
                     resolved_uri, resolved_schema = resolve(reference)
 
                     if not isinstance(resolved_schema, (dict, bool)):
