@@ -495,3 +495,50 @@ def test_unregister_string_format_valid():
 def test_unregister_string_format_invalid():
     with pytest.raises(ValueError, match="Unknown Open API format: unknown"):
         formats.unregister_string_format("unknown")
+
+
+def test_custom_format_with_bytes(testdir):
+    # See GH-3289: custom formats returning bytes should work
+    testdir.make_test(
+        """
+import schemathesis
+from hypothesis import strategies as st
+
+# Register a custom format that returns bytes
+pdf_strategy = st.sampled_from([
+    b"%PDF-1.4\\n1 0 obj\\n",
+    b"%PDF-1.5\\n%\\xe2\\xe3",
+])
+schemathesis.openapi.format("custom-pdf", pdf_strategy)
+
+schema = schemathesis.openapi.from_dict({
+    "openapi": "3.0.0",
+    "info": {"title": "Test", "version": "1.0.0"},
+    "paths": {
+        "/upload": {
+            "put": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/octet-stream": {
+                            "schema": {
+                                "type": "string",
+                                "format": "custom-pdf"
+                            }
+                        }
+                    }
+                },
+                "responses": {"200": {"description": "OK"}}
+            }
+        }
+    }
+})
+
+@schema.parametrize()
+def test_api(case):
+    # Should not crash
+    pass
+        """,
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
