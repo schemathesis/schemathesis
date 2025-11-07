@@ -63,7 +63,13 @@ def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
     if not isinstance(strategy, SearchStrategy):
         raise TypeError(f"strategy must be of type {SearchStrategy}, not {type(strategy)}")
 
-    STRING_FORMATS[name] = strategy
+    # Wrap bytes in Binary so hypothesis-jsonschema can process binary data from user-provided formats
+    def wrap_bytes(value: bytes | str | Binary) -> Binary | str:
+        if isinstance(value, bytes):
+            return Binary(value)
+        return value
+
+    STRING_FORMATS[name] = strategy.map(wrap_bytes)
 
 
 def unregister_string_format(name: str) -> None:
