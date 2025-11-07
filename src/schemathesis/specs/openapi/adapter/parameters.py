@@ -9,7 +9,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema import BundleCache, BundleError, Bundler
+from schemathesis.core.jsonschema import BundleError, Bundler
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
@@ -372,8 +372,6 @@ def iter_parameters_v2(
     default_media_types: list[str],
     resolver: RefResolver,
     adapter: SpecificationAdapter,
-    bundler: Bundler,
-    bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
     media_types = definition.get("consumes", default_media_types)
     # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
@@ -385,15 +383,9 @@ def iter_parameters_v2(
 
     form_parameters = []
     form_name_to_uri = {}
-
+    bundler = Bundler()
     for parameter in chain(definition.get("parameters", []), shared_parameters):
-        # Check cache first to avoid re-bundling the same parameter
-        param_id = id(parameter)
-        if param_id in bundle_cache:
-            parameter, name_to_uri = bundle_cache[param_id]
-        else:
-            parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
-            bundle_cache[param_id] = (parameter, name_to_uri)
+        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
         if parameter["in"] in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
@@ -436,21 +428,14 @@ def iter_parameters_v3(
     default_media_types: list[str],
     resolver: RefResolver,
     adapter: SpecificationAdapter,
-    bundler: Bundler,
-    bundle_cache: BundleCache,
 ) -> Iterator[OperationParameter]:
     # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
     # TODO: Typing
     operation = definition
 
+    bundler = Bundler()
     for parameter in chain(definition.get("parameters", []), shared_parameters):
-        # Check cache first to avoid re-bundling the same parameter
-        param_id = id(parameter)
-        if param_id in bundle_cache:
-            parameter, name_to_uri = bundle_cache[param_id]
-        else:
-            parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
-            bundle_cache[param_id] = (parameter, name_to_uri)
+        parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler)
         if parameter["in"] in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
