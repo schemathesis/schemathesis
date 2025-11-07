@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import string
 from contextlib import contextmanager, suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cached_property, lru_cache
 from json import JSONDecodeError
@@ -68,16 +68,36 @@ def get_template_fields(template: str) -> set[str]:
 
 
 @dataclass(eq=False, repr=False)
-class BaseOpenAPISchema(BaseSchema):
+class OpenApiSchema(BaseSchema):
     adapter: SpecificationAdapter = None  # type: ignore[assignment]
+    _spec_version: str = field(init=False)
 
     def __post_init__(self) -> None:
+        self._initialize_adapter()
         super().__post_init__()
         self.analysis = OpenAPIAnalysis(self)
 
-    @property
+    def _initialize_adapter(self) -> None:
+        swagger_version = self.raw_schema.get("swagger")
+        if swagger_version is not None:
+            self._spec_version = swagger_version or "2.0"
+            self.adapter = adapter.v2
+            return
+
+        openapi_version = self.raw_schema.get("openapi")
+        if openapi_version is not None:
+            self._spec_version = openapi_version
+            if openapi_version.startswith("3.1"):
+                self.adapter = adapter.v3_1
+            else:
+                self.adapter = adapter.v3_0
+            return
+
+        raise InvalidSchema("Unable to determine Open API version for this schema.")
+
+    @cached_property
     def specification(self) -> Specification:
-        raise NotImplementedError
+        return Specification.openapi(version=self._spec_version)
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]
@@ -436,7 +456,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        raise NotImplementedError
+        return get_strategies_from_examples(operation, **kwargs)
 
     def find_operation_by_id(self, operation_id: str) -> APIOperation:
         """Find an `APIOperation` instance by its `operationId`."""
@@ -538,6 +558,35 @@ class BaseOpenAPISchema(BaseSchema):
         self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         return self.adapter.prepare_multipart(operation, form_data)
+
+    def make_case(
+        self,
+        *,
+        operation: APIOperation,
+        method: str | None = None,
+        path: str | None = None,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | CaseInsensitiveDict | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
+        media_type: str | None = None,
+        meta: CaseMetadata | None = None,
+    ) -> Case:
+        if body is not NOT_SET and media_type is None:
+            media_type = operation._get_default_media_type()
+        return Case(
+            operation=operation,
+            method=method or operation.method.upper(),
+            path=path or operation.path,
+            path_parameters=path_parameters or {},
+            headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
+            cookies=cookies or {},
+            query=query or {},
+            body=body,
+            media_type=media_type,
+            meta=meta,
+        )
 
     def validate_response(
         self,
@@ -653,7 +702,7 @@ class MethodMap(Mapping):
     def _init_operation(self, method: str) -> APIOperation:
         method = method.lower()
         operation = self._path_item[method]
-        schema = cast(BaseOpenAPISchema, self._parent._schema)
+        schema = cast(OpenApiSchema, self._parent._schema)
         path = self._path
         scope = self._scope
         with in_scope(schema.resolver, scope):
@@ -672,65 +721,3 @@ class MethodMap(Mapping):
             if available_methods:
                 message += f" Available methods: {available_methods}"
             raise LookupError(message) from exc
-
-
-class SwaggerV20(BaseOpenAPISchema):
-    def __post_init__(self) -> None:
-        self.adapter = adapter.v2
-        super().__post_init__()
-
-    @property
-    def specification(self) -> Specification:
-        version = self.raw_schema.get("swagger", "2.0")
-        return Specification.openapi(version=version)
-
-    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
-        """Get examples from the API operation."""
-        return get_strategies_from_examples(operation, **kwargs)
-
-    def make_case(
-        self,
-        *,
-        operation: APIOperation,
-        method: str | None = None,
-        path: str | None = None,
-        path_parameters: dict[str, Any] | None = None,
-        headers: dict[str, Any] | CaseInsensitiveDict | None = None,
-        cookies: dict[str, Any] | None = None,
-        query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
-        media_type: str | None = None,
-        meta: CaseMetadata | None = None,
-    ) -> Case:
-        if body is not NOT_SET and media_type is None:
-            media_type = operation._get_default_media_type()
-        return Case(
-            operation=operation,
-            method=method or operation.method.upper(),
-            path=path or operation.path,
-            path_parameters=path_parameters or {},
-            headers=CaseInsensitiveDict() if headers is None else CaseInsensitiveDict(headers),
-            cookies=cookies or {},
-            query=query or {},
-            body=body,
-            media_type=media_type,
-            meta=meta,
-        )
-
-
-class OpenApi30(SwaggerV20):
-    def __post_init__(self) -> None:
-        if self.specification.version.startswith("3.1"):
-            self.adapter = adapter.v3_1
-        else:
-            self.adapter = adapter.v3_0
-        BaseOpenAPISchema.__post_init__(self)
-
-    @property
-    def specification(self) -> Specification:
-        version = self.raw_schema["openapi"]
-        return Specification.openapi(version=version)
-
-    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
-        """Get examples from the API operation."""
-        return get_strategies_from_examples(operation, **kwargs)

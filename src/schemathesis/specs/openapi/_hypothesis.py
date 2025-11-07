@@ -369,9 +369,9 @@ def _build_form_strategy_with_encoding(
         if property_name in custom_property_strategies:
             property_strategies[property_name] = custom_property_strategies[property_name]
         else:
-            from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+            from schemathesis.specs.openapi.schemas import OpenApiSchema
 
-            assert isinstance(operation.schema, BaseOpenAPISchema)
+            assert isinstance(operation.schema, OpenApiSchema)
             strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
             property_strategies[property_name] = strategy_factory(
                 subschema,

@@ -24,7 +24,7 @@ from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import StepOutput
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 FilterFunction = Callable[["StepOutput"], bool]
 
@@ -113,7 +113,7 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     return transitions
 
 
-def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
+def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
     transitions = collect_transitions(operations)

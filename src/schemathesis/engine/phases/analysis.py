@@ -20,9 +20,9 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
 
 
 def _collect_warnings(ctx: EngineContext) -> list[SchemaWarning]:
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     schema = ctx.schema
-    if isinstance(schema, BaseOpenAPISchema):
+    if isinstance(schema, OpenApiSchema):
         return list(schema.analysis.iter_warnings())
     return []

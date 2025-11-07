@@ -54,12 +54,12 @@ class OpenApiLink:
     )
 
     def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: APIOperation):
-        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         self.name = name
         self.status_code = status_code
         self.source = source
-        assert isinstance(source.schema, BaseOpenAPISchema)
+        assert isinstance(source.schema, OpenApiSchema)
         errors = []
 
         get_operation: Callable[[str], APIOperation]

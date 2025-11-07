@@ -37,7 +37,7 @@ from schemathesis.transport.prepare import prepare_path
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
 def is_unexpected_http_status_case(case: Case) -> bool:
@@ -54,9 +54,9 @@ def requires_openapi_schema(func: CheckFunction) -> CheckFunction:
 
     @wraps(func)
     def wrapper(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
-        if not isinstance(case.operation.schema, BaseOpenAPISchema):
+        if not isinstance(case.operation.schema, OpenApiSchema):
             return True
         return func(ctx, response, case)
 
@@ -87,8 +87,8 @@ def requires_case_meta(func: CheckFunction) -> CheckFunction:
     return wrapper
 
 
-def _get_openapi_schema(case: Case) -> "BaseOpenAPISchema":
-    return cast("BaseOpenAPISchema", case.operation.schema)
+def _get_openapi_schema(case: Case) -> "OpenApiSchema":
+    return cast("OpenApiSchema", case.operation.schema)
 
 
 @schemathesis.check
@@ -385,10 +385,10 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     # Check if the case contains only additional properties in query, headers, or cookies.
     # This function is used to determine if negation is solely in the form of extra properties,
     # which are often ignored for backward-compatibility by the tested apps
-    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     meta = case.meta
-    if meta is None or not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if meta is None or not isinstance(case.operation.schema, OpenApiSchema):
         # Ignore manually created cases
         return False
     if (ParameterLocation.BODY in meta.components and meta.components[ParameterLocation.BODY].mode.is_negative) or (

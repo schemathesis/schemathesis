@@ -85,16 +85,16 @@ class EngineContext:
 
     def inject_links(self) -> int:
         """Inject inferred OpenAPI links into API operations based on collected observations."""
-        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         injected = 0
         if self.observations is not None and self.observations.location_headers:
-            assert isinstance(self.schema, BaseOpenAPISchema)
+            assert isinstance(self.schema, OpenApiSchema)
 
             # Generate links from collected Location headers
             for operation, entries in self.observations.location_headers.items():
                 injected += self.schema.analysis.inferencer.inject_links(operation.responses, entries)
-        if isinstance(self.schema, BaseOpenAPISchema) and self.schema.analysis.should_inject_links():
+        if isinstance(self.schema, OpenApiSchema) and self.schema.analysis.should_inject_links():
             injected += self.schema.analysis.inject_links()
         return injected
 
