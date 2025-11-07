@@ -14,6 +14,7 @@
 ### :racing_car: Performance
 
 - 25-75% faster schema iteration through base URL caching and schema-level parameter bundler caching.
+- 10-100x faster link generation for stateful testing on large APIs.
 
 ## [4.4.1](https://github.com/schemathesis/schemathesis/compare/v4.4.0...v4.4.1) - 2025-11-06
 
