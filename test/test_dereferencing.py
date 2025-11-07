@@ -1067,3 +1067,83 @@ def test_remote_ref_fails(ctx, kind, cli, snapshot_cli, app_runner):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.hypothesis_nested
+def test_bundling_cache_with_shared_references(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "put": {
+                    "parameters": [
+                        {"in": "path", "name": "key", "type": "string"},
+                        {"in": "body", "schema": {"$ref": "#/definitions/Connection"}},
+                    ]
+                }
+            }
+        },
+        version="2.0",
+        definitions={
+            "Connection": {
+                "allOf": [{"$ref": "#/definitions/Resource"}],
+                "properties": {"key": {"properties": {"api": {"$ref": "#/definitions/ExpandedParent[ApiEntity]"}}}},
+            },
+            "ExpandedParent[ApiEntity]": {"$ref": "#/definitions/Resource"},
+            "Resource": {},
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = next(schema.get_all_operations()).ok()
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=3)
+    def test(case):
+        pass
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_bundling_cache_returns_independent_copies(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/path1": {
+                "get": {
+                    "parameters": [
+                        {"in": "body", "schema": {"$ref": "#/definitions/Model"}},
+                    ]
+                }
+            },
+            "/path2": {
+                "post": {
+                    "parameters": [
+                        {"in": "body", "schema": {"$ref": "#/definitions/Model"}},
+                    ]
+                }
+            },
+        },
+        version="2.0",
+        definitions={
+            "Model": {"type": "object", "properties": {"id": {"type": "integer"}}},
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    ops = list(schema.get_all_operations())
+
+    op1 = ops[0].ok()
+    op2 = ops[1].ok()
+
+    @given(case=op1.as_strategy())
+    @settings(max_examples=1)
+    def test1(case):
+        pass
+
+    @given(case=op2.as_strategy())
+    @settings(max_examples=1)
+    def test2(case):
+        pass
+
+    test1()
+    test2()

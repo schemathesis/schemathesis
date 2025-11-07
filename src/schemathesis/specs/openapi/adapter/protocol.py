@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.compat import RefResolver
+    from schemathesis.core.jsonschema.bundler import BundleCache, Bundler
     from schemathesis.core.jsonschema.types import JsonSchema
     from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
@@ -44,7 +45,15 @@ GetBasePath = Callable[[Mapping[str, Any]], str]
 ValidateSchema = Callable[[Mapping[str, Any]], None]
 GetParameterSerializer = Callable[[List[dict[str, Any]]], Optional[Callable]]
 IterParameters = Callable[
-    [Mapping[str, Any], Sequence[Mapping[str, Any]], list[str], "RefResolver", "SpecificationAdapter"],
+    [
+        Mapping[str, Any],
+        Sequence[Mapping[str, Any]],
+        list[str],
+        "RefResolver",
+        "SpecificationAdapter",
+        "Bundler",
+        "BundleCache",
+    ],
     Iterable["OperationParameter"],
 ]
 BuildPathParameter = Callable[[Mapping[str, Any]], "OperationParameter"]
