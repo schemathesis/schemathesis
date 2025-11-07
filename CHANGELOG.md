@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Empty `$ref` references in schemas are now gracefully skipped during bundling.
+- Custom format strategies returning binary data. [#3289](https://github.com/schemathesis/schemathesis/issues/3289)
 
 ## [4.4.2](https://github.com/schemathesis/schemathesis/compare/v4.4.1...v4.4.2) - 2025-11-07
 
