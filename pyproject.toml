@@ -33,7 +33,6 @@ classifiers = [
   "Topic :: Software Development :: Testing",
 ]
 dependencies = [
-  "backoff>=2.1.2,<3.0",
   "click>=8.0,<9",
   "colorama>=0.4,<1.0",
   "harfile>=0.4.0,<1.0",
@@ -51,6 +50,7 @@ dependencies = [
   "rich>=13.9.4",
   "starlette-testclient>=0.4.1,<1",
   "tomli>=2.2.1; python_version < '3.11'",
+  "tenacity>=9.1.2,<10.0",
   "typing-extensions>=4.12.2",
   "werkzeug>=0.16.0,<4",
 ]
