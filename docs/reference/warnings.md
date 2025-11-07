@@ -7,6 +7,13 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 !!! note ""
     Percentages are computed for each individual operation after all scenarios finish, so warnings fire per-endpoint when its error rate crosses the threshold
 
+| Warning | Signals | Quick fix |
+| --- | --- | --- |
+| `missing_auth` | Most interactions returned 401/403 | Provide valid credentials via `--auth`, custom headers, or config |
+| `missing_test_data` | Generated parameters hit non-existent resources (404) | Seed known IDs / payloads in your config file |
+| `validation_mismatch` | Schema constraints differ from real validation (lots of 4xx) | Tighten schema or extend generators to match runtime rules |
+| `missing_deserializer` | Structured responses lack a registered deserializer | Register one via `@schemathesis.deserializer` or align `content` types with actual formats |
+
 ## Available Warnings
 
 ### `missing_auth`
@@ -66,6 +73,26 @@ The tested API rejects a lot of data - while technically it is a valid behavior,
 As Schemathesis uses API schema to generate data, the most probable cause is that the schema is too rough and does not match the real API behavior, which leads to rejecting the generated data. 
 
 To mitigate it, re-check the real validation rules and update your API schema so they match. Alternatively you can [extend](../guides/extending.md) Schemathesis so it generates data which is more likely to pass validation.
+
+### `missing_deserializer`
+
+```
+Schema validation skipped: 1 operation cannot validate responses due to missing deserializers
+
+  - GET /reports
+    Cannot validate response 200: no deserializer registered for application/xml
+```
+
+!!! tip
+    Register a deserializer with [@schemathesis.deserializer](../guides/extending.md#custom-deserializers) to enable validation
+
+**Trigger**: Operation responses declare structured schemas (objects / arrays) for a media type, but Schemathesis has no deserializer registered for that `content-type`.
+
+When this warning appears, Schemathesis skips validation because it cannot deserialize the response body. Restore validation by:
+
+- Registering a deserializer for the media type via `@schemathesis.deserializer()` (or `schemathesis.deserializer.register`) so the payload is converted into Python data.
+- Updating the schema to advertise the actual media type (for example `application/json`) if the server already returns JSON.
+- Omitting structured schemas for truly binary responses; without a schema, Schemathesis won’t expect to validate those payloads.
 
 ## Configuring Warnings
 
