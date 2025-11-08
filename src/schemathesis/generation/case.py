@@ -67,6 +67,7 @@ class Case:
     _has_explicit_auth: bool
     _components: dict
     _freeze_metadata: bool
+    _curl_cache: dict[tuple, str]
 
     __slots__ = (
         "operation",
@@ -84,6 +85,7 @@ class Case:
         "_has_explicit_auth",
         "_components",
         "_freeze_metadata",
+        "_curl_cache",
     )
 
     def __init__(
@@ -119,6 +121,7 @@ class Case:
         object.__setattr__(self, "_has_explicit_auth", _has_explicit_auth)
         object.__setattr__(self, "_components", store_components(self))
         object.__setattr__(self, "_freeze_metadata", False)
+        object.__setattr__(self, "_curl_cache", {})
 
         # Initialize hash tracking if we have metadata
         if self._meta is not None:
@@ -144,6 +147,10 @@ class Case:
         """Track modifications to containers for metadata revalidation."""
         # Set the value
         object.__setattr__(self, name, value)
+
+        # Clear curl cache when case data is modified
+        if name in CONTAINER_TO_LOCATION:
+            object.__setattr__(self, "_curl_cache", {})
 
         # Mark as dirty if we modified a tracked container and have metadata
         if name in CONTAINER_TO_LOCATION and self._meta is not None:
@@ -292,6 +299,15 @@ class Case:
             verify: When False, adds `--insecure` flag to curl command.
 
         """
+        # Create cache key from parameters
+        headers_key = tuple(sorted(headers.items())) if headers else None
+        cache_key = (headers_key, verify)
+
+        # Check cache
+        if cache_key in self._curl_cache:
+            return self._curl_cache[cache_key]
+
+        # Generate curl command
         request_data = prepare_request(self, headers, config=self.operation.schema.config.output.sanitization)
         result = curl.generate(
             method=str(request_data.method),
@@ -304,8 +320,13 @@ class Case:
         # Include warnings if any exist
         if result.warnings:
             warnings_text = "\n\n".join(f"⚠️  {warning}" for warning in result.warnings)
-            return f"{result.command}\n\n{warnings_text}"
-        return result.command
+            output = f"{result.command}\n\n{warnings_text}"
+        else:
+            output = result.command
+
+        # Cache and return
+        self._curl_cache[cache_key] = output
+        return output
 
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)
