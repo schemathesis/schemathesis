@@ -339,7 +339,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
                 header_name=data.parameter,
                 status_code=response.status_code,
                 expected_statuses=list(expected_statuses),
-                message=f"Missing header not rejected (got {response.status_code}, expected {allowed})",
+                message=f"Got {response.status_code} when missing required '{data.parameter}' header, expected {allowed}",
             )
     return None
 
