@@ -1,0 +1,66 @@
+name: 🏆 Trophy Case Submission
+description: Submit a bug discovered by Schemathesis
+title: "[Trophy] "
+labels: ["trophy-case"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share a bug you found with Schemathesis to help showcase its capabilities.
+
+        **Requirements:**
+        - Bug discovered using Schemathesis
+        - Security bugs: only submit after fix is public
+        - Include link to upstream issue/fix when available
+
+  - type: input
+    id: project
+    attributes:
+      label: Project
+      description: Project name where the bug was found
+      placeholder: "YourProject API"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: bug-type
+    attributes:
+      label: Type
+      options:
+        - "💥 Server Crashes"
+        - "📋 Schema Violations"
+        - "🚪 Validation Bypass"
+        - "🔗 Integration Issues"
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What happened (endpoint and description)
+      placeholder: |
+        **Endpoint:** POST /api/users
+        **What went wrong:** Server returns 500 when email contains NULL byte
+      value: |
+        **Endpoint:**
+        **What went wrong:**
+    validations:
+      required: true
+
+  - type: input
+    id: link
+    attributes:
+      label: Link
+      description: Link to upstream issue or fix (if available)
+      placeholder: "https://github.com/project/repo/issues/123"
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status
+      options:
+        - "Open"
+        - "Fixed"
+    validations:
+      required: true
