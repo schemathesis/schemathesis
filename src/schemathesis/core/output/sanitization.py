@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import MutableMapping, MutableSequence
+from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
@@ -35,18 +36,36 @@ def sanitize_url(url: str, *, config: SanitizationConfig) -> str:
 
     This function will sanitize the authority and query parameters in the URL.
     """
+    return _sanitize_url_cached(
+        url,
+        config.replacement,
+        config.keys_to_sanitize,
+        config.sensitive_markers,
+    )
+
+
+@lru_cache(maxsize=512)
+def _sanitize_url_cached(
+    url: str,
+    replacement: str,
+    keys_to_sanitize: tuple[str, ...],
+    sensitive_markers: tuple[str, ...],
+) -> str:
     parsed = urlsplit(url)
 
     # Sanitize authority
     netloc_parts = parsed.netloc.split("@")
     if len(netloc_parts) > 1:
-        netloc = f"{config.replacement}@{netloc_parts[-1]}"
+        netloc = f"{replacement}@{netloc_parts[-1]}"
     else:
         netloc = parsed.netloc
 
     # Sanitize query parameters
     query = parse_qs(parsed.query, keep_blank_values=True)
-    sanitize_value(query, config=config)
+    for key in query:
+        lower_key = key.lower()
+        if lower_key in keys_to_sanitize or any(marker in lower_key for marker in sensitive_markers):
+            query[key] = [replacement]
     sanitized_query = urlencode(query, doseq=True)
 
     # Reconstruct the URL

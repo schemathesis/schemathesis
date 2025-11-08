@@ -6,7 +6,7 @@ from typing import Any
 from schemathesis.config._diff_base import DiffBase
 
 # Exact keys to sanitize
-DEFAULT_KEYS_TO_SANITIZE = [
+DEFAULT_KEYS_TO_SANITIZE = (
     "phpsessid",
     "xsrf-token",
     "_csrf",
@@ -49,10 +49,10 @@ DEFAULT_KEYS_TO_SANITIZE = [
     "x-forwarded-for",
     "x_real_ip",
     "x-real-ip",
-]
+)
 
 # Markers indicating potentially sensitive keys
-DEFAULT_SENSITIVE_MARKERS = [
+DEFAULT_SENSITIVE_MARKERS = (
     "token",
     "key",
     "secret",
@@ -61,7 +61,7 @@ DEFAULT_SENSITIVE_MARKERS = [
     "session",
     "passwd",
     "credential",
-]
+)
 
 DEFAULT_REPLACEMENT = "[Filtered]"
 
@@ -71,8 +71,8 @@ class SanitizationConfig(DiffBase):
     """Configuration for sanitizing sensitive data."""
 
     enabled: bool
-    keys_to_sanitize: list[str]
-    sensitive_markers: list[str]
+    keys_to_sanitize: tuple[str, ...]
+    sensitive_markers: tuple[str, ...]
     replacement: str
 
     __slots__ = ("enabled", "keys_to_sanitize", "sensitive_markers", "replacement")
@@ -81,8 +81,8 @@ class SanitizationConfig(DiffBase):
         self,
         *,
         enabled: bool = True,
-        keys_to_sanitize: list[str] | None = None,
-        sensitive_markers: list[str] | None = None,
+        keys_to_sanitize: tuple[str, ...] | None = None,
+        sensitive_markers: tuple[str, ...] | None = None,
         replacement: str | None = None,
     ) -> None:
         self.enabled = enabled
@@ -94,8 +94,8 @@ class SanitizationConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> SanitizationConfig:
         return cls(
             enabled=data.get("enabled", True),
-            keys_to_sanitize=[k.lower() for k in data.get("keys-to-sanitize", [])] or DEFAULT_KEYS_TO_SANITIZE,
-            sensitive_markers=[m.lower() for m in data.get("sensitive-markers", [])] or DEFAULT_SENSITIVE_MARKERS,
+            keys_to_sanitize=tuple(k.lower() for k in data.get("keys-to-sanitize", [])) or DEFAULT_KEYS_TO_SANITIZE,
+            sensitive_markers=tuple(m.lower() for m in data.get("sensitive-markers", [])) or DEFAULT_SENSITIVE_MARKERS,
             replacement=data.get("replacement", DEFAULT_REPLACEMENT),
         )
 
