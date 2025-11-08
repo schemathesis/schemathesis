@@ -335,10 +335,11 @@ The following options control how Schemathesis makes network requests to the API
 
 !!! note ""
 
-    **Type**: `Float`  
-    **Range**: `>0.0`  
+    **Type**: `Float`
+    **Default**: `10.0`
+    **Range**: `>0.0`
 
-    Timeout limit, in seconds, for each network request during tests.
+    Timeout limit, in seconds, for each network request during tests. This is the maximum time to wait for a response before aborting the request.
 
     ```console
     $ st run openapi.yaml --request-timeout 5.0
