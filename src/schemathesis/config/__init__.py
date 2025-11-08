@@ -4,6 +4,7 @@ import os
 import sys
 from dataclasses import dataclass
 from os import PathLike
+from pathlib import Path
 from random import Random
 
 from schemathesis.config._auth import ApiKeyAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
@@ -73,6 +74,7 @@ class SchemathesisConfig(DiffBase):
     color: bool | None
     suppress_health_check: list[HealthCheck]
     _seed: int | None
+    _config_path: str | None
     wait_for_schema: float | int | None
     max_failures: int | None
     reports: ReportsConfig
@@ -83,6 +85,7 @@ class SchemathesisConfig(DiffBase):
         "color",
         "suppress_health_check",
         "_seed",
+        "_config_path",
         "wait_for_schema",
         "max_failures",
         "reports",
@@ -105,6 +108,7 @@ class SchemathesisConfig(DiffBase):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
         self._seed = seed
+        self._config_path = None
         self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures
         self.reports = reports or ReportsConfig()
@@ -117,6 +121,14 @@ class SchemathesisConfig(DiffBase):
         if self._seed is None:
             self._seed = Random().getrandbits(128)
         return self._seed
+
+    @property
+    def config_path(self) -> str | None:
+        """Filesystem path to the loaded configuration file, if any.
+
+        Returns None if using default configuration.
+        """
+        return self._config_path
 
     @classmethod
     def discover(cls) -> SchemathesisConfig:
@@ -175,7 +187,9 @@ class SchemathesisConfig(DiffBase):
     def from_path(cls, path: PathLike | str) -> SchemathesisConfig:
         """Load configuration from a file path."""
         with open(path, encoding="utf-8") as fd:
-            return cls.from_str(fd.read())
+            config = cls.from_str(fd.read())
+            config._config_path = str(Path(path).resolve())
+            return config
 
     @classmethod
     def from_str(cls, data: str) -> SchemathesisConfig:
