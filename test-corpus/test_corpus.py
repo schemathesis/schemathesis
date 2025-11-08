@@ -368,7 +368,6 @@ def test_default(corpus, filename):
     schema = _load_schema(corpus, filename)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
-    schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])
 
     handlers = [
@@ -439,6 +438,8 @@ def _load_schema(corpus, filename):
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
         schema.config.update(base_url="http://127.0.0.1:8080/")
+        schema.config.generation.update(database="none", max_examples=1)
+        schema.config.output.sanitization.update(enabled=False)
         return schema
     except LoaderError as exc:
         assert_invalid_schema(exc)
