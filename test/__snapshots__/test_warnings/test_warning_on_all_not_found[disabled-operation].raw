@@ -10,6 +10,7 @@ Schemathesis dev
      Base URL:         http://127.0.0.1/api/v4
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
+     Configuration:    /tmp/config.toml
 
 
  ✅  API capabilities:

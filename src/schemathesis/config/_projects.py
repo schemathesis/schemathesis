@@ -246,6 +246,16 @@ class ProjectConfig(DiffBase):
         if warnings is not None:
             self.warnings = warnings
 
+    @property
+    def config_path(self) -> str | None:
+        """Filesystem path to the loaded configuration file, if any.
+
+        Returns None if using default configuration.
+        """
+        if self._parent is not None:
+            return self._parent.config_path
+        return None
+
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
         """Get auth credentials, prioritizing operation-specific configs."""
         if operation is not None:

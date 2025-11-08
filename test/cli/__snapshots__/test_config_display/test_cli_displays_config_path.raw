@@ -9,7 +9,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
+     Operations:       1 selected / 1 total
      Configuration:    /tmp/config.toml
 
 
@@ -17,23 +17,40 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
  ✅  Coverage (in 0.00s)
 
-     ✅ 1 passed  ⏭  1 skipped
+     ✅ 1 passed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - GET /test
+
+💡 Provide realistic parameter values in your config file so tests can access existing resources
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
+  Selected: 1/1
   Tested: 1
-  Skipped: 1
-    - No examples in schema
 
 Test Phases:
-  ⏭  Examples (disabled)
+  ⏭  Examples
   ✅ Coverage
-  ⏭  Fuzzing (disabled)
-  ⏭  Stateful (disabled)
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Warnings:
+  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
 
 Test cases:
   N generated, N passed

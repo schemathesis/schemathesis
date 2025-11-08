@@ -35,7 +35,7 @@ test-k PATTERN *ARGS:
 
 # Update test snapshots
 snapshot-update *ARGS:
-    python -m pytest test/ --snapshot-update {{ARGS}}
+    python -m pytest test/ --snapshot-update -n auto --dist=worksteal {{ARGS}}
 
 # Run corpus tests
 test-corpus:

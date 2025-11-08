@@ -899,6 +899,8 @@ class OutputHandler(EventHandler):
         table.add_row("Specification:", event.specification.name)
         statistic = event.statistic.operations
         table.add_row("Operations:", f"{statistic.selected} selected / {statistic.total} total")
+        if event.config.config_path:
+            table.add_row("Configuration:", event.config.config_path)
 
         message = Padding(table, BLOCK_PADDING)
         self.console.print(message)
