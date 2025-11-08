@@ -3,6 +3,7 @@ from __future__ import annotations
 import click
 from aiohttp import web
 
+from schemathesis.cli.console import secho
 from schemathesis.cli.ext.options import CsvEnumChoice
 
 try:
@@ -47,7 +48,7 @@ def run_app(port: int, operations: list[openapi.schema.Operation], spec: str, fr
         version = {"openapi2": openapi.schema.OpenAPIVersion("2.0"), "openapi3": openapi.schema.OpenAPIVersion("3.0")}[
             spec
         ]
-        click.secho(
+        secho(
             f"Schemathesis test server is running!\n\nAPI Schema is available at: http://0.0.0.0:{port}/schema.yaml\n",
             bold=True,
         )

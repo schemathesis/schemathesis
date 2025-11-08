@@ -9,6 +9,7 @@ import click
 from schemathesis.cli.commands.data import Data
 from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.commands.run.handlers.output import display_header
+from schemathesis.cli.console import echo, secho
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption, StyledGroup, should_use_color
@@ -37,7 +38,7 @@ def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
     if value:
         if ctx.color is None:
             ctx.color = should_use_color(ctx)
-        click.echo(ctx.get_help(), color=ctx.color)
+        echo(ctx.get_help())
         ctx.exit()
 
 
@@ -77,16 +78,16 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             config = SchemathesisConfig.discover()
     except FileNotFoundError:
         display_header(SCHEMATHESIS_VERSION)
-        click.secho(
+        secho(
             f"❌  Failed to load configuration file from {config_file}",
             fg="red",
             bold=True,
         )
-        click.echo("\nThe configuration file does not exist")
+        echo("\nThe configuration file does not exist")
         ctx.exit(1)
     except (TOMLDecodeError, ConfigError) as exc:
         display_header(SCHEMATHESIS_VERSION)
-        click.secho(
+        secho(
             f"❌  Failed to load configuration file{f' from {config_file}' if config_file else ''}",
             fg="red",
             bold=True,
@@ -95,23 +96,21 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
             detail = "The configuration file content is not valid TOML"
         else:
             detail = "The loaded configuration is incorrect"
-        click.echo(f"\n{detail}\n\n{exc}")
+        echo(f"\n{detail}\n\n{exc}")
         ctx.exit(1)
     except HookError as exc:
-        click.secho("Unable to load Schemathesis extension hooks", fg="red", bold=True)
+        secho("Unable to load Schemathesis extension hooks", fg="red", bold=True)
         formatted_module_name = click.style(f"'{exc.module_path}'", bold=True)
         cause = exc.__cause__
         assert isinstance(cause, Exception)
         if isinstance(cause, ModuleNotFoundError) and cause.name == exc.module_path:
-            click.echo(
-                f"\nAn attempt to import the module {formatted_module_name} failed because it could not be found."
-            )
-            click.echo("\nEnsure the module name is correctly spelled and reachable from the current directory.")
+            echo(f"\nAn attempt to import the module {formatted_module_name} failed because it could not be found.")
+            echo("\nEnsure the module name is correctly spelled and reachable from the current directory.")
         else:
-            click.echo(f"\nAn error occurred while importing the module {formatted_module_name}. Traceback:")
+            echo(f"\nAn error occurred while importing the module {formatted_module_name}. Traceback:")
             message = format_exception(cause, with_traceback=True, skip_frames=1)
-            click.secho(f"\n{message}", fg="red")
-        click.echo(f"\nFor more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
+            secho(f"\n{message}", fg="red")
+        echo(f"\nFor more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
         ctx.exit(1)
     ctx.obj = Data(config=config)
 

@@ -14,6 +14,8 @@ import click
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.console import echo as console_echo
+from schemathesis.cli.console import get_console
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
@@ -47,7 +49,7 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     """Print section name with separators in terminal with the given title nicely centered."""
     message = f" {title} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
-    click.echo(_style(message, **kwargs))
+    console_echo(_style(message, **kwargs))
 
 
 def bold(option: str) -> str:
@@ -93,7 +95,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
     """Display a failure for a single method / path."""
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
-        click.echo(
+        console_echo(
             format_failures(
                 case_id=f"{idx}. Test Case ID: {group.case_id}",
                 response=group.response,
@@ -103,7 +105,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
                 config=ctx.config.output,
             )
         )
-        click.echo()
+        console_echo()
 
 
 VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema or GraphQL endpoint"
@@ -129,17 +131,17 @@ LOADER_ERROR_SUGGESTIONS = {
 
 def _display_extras(extras: list[str]) -> None:
     if extras:
-        click.echo()
+        console_echo()
     for extra in extras:
-        click.echo(_style(f"    {extra}"))
+        console_echo(_style(f"    {extra}"))
 
 
 def display_header(version: str) -> None:
     prefix = "v" if version != "dev" else ""
     header = f"Schemathesis {prefix}{version}"
-    click.echo(_style(header, bold=True))
-    click.echo(_style(HEADER_SEPARATOR * len(header), bold=True))
-    click.echo()
+    console_echo(_style(header, bold=True))
+    console_echo(_style(HEADER_SEPARATOR * len(header), bold=True))
+    console_echo()
 
 
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
@@ -149,20 +151,10 @@ TRUNCATION_PLACEHOLDER = "[...]"
 def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
     for entry in lines:
         if isinstance(entry, str):
-            click.echo(entry)
+            console_echo(entry)
         elif isinstance(entry, GeneratorType):
             for line in entry:
-                click.echo(line)
-
-
-def _default_console() -> Console:
-    from rich.console import Console
-
-    kwargs = {}
-    # For stdout recording in tests
-    if "PYTEST_VERSION" in os.environ:
-        kwargs["width"] = 240
-    return Console(**kwargs)
+                console_echo(line)
 
 
 BLOCK_PADDING = (0, 1, 0, 1)
@@ -811,7 +803,7 @@ class OutputHandler(EventHandler):
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
         default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
     )
-    console: Console = field(default_factory=_default_console)
+    console: Console = field(default_factory=get_console)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.PhaseStarted):
@@ -836,6 +828,13 @@ class OutputHandler(EventHandler):
             self._on_loading_started(event)
         elif isinstance(event, LoadingFinished):
             self._on_loading_finished(ctx, event)
+
+    def _print(self, message: object = "", *, end: str | None = None, **kwargs: Any) -> None:
+        if isinstance(message, str):
+            kwargs.setdefault("markup", False)
+        if end is not None:
+            kwargs["end"] = end
+        self.console.print(message, **kwargs)
 
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
@@ -1228,7 +1227,7 @@ class OutputHandler(EventHandler):
             ):
                 suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
                 if suggestion is not None:
-                    click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
+                    self._print(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
             raise click.Abort
         title = "Test Execution Error"
@@ -1236,16 +1235,16 @@ class OutputHandler(EventHandler):
         traceback = format_exception(event.exception, with_traceback=True)
         extras = split_traceback(traceback)
         suggestion = f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-        click.echo(_style(title, fg="red", bold=True))
-        click.echo()
-        click.echo(message)
+        self._print(_style(title, fg="red", bold=True))
+        self._print()
+        self._print(message)
         _display_extras(extras)
         if not (
             isinstance(event.exception, LoaderError)
             and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
             and self.config.wait_for_schema is not None
         ):
-            click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
+            self._print(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
         raise click.Abort
 
@@ -1258,7 +1257,7 @@ class OutputHandler(EventHandler):
             total = len(operations)
 
         suffix = "" if total == 1 else "s"
-        click.echo(
+        self._print(
             _style(
                 f"{title}: {total} operation{suffix}{operation_suffix}\n",
                 fg="yellow",
@@ -1268,33 +1267,33 @@ class OutputHandler(EventHandler):
         # Print up to 3 endpoints, then "+N more"
         def _print_up_to_three(operations_: list[str] | set[str]) -> None:
             for operation in sorted(operations_)[:3]:
-                click.echo(_style(f"  - {operation}", fg="yellow"))
+                self._print(_style(f"  - {operation}", fg="yellow"))
             extra_count = len(operations_) - 3
             if extra_count > 0:
-                click.echo(_style(f"  + {extra_count} more", fg="yellow"))
+                self._print(_style(f"  + {extra_count} more", fg="yellow"))
 
         if isinstance(operations, dict):
             for status_code, ops in operations.items():
                 status_text = "Unauthorized" if status_code == 401 else "Forbidden"
                 count = len(ops)
                 suffix = "" if count == 1 else "s"
-                click.echo(_style(f"{status_code} {status_text} ({count} operation{suffix}):", fg="yellow"))
+                self._print(_style(f"{status_code} {status_text} ({count} operation{suffix}):", fg="yellow"))
 
                 _print_up_to_three(ops)
         else:
             _print_up_to_three(operations)
 
         if tips:
-            click.echo()
+            self._print()
 
         for tip in tips:
-            click.echo(_style(tip, fg="yellow"))
+            self._print(_style(tip, fg="yellow"))
 
-        click.echo()
+        self._print()
 
     def display_warnings(self) -> None:
         display_section_name("WARNINGS")
-        click.echo()
+        self._print()
         if self.warnings.missing_auth:
             self._display_warning_block(
                 title="Authentication failed",
@@ -1324,7 +1323,7 @@ class OutputHandler(EventHandler):
         if self.warnings.missing_deserializer:
             total = len(self.warnings.missing_deserializer)
             suffix = "" if total == 1 else "s"
-            click.echo(
+            self._print(
                 _style(
                     f"Schema validation skipped: {total} operation{suffix} cannot validate responses due to missing deserializers\n",
                     fg="yellow",
@@ -1335,27 +1334,27 @@ class OutputHandler(EventHandler):
             displayed_operations = sorted(self.warnings.missing_deserializer.keys())[:3]
             for idx, operation_label in enumerate(displayed_operations):
                 messages = self.warnings.missing_deserializer[operation_label]
-                click.echo(_style(f"  - {operation_label}", fg="yellow"))
+                self._print(_style(f"  - {operation_label}", fg="yellow"))
                 for message in sorted(messages):
-                    click.echo(_style(f"    {message}", fg="yellow"))
+                    self._print(_style(f"    {message}", fg="yellow"))
                 # Add empty line between operations
                 if idx < len(displayed_operations) - 1:
-                    click.echo()
+                    self._print()
 
             extra_count = len(self.warnings.missing_deserializer) - 3
             if extra_count > 0:
-                click.echo(_style(f"  + {extra_count} more", fg="yellow"))
+                self._print(_style(f"  + {extra_count} more", fg="yellow"))
 
-            click.echo()
-            click.echo(
+            self._print()
+            self._print(
                 _style("💡 Register a deserializer with @schemathesis.deserializer() to enable validation", fg="yellow")
             )
-            click.echo()
+            self._print()
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
 
-        click.echo("\nFailed to extract data from response:")
+        self._print("\nFailed to extract data from response:")
 
         grouped: dict[str, list[ExtractionFailure]] = {}
         for failure in ctx.statistic.extraction_failures:
@@ -1363,15 +1362,15 @@ class OutputHandler(EventHandler):
 
         for idx, (transition_id, failures) in enumerate(grouped.items(), 1):
             for failure in failures:
-                click.echo(f"\n    {idx}. Test Case ID: {failure.case_id}\n")
-                click.echo(f"    {transition_id}")
+                self._print(f"\n    {idx}. Test Case ID: {failure.case_id}\n")
+                self._print(f"    {transition_id}")
 
                 indent = "        "
                 if failure.error:
                     if isinstance(failure.error, JSONDecodeError):
-                        click.echo(f"\n{indent}Failed to parse JSON from response")
+                        self._print(f"\n{indent}Failed to parse JSON from response")
                     else:
-                        click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
+                        self._print(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
                 else:
                     if failure.parameter_name == "body":
                         description = f"\n{indent}Could not resolve request body via {failure.expression}"
@@ -1380,37 +1379,37 @@ class OutputHandler(EventHandler):
                     prefix = "$response.body"
                     if failure.expression.startswith(prefix):
                         description += f"\n{indent}Path `{failure.expression[len(prefix) :]}` not found in response"
-                    click.echo(description)
+                    self._print(description)
 
-                click.echo()
+                self._print()
 
                 for case, response in reversed(failure.history):
                     curl = case.as_curl_command(headers=dict(response.request.headers), verify=response.verify)
-                    click.echo(f"{indent}[{response.status_code}] {curl}")
+                    self._print(f"{indent}[{response.status_code}] {curl}")
 
                 response = failure.response
 
                 if response.content is None or not response.content:
-                    click.echo(f"\n{indent}<EMPTY>")
+                    self._print(f"\n{indent}<EMPTY>")
                 else:
                     try:
                         payload = prepare_response_payload(response.text, config=ctx.config.output)
-                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
+                        self._print(textwrap.indent(f"\n{payload}", prefix=indent))
                     except UnicodeDecodeError:
-                        click.echo(f"\n{indent}<BINARY>")
+                        self._print(f"\n{indent}<BINARY>")
 
-        click.echo()
+        self._print()
 
     def display_api_operations(self, ctx: ExecutionContext) -> None:
         assert self.statistic is not None
-        click.echo(_style("API Operations:", bold=True))
-        click.echo(
+        self._print(_style("API Operations:", bold=True))
+        self._print(
             _style(
                 f"  Selected: {click.style(str(self.statistic.operations.selected), bold=True)}/"
                 f"{click.style(str(self.statistic.operations.total), bold=True)}"
             )
         )
-        click.echo(_style(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}"))
+        self._print(_style(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}"))
         errors = len(
             {
                 err.label
@@ -1422,18 +1421,18 @@ class OutputHandler(EventHandler):
             }
         )
         if errors:
-            click.echo(_style(f"  Errored: {click.style(str(errors), bold=True)}"))
+            self._print(_style(f"  Errored: {click.style(str(errors), bold=True)}"))
 
         # API operations that are skipped due to fail-fast are counted here as well
         total_skips = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errors
         if total_skips:
-            click.echo(_style(f"  Skipped: {click.style(str(total_skips), bold=True)}"))
+            self._print(_style(f"  Skipped: {click.style(str(total_skips), bold=True)}"))
             for reason in sorted(set(self.skip_reasons)):
-                click.echo(_style(f"    - {reason.rstrip('.')}"))
-        click.echo()
+                self._print(_style(f"    - {reason.rstrip('.')}"))
+        self._print()
 
     def display_phases(self) -> None:
-        click.echo(_style("Test Phases:", bold=True))
+        self._print(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
             if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
@@ -1442,31 +1441,31 @@ class OutputHandler(EventHandler):
             status, skip_reason = self.phases[phase]
 
             if status == Status.SKIP:
-                click.echo(_style(f"  ⏭  {phase.value}", fg="yellow"), nl=False)
+                self._print(_style(f"  ⏭  {phase.value}", fg="yellow"), end="")
                 if skip_reason:
-                    click.echo(_style(f" ({skip_reason.value})", fg="yellow"))
+                    self._print(_style(f" ({skip_reason.value})", fg="yellow"))
                 else:
-                    click.echo()
+                    self._print()
             elif status == Status.SUCCESS:
-                click.echo(_style(f"  ✅ {phase.value}", fg="green"))
+                self._print(_style(f"  ✅ {phase.value}", fg="green"))
             elif status == Status.FAILURE:
-                click.echo(_style(f"  ❌ {phase.value}", fg="red"))
+                self._print(_style(f"  ❌ {phase.value}", fg="red"))
             elif status == Status.ERROR:
-                click.echo(_style(f"  🚫 {phase.value}", fg="red"))
+                self._print(_style(f"  🚫 {phase.value}", fg="red"))
             elif status == Status.INTERRUPTED:
-                click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
-        click.echo()
+                self._print(_style(f"  ⚡ {phase.value}", fg="yellow"))
+        self._print()
 
     def display_test_cases(self, ctx: ExecutionContext) -> None:
         if ctx.statistic.total_cases == 0:
-            click.echo(_style("Test cases:", bold=True))
-            click.echo("  No test cases were generated\n")
+            self._print(_style("Test cases:", bold=True))
+            self._print("  No test cases were generated\n")
             return
 
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
         )
-        click.echo(_style("Test cases:", bold=True))
+        self._print(_style("Test cases:", bold=True))
 
         parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
 
@@ -1485,7 +1484,7 @@ class OutputHandler(EventHandler):
             if ctx.statistic.cases_without_checks > 0:
                 parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
 
-        click.echo(_style(", ".join(parts) + "\n"))
+        self._print(_style(", ".join(parts) + "\n"))
 
     def display_failures_summary(self, ctx: ExecutionContext) -> None:
         # Collect all unique failures and their counts by title
@@ -1496,15 +1495,15 @@ class OutputHandler(EventHandler):
                     data = failure_counts.get(failure.title, (failure.severity, 0))
                     failure_counts[failure.title] = (failure.severity, data[1] + 1)
 
-        click.echo(_style("Failures:", bold=True))
+        self._print(_style("Failures:", bold=True))
 
         # Sort by severity first, then by title
         sorted_failures = sorted(failure_counts.items(), key=lambda x: (x[1][0], x[0]))
 
         for title, (_, count) in sorted_failures:
-            click.echo(_style(f"  ❌ {title}: "), nl=False)
-            click.echo(_style(str(count), bold=True))
-        click.echo()
+            self._print(_style(f"  ❌ {title}: "), end="")
+            self._print(_style(str(count), bold=True))
+        self._print()
 
     def display_errors_summary(self) -> None:
         # Group errors by title and count occurrences
@@ -1513,12 +1512,12 @@ class OutputHandler(EventHandler):
             title = error.info.title
             error_counts[title] = error_counts.get(title, 0) + 1
 
-        click.echo(_style("Errors:", bold=True))
+        self._print(_style("Errors:", bold=True))
 
         for title in sorted(error_counts):
-            click.echo(_style(f"  🚫 {title}: "), nl=False)
-            click.echo(_style(str(error_counts[title]), bold=True))
-        click.echo()
+            self._print(_style(f"  🚫 {title}: "), end="")
+            self._print(_style(str(error_counts[title]), bold=True))
+        self._print()
 
     def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         parts = []
@@ -1554,7 +1553,7 @@ class OutputHandler(EventHandler):
     def display_reports(self) -> None:
         reports = self.config.reports
         if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled:
-            click.echo(_style("Reports:", bold=True))
+            self._print(_style("Reports:", bold=True))
             for format, report in (
                 (ReportFormat.JUNIT, reports.junit),
                 (ReportFormat.VCR, reports.vcr),
@@ -1562,18 +1561,18 @@ class OutputHandler(EventHandler):
             ):
                 if report.enabled:
                     path = reports.get_path(format)
-                    click.echo(_style(f"  - {format.value.upper()}: {path}"))
-            click.echo()
+                    self._print(_style(f"  - {format.value.upper()}: {path}"))
+            self._print()
 
     def display_seed(self) -> None:
-        click.echo(_style("Seed: ", bold=True), nl=False)
+        self._print(_style("Seed: ", bold=True), end="")
         # Deterministic mode can be applied to a subset of tests, but we only care if it is enabled everywhere
         # If not everywhere, then the seed matter and should be displayed
         if self.config.seed is None or self.config.generation.deterministic:
-            click.echo("not used in the deterministic mode")
+            self._print("not used in the deterministic mode")
         else:
-            click.echo(str(self.config.seed))
-        click.echo()
+            self._print(str(self.config.seed))
+        self._print()
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         assert self.loading_manager is None
@@ -1587,10 +1586,10 @@ class OutputHandler(EventHandler):
                 display_section_name(label, "_", fg="red")
                 _errors = list(group_errors)
                 for idx, error in enumerate(_errors, 1):
-                    click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
+                    self._print(error.info.format(bold=lambda x: click.style(x, bold=True)))
                     if idx < len(_errors):
-                        click.echo()
-            click.echo(
+                        self._print()
+            self._print(
                 _style(
                     f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
                     fg="red",
@@ -1602,7 +1601,7 @@ class OutputHandler(EventHandler):
         if ctx.statistic.extraction_failures:
             self.display_stateful_failures(ctx)
         display_section_name("SUMMARY")
-        click.echo()
+        self._print()
 
         if self.statistic:
             self.display_api_operations(ctx)
@@ -1616,12 +1615,12 @@ class OutputHandler(EventHandler):
             self.display_errors_summary()
 
         if not self.warnings.is_empty:
-            click.echo(_style("Warnings:", bold=True))
+            self._print(_style("Warnings:", bold=True))
 
             if self.warnings.missing_auth:
                 affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
                 suffix = "" if affected == 1 else "s"
-                click.echo(
+                self._print(
                     _style(
                         f"  ⚠️ Missing authentication: {bold(str(affected))} operation{suffix} returned only 401/403 responses",
                         fg="yellow",
@@ -1631,7 +1630,7 @@ class OutputHandler(EventHandler):
             if self.warnings.missing_test_data:
                 count = len(self.warnings.missing_test_data)
                 suffix = "" if count == 1 else "s"
-                click.echo(
+                self._print(
                     _style(
                         f"  ⚠️ Missing valid test data: {bold(str(count))} operation{suffix} repeatedly returned 404 responses",
                         fg="yellow",
@@ -1641,7 +1640,7 @@ class OutputHandler(EventHandler):
             if self.warnings.validation_mismatch:
                 count = len(self.warnings.validation_mismatch)
                 suffix = "" if count == 1 else "s"
-                click.echo(
+                self._print(
                     _style(
                         f"  ⚠️ Schema validation mismatch: {bold(str(count))} operation{suffix} mostly rejected generated data",
                         fg="yellow",
@@ -1651,18 +1650,18 @@ class OutputHandler(EventHandler):
             if self.warnings.missing_deserializer:
                 count = len(self.warnings.missing_deserializer)
                 suffix = "" if count == 1 else "s"
-                click.echo(
+                self._print(
                     _style(
                         f"  ⚠️ Schema validation skipped: {bold(str(count))} operation{suffix} cannot validate responses",
                         fg="yellow",
                     )
                 )
 
-            click.echo()
+            self._print()
 
         if ctx.summary_lines:
             _print_lines(ctx.summary_lines)
-            click.echo()
+            self._print()
 
         self.display_test_cases(ctx)
         self.display_reports()
