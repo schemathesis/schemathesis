@@ -32,6 +32,14 @@ def run_state_machine_as_test(
     """
     from hypothesis.stateful import run_state_machine_as_test as _run_state_machine_as_test
 
+    from schemathesis.engine.errors import clear_hypothesis_notes
+    from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+
     __tracebackhide__ = True
 
-    return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)
+    try:
+        with ignore_hypothesis_output():
+            return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)
+    except Exception as exc:
+        clear_hypothesis_notes(exc)
+        raise

@@ -623,6 +623,46 @@ def test_b(v):
     assert "Falsifying example: test_b(" in stdout
 
 
+def test_stateful_missing_links_hide_hypothesis_block(testdir):
+    testdir.make_test(
+        """
+import pytest
+
+
+@pytest.fixture
+def api_schema():
+    # Mirrors docs/guides/stateful-testing.py fixture example
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.phases.update(phases=["stateful"])
+    return schema
+
+
+@pytest.fixture
+def state_machine(api_schema):
+    return api_schema.as_state_machine()
+
+
+def test_statefully(state_machine):
+    state_machine.run()
+""",
+        paths={
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK"},
+                    }
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest("-k", "test_statefully")
+    result.assert_outcomes(failed=1)
+    stdout = result.stdout.str()
+    assert "Schema contains no link definitions required for stateful testing" in stdout
+    assert "Falsifying example" not in stdout
+
+
 def test_invalid_schema_reraising(testdir):
     # When there is a non-Schemathesis test failing because of Hypothesis' `InvalidArgument` error
     testdir.make_test(

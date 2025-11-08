@@ -9,6 +9,7 @@
 ### :wrench: Changed
 
 - Replace archived `backoff` with `tenacity`. [#3286](https://github.com/schemathesis/schemathesis/issues/3286)
+- Suppress Hypothesis reproduction blocks in Schemathesis pytest failures.
 - Improved `missing_required_header` check message to show which header was missing instead of repeating the check title.
 
 ### :memo: Documentation

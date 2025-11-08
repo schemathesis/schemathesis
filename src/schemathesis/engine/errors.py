@@ -382,8 +382,18 @@ def canonicalize_error_message(error: Exception, with_traceback: bool = True) ->
 
 def clear_hypothesis_notes(exc: Exception) -> None:
     notes = getattr(exc, "__notes__", [])
-    if any("while generating" in note for note in notes):
-        notes.clear()
+    if not notes:
+        return
+    # Keep "Falsifying example" blocks as they show operation sequences
+    # Only remove "You can reproduce" blocks (non-working for Schemathesis)
+    # and "while generating" messages (internal Hypothesis details)
+    filtered_notes = [
+        note
+        for note in notes
+        if not ("while generating" in note or note.strip().startswith("You can reproduce this example"))
+    ]
+    if filtered_notes != notes:
+        exc.__notes__ = filtered_notes  # type: ignore[attr-defined]
 
 
 def is_unrecoverable_network_error(exc: Exception) -> bool:
