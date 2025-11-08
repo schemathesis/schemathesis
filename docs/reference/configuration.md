@@ -770,10 +770,10 @@ The following settings control how Schemathesis makes network requests to the AP
 
 !!! note ""
 
-    **Type:** `Float`  
-    **Default:** `null`  
+    **Type:** `Float`
+    **Default:** `10.0`
 
-    Set a timeout limit in seconds for each network request during tests. Must be a positive number.
+    Set a timeout limit in seconds for each network request during tests. This is the maximum time to wait for a response before aborting the request. Must be a positive number. When omitted from configuration, defaults to 10 seconds.
 
     5 second timeout:
 
