@@ -15,6 +15,19 @@ Welcome! Thank you for considering contributing to Schemathesis. Your feedback a
 uv pip install prek tox
 ```
 
+**Optional but recommended**: Install [`just`](https://github.com/casey/just) for convenient development commands:
+
+```bash
+# macOS
+brew install just
+
+# Linux
+cargo install just
+# or use your package manager
+```
+
+See `just --list` for all available commands like `just test`, `just check`, `just docs`, etc.
+
 **For documentation contributions**: No specific prerequisites are required.
 
 ## Feature Requests and Feedback
@@ -65,7 +78,11 @@ prek install
 7. **Run Tests**:
 
 ```bash
+# Using tox
 tox -e py311
+
+# Or using just
+just test
 ```
 
 8. **Update Changelog**: Add a corresponding entry to `CHANGELOG.md` located in the repository root.
