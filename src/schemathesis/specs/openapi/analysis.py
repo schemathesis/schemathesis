@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Iterator, Mapping, Sequence
 
 from schemathesis.config import InferenceAlgorithm
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
-from schemathesis.specs.openapi.warnings import detect_missing_deserializers
+from schemathesis.specs.openapi.warnings import detect_missing_deserializers, detect_unused_openapi_auth
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -21,14 +21,22 @@ class OpenAPIAnalysis:
     downstream features share cached results instead of recomputing them.
     """
 
-    __slots__ = ("schema", "_links_injected", "_dependency_graph", "_inferencer", "_warnings_cache")
+    __slots__ = (
+        "schema",
+        "_links_injected",
+        "_dependency_graph",
+        "_inferencer",
+        "_warnings_cache",
+        "_schema_warnings_cache",
+    )
 
     def __init__(self, schema: OpenApiSchema) -> None:
         self.schema = schema
         self._links_injected = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
         self._inferencer: LinkInferencer | None = None
-        self._warnings_cache: dict[str, list[SchemaWarning]] | None = None
+        self._warnings_cache: Mapping[str, Sequence[SchemaWarning]] | None = None
+        self._schema_warnings_cache: Sequence[SchemaWarning] | None = None
 
     @property
     def dependency_graph(self) -> dependencies.DependencyGraph:
@@ -78,19 +86,34 @@ class OpenAPIAnalysis:
 
     def iter_warnings(self) -> Iterator[SchemaWarning]:
         """Iterate over all cached schema warnings."""
+        # Operation-level warnings
         warnings_map = self._get_warnings_map()
         for warnings in warnings_map.values():
             yield from warnings
+        # Schema-level warnings
+        yield from self._get_schema_warnings()
 
-    def _get_warnings_map(self) -> dict[str, list[SchemaWarning]]:
+    def _get_warnings_map(self) -> Mapping[str, Sequence[SchemaWarning]]:
         if self._warnings_cache is None:
             self._warnings_cache = self._collect_warnings()
         return self._warnings_cache
 
-    def _collect_warnings(self) -> dict[str, list[SchemaWarning]]:
+    def _get_schema_warnings(self) -> Sequence[SchemaWarning]:
+        if self._schema_warnings_cache is None:
+            self._schema_warnings_cache = self._collect_schema_warnings()
+        return self._schema_warnings_cache
+
+    def _collect_warnings(self) -> Mapping[str, Sequence[SchemaWarning]]:
+        """Collect operation-level warnings."""
         warnings_map: dict[str, list[SchemaWarning]] = defaultdict(list)
         for result in self.schema.get_all_operations():
             if isinstance(result, Ok):
                 operation = result.ok()
-                warnings_map[operation.label].extend(detect_missing_deserializers(operation))
+                # Iterate to avoid type issues with list variance
+                for warning in detect_missing_deserializers(operation):
+                    warnings_map[operation.label].append(warning)
         return warnings_map
+
+    def _collect_schema_warnings(self) -> Sequence[SchemaWarning]:
+        """Collect schema-level warnings."""
+        return detect_unused_openapi_auth(self.schema)

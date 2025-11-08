@@ -171,6 +171,8 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     - `missing_auth`: API returns only 401/403 responses, suggesting missing or invalid authentication
     - `missing_test_data`: API returns mostly 404 responses, suggesting test data doesn't match existing resources
     - `validation_mismatch`: API rejects most generated data with 4xx errors, suggesting schema/validation mismatch
+    - `missing_deserializer`: Response has structured schema but no registered deserializer for validation
+    - `unused_openapi_auth`: Configured OpenAPI auth scheme is not defined in the schema
 
 ### Reporting
 
@@ -568,6 +570,48 @@ These settings can only be applied at the project level.
     [auth]
     basic = { username = "${USERNAME}", password = "${PASSWORD}" }
     ```
+
+#### `auth.openapi.<scheme>`
+
+!!! note ""
+
+    **Type:** `Object`
+    **Default:** `null`
+
+    OpenAPI-aware authentication that aligns with schema security definitions. Each `<scheme>` name must match a `securityScheme` from your OpenAPI spec. Schemathesis reads parameter names and locations from the schema.
+
+    **API Key authentication:**
+
+    ```toml
+    [auth.openapi.ApiKeyAuth]
+    api_key = "${API_KEY}"
+    ```
+
+    **HTTP Bearer authentication:**
+
+    ```toml
+    [auth.openapi.BearerAuth]
+    bearer = "${TOKEN}"
+    ```
+
+    **HTTP Basic authentication:**
+
+    ```toml
+    [auth.openapi.BasicAuth]
+    username = "${USERNAME}"
+    password = "${PASSWORD}"
+    ```
+
+    Required fields by type:
+
+    - API Key: `api_key`
+    - HTTP Basic: `username`, `password`
+    - HTTP Bearer: `bearer`
+
+    Supported for OpenAPI 2.0 and 3.x schemas.
+
+    !!! note
+        CLI flags (`--auth`, `--header`) always take precedence over OpenAPI config. You cannot mix `[auth.basic]` and `[auth.openapi.*]` in the same config file.
 
 ### Checks
 

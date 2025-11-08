@@ -448,17 +448,54 @@ class AuthStorage(Generic[Auth]):
                 break
 
 
+def apply_basic_auth(case: Case, username: str, password: str) -> None:
+    """Apply HTTP Basic authentication to a case.
+
+    Args:
+        case: Test case to apply authentication to
+        username: Username for basic auth
+        password: Password for basic auth
+
+    """
+    from requests.auth import _basic_auth_str
+
+    case.headers["Authorization"] = _basic_auth_str(username, password)
+    case._has_explicit_auth = True
+
+
 def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | None) -> None:
     """Set authentication data on this case.
+
+    Precedence order (highest to lowest):
+    1. Programmatic auth (@schemathesis.auth())
+    2. Generic auth (--auth CLI or [auth.basic] config)
+    3. Spec-specific auth (OpenAPI-aware [auth.openapi.*])
+    4. Global auth
 
     If there is no auth defined, then this function is no-op.
     """
     __tracebackhide__ = True
+    # 1. Programmatic auth (highest priority)
     if auth_storage is not None:
         auth_storage.set(case, context)
-    elif case.operation.schema.auth.is_defined:
+        return
+
+    # 2. Generic auth (CLI overrides or config - applies to all operations)
+    basic_auth = case.operation.schema.config.auth_for(operation=case.operation)
+    if basic_auth is not None:
+        apply_basic_auth(case, *basic_auth)
+        return
+
+    if case.operation.schema.auth.is_defined:
         case.operation.schema.auth.set(case, context)
-    elif GLOBAL_AUTH_STORAGE.is_defined:
+        return
+
+    # 3. Spec-specific auth (OpenAPI-aware, more targeted)
+    if case.operation.schema.apply_auth(case, context):
+        return
+
+    # 4. Global auth (fallback)
+    if GLOBAL_AUTH_STORAGE.is_defined:
         GLOBAL_AUTH_STORAGE.set(case, context)
 
 

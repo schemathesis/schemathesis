@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.4...HEAD) - TBD
 
+### :rocket: Added
+
+- OpenAPI-aware authentication via `[auth.openapi.<scheme>]` config. Automatically aligns with schema security definitions and warns about unused/misnamed schemes. [#1710](https://github.com/schemathesis/schemathesis/issues/1710)
+
 ### :racing_car: Performance
 
 - ~20% faster VCR cassette recording through output sanitization caching.

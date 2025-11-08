@@ -125,3 +125,39 @@ def test_undefined_security_scheme_is_ignored(ctx, version):
     operation = schema["/users"]["get"]
     # Then it should be ignored
     assert not list(operation.security.iter_parameters())
+
+
+def test_invalid_security_requirement_types_are_ignored(ctx):
+    # When security requirements contain non-dict elements
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "security": [
+                        "invalid_string",
+                        123,
+                        ["invalid", "list"],
+                        None,
+                        # Valid: should be processed
+                        {"ApiKeyAuth": []},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["GET"]
+
+    # Should not crash and should extract parameters from the valid requirement
+    params = list(operation.security.iter_parameters())
+    # Only the valid ApiKeyAuth requirement should be processed
+    assert len(params) == 1
+    assert params[0]["name"] == "X-API-Key"
+    assert params[0]["in"] == "header"

@@ -96,10 +96,15 @@ def _resolve(current):
 
 
 def _search_rest(current, variant, title, segment):
-    data = _resolve(current["properties"][variant])
+    # Check if current uses additionalProperties (e.g., auth.openapi.<scheme>)
+    if "additionalProperties" in current and "properties" not in current:
+        data = _resolve(current["additionalProperties"])
+    else:
+        data = _resolve(current["properties"][variant])
     rest = title.split(segment, 1)[1].strip(".")
-    for rest_segment in rest.split("."):
-        data = data["properties"][rest_segment]
+    if rest:
+        for rest_segment in rest.split("."):
+            data = data["properties"][rest_segment]
 
 
 def test_titles_are_valid():
@@ -124,6 +129,9 @@ def test_titles_are_valid():
                         ]
                     else:
                         variants = CHECKS.get_all_names()
+                elif name == "scheme":
+                    # For auth.openapi.<scheme> - use a sample scheme name
+                    variants = ["ApiKeyAuth"]
                 else:
                     raise ValueError(f"Unknown segment: {name}")
 

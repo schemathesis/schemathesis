@@ -1,0 +1,6 @@
+Error in [auth.openapi.DigestAuth] section:
+  Invalid property:
+
+  - 'scheme' is not allowed
+
+Valid properties: 'api_key', 'username', 'password', 'bearer'

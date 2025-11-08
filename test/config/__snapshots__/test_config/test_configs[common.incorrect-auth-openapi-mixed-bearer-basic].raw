@@ -1,0 +1,4 @@
+Error in [auth.openapi.Auth3] section:
+  Missing required property (HTTP Basic):
+
+  - 'username'

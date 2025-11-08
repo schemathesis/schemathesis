@@ -169,6 +169,93 @@
             "password"
           ],
           "additionalProperties": false
+        },
+        "openapi": {
+          "type": "object",
+          "description": "OpenAPI-aware authentication configuration. Each key matches a securityScheme name from components.securitySchemes.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ApiKeyAuthConfig"
+              },
+              {
+                "$ref": "#/$defs/HttpBasicAuthConfig"
+              },
+              {
+                "$ref": "#/$defs/HttpBearerAuthConfig"
+              }
+            ]
+          },
+          "minProperties": 1
+        }
+      }
+    },
+    "OperationAuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basic": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "ApiKeyAuthConfig": {
+      "type": "object",
+      "description": "API Key authentication configuration",
+      "additionalProperties": false,
+      "required": [
+        "api_key"
+      ],
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "description": "API key value (supports ${VAR} environment variable interpolation)"
+        }
+      }
+    },
+    "HttpBasicAuthConfig": {
+      "type": "object",
+      "description": "HTTP Basic authentication configuration",
+      "additionalProperties": false,
+      "required": [
+        "username",
+        "password"
+      ],
+      "properties": {
+        "username": {
+          "type": "string",
+          "description": "Username (supports ${VAR} environment variable interpolation)"
+        },
+        "password": {
+          "type": "string",
+          "description": "Password (supports ${VAR} environment variable interpolation)"
+        }
+      }
+    },
+    "HttpBearerAuthConfig": {
+      "type": "object",
+      "description": "HTTP Bearer token authentication configuration",
+      "additionalProperties": false,
+      "required": [
+        "bearer"
+      ],
+      "properties": {
+        "bearer": {
+          "type": "string",
+          "description": "Bearer token (supports ${VAR} environment variable interpolation)"
         }
       }
     },
@@ -585,7 +672,8 @@
               "missing_auth",
               "missing_test_data",
               "validation_mismatch",
-              "missing_deserializer"
+              "missing_deserializer",
+              "unused_openapi_auth"
             ]
           }
         },
@@ -604,7 +692,8 @@
                   "missing_auth",
                   "missing_test_data",
                   "validation_mismatch",
-                  "missing_deserializer"
+                  "missing_deserializer",
+                  "unused_openapi_auth"
                 ]
               }
             },
@@ -621,7 +710,8 @@
                       "missing_auth",
                       "missing_test_data",
                       "validation_mismatch",
-                      "missing_deserializer"
+                      "missing_deserializer",
+                      "unused_openapi_auth"
                     ]
                   }
                 }
@@ -639,7 +729,7 @@
           "type": "boolean"
         },
         "auth": {
-          "$ref": "#/$defs/AuthConfig"
+          "$ref": "#/$defs/OperationAuthConfig"
         },
         "headers": {
           "additionalProperties": {

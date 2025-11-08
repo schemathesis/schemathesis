@@ -1,0 +1,3 @@
+# Valid HTTP Bearer token auth
+[auth.openapi.BearerAuth]
+bearer = "${TEST_STRING_1}"

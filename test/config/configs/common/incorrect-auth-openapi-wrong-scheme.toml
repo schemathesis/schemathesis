@@ -1,0 +1,5 @@
+# Invalid field - 'scheme'
+[auth.openapi.DigestAuth]
+scheme = "digest"
+username = "user"
+password = "pass"

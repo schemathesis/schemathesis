@@ -36,7 +36,7 @@ from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
-from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
+from schemathesis.specs.openapi.adapter.security import OpenApiSecurity, OpenApiSecurityParameters
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
 
 from ...generation import GenerationMode
@@ -50,7 +50,7 @@ from .stateful import create_state_machine
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.auths import AuthStorage
+    from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.generation.stateful import APIStateMachine
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
@@ -102,6 +102,20 @@ class OpenApiSchema(BaseSchema):
     @cached_property
     def specification(self) -> Specification:
         return Specification.openapi(version=self._spec_version)
+
+    @cached_property
+    def security(self) -> OpenApiSecurity:
+        return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.resolver)
+
+    def apply_auth(self, case: Case, context: AuthContext) -> bool:
+        """Apply OpenAPI-aware authentication to a test case.
+
+        Returns True if authentication was applied, False otherwise.
+        """
+        configured_schemes = self.config.auth.openapi.schemes
+        if not configured_schemes:
+            return False
+        return self.security.apply_auth(case, context, configured_schemes)
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]

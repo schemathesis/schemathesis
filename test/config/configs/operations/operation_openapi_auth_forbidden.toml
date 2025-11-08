@@ -1,0 +1,5 @@
+[[operations]]
+include-path = "/api"
+
+[operations.auth.openapi.ApiKeyHeader]
+api_key = "${TEST_STRING_1}"

@@ -40,6 +40,49 @@ export API_TOKEN="your-secret-token"
 schemathesis run http://localhost:8000/openapi.json
 ```
 
+## OpenAPI-Aware Authentication
+
+Configure authentication that automatically aligns with your OpenAPI schema's security definitions. Schemathesis reads parameter names and locations directly from `securitySchemes`.
+
+```toml
+# schemathesis.toml
+[auth.openapi.ApiKeyAuth]
+api_key = "${API_KEY}"
+
+[auth.openapi.BearerAuth]
+bearer = "${TOKEN}"
+
+[auth.openapi.BasicAuth]
+username = "${USERNAME}"
+password = "${PASSWORD}"
+```
+
+```bash
+export API_KEY="your-api-key"
+export TOKEN="your-token"
+schemathesis run http://localhost:8000/openapi.json
+```
+
+Each config block name must match a `securityScheme` name from your OpenAPI spec. Schemathesis extracts the parameter location (`header`, `query`, or `cookie`) and name from the schema, so you only provide the value.
+
+**Supported types:**
+
+| Type | Scheme | Config Fields | OpenAPI Version |
+|------|--------|---------------|-----------------|
+| `apiKey` | - | `api_key` | 2.0, 3.x |
+| `http` | `basic` | `username`, `password` | 3.x (2.0 as `basic`) |
+| `http` | `bearer` | `bearer` | 3.x |
+
+**Authentication precedence (highest to lowest):**
+
+1. **Programmatic auth** - Explicit `@schemathesis.auth()` decorators
+2. **CLI flags** - `--auth` and `--header` (always override config)
+3. **OpenAPI-aware config** - `[auth.openapi.*]` (targets specific security schemes)
+4. **Global auth** - Fallback authentication
+
+!!! note
+    You cannot mix `[auth.basic]` and `[auth.openapi.*]` in the same config file. Choose one authentication strategy.
+
 ## Dynamic Token Authentication
 
 Static options can't handle tokens that expire, so create a custom authentication class:

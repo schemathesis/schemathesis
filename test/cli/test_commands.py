@@ -197,6 +197,42 @@ def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
     assert " HYPOTHESIS OUTPUT " not in result.stdout
 
 
+@pytest.mark.operations("ignored_auth")
+def test_openapi_auth_skips_malformed_security_requirements(cli, ctx, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/ignored_auth": {
+                "get": {
+                    "security": [
+                        None,
+                        {"ApiKeyAuth": []},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {
+                "ApiKeyAuth": {
+                    "type": "apiKey",
+                    "name": "X-API-Key",
+                    "in": "header",
+                }
+            }
+        },
+    )
+
+    result = cli.run(
+        str(schema_path),
+        f"--url={openapi3_base_url}",
+        "--max-examples=1",
+        "--checks=not_a_server_error",
+        config={"auth": {"openapi": {"ApiKeyAuth": {"api_key": "secret"}}}},
+    )
+
+    assert result.exit_code == ExitCode.OK, result.stdout
+
+
 @pytest.mark.operations
 @pytest.mark.parametrize("workers", [1, 2])
 def test_cli_run_output_empty(cli, schema_url, workers):

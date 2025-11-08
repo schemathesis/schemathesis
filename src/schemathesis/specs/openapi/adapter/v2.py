@@ -17,6 +17,7 @@ from schemathesis.specs.openapi.adapter.protocol import (
     ExtractRawResponseSchema,
     ExtractResponseSchema,
     ExtractSchemaForMediaType,
+    ExtractSecurityDefinitions,
     ExtractSecurityParameters,
     GetBasePath,
     GetDefaultMediaTypes,
@@ -57,5 +58,6 @@ get_default_media_types: GetDefaultMediaTypes = content_types.default_media_type
 get_base_path: GetBasePath = base_paths.base_path_v2
 validate_schema: ValidateSchema = validators.validate_v2
 get_parameter_serializer: GetParameterSerializer = parameter_serializers.serializer_v2
+extract_security_definitions: ExtractSecurityDefinitions = security.extract_security_definitions_v2
 
 jsonschema_validator_cls = Draft4Validator

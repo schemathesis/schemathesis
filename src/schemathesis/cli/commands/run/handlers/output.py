@@ -329,8 +329,15 @@ class WarningData:
     missing_test_data: set[str]
     validation_mismatch: set[str]
     missing_deserializer: dict[str, set[str]]
+    unused_openapi_auth: set[str]
 
-    __slots__ = ("missing_auth", "missing_test_data", "validation_mismatch", "missing_deserializer")
+    __slots__ = (
+        "missing_auth",
+        "missing_test_data",
+        "validation_mismatch",
+        "missing_deserializer",
+        "unused_openapi_auth",
+    )
 
     def __init__(
         self,
@@ -338,16 +345,22 @@ class WarningData:
         missing_test_data: set[str] | None = None,
         validation_mismatch: set[str] | None = None,
         missing_deserializer: dict[str, set[str]] | None = None,
+        unused_openapi_auth: set[str] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
         self.validation_mismatch = validation_mismatch or set()
         self.missing_deserializer = missing_deserializer or {}
+        self.unused_openapi_auth = unused_openapi_auth or set()
 
     @property
     def is_empty(self) -> bool:
         return not bool(
-            self.missing_auth or self.missing_test_data or self.validation_mismatch or self.missing_deserializer
+            self.missing_auth
+            or self.missing_test_data
+            or self.validation_mismatch
+            or self.missing_deserializer
+            or self.unused_openapi_auth
         )
 
 
@@ -1158,6 +1171,14 @@ class OutputHandler(EventHandler):
 
         return record
 
+    def _record_unused_openapi_auth_warning(self, message: str) -> Callable[[], None]:
+        """Create a callback that records an unused OpenAPI auth warning."""
+
+        def record() -> None:
+            self.warnings.unused_openapi_auth.add(message)
+
+        return record
+
     def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
         # warnings, then remove them from warnings
@@ -1174,10 +1195,19 @@ class OutputHandler(EventHandler):
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
             if warning.kind is SchemathesisWarning.MISSING_DESERIALIZER:
+                # MissingDeserializerWarning always has operation_label
+                assert warning.operation_label is not None
                 self._handle_warning(
                     ctx,
                     warning.kind,
                     self._record_missing_deserializer_warning(warning.operation_label, warning.message),
+                )
+            elif warning.kind is SchemathesisWarning.UNUSED_OPENAPI_AUTH:
+                # UnusedOpenAPIAuthWarning has no operation_label (schema-level)
+                self._handle_warning(
+                    ctx,
+                    warning.kind,
+                    self._record_unused_openapi_auth_warning(warning.message),
                 )
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
@@ -1249,48 +1279,85 @@ class OutputHandler(EventHandler):
 
         raise click.Abort
 
-    def _display_warning_block(
-        self, title: str, operations: set[str] | dict, tips: list[str], operation_suffix: str = ""
-    ) -> None:
-        if isinstance(operations, dict):
-            total = sum(len(ops) for ops in operations.values())
-        else:
-            total = len(operations)
+    def _print_warning_header(self, title: str, count: int, entity_name: str, suffix_text: str) -> None:
+        """Print warning block header."""
+        plural = "" if count == 1 else "s"
+        click.echo(_style(f"{title}: {count} {entity_name}{plural}{suffix_text}\n", fg="yellow"))
 
-        suffix = "" if total == 1 else "s"
-        click.echo(
-            _style(
-                f"{title}: {total} operation{suffix}{operation_suffix}\n",
-                fg="yellow",
-            )
-        )
-
-        # Print up to 3 endpoints, then "+N more"
-        def _print_up_to_three(operations_: list[str] | set[str]) -> None:
-            for operation in sorted(operations_)[:3]:
-                click.echo(_style(f"  - {operation}", fg="yellow"))
-            extra_count = len(operations_) - 3
-            if extra_count > 0:
-                click.echo(_style(f"  + {extra_count} more", fg="yellow"))
-
-        if isinstance(operations, dict):
-            for status_code, ops in operations.items():
-                status_text = "Unauthorized" if status_code == 401 else "Forbidden"
-                count = len(ops)
-                suffix = "" if count == 1 else "s"
-                click.echo(_style(f"{status_code} {status_text} ({count} operation{suffix}):", fg="yellow"))
-
-                _print_up_to_three(ops)
-        else:
-            _print_up_to_three(operations)
-
+    def _print_warning_tips(self, tips: list[str]) -> None:
+        """Print warning tips and footer."""
+        click.echo()
+        for tip in tips:
+            click.echo(_style(tip, fg="yellow"))
         if tips:
             click.echo()
 
-        for tip in tips:
-            click.echo(_style(tip, fg="yellow"))
+    def _print_items_truncated(self, items: set[str], max_items: int = 3) -> None:
+        """Print up to max_items, then show +N more."""
+        for item in sorted(items)[:max_items]:
+            click.echo(_style(f"  - {item}", fg="yellow"))
+        extra = len(items) - max_items
+        if extra > 0:
+            click.echo(_style(f"  + {extra} more", fg="yellow"))
 
-        click.echo()
+    def _display_warning_block(
+        self,
+        title: str,
+        operations: set[str] | dict[int, set[str]],
+        tips: list[str],
+        suffix_text: str = "",
+        entity_name: str = "operation",
+    ) -> None:
+        """Display warnings for operations (simple list or grouped by status code)."""
+        if isinstance(operations, dict):
+            # Status code grouped: dict[int, set[str]]
+            total = sum(len(ops) for ops in operations.values())
+            self._print_warning_header(title, total, entity_name, suffix_text)
+
+            for status_code, ops in operations.items():
+                status_text = "Unauthorized" if status_code == 401 else "Forbidden"
+                count = len(ops)
+                plural = "" if count == 1 else "s"
+                click.echo(_style(f"{status_code} {status_text} ({count} {entity_name}{plural}):", fg="yellow"))
+                self._print_items_truncated(ops)
+        else:
+            # Simple set of operations
+            self._print_warning_header(title, len(operations), entity_name, suffix_text)
+            self._print_items_truncated(operations)
+
+        self._print_warning_tips(tips)
+
+    def _display_detailed_warning_block(
+        self,
+        title: str,
+        warnings: dict[str, set[str]],
+        entity_name: str,
+        suffix_text: str,
+        tips: list[str],
+        show_entity_label: bool = True,
+    ) -> None:
+        """Display warnings with detailed messages per entity."""
+        self._print_warning_header(title, len(warnings), entity_name, suffix_text)
+
+        # Show up to 3 entities with their messages
+        for idx, (entity_label, messages) in enumerate(sorted(warnings.items())[:3]):
+            if show_entity_label:
+                click.echo(_style(f"  - {entity_label}", fg="yellow"))
+                for message in sorted(messages):
+                    click.echo(_style(f"    {message}", fg="yellow"))
+            else:
+                for message in sorted(messages):
+                    click.echo(_style(f"  {message}", fg="yellow"))
+
+            # Add spacing between entities (but not after the last one)
+            if idx < min(len(warnings), 3) - 1:
+                click.echo()
+
+        extra = len(warnings) - 3
+        if extra > 0:
+            click.echo(_style(f"  + {extra} more", fg="yellow"))
+
+        self._print_warning_tips(tips)
 
     def display_warnings(self) -> None:
         display_section_name("WARNINGS")
@@ -1299,7 +1366,7 @@ class OutputHandler(EventHandler):
             self._display_warning_block(
                 title="Authentication failed",
                 operations=self.warnings.missing_auth,
-                operation_suffix=" returned authentication errors",
+                suffix_text=" returned authentication errors",
                 tips=["💡 Ensure valid authentication credentials are set via --auth or -H"],
             )
 
@@ -1307,7 +1374,7 @@ class OutputHandler(EventHandler):
             self._display_warning_block(
                 title="Missing test data",
                 operations=self.warnings.missing_test_data,
-                operation_suffix=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
+                suffix_text=" repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic",
                 tips=[
                     "💡 Provide realistic parameter values in your config file so tests can access existing resources",
                 ],
@@ -1317,40 +1384,27 @@ class OutputHandler(EventHandler):
             self._display_warning_block(
                 title="Schema validation mismatch",
                 operations=self.warnings.validation_mismatch,
-                operation_suffix=" mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation",
+                suffix_text=" mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation",
                 tips=["💡 Check your schema constraints - API validation may be stricter than documented"],
             )
 
         if self.warnings.missing_deserializer:
-            total = len(self.warnings.missing_deserializer)
-            suffix = "" if total == 1 else "s"
-            click.echo(
-                _style(
-                    f"Schema validation skipped: {total} operation{suffix} cannot validate responses due to missing deserializers\n",
-                    fg="yellow",
-                )
+            self._display_detailed_warning_block(
+                title="Schema validation skipped",
+                warnings=self.warnings.missing_deserializer,
+                entity_name="operation",
+                suffix_text=" cannot validate responses due to missing deserializers",
+                tips=["💡 Register a deserializer with @schemathesis.deserializer() to enable validation"],
             )
 
-            # Show up to 3 operations with their warnings
-            displayed_operations = sorted(self.warnings.missing_deserializer.keys())[:3]
-            for idx, operation_label in enumerate(displayed_operations):
-                messages = self.warnings.missing_deserializer[operation_label]
-                click.echo(_style(f"  - {operation_label}", fg="yellow"))
-                for message in sorted(messages):
-                    click.echo(_style(f"    {message}", fg="yellow"))
-                # Add empty line between operations
-                if idx < len(displayed_operations) - 1:
-                    click.echo()
-
-            extra_count = len(self.warnings.missing_deserializer) - 3
-            if extra_count > 0:
-                click.echo(_style(f"  + {extra_count} more", fg="yellow"))
-
-            click.echo()
-            click.echo(
-                _style("💡 Register a deserializer with @schemathesis.deserializer() to enable validation", fg="yellow")
+        if self.warnings.unused_openapi_auth:
+            self._display_warning_block(
+                title="Unused OpenAPI auth",
+                operations=self.warnings.unused_openapi_auth,
+                suffix_text=" not defined in the schema",
+                tips=[],
+                entity_name="configured auth scheme",
             )
-            click.echo()
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
@@ -1654,6 +1708,16 @@ class OutputHandler(EventHandler):
                 click.echo(
                     _style(
                         f"  ⚠️ Schema validation skipped: {bold(str(count))} operation{suffix} cannot validate responses",
+                        fg="yellow",
+                    )
+                )
+
+            if self.warnings.unused_openapi_auth:
+                count = len(self.warnings.unused_openapi_auth)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Unused OpenAPI auth: {bold(str(count))} configured auth scheme{suffix} not used in the schema",
                         fg="yellow",
                     )
                 )

@@ -63,6 +63,7 @@ IterParameters = Callable[
     Iterable["OperationParameter"],
 ]
 BuildPathParameter = Callable[[Mapping[str, Any]], "OperationParameter"]
+ExtractSecurityDefinitions = Callable[[Mapping[str, Any], "RefResolver"], Mapping[str, Mapping[str, Any]]]
 
 
 class SpecificationAdapter(Protocol):
@@ -106,6 +107,8 @@ class SpecificationAdapter(Protocol):
     get_base_path: GetBasePath
     validate_schema: ValidateSchema
     get_parameter_serializer: GetParameterSerializer
+    # Function to extract security scheme definitions from the schema with resolved references
+    extract_security_definitions: ExtractSecurityDefinitions
 
     # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[Validator]
