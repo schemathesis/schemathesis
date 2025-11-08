@@ -27,6 +27,7 @@ from schemathesis.config._phases import (
 )
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig, get_workers_count
 from schemathesis.config._report import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat, ReportsConfig
+from schemathesis.config._retry import RequestRetryConfig
 from schemathesis.config._warnings import SchemathesisWarning, WarningsConfig
 
 if sys.version_info < (3, 11):
@@ -59,6 +60,7 @@ __all__ = [
     "ProjectsConfig",
     "ProjectConfig",
     "get_workers_count",
+    "RequestRetryConfig",
     "SchemathesisWarning",
     "WarningsConfig",
 ]

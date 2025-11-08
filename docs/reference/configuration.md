@@ -787,6 +787,49 @@ The following settings control how Schemathesis makes network requests to the AP
     request-timeout = 0.5
     ```
 
+#### `request-retry`
+
+!!! note ""
+
+    **Type:** `Table`  
+    **Default:** Disabled  
+
+    Configure exponential backoff retries for outgoing requests. Applies to both CLI runs and `Case.call()` usage.
+
+    | Key | Type | Default | Description |
+    | --- | --- | --- | --- |
+    | `enabled` | `Boolean` | `false` | Turns retries on/off without removing other settings. |
+    | `max-attempts` | `Integer` | `3` | Total attempts per request (including the first). Must be ≥1. |
+    | `wait-initial` | `Float` | `0.5` | Initial delay before the first retry. |
+    | `backoff-multiplier` | `Float` | `2.0` | Exponential factor applied to the delay after each retry. |
+    | `max-wait` | `Float \| null` | `5.0` | Maximum delay between attempts. |
+    | `jitter` | `Enum` (`"none"`, `"full"`) | `"none"` | Adds randomization to delays to avoid sync storms. |
+    | `retry-on` | `Array` | `["connection", "timeout"]` | Which network errors to retry for HTTP transports. Use an empty list to skip exception-based retries. |
+    | `status-forcelist` | `Array` of status codes | `[]` | HTTP status codes that trigger retries (works for HTTP, ASGI, and WSGI transports). |
+    | `methods` | `Array` | `["GET", "HEAD", "OPTIONS"]` | Limit retries to specific HTTP methods. |
+    | `respect-retry-after` | `Boolean` | `true` | Honor `Retry-After` headers (capped by `max-wait`). |
+
+    Example with both network and status retries:
+
+    ```toml
+    [request-retry]
+    max-attempts = 4
+    wait-initial = 0.5
+    backoff-multiplier = 2.0
+    status-forcelist = [429, 502, 503, 504]
+    methods = ["GET", "HEAD"]
+    ```
+
+    Per-operation overrides:
+
+    ```toml
+    [[operations]]
+    include-name = "POST /reports/export"
+    request-retry = { max-attempts = 6, methods = ["POST"], retry-on = [], status-forcelist = [500, 503] }
+    ```
+
+    Network retries are skipped for ASGI/WSGI transports, but status-based retries always apply. Prefer idempotent operations unless you are certain repeated calls are safe.
+
 #### `request-cert`
 
 !!! note ""

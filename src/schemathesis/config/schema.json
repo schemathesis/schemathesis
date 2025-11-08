@@ -6,6 +6,76 @@
       "description": "Controls ANSI color output in the CLI. Schemathesis auto-detects color support by default. Set to true to force color output or false to disable it.",
       "type": "boolean"
     },
+    "RequestRetryConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max-attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "wait-initial": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "backoff-multiplier": {
+          "type": "number",
+          "minimum": 1
+        },
+        "max-wait": {
+          "type": "number",
+          "minimum": 0
+        },
+        "jitter": {
+          "enum": [
+            "none",
+            "full"
+          ]
+        },
+        "retry-on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "connection",
+              "timeout",
+              "read"
+            ]
+          }
+        },
+        "status-forcelist": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 599
+          }
+        },
+        "methods": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "GET",
+              "PUT",
+              "POST",
+              "DELETE",
+              "OPTIONS",
+              "HEAD",
+              "PATCH",
+              "TRACE"
+            ]
+          }
+        },
+        "respect-retry-after": {
+          "type": "boolean"
+        }
+      }
+    },
     "suppress-health-check": {
       "description": "Specifies a list of health checks to disable during test execution.",
       "type": "array",
@@ -126,6 +196,9 @@
     "request-timeout": {
       "type": "number",
       "minimum": 0
+    },
+    "request-retry": {
+      "$ref": "#/$defs/RequestRetryConfig"
     },
     "request-cert": {
       "type": "string"
@@ -557,6 +630,12 @@
         "request-timeout": {
           "type": "number",
           "minimum": 0
+        },
+        "request-retry": {
+          "$ref": "#/$defs/RequestRetryConfig"
+        },
+        "request-retry": {
+          "$ref": "#/$defs/RequestRetryConfig"
         },
         "request-cert": {
           "type": "string"

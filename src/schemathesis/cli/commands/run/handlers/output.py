@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
 
 import click
 
+from schemathesis import hook as register_hook
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
@@ -22,13 +23,16 @@ from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
+from schemathesis.core.retry import RetryableHTTPStatus
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
+from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.hooks import HookContext, unregister
 from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
@@ -812,6 +816,7 @@ class OutputHandler(EventHandler):
         default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
     )
     console: Console = field(default_factory=_default_console)
+    retry_hook: Callable | None = None
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.PhaseStarted):
@@ -839,8 +844,12 @@ class OutputHandler(EventHandler):
 
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
+        self._register_retry_hook()
 
     def shutdown(self, ctx: ExecutionContext) -> None:
+        if self.retry_hook is not None:
+            unregister(self.retry_hook)
+            self.retry_hook = None
         if self.unit_tests_manager is not None:
             self.unit_tests_manager.stop()
         if self.stateful_tests_manager is not None:
@@ -893,6 +902,62 @@ class OutputHandler(EventHandler):
 
         if ctx.initialization_lines:
             _print_lines(ctx.initialization_lines)
+
+    def _register_retry_hook(self) -> None:
+        if self.retry_hook is not None:
+            return
+
+        handler = self
+
+        @register_hook("on_request_retry")
+        def _cli_retry_hook(
+            context: HookContext,
+            case: Case,
+            attempt: int,
+            max_attempts: int,
+            delay: float,
+            exception: BaseException,
+        ) -> None:
+            handler._on_request_retry(case, attempt, max_attempts, delay, exception)
+
+        self.retry_hook = _cli_retry_hook
+
+    def _on_request_retry(
+        self,
+        case: Case,
+        attempt: int,
+        max_attempts: int,
+        delay: float,
+        exception: BaseException,
+    ) -> None:
+        from rich.padding import Padding
+        from rich.style import Style
+        from rich.text import Text
+
+        next_attempt = min(attempt + 1, max_attempts)
+        if next_attempt > max_attempts:
+            next_attempt = max_attempts
+        reason = self._format_retry_reason(exception)
+        message = Text.assemble(
+            ("↻  ", Style(color="yellow")),
+            (case.operation.method.upper(), Style(bold=True)),
+            (" ",),
+            (case.operation.path, Style(color="cyan")),
+            (f"  attempt {next_attempt}/{max_attempts}", Style(dim=True)),
+            (f" in {delay:.2f}s", Style(dim=True)),
+            (" — ", Style(dim=True)),
+            (reason, Style(color="bright_white")),
+        )
+        self.console.print(Padding(message, BLOCK_PADDING))
+
+    @staticmethod
+    def _format_retry_reason(exception: BaseException) -> str:
+        if isinstance(exception, RetryableHTTPStatus):
+            response = exception.response
+            status = response.status_code
+            reason = response.message or ""
+            return f"HTTP {status} {reason}".strip()
+        return f"{exception.__class__.__name__}: {exception}"
 
     def _on_phase_started(self, event: events.PhaseStarted) -> None:
         phase = event.phase

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.3...HEAD) - TBD
 
+### :rocket: Added
+
+- Configurable request retries.
+
 ### :racing_car: Performance
 
 - 10-50% faster schema iteration through parameter bundling cache.

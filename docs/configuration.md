@@ -116,6 +116,34 @@ include-tag = "slow"
 request-timeout = 30.0
 ```
 
+### Handling flaky endpoints
+
+Transient TLS hiccups or overloaded upstream services can interrupt runs. Configure `request-retry` to add backoff-based retries at the transport layer:
+
+```toml
+[request-retry]
+max-attempts = 4
+wait-initial = 0.5
+backoff-multiplier = 2.0
+max-wait = 5.0
+retry-on = ["connection", "timeout"]
+status-forcelist = [429, 502, 503, 504]
+methods = ["GET", "HEAD"]
+```
+
+- **Network retries** (timeouts, dropped connections) only apply to real HTTP sessions.
+- **Status-based retries** work everywhere, including ASGI/WSGI apps—only responses whose method matches `methods` and whose status is listed in `status-forcelist` are retried.
+- `Retry-After` headers are honored by default, capped by `max-wait`.
+
+Override behavior for specific operations:
+```toml
+[[operations]]
+include-path = "/reports/export"
+request-retry = { max-attempts = 6, methods = ["GET", "POST"] }
+```
+
+Keep retries on idempotent calls unless you are confident the endpoint safely handles duplicates.
+
 ### Environment-specific configuration
 
 Different base URLs per environment:

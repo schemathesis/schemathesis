@@ -14,6 +14,7 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
+from schemathesis.config._retry import RequestRetryConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.filters import FilterSet, HasAPIOperation, expression_to_filter_function, is_deprecated
@@ -203,6 +204,7 @@ class OperationConfig(DiffBase):
     rate_limit: Limiter | None
     max_redirects: int | None
     request_timeout: float | int | None
+    request_retry: RequestRetryConfig | None
     request_cert: str | None
     request_cert_key: str | None
     parameters: dict[str, Any]
@@ -223,6 +225,7 @@ class OperationConfig(DiffBase):
         "_rate_limit",
         "max_redirects",
         "request_timeout",
+        "request_retry",
         "request_cert",
         "request_cert_key",
         "parameters",
@@ -245,6 +248,7 @@ class OperationConfig(DiffBase):
         rate_limit: str | None = None,
         max_redirects: int | None = None,
         request_timeout: float | int | None = None,
+        request_retry: RequestRetryConfig | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
@@ -267,6 +271,7 @@ class OperationConfig(DiffBase):
         self._rate_limit = rate_limit
         self.max_redirects = max_redirects
         self.request_timeout = request_timeout
+        self.request_retry = request_retry
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
         self.parameters = parameters or {}
@@ -324,6 +329,9 @@ class OperationConfig(DiffBase):
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),
             request_timeout=data.get("request-timeout"),
+            request_retry=(
+                RequestRetryConfig.from_dict(data.get("request-retry", {})) if "request-retry" in data else None
+            ),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),

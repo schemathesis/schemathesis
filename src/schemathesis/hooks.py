@@ -396,6 +396,18 @@ def after_call(context: HookContext, case: Case, response: Response) -> None:
     """
 
 
+@HookDispatcher.register_spec([HookScope.GLOBAL])
+def on_request_retry(
+    context: HookContext,
+    case: Case,
+    attempt: int,
+    max_attempts: int,
+    delay: float,
+    exception: BaseException,
+) -> None:
+    """Called when Schemathesis schedules a retry for a network request."""
+
+
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name

@@ -17,6 +17,7 @@ from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._report import ReportsConfig
+from schemathesis.config._retry import RequestRetryConfig
 from schemathesis.config._warnings import WarningsConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, hooks
 from schemathesis.core.validation import validate_base_url
@@ -56,6 +57,7 @@ class ProjectConfig(DiffBase):
     rate_limit: Limiter | None
     max_redirects: int | None
     request_timeout: float | int | None
+    request_retry: RequestRetryConfig
     request_cert: str | None
     request_cert_key: str | None
     parameters: dict[str, Any]
@@ -79,6 +81,7 @@ class ProjectConfig(DiffBase):
         "_rate_limit",
         "max_redirects",
         "request_timeout",
+        "request_retry",
         "request_cert",
         "request_cert_key",
         "parameters",
@@ -104,6 +107,7 @@ class ProjectConfig(DiffBase):
         rate_limit: str | None = None,
         max_redirects: int | None = None,
         request_timeout: float | int | None = None,
+        request_retry: RequestRetryConfig | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
@@ -138,6 +142,7 @@ class ProjectConfig(DiffBase):
         self._rate_limit = rate_limit
         self.max_redirects = max_redirects
         self.request_timeout = request_timeout
+        self.request_retry = request_retry or RequestRetryConfig()
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
         self.parameters = parameters or {}
@@ -163,6 +168,11 @@ class ProjectConfig(DiffBase):
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),
             request_timeout=data.get("request-timeout"),
+            request_retry=(
+                RequestRetryConfig.from_dict(data.get("request-retry", {}))
+                if "request-retry" in data
+                else RequestRetryConfig()
+            ),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),
@@ -187,6 +197,7 @@ class ProjectConfig(DiffBase):
         rate_limit: str | None = None,
         max_redirects: int | None = None,
         request_timeout: float | int | None = None,
+        request_retry: RequestRetryConfig | None = None,
         tls_verify: bool | str | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
@@ -224,6 +235,8 @@ class ProjectConfig(DiffBase):
 
         if request_timeout is not None:
             self.request_timeout = request_timeout
+        if request_retry is not None:
+            self.request_retry = request_retry
 
         if tls_verify is not None:
             self.tls_verify = tls_verify
@@ -282,6 +295,13 @@ class ProjectConfig(DiffBase):
         if self.request_timeout is not None:
             return self.request_timeout
         return None
+
+    def request_retry_for(self, *, operation: APIOperation | None = None) -> RequestRetryConfig:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.request_retry is not None:
+                return config.request_retry
+        return self.request_retry
 
     def tls_verify_for(self, *, operation: APIOperation | None = None) -> bool | str | None:
         if operation is not None:

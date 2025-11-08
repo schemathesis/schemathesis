@@ -9,12 +9,14 @@ from schemathesis.checks import CHECKS, CheckContext, CheckFunction, load_all_ch
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
+from schemathesis.core.retry import execute_with_retry
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode, generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 if TYPE_CHECKING:
     import httpx
@@ -349,30 +351,51 @@ class Case:
             transport_ = transport.get(kwargs["app"])
         else:
             transport_ = self.operation.schema.transport
-        try:
-            response = transport_.send(
-                self,
-                session=session,
-                base_url=base_url,
-                headers=headers,
-                params=params,
-                cookies=cookies,
-                **kwargs,
-            )
-        except Exception as exc:
-            # May happen in ASGI / WSGI apps
-            if not hasattr(exc, "__notes__"):
-                exc.__notes__ = []  # type: ignore[attr-defined]
-            verify = kwargs.get("verify", True)
+
+        extra_kwargs = dict(kwargs)
+        retry_config = self.operation.schema.config.request_retry_for(operation=self.operation)
+
+        def perform_send() -> Response:
+            current_kwargs = dict(extra_kwargs)
             try:
-                curl = self.as_curl_command(headers=headers, verify=verify)
-                exc.__notes__.append(f"\nReproduce with: \n\n    {curl}")  # type: ignore[attr-defined]
-            except Exception:
-                # Curl generation can fail for the same reason as the original error
-                # (e.g., malformed path template). Skip adding curl command to avoid
-                # replacing the original exception with a secondary error.
-                pass
-            raise
+                return transport_.send(
+                    self,
+                    session=session,
+                    base_url=base_url,
+                    headers=headers,
+                    params=params,
+                    cookies=cookies,
+                    **current_kwargs,
+                )
+            except Exception as exc:
+                if not hasattr(exc, "__notes__"):
+                    exc.__notes__ = []  # type: ignore[attr-defined]
+                verify = current_kwargs.get("verify", True)
+                try:
+                    curl = self.as_curl_command(headers=headers, verify=verify)
+                    exc.__notes__.append(f"\nReproduce with: \n\n    {curl}")  # type: ignore[attr-defined]
+                except Exception:
+                    pass
+                raise
+
+        def handle_retry(attempt: int, max_attempts: int, delay: float, exception: BaseException) -> None:
+            dispatch(
+                "on_request_retry",
+                hook_context,
+                self,
+                attempt,
+                max_attempts,
+                delay,
+                exception,
+            )
+
+        response = execute_with_retry(
+            perform_send,
+            config=retry_config,
+            method=self.method.upper(),
+            allow_exception_retry=transport_ is REQUESTS_TRANSPORT,
+            on_retry=handle_retry,
+        )
         dispatch("after_call", hook_context, self, response)
         return response
 
