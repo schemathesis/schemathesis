@@ -41,9 +41,10 @@ nav:
       - Checks: reference/checks.md
       - reference/warnings.md
 
-  - Migration from v3: migration.md
-  - FAQ: faq.md
+  - Trophy Case: reference/trophy-case.md
   - External Resources: resources.md
+  - FAQ: faq.md
+  - Migration from v3: migration.md
 
 theme:
   name: material
