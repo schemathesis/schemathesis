@@ -374,6 +374,17 @@ class CliSnapshotConfig:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
                 data = data.replace(str(Path(self.testdir.tmpdir).parent) + os.path.sep, "/tmp/")
+        if "Configuration:" in data:
+            lines = []
+            for line in data.splitlines():
+                normalized = click.unstyle(line)
+                stripped = normalized.lstrip()
+                if stripped.startswith("Configuration:"):
+                    indent = " " * (len(normalized) - len(stripped))
+                    lines.append(f"{indent}Configuration:    /tmp/config.toml")
+                else:
+                    lines.append(line)
+            data = "\n".join(lines)
         package_root = "/package-root"
         site_packages = "/site-packages/"
         data = data.replace(str(PACKAGE_ROOT), package_root)

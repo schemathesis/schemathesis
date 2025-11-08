@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - OpenAPI-aware authentication via `[auth.openapi.<scheme>]` config. Automatically aligns with schema security definitions and warns about unused/misnamed schemes. [#1710](https://github.com/schemathesis/schemathesis/issues/1710)
+- Display configuration file path in CLI output
 
 ### :racing_car: Performance
 
