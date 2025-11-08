@@ -2,6 +2,6 @@ Error in [reports] section:
   Unknown properties:
 
   - 'json'
-  - 'junitxml' → Did you mean 'junit'?
+  - 'junitxml' -> Did you mean 'junit'?
 
 Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr'.

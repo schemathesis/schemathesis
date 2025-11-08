@@ -1,0 +1,3 @@
+# Invalid property name - should be "api_key"
+[auth.openapi.ApiKeyAuth]
+value = "${TEST_STRING_1}"

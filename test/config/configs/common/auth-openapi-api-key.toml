@@ -1,0 +1,3 @@
+# Valid API Key auth
+[auth.openapi.ApiKeyAuth]
+api_key = "${TEST_STRING_1}"

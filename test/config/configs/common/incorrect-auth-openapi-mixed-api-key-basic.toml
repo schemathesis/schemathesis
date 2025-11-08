@@ -1,0 +1,4 @@
+# Mixed: has api_key and username but missing password
+[auth.openapi.Auth2]
+api_key = "key123"
+username = "user"

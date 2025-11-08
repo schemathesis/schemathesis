@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(openapi=OpenAPIAuthConfig(schemes={'BasicAuth': HttpBasicAuthConfig(username='user-1', password='secret-password')})))))

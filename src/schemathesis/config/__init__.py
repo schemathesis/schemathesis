@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from os import PathLike
 from random import Random
 
+from schemathesis.config._auth import ApiKeyAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
 from schemathesis.config._checks import (
     CheckConfig,
     ChecksConfig,
@@ -61,6 +62,9 @@ __all__ = [
     "get_workers_count",
     "SchemathesisWarning",
     "WarningsConfig",
+    "ApiKeyAuthConfig",
+    "HttpBasicAuthConfig",
+    "HttpBearerAuthConfig",
 ]
 
 

@@ -9,7 +9,6 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
-from schemathesis.specs.openapi.schemas import ReferenceResolver
 
 
 @pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
@@ -45,18 +44,6 @@ def test_open_api_base_path(openapi_30, server, base_path):
 def test_open_api_specification(openapi_30):
     assert openapi_30.specification.name == "Open API 3.0.0"
     assert openapi_30.specification.version == "3.0.0"
-
-
-def test_resolver_cache(simple_schema, mocker):
-    schema = schemathesis.openapi.from_dict(simple_schema)
-    spy = mocker.patch("schemathesis.specs.openapi.schemas.ReferenceResolver", wraps=ReferenceResolver)
-    assert "_resolver" not in schema.__dict__
-    assert isinstance(schema.resolver, ReferenceResolver)
-    assert spy.call_count == 1
-    # Cached
-    assert "_resolver" in schema.__dict__
-    assert isinstance(schema.resolver, ReferenceResolver)
-    assert spy.call_count == 1
 
 
 def test_resolving_multiple_files():

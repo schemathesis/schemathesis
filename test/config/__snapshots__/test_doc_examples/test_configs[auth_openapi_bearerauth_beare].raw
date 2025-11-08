@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(openapi=OpenAPIAuthConfig(schemes={'BearerAuth': HttpBearerAuthConfig(bearer='secret-token!')})))))

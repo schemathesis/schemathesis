@@ -1,0 +1,7 @@
+# Cannot mix generic basic auth with OpenAPI-aware auth
+[auth.basic]
+username = "user"
+password = "pass"
+
+[auth.openapi.ApiKeyAuth]
+api_key = "${TEST_STRING_1}"
