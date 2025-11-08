@@ -13,29 +13,15 @@ Real-world defects uncovered by Schemathesis’ property-based testing engine.
 
 ## Submitting a Trophy
 
-Seen Schemathesis expose a bug? Open an issue or PR with the details.
+Found a bug? [Submit it here](https://github.com/schemathesis/schemathesis/issues/new?template=trophy-submission.yml).
 
-Please include:
-
-- Minimal reproduction (cURL command, failing test, or code snippet)
-- What went wrong (status code, incorrect payload, side effect, etc.)
-- Link to the upstream issue or fix, when available
+**Looking for:** Bugs in APIs that other developers use or recognize (open-source projects with active communities, public SaaS APIs, popular tools). This keeps the trophy case educational and impactful for everyone.
 
 Security vulnerabilities should follow responsible-disclosure rules; only document them here once the fix is public.
 
-Maintainers curate the list to keep it clear and educational. Similar bugs may be consolidated.
-
-**Submission template**
-
-```
-| Project | Type | Endpoint | Description | Status | Link |
-|---------|------|----------|-------------|--------|------|
-| YourProject | 💥 | `POST /endpoint` | What went wrong | Fixed | [#123](url) |
-```
+Maintainers curate the list. Similar bugs may be consolidated.
 
 ## Discoveries
-
-Curated examples demonstrating edge cases Schemathesis can uncover:
 
 | Project | Type | Endpoint | Description | Status | Link |
 | --- | --- | --- | --- | --- | --- |
