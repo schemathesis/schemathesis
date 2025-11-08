@@ -1,0 +1,6 @@
+Error in [auth.openapi.ApiKeyAuth] section:
+  Invalid property:
+
+  - 'value' is not allowed
+
+Valid properties: 'api_key', 'username', 'password', 'bearer'

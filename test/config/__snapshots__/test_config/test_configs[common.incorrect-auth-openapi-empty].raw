@@ -1,0 +1,7 @@
+Error in [auth.openapi.EmptyAuth] section:
+  Configuration does not match any valid auth scheme.
+
+Valid schemes:
+  - apiKey: requires 'api_key'
+  - http+basic: requires 'username', 'password'
+  - http+bearer: requires 'bearer'

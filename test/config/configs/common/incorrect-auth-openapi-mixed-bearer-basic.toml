@@ -1,0 +1,4 @@
+# Mixed: has bearer and password but missing username
+[auth.openapi.Auth3]
+bearer = "token123"
+password = "secret"

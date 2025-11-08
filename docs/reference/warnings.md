@@ -13,6 +13,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `missing_test_data` | Generated parameters hit non-existent resources (404) | Seed known IDs / payloads in your config file |
 | `validation_mismatch` | Schema constraints differ from real validation (lots of 4xx) | Tighten schema or extend generators to match runtime rules |
 | `missing_deserializer` | Structured responses lack a registered deserializer | Register one via `@schemathesis.deserializer` or align `content` types with actual formats |
+| `unused_openapi_auth` | Configured OpenAPI auth scheme doesn't exist in schema | Check scheme name matches `securitySchemes` (check for typos) |
 
 ## Available Warnings
 
@@ -92,7 +93,21 @@ When this warning appears, Schemathesis skips validation because it cannot deser
 
 - Registering a deserializer for the media type via `@schemathesis.deserializer()` (or `schemathesis.deserializer.register`) so the payload is converted into Python data.
 - Updating the schema to advertise the actual media type (for example `application/json`) if the server already returns JSON.
-- Omitting structured schemas for truly binary responses; without a schema, Schemathesis won’t expect to validate those payloads.
+- Omitting structured schemas for truly binary responses; without a schema, Schemathesis won't expect to validate those payloads.
+
+### `unused_openapi_auth`
+
+```
+Unused OpenAPI auth: 1 configured auth scheme not used in the schema
+
+  'ApiKeyHeadr' - Did you mean 'ApiKeyHeader'?
+```
+
+**Trigger**: Configured OpenAPI auth scheme is not defined in the schema's `securitySchemes`.
+
+This warning appears when `[auth.openapi.<scheme>]` references a scheme that doesn't exist in your OpenAPI spec. Verify the scheme name matches your schema's `securitySchemes` exactly - Schemathesis will suggest corrections for likely typos.
+
+See the [Authentication Guide](../guides/auth.md#openapi-aware-authentication) for details.
 
 ## Configuring Warnings
 

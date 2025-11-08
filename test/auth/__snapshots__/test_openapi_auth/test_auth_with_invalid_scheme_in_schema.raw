@@ -1,0 +1,72 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+________________________________ GET /protected ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"unauthorized"}`
+
+Reproduce with:
+
+    curl -X GET http://127.0.0.1/protected
+
+=================================== WARNINGS ===================================
+
+Authentication failed: 1 operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  - GET /protected
+
+💡 Ensure valid authentication credentials are set via --auth or -H
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Warnings:
+  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 1 failure, 1 warning in 1.00s =========================

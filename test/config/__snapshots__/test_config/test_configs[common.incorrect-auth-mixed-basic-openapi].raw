@@ -1,0 +1,9 @@
+Cannot use both generic basic authentication and OpenAPI-aware authentication.
+
+You have configured:
+  - [auth.basic] (generic basic authentication)
+  - [auth.openapi.*] (OpenAPI-aware authentication)
+
+Please choose one authentication method:
+  - Use [auth.basic] for simple basic auth on all operations
+  - Use [auth.openapi.*] for OpenAPI security scheme-aware authentication

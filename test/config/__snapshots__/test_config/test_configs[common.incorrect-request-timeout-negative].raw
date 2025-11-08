@@ -1,4 +1,4 @@
 Error in root section:
   Value too low:
 
-  - 'request-timeout' → Must be at least 0, but got -1.
+  - 'request-timeout' -> Must be at least 0, but got -1.

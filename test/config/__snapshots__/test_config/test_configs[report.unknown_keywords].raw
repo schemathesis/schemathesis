@@ -2,6 +2,6 @@ Error in [reports] section:
   Unknown properties:
 
   - 'output_format'
-  - 'preserve_byte' → Did you mean 'preserve-bytes'?
+  - 'preserve_byte' -> Did you mean 'preserve-bytes'?
 
 Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr'.

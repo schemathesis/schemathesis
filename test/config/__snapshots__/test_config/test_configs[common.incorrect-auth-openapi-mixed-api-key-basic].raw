@@ -1,0 +1,4 @@
+Error in [auth.openapi.Auth2] section:
+  Missing required property (HTTP Basic):
+
+  - 'password'

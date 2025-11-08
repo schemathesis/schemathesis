@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from werkzeug.test import TestResponse
 
+    from schemathesis.auths import AuthContext
     from schemathesis.core import Specification
     from schemathesis.generation.stateful.state_machine import APIStateMachine
 
@@ -118,6 +119,14 @@ class BaseSchema(Mapping):
     @property
     def transport(self) -> transport.BaseTransport:
         return transport.get(self.app)
+
+    def apply_auth(self, case: Case, context: AuthContext) -> bool:
+        """Apply spec-specific authentication to a test case.
+
+        Returns True if authentication was applied, False otherwise.
+        Subclasses should implement this to provide spec-specific auth mechanisms.
+        """
+        raise NotImplementedError
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

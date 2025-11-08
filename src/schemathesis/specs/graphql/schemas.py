@@ -53,7 +53,7 @@ if TYPE_CHECKING:
     import graphql
     from hypothesis.strategies import SearchStrategy
 
-    from schemathesis.auths import AuthStorage
+    from schemathesis.auths import AuthContext, AuthStorage
 
 
 @unique
@@ -139,6 +139,9 @@ class GraphQLSchema(BaseSchema):
     @property
     def specification(self) -> Specification:
         return Specification.graphql(version="")
+
+    def apply_auth(self, case: Case, context: AuthContext) -> bool:
+        return False
 
     @property
     def client_schema(self) -> graphql.GraphQLSchema:

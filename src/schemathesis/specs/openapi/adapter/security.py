@@ -3,11 +3,110 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Iterator, Mapping
 
+from schemathesis.config import ApiKeyAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
+from schemathesis.specs.openapi.auths import ApiKeyAuthProvider, HttpBasicAuthProvider, HttpBearerAuthProvider
+
 if TYPE_CHECKING:
+    from schemathesis.auths import AuthContext, AuthProvider
     from schemathesis.core.compat import RefResolver
+    from schemathesis.generation.case import Case
     from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 
 ORIGINAL_SECURITY_TYPE_KEY = "x-original-security-type"
+
+
+class OpenApiSecurity:
+    """OpenAPI security scheme definitions and authentication logic."""
+
+    raw_schema: Mapping[str, Any]
+    adapter: SpecificationAdapter
+    resolver: RefResolver
+    _auth_provider_cache: dict[str, AuthProvider]
+    _resolved_definitions: Mapping[str, Mapping[str, Any]] | None
+
+    __slots__ = ("raw_schema", "adapter", "resolver", "_auth_provider_cache", "_resolved_definitions")
+
+    def __init__(self, raw_schema: Mapping[str, Any], adapter: SpecificationAdapter, resolver: RefResolver) -> None:
+        self.raw_schema = raw_schema
+        self.adapter = adapter
+        self.resolver = resolver
+        self._auth_provider_cache = {}
+        self._resolved_definitions = None
+
+    @property
+    def security_definitions(self) -> Mapping[str, Mapping[str, Any]]:
+        """Get security scheme definitions from the schema."""
+        if self._resolved_definitions is None:
+            self._resolved_definitions = self.adapter.extract_security_definitions(self.raw_schema, self.resolver)
+        return self._resolved_definitions
+
+    def auth_provider_for(
+        self, scheme: str, config: ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig
+    ) -> AuthProvider:
+        """Get or build an auth provider for the given scheme (cached per scheme).
+
+        Args:
+            scheme: Name of the security scheme
+            config: Auth configuration
+
+        """
+        if scheme not in self._auth_provider_cache:
+            definition = self.security_definitions[scheme]
+            self._auth_provider_cache[scheme] = build_auth_provider(config, definition)
+        return self._auth_provider_cache[scheme]
+
+    def apply_auth(
+        self,
+        case: Case,
+        context: AuthContext,
+        configured_schemes: Mapping[str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig],
+    ) -> bool:
+        """Apply OpenAPI-aware authentication to a test case.
+
+        Args:
+            case: Test case to authenticate
+            context: Auth context
+            configured_schemes: Dict of configured auth schemes from config
+
+        """
+        # Get security requirements for this operation
+        operation_definition = case.operation.definition.raw
+
+        # Security requirements: OR semantics (first match wins), AND semantics (all in requirement)
+        security_requirements = operation_definition.get("security", self.raw_schema.get("security", []))
+
+        if not security_requirements:
+            return False
+
+        security_definitions = self.security_definitions
+
+        # Try each security requirement (OR semantics)
+        for requirement in security_requirements:
+            if not isinstance(requirement, dict):
+                continue
+            # Check if all schemes in this requirement can be satisfied (AND semantics)
+            providers_to_apply = []
+            can_satisfy = True
+
+            for scheme_name in requirement:
+                if scheme_name not in configured_schemes or scheme_name not in security_definitions:
+                    can_satisfy = False
+                    break
+
+                config = configured_schemes[scheme_name]
+                provider = self.auth_provider_for(scheme_name, config)
+                providers_to_apply.append(provider)
+
+            # If we can satisfy this requirement, apply all providers
+            if can_satisfy and providers_to_apply:
+                for provider in providers_to_apply:
+                    data = provider.get(case, context)
+                    assert data is not None
+                    provider.set(case, data, context)
+                case._has_explicit_auth = True
+                return True
+
+        return False
 
 
 @dataclass
@@ -112,7 +211,7 @@ def make_api_key_schema(definition: dict[str, Any], **kwargs: Any) -> dict[str, 
 
 def get_security_requirements(schema: Mapping[str, Any], operation: Mapping[str, Any]) -> list[str]:
     requirements = operation.get("security", schema.get("security", []))
-    return [key for requirement in requirements for key in requirement]
+    return [key for requirement in requirements if isinstance(requirement, dict) for key in requirement]
 
 
 def has_optional_auth(schema: Mapping[str, Any], operation: Mapping[str, Any]) -> bool:
@@ -142,3 +241,32 @@ def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: RefReso
     finally:
         if scope is not None:
             resolver._scopes_stack.append(scope)
+
+
+def build_auth_provider(
+    config: ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig,
+    scheme: Mapping[str, Any],
+) -> AuthProvider:
+    """Build an auth provider from config and OpenAPI scheme definition.
+
+    This function is used by both v2 and v3 adapters as the logic is the same.
+
+    Args:
+        config: Auth configuration
+        scheme: Security scheme definition
+
+    Returns:
+        AuthProvider instance for the given scheme
+
+    """
+    if isinstance(config, ApiKeyAuthConfig):
+        return ApiKeyAuthProvider(value=config.api_key, name=scheme["name"], location=scheme["in"])
+
+    elif isinstance(config, HttpBasicAuthConfig):
+        return HttpBasicAuthProvider(username=config.username, password=config.password)
+
+    elif isinstance(config, HttpBearerAuthConfig):
+        return HttpBearerAuthProvider(bearer=config.bearer)
+
+    # Should never reach here due to JSON Schema validation
+    raise TypeError(f"Unknown auth config type: {type(config)}")  # pragma: no cover

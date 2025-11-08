@@ -1,0 +1,77 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.0
+     Operations:       1 selected / 8 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+_____________________________ GET /api-key-header ______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 401
+    Documented: 200
+
+[401] Unauthorized:
+
+    `{"error":"unauthorized"}`
+
+Reproduce with:
+
+    curl -X GET -H 'X-API-Key: [Filtered]' http://127.0.0.1/api-key-header
+
+=================================== WARNINGS ===================================
+
+Authentication failed: 1 operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  - GET /api-key-header
+
+💡 Ensure valid authentication credentials are set via --auth or -H
+
+Unused OpenAPI auth: 1 configured auth scheme not defined in the schema
+
+  - 'ApiKeyHeadr' - Did you mean 'ApiKeyHeader'?
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/8
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Undocumented HTTP status code: 1
+
+Warnings:
+  ⚠️ Missing authentication: 1 operation returned only 401/403 responses
+  ⚠️ Unused OpenAPI auth: 1 configured auth scheme not used in the schema
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+======================== 1 failure, 1 warning in 1.00s =========================

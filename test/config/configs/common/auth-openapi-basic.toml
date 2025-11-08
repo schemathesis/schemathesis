@@ -1,0 +1,4 @@
+# Valid HTTP Basic auth
+[auth.openapi.BasicAuth]
+username = "${TEST_STRING_1}"
+password = "${TEST_STRING_2}"
