@@ -13,16 +13,21 @@ Real-world defects uncovered by Schemathesis’ property-based testing engine.
 
 ## Submitting a Trophy
 
-Found a bug? [Submit it here](https://github.com/schemathesis/schemathesis/issues/new?template=trophy-submission.yml).
+<div align="center" markdown>
 
-**Looking for:** Bugs in APIs that other developers use or recognize (open-source projects with active communities, public SaaS APIs, popular tools). This keeps the trophy case educational and impactful for everyone.
+[Submit a Trophy :fontawesome-solid-trophy:](https://github.com/schemathesis/schemathesis/issues/new?template=trophy-submission.yml){ .md-button .md-button--primary }
 
-Security vulnerabilities should follow responsible-disclosure rules; only document them here once the fix is public.
+</div>
 
-Maintainers curate the list. Similar bugs may be consolidated.
+!!! info "What we're looking for"
+    Bugs in APIs that other developers use or recognize (open-source projects with active communities, public SaaS APIs, popular tools).
+
+    Security vulnerabilities should follow responsible-disclosure rules; only document them here once the fix is public.
 
 ## Discoveries
 
-| Project | Type | Endpoint | Description | Status | Link |
-| --- | --- | --- | --- | --- | --- |
-| *Coming soon* | | | Submit the first trophy! | | |
+<div align="center" markdown>
+
+*Submit the first trophy!* 🏆
+
+</div>
