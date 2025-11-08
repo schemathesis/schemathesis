@@ -10,8 +10,11 @@ body:
 
         **Requirements:**
         - Bug discovered using Schemathesis
+        - Found in APIs that other developers use or recognize (open-source projects with active communities, public SaaS APIs, popular tools)
         - Security bugs: only submit after fix is public
         - Include link to upstream issue/fix when available
+
+        This keeps the trophy case educational and impactful for everyone.
 
   - type: input
     id: project
