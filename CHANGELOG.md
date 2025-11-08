@@ -5,6 +5,11 @@
 ### :wrench: Changed
 
 - Replace archived `backoff` with `tenacity`. [#3286](https://github.com/schemathesis/schemathesis/issues/3286)
+- Improved `missing_required_header` check message to show which header was missing instead of repeating the check title.
+
+### :memo: Documentation
+
+- Improved checks reference documentation.
 
 ## [4.4.3](https://github.com/schemathesis/schemathesis/compare/v4.4.2...v4.4.3) - 2025-11-07
 

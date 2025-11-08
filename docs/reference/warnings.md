@@ -84,7 +84,7 @@ Schema validation skipped: 1 operation cannot validate responses due to missing 
 ```
 
 !!! tip
-    Register a deserializer with [@schemathesis.deserializer](../guides/extending.md#custom-deserializers) to enable validation
+    Register a deserializer with [@schemathesis.deserializer](../guides/custom-response-deserializers.md) to enable validation
 
 **Trigger**: Operation responses declare structured schemas (objects / arrays) for a media type, but Schemathesis has no deserializer registered for that `content-type`.
 
