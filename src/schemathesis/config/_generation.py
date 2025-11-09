@@ -30,6 +30,7 @@ class GenerationConfig(DiffBase):
     database: str | None
     unique_inputs: bool
     exclude_header_characters: str | None
+    reuse_captured_resources: bool
 
     __slots__ = (
         "modes",
@@ -45,6 +46,7 @@ class GenerationConfig(DiffBase):
         "database",
         "unique_inputs",
         "exclude_header_characters",
+        "reuse_captured_resources",
     )
 
     def __init__(
@@ -63,6 +65,7 @@ class GenerationConfig(DiffBase):
         database: str | None = None,
         unique_inputs: bool = False,
         exclude_header_characters: str | None = None,
+        reuse_captured_resources: bool = False,
     ) -> None:
         from schemathesis.generation import GenerationMode
 
@@ -79,6 +82,7 @@ class GenerationConfig(DiffBase):
         self.database = database
         self.unique_inputs = unique_inputs
         self.exclude_header_characters = exclude_header_characters
+        self.reuse_captured_resources = reuse_captured_resources
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> GenerationConfig:
@@ -104,6 +108,7 @@ class GenerationConfig(DiffBase):
             database=data.get("database"),
             unique_inputs=data.get("unique-inputs", False),
             exclude_header_characters=data.get("exclude-header-characters"),
+            reuse_captured_resources=data.get("reuse-captured-resources", False),
         )
 
     def update(
@@ -122,6 +127,7 @@ class GenerationConfig(DiffBase):
         database: str | None = None,
         unique_inputs: bool | None = None,
         exclude_header_characters: str | None = None,
+        reuse_captured_resources: bool | None = None,
     ) -> None:
         if modes is not None:
             self.modes = modes
@@ -143,6 +149,8 @@ class GenerationConfig(DiffBase):
         self.unique_inputs = unique_inputs or False
         if exclude_header_characters is not None:
             self.exclude_header_characters = exclude_header_characters
+        if reuse_captured_resources is not None:
+            self.reuse_captured_resources = reuse_captured_resources
 
 
 def _get_maximize(value: Any) -> list[MetricFunction]:

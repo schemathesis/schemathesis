@@ -169,7 +169,7 @@ def worker_task(
                         or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
                     ):
                         continue
-                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation)
+                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation, phase=phase)
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
                     events_queue.put(scenario_started)
                     try:
@@ -207,7 +207,7 @@ def worker_task(
             events_queue.put(events.Interrupted(phase=phase))
 
 
-def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, Any]:
+def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: PhaseName) -> dict[str, Any]:
     kwargs = {}
     override = overrides.for_operation(ctx.config, operation=operation)
     for location in ("query", "headers", "cookies", "path_parameters"):
@@ -217,4 +217,9 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[
     headers = ctx.config.headers_for(operation=operation)
     if headers:
         kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
+    generation_config = ctx.config.generation_for(operation=operation, phase=phase.name)
+    if generation_config.reuse_captured_resources:
+        provider = ctx.get_resource_provider()
+        if provider is not None:
+            kwargs["resource_provider"] = provider
     return kwargs

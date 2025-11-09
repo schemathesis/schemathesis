@@ -15,7 +15,7 @@ import schemathesis
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import MalformedMediaType
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import (
@@ -25,6 +25,9 @@ from schemathesis.generation.hypothesis.builder import (
     create_test,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.schemas import APIOperation, OperationDefinition
+from schemathesis.specs.openapi.adapter import v2
+from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from test.utils import assert_requests_call
 
 
@@ -2542,6 +2545,50 @@ def assert_coverage(schema, modes, expected, path=None):
         assert cases in expected
     else:
         assert cases == expected
+
+
+def test_coverage_uses_resource_provider(swagger_20):
+    parameter = OpenApiParameter.from_definition(
+        definition={
+            "name": "user_id",
+            "in": "path",
+            "required": True,
+            "type": "string",
+        },
+        name_to_uri={},
+        adapter=v2,
+    )
+    operation = APIOperation(
+        path="/users/{user_id}",
+        method="GET",
+        definition=OperationDefinition({}),
+        schema=swagger_20,
+        responses=swagger_20._parse_responses({}, ""),
+        security=swagger_20._parse_security({}),
+        path_parameters=OpenApiParameterSet(ParameterLocation.PATH, [parameter]),
+    )
+
+    class DummyProvider:
+        def augment(self, *, operation, location, schema):
+            if location != ParameterLocation.PATH:
+                return schema
+            schema = dict(schema)
+            properties = dict(schema.get("properties", {}))
+            properties["user_id"] = {**properties.get("user_id", {}), "enum": ["captured"]}
+            schema["properties"] = properties
+            return schema
+
+    generator = _iter_coverage_cases(
+        operation=operation,
+        generation_modes=[GenerationMode.POSITIVE],
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=swagger_20.config.generation,
+        resource_provider=DummyProvider(),
+    )
+
+    case = next(generator)
+    assert case.path_parameters["user_id"] == "captured"
 
 
 def get_value_and_parameter(case):

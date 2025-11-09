@@ -92,8 +92,9 @@ class ResourceRepository:
         if not descriptors:
             return
 
+        status_code_str = str(status_code)
         for descriptor in descriptors:
-            if descriptor.status_code != status_code:
+            if not self._status_matches(descriptor.status_code, status_code_str):
                 continue
             for candidate in self._extract_payload(payload, descriptor):
                 self._store(
@@ -222,3 +223,14 @@ class ResourceRepository:
             return json.dumps(value, sort_keys=True, default=str)
         except (TypeError, ValueError):
             return repr(sorted(value.items()))
+
+    @staticmethod
+    def _status_matches(descriptor_status: str, response_status: str) -> bool:
+        if descriptor_status == response_status:
+            return True
+        code = descriptor_status.upper()
+        if code == "DEFAULT":
+            return True
+        if len(code) == 3 and code.endswith("XX") and response_status:
+            return code[0].isdigit() and code[0] == response_status[0]
+        return False

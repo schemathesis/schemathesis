@@ -32,6 +32,7 @@ from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.resources.interfaces import ParameterSchemaAugmenter
 from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
@@ -553,6 +554,7 @@ class OpenApiSchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
+        resource_provider: ParameterSchemaAugmenter | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
@@ -560,6 +562,7 @@ class OpenApiSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
+            resource_provider=resource_provider,
             **kwargs,
         )
 

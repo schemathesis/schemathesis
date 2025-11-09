@@ -29,6 +29,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
+from schemathesis.resources.interfaces import ParameterSchemaAugmenter
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import FORM_MEDIA_TYPES, OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
@@ -69,6 +70,7 @@ def openapi_cases(
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
+    resource_provider: ParameterSchemaAugmenter | None = None,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -89,16 +91,48 @@ def openapi_cases(
     ctx = HookContext(operation=operation)
 
     path_parameters_ = generate_parameter(
-        ParameterLocation.PATH, path_parameters, operation, draw, ctx, hooks, generation_mode, generation_config
+        ParameterLocation.PATH,
+        path_parameters,
+        operation,
+        draw,
+        ctx,
+        hooks,
+        generation_mode,
+        generation_config,
+        resource_provider=resource_provider,
     )
     headers_ = generate_parameter(
-        ParameterLocation.HEADER, headers, operation, draw, ctx, hooks, generation_mode, generation_config
+        ParameterLocation.HEADER,
+        headers,
+        operation,
+        draw,
+        ctx,
+        hooks,
+        generation_mode,
+        generation_config,
+        resource_provider=resource_provider,
     )
     cookies_ = generate_parameter(
-        ParameterLocation.COOKIE, cookies, operation, draw, ctx, hooks, generation_mode, generation_config
+        ParameterLocation.COOKIE,
+        cookies,
+        operation,
+        draw,
+        ctx,
+        hooks,
+        generation_mode,
+        generation_config,
+        resource_provider=resource_provider,
     )
     query_ = generate_parameter(
-        ParameterLocation.QUERY, query, operation, draw, ctx, hooks, generation_mode, generation_config
+        ParameterLocation.QUERY,
+        query,
+        operation,
+        draw,
+        ctx,
+        hooks,
+        generation_mode,
+        generation_config,
+        resource_provider=resource_provider,
     )
 
     if body is NOT_SET:
@@ -443,6 +477,7 @@ def get_parameters_value(
     hooks: HookDispatcher | None,
     generation_mode: GenerationMode,
     generation_config: GenerationConfig,
+    resource_provider: ParameterSchemaAugmenter | None = None,
 ) -> tuple[dict[str, Any] | None, Any]:
     """Get the final value for the specified location.
 
@@ -450,14 +485,23 @@ def get_parameters_value(
     generate those parts.
     """
     if value is None:
-        strategy = get_parameters_strategy(operation, generation_mode, location, generation_config)
+        strategy = get_parameters_strategy(
+            operation, generation_mode, location, generation_config, resource_provider=resource_provider
+        )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = draw(strategy)
         # Negative strategy returns GeneratedValue, positive returns just value
         if isinstance(result, GeneratedValue):
             return result.value, result.meta
         return result, None
-    strategy = get_parameters_strategy(operation, generation_mode, location, generation_config, exclude=value.keys())
+    strategy = get_parameters_strategy(
+        operation,
+        generation_mode,
+        location,
+        generation_config,
+        exclude=value.keys(),
+        resource_provider=resource_provider,
+    )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = draw(strategy)
     metadata = None
@@ -502,6 +546,7 @@ def generate_parameter(
     hooks: HookDispatcher | None,
     generator: GenerationMode,
     generation_config: GenerationConfig,
+    resource_provider: ParameterSchemaAugmenter | None = None,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -515,7 +560,15 @@ def generate_parameter(
         # If nothing else will be negated, then skip the test completely
         generator = GenerationMode.POSITIVE
     value, metadata = get_parameters_value(
-        explicit, location, draw, operation, ctx, hooks, generator, generation_config
+        explicit,
+        location,
+        draw,
+        operation,
+        ctx,
+        hooks,
+        generator,
+        generation_config,
+        resource_provider=resource_provider,
     )
     used_generator: GenerationMode | None = generator
     if value == explicit:
@@ -554,11 +607,18 @@ def get_parameters_strategy(
     location: ParameterLocation,
     generation_config: GenerationConfig,
     exclude: Iterable[str] = (),
+    resource_provider: ParameterSchemaAugmenter | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = getattr(operation, location.container_name)
     if container:
-        return container.get_strategy(operation, generation_config, generation_mode, exclude)
+        return container.get_strategy(
+            operation,
+            generation_config,
+            generation_mode,
+            exclude,
+            resource_provider=resource_provider,
+        )
     # No parameters defined for this location
     return st.none()
 

@@ -304,8 +304,10 @@ def run_test(
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
 
-    if status == Status.SUCCESS and ctx.resource_repository is not None:
-        descriptors = ctx.resource_repository.descriptors_for_operation(operation.label)
+    reuse_resources = generation.reuse_captured_resources
+    repository = ctx.resource_repository if reuse_resources else None
+    if status == Status.SUCCESS and repository is not None:
+        descriptors = repository.descriptors_for_operation(operation.label)
         if descriptors:
             for interaction in recorder.interactions.values():
                 response = interaction.response
@@ -315,7 +317,7 @@ def run_test(
                     payload = response.json()
                 except (TypeError, ValueError, json.JSONDecodeError):
                     continue
-                ctx.resource_repository.ingest_response(
+                repository.ingest_response(
                     operation_label=operation.label,
                     status_code=response.status_code,
                     payload=payload,

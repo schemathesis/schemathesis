@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import ProjectConfig
+from schemathesis.config import InferenceAlgorithm, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.observations import Observations
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.resources import ResourceRepository
+    from schemathesis.resources.interfaces import ParameterSchemaAugmenter
 
 
 @dataclass
@@ -37,7 +38,7 @@ class EngineContext:
         "observations",
         "_session",
         "_transport_kwargs_cache",
-        "resource_repository",
+        "_resource_context",
     )
 
     def __init__(
@@ -55,7 +56,7 @@ class EngineContext:
         self.observations = observations
         self._session = session
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
-        self.resource_repository = self._create_resource_repository(schema)
+        self._resource_context: _ResourceContext | None | NotSet = NOT_SET
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -153,16 +154,48 @@ class EngineContext:
         self._transport_kwargs_cache[key] = kwargs
         return kwargs
 
-    def _create_resource_repository(self, schema: BaseSchema) -> ResourceRepository | None:
-        """Create resource repository from schema descriptors.
+    @property
+    def resource_repository(self) -> ResourceRepository | None:
+        context = self._get_resource_context()
+        if context is None:
+            return None
+        return context.repository
 
-        Only schemas with resource tracking support (e.g., OpenAPI) will return
-        non-empty descriptors, enabling resource capture and reuse.
-        """
+    def get_resource_provider(self) -> ParameterSchemaAugmenter | None:
+        context = self._get_resource_context()
+        if context is None:
+            return None
+        return context.provider
+
+    def _get_resource_context(self) -> _ResourceContext | None:
+        if self._resource_context is NOT_SET:
+            self._resource_context = self._create_resource_context(self.schema)
+        return None if self._resource_context is NOT_SET else self._resource_context
+
+    def _create_resource_context(self, schema: BaseSchema) -> _ResourceContext | None:
+        """Create resource repository & provider for schemas that support it."""
+        from schemathesis.resources import ResourceRepository
+        from schemathesis.specs.openapi.resource_provider import (
+            OpenApiResourceProvider,
+            build_parameter_requirements,
+        )
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+        if not isinstance(schema, OpenApiSchema):
+            return None
+        inference = schema.config.phases.stateful.inference
+        if not inference.is_algorithm_enabled(InferenceAlgorithm.DEPENDENCY_ANALYSIS):
+            return None
         descriptors = schema.get_resource_descriptors()
         if not descriptors:
             return None
+        repository = ResourceRepository(descriptors)
+        requirements = build_parameter_requirements(schema.analysis.dependency_graph)
+        provider = OpenApiResourceProvider(repository=repository, requirements=requirements)
+        return _ResourceContext(repository=repository, provider=provider)
 
-        from schemathesis.resources import ResourceRepository
 
-        return ResourceRepository(descriptors)
+@dataclass
+class _ResourceContext:
+    repository: ResourceRepository
+    provider: ParameterSchemaAugmenter

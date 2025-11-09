@@ -48,6 +48,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
 )
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
+from schemathesis.resources.interfaces import ParameterSchemaAugmenter
 from schemathesis.schemas import APIOperation, ParameterSet
 
 setup()
@@ -335,6 +336,7 @@ def add_coverage(
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
 ) -> Callable:
+    resource_provider = as_strategy_kwargs.get("resource_provider")
     for case in generate_coverage_cases(
         operation=operation,
         generation_modes=generation_modes,
@@ -343,6 +345,7 @@ def add_coverage(
         generate_duplicate_query_parameters=generate_duplicate_query_parameters,
         unexpected_methods=unexpected_methods,
         generation_config=generation_config,
+        resource_provider=resource_provider,
     ):
         test = hypothesis.example(case=case)(test)
     return test
@@ -357,6 +360,7 @@ def generate_coverage_cases(
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
+    resource_provider: ParameterSchemaAugmenter | None = None,
 ) -> Generator[Case]:
     from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 
@@ -379,6 +383,7 @@ def generate_coverage_cases(
             generate_duplicate_query_parameters=generate_duplicate_query_parameters,
             unexpected_methods=unexpected_methods,
             generation_config=generation_config,
+            resource_provider=resource_provider,
         ):
             if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
                 continue
@@ -518,6 +523,7 @@ def _iter_coverage_cases(
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
+    resource_provider: ParameterSchemaAugmenter | None = None,
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.examples import find_matching_in_responses
@@ -538,10 +544,32 @@ def _iter_coverage_cases(
     assert isinstance(operation.schema, OpenApiSchema)
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
 
+    augmented_parameter_schemas: dict[tuple[ParameterLocation, str], dict[str, Any]] = {}
+    if resource_provider is not None:
+        supported_locations = (
+            ParameterLocation.PATH,
+            ParameterLocation.QUERY,
+            ParameterLocation.HEADER,
+            ParameterLocation.COOKIE,
+        )
+        for location in supported_locations:
+            container = getattr(operation, location.container_name, None)
+            if not container or not hasattr(container, "schema"):
+                continue
+            schema = container.schema
+            augmented = resource_provider.augment(operation=operation, location=location, schema=schema)
+            properties = augmented.get("properties")
+            if not isinstance(properties, dict):
+                continue
+            augmented_parameter_schemas.update(
+                ((location, name), prop_schema) for name, prop_schema in properties.items()
+            )
+
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
-        schema = parameter.unoptimized_schema
+        base_schema = augmented_parameter_schemas.get((location, name))
+        schema = dict(base_schema) if base_schema is not None else parameter.unoptimized_schema
         examples = parameter.examples
         if examples:
             schema = dict(schema)

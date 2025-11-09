@@ -24,7 +24,7 @@ def _iter_output_descriptors(operation: OperationNode, label: str) -> Iterable[R
         yield ResourceDescriptor(
             resource_name=output.resource.name,
             operation_label=label,
-            status_code=int(output.status_code),
+            status_code=str(output.status_code),
             pointer=output.pointer,
             cardinality=cardinality,
             fields=tuple(output.resource.fields),

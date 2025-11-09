@@ -16,6 +16,7 @@ from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.resources.interfaces import ParameterSchemaAugmenter
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
@@ -589,12 +590,15 @@ class OpenApiParameterSet(ParameterSet):
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
         exclude: Iterable[str] = (),
+        resource_provider: ParameterSchemaAugmenter | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = frozenset(exclude)
         cache_key = (exclude_key, generation_mode)
 
-        if cache_key in self._strategy_cache:
+        use_cache = resource_provider is None
+
+        if use_cache and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
 
         # Import here to avoid circular dependency
@@ -613,6 +617,8 @@ class OpenApiParameterSet(ParameterSet):
 
         # Get schema with exclusions
         schema = self.get_schema_with_exclusions(exclude)
+        if resource_provider is not None:
+            schema = resource_provider.augment(operation=operation, location=self.location, schema=schema)
 
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
@@ -672,7 +678,8 @@ class OpenApiParameterSet(ParameterSet):
                 else:
                     strategy = strategy.map(jsonify_python_specific_types)
 
-        self._strategy_cache[cache_key] = strategy
+        if use_cache:
+            self._strategy_cache[cache_key] = strategy
         return strategy
 
 

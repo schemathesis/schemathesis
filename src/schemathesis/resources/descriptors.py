@@ -33,7 +33,7 @@ class ResourceDescriptor:
 
     resource_name: str
     operation_label: str
-    status_code: int
+    status_code: str
     pointer: str
     cardinality: Cardinality
     fields: tuple[str, ...]
