@@ -11,6 +11,7 @@ from schemathesis.config._checks import (
     ChecksConfig,
     NotAServerErrorConfig,
     PositiveDataAcceptanceConfig,
+    SensitiveDataLeakConfig,
     SimpleCheckConfig,
 )
 from schemathesis.config._diff_base import DiffBase
@@ -50,6 +51,7 @@ __all__ = [
     "CheckConfig",
     "NotAServerErrorConfig",
     "PositiveDataAcceptanceConfig",
+    "SensitiveDataLeakConfig",
     "SimpleCheckConfig",
     "PhaseConfig",
     "PhasesConfig",

@@ -236,6 +236,39 @@ class MalformedJson(Failure):
         )
 
 
+class SensitiveDataLeakFailure(Failure):
+    """Response contains sensitive data markers."""
+
+    __slots__ = ("operation", "marker", "matched", "location", "assessment", "title", "message", "case_id", "severity")
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        marker: str,
+        matched: str,
+        location: str,
+        case_id: str | None = None,
+        assessment: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.marker = marker
+        self.matched = matched
+        self.location = location
+        self.assessment = assessment
+        self.title = "Sensitive data leak detected"
+        message = f"Marker: {marker}\nMatched: {matched}\nLocation: {location}"
+        if assessment:
+            message += f"\nAssessment: {assessment}"
+        self.message = message
+        self.case_id = case_id
+        self.severity = Severity.CRITICAL
+
+    @property
+    def _unique_key(self) -> Any:
+        return (self.marker, self.location, self.matched)
+
+
 class FailureGroup(BaseExceptionGroup):
     """Multiple distinct check failures."""
 

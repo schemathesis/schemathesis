@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Sequence
 
@@ -13,6 +14,9 @@ NOT_A_SERVER_ERROR_EXPECTED_STATUSES = ["2xx", "3xx", "4xx"]
 NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES = ["400", "401", "403", "404", "406", "422", "428", "5xx"]
 POSITIVE_DATA_ACCEPTANCE_EXPECTED_STATUSES = ["2xx", "401", "403", "404", "5xx"]
 MISSING_REQUIRED_HEADER_EXPECTED_STATUSES = ["406"]
+SENSITIVE_DATA_LEAK_BUILTINS = [
+    "sql_statement",
+]
 
 
 def validate_status_codes(value: Sequence[str] | None) -> Sequence[str] | None:
@@ -124,8 +128,75 @@ class MissingRequiredHeaderConfig(CheckConfig):
 
 
 @dataclass(repr=False)
+class SensitiveDataMarkerConfig(DiffBase):
+    name: str
+    pattern: str
+    assessment: str | None
+    _compiled: re.Pattern[str] | None
+
+    __slots__ = ("name", "pattern", "assessment", "_compiled")
+
+    def __init__(self, *, name: str = "", pattern: str = "", assessment: str | None = None) -> None:
+        self.name = name
+        self.pattern = pattern
+        self.assessment = assessment
+        self._compiled = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SensitiveDataMarkerConfig:
+        name = data["name"]
+        pattern = data["pattern"]
+        assessment = data.get("assessment")
+        marker = cls(name=name, pattern=pattern, assessment=assessment)
+        try:
+            marker._compiled = re.compile(pattern)
+        except re.error as exc:
+            raise ConfigError(f"Invalid regex for sensitive data marker '{name}': {exc}") from None
+        return marker
+
+    def compile(self) -> re.Pattern[str]:
+        if self._compiled is None:
+            self._compiled = re.compile(self.pattern)
+        return self._compiled
+
+
+@dataclass(repr=False)
+class SensitiveDataLeakConfig(DiffBase):
+    enabled: bool
+    builtins: list[str]
+    markers: list[SensitiveDataMarkerConfig]
+
+    __slots__ = ("enabled", "builtins", "markers")
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        builtins: list[str] | None = None,
+        markers: list[SensitiveDataMarkerConfig] | None = None,
+    ) -> None:
+        self.enabled = enabled
+        if builtins is None:
+            self.builtins = list(SENSITIVE_DATA_LEAK_BUILTINS)
+        else:
+            self.builtins = builtins
+        self.markers = markers or []
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> SensitiveDataLeakConfig:
+        markers_data = data.get("markers", [])
+        markers = [SensitiveDataMarkerConfig.from_dict(item) for item in markers_data]
+        return cls(
+            enabled=data.get("enabled", True),
+            builtins=data.get("builtins"),
+            markers=markers,
+        )
+
+
+@dataclass(repr=False)
 class ChecksConfig(DiffBase):
     not_a_server_error: NotAServerErrorConfig
+    sensitive_data_leak: SensitiveDataLeakConfig
     status_code_conformance: SimpleCheckConfig
     content_type_conformance: SimpleCheckConfig
     response_schema_conformance: SimpleCheckConfig
@@ -142,6 +213,7 @@ class ChecksConfig(DiffBase):
 
     __slots__ = (
         "not_a_server_error",
+        "sensitive_data_leak",
         "status_code_conformance",
         "content_type_conformance",
         "response_schema_conformance",
@@ -161,6 +233,7 @@ class ChecksConfig(DiffBase):
         self,
         *,
         not_a_server_error: NotAServerErrorConfig | None = None,
+        sensitive_data_leak: SensitiveDataLeakConfig | None = None,
         status_code_conformance: SimpleCheckConfig | None = None,
         content_type_conformance: SimpleCheckConfig | None = None,
         response_schema_conformance: SimpleCheckConfig | None = None,
@@ -175,6 +248,7 @@ class ChecksConfig(DiffBase):
         max_response_time: MaxResponseTimeConfig | None = None,
     ) -> None:
         self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
+        self.sensitive_data_leak = sensitive_data_leak or SensitiveDataLeakConfig()
         self.status_code_conformance = status_code_conformance or SimpleCheckConfig()
         self.content_type_conformance = content_type_conformance or SimpleCheckConfig()
         self.response_schema_conformance = response_schema_conformance or SimpleCheckConfig()
@@ -203,6 +277,9 @@ class ChecksConfig(DiffBase):
         return cls(
             not_a_server_error=NotAServerErrorConfig.from_dict(
                 merge(data.get("not_a_server_error", {})),
+            ),
+            sensitive_data_leak=SensitiveDataLeakConfig.from_dict(
+                merge(data.get("sensitive_data_leak", {})),
             ),
             status_code_conformance=SimpleCheckConfig.from_dict(merge(data.get("status_code_conformance", {}))),
             content_type_conformance=SimpleCheckConfig.from_dict(merge(data.get("content_type_conformance", {}))),

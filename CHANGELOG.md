@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.4.4...HEAD) - TBD
 
+### :rocket: Added
+
+- Added a configurable `sensitive_data_leak` check that scans response bodies and headers for secrets and other leak markers.
+
 ## [4.4.4](https://github.com/schemathesis/schemathesis/compare/v4.4.3...v4.4.4) - 2025-11-08
 
 ### :racing_car: Performance

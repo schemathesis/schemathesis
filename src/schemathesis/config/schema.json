@@ -182,6 +182,9 @@
         "not_a_server_error": {
           "$ref": "#/$defs/CheckConfig"
         },
+        "sensitive_data_leak": {
+          "$ref": "#/$defs/SensitiveDataLeakConfig"
+        },
         "status_code_conformance": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
@@ -247,6 +250,46 @@
               "integer",
               "string"
             ]
+          }
+        }
+      }
+    },
+    "SensitiveDataMarkerConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "pattern"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "assessment": {
+          "type": "string"
+        }
+      }
+    },
+    "SensitiveDataLeakConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "builtins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SensitiveDataMarkerConfig"
           }
         }
       }

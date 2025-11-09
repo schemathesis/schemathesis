@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from schemathesis.config import ConfigError, SchemathesisConfig
+from schemathesis.config._checks import SensitiveDataMarkerConfig
 from schemathesis.config._operations import OperationConfig
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.config._validator import CONFIG_SCHEMA
@@ -60,3 +61,14 @@ def test_project_key_config_sync():
         property_name = key.replace("_", "-")
         assert property_name not in CONFIG_SCHEMA["$defs"]["OperationConfig"]["properties"]
         assert key not in OperationConfig.__slots__
+
+
+def test_sensitive_data_marker_repr():
+    marker = SensitiveDataMarkerConfig()
+    assert "SensitiveDataMarkerConfig" in repr(marker)
+
+
+def test_sensitive_data_marker_invalid_pattern():
+    with pytest.raises(ConfigError) as excinfo:
+        SensitiveDataMarkerConfig.from_dict({"name": "broken", "pattern": "("})
+    assert "Invalid regex for sensitive data marker 'broken'" in str(excinfo.value)

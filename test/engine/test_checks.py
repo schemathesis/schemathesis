@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from hypothesis import given, settings
 
+import schemathesis
 import schemathesis.checks
 from schemathesis import Case
 from schemathesis.checks import CheckContext, not_a_server_error
-from schemathesis.config._checks import ChecksConfig
+from schemathesis.config import OutputConfig
+from schemathesis.config._checks import ChecksConfig, SensitiveDataMarkerConfig
+from schemathesis.config._output import TruncationConfig
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.failures import Failure, FailureGroup, SensitiveDataLeakFailure
 from schemathesis.core.transport import Response
 from schemathesis.engine.phases.unit._executor import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -29,6 +33,251 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+
+def make_check_context() -> CheckContext:
+    return CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+
+def make_dummy_case() -> SimpleNamespace:
+    output = OutputConfig()
+    config = SimpleNamespace(output=output)
+    schema = SimpleNamespace(config=config)
+    operation = SimpleNamespace(label="GET /dummy", schema=schema)
+    return SimpleNamespace(operation=operation)
+
+
+def make_sensitive_operation(ctx):
+    schema = schemathesis.openapi.from_dict(
+        ctx.openapi.build_schema(
+            {
+                "/leak": {
+                    "get": {
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {
+                                    "text/plain": {
+                                        "schema": {"type": "string"},
+                                    }
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        )
+    )
+    return schema["/leak"]["GET"]
+
+
+def make_case_with_output_limit(limit: int) -> SimpleNamespace:
+    truncation = TruncationConfig(enabled=True, max_payload_size=limit, max_lines=10, max_width=80)
+    output = OutputConfig(truncation=truncation)
+    config = SimpleNamespace(output=output)
+    schema = SimpleNamespace(config=config)
+    operation = SimpleNamespace(label="GET /dummy", schema=schema)
+    return SimpleNamespace(operation=operation)
+
+
+def test_sensitive_data_leak_in_body(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.builtins = ["sql_statement"]
+    response = Response.from_requests(
+        response_factory.requests(
+            content=b"SQL: INSERT INTO users (email) VALUES ('admin@example.com')", content_type="text/plain"
+        ),
+        True,
+    )
+    case = make_dummy_case()
+
+    with pytest.raises(SensitiveDataLeakFailure) as excinfo:
+        schemathesis.checks.sensitive_data_leak(ctx, response, case)
+    assert "Assessment:" in str(excinfo.value)
+
+
+def test_sensitive_data_leak_in_header(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.builtins = ["sql_statement"]
+    response = Response.from_requests(
+        response_factory.requests(
+            content=b"{}",
+            headers={"SQL-Debug": "DELETE FROM users WHERE email = 'admin@example.com'"},
+        ),
+        True,
+    )
+    case = make_dummy_case()
+
+    with pytest.raises(SensitiveDataLeakFailure):
+        schemathesis.checks.sensitive_data_leak(ctx, response, case)
+
+
+def test_sensitive_data_leak_custom_marker(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.builtins = []
+    ctx.config.sensitive_data_leak.markers = [
+        SensitiveDataMarkerConfig(
+            name="internal_id", pattern=r"internal-id\s*:\s*\d{3}", assessment="Internal IDs leaked"
+        )
+    ]
+    response = Response.from_requests(
+        response_factory.requests(content=b"internal-id: 123", content_type="text/plain"),
+        True,
+    )
+    case = make_dummy_case()
+
+    with pytest.raises(SensitiveDataLeakFailure) as excinfo:
+        schemathesis.checks.sensitive_data_leak(ctx, response, case)
+    assert "Internal IDs leaked" in str(excinfo.value)
+
+
+def test_sensitive_data_leak_disabled_flag(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.enabled = False
+    response = Response.from_requests(
+        response_factory.requests(content=b"SQL: INSERT INTO users VALUES (1)", content_type="text/plain"),
+        True,
+    )
+    case = make_dummy_case()
+
+    assert schemathesis.checks.sensitive_data_leak(ctx, response, case) is None
+
+
+def test_sensitive_data_leak_reports_all(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.builtins = ["sql_statement"]
+    ctx.config.sensitive_data_leak.markers = [
+        SensitiveDataMarkerConfig(
+            name="stack_trace",
+            pattern=r"Traceback \(most recent call last\):",
+            assessment="Stack traces leak framework internals",
+        )
+    ]
+    response = Response.from_requests(
+        response_factory.requests(
+            content=(
+                b"SQL: INSERT INTO users (email) VALUES ('admin@example.com')\n"
+                b"Traceback (most recent call last):\nValueError: boom"
+            ),
+            content_type="text/plain",
+        ),
+        True,
+    )
+    case = make_dummy_case()
+
+    with pytest.raises(FailureGroup) as excinfo:
+        schemathesis.checks.sensitive_data_leak(ctx, response, case)
+
+    assert len(excinfo.value.exceptions) == 2
+
+
+def test_sensitive_data_leak_reports_multiple_sql_statements(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.builtins = ["sql_statement"]
+    response = Response.from_requests(
+        response_factory.requests(
+            content=(
+                b"SQL: INSERT INTO users (email) VALUES ('admin@example.com')\n"
+                b"SQL: DELETE FROM users WHERE email = 'guest@example.com'"
+            ),
+            content_type="text/plain",
+        ),
+        True,
+    )
+    case = make_dummy_case()
+
+    with pytest.raises(FailureGroup) as excinfo:
+        schemathesis.checks.sensitive_data_leak(ctx, response, case)
+
+    assert len(excinfo.value.exceptions) == 2
+
+
+def test_sensitive_data_leak_respects_output_truncation(response_factory):
+    ctx = make_check_context()
+    ctx.config.sensitive_data_leak.builtins = ["sql_statement"]
+    response = Response.from_requests(
+        response_factory.requests(
+            content=b"SQL: SELECT " + b"x" * 600,
+            content_type="text/plain",
+        ),
+        True,
+    )
+    case = make_case_with_output_limit(limit=50)
+
+    with pytest.raises(SensitiveDataLeakFailure) as excinfo:
+        schemathesis.checks.sensitive_data_leak(ctx, response, case)
+    assert "// Output truncated..." in str(excinfo.value)
+
+
+def test_sensitive_data_leak_validate_response_builtin(ctx, response_factory):
+    operation = make_sensitive_operation(ctx)
+    case = operation.Case()
+    response = Response.from_requests(
+        response_factory.requests(
+            content=b"SQL: INSERT INTO users (email) VALUES ('admin@example.com')",
+            content_type="text/plain",
+        ),
+        True,
+    )
+    recorder = ScenarioRecorder(label=operation.label)
+    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=case.id, response=response)
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+
+    with pytest.raises(FailureGroup) as excinfo:
+        validate_response(
+            case=case,
+            ctx=check_ctx,
+            response=response,
+            continue_on_failure=False,
+            recorder=recorder,
+        )
+
+    assert any(isinstance(failure, SensitiveDataLeakFailure) for failure in excinfo.value.exceptions)
+
+
+def test_sensitive_data_leak_validate_response_custom_marker(ctx, response_factory):
+    operation = make_sensitive_operation(ctx)
+    case = operation.Case()
+    response = Response.from_requests(
+        response_factory.requests(content=b"internal-id: 123", content_type="text/plain"),
+        True,
+    )
+    recorder = ScenarioRecorder(label=operation.label)
+    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=case.id, response=response)
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+    check_ctx.config.sensitive_data_leak.builtins = []
+    check_ctx.config.sensitive_data_leak.markers = [
+        SensitiveDataMarkerConfig(name="internal_id", pattern=r"internal-id\s*:\s*\d{3}")
+    ]
+
+    with pytest.raises(FailureGroup) as excinfo:
+        validate_response(
+            case=case,
+            ctx=check_ctx,
+            response=response,
+            continue_on_failure=False,
+            recorder=recorder,
+        )
+
+    failures = excinfo.value.exceptions
+    assert len(failures) == 1
+    assert failures[0].marker == "internal_id"
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:

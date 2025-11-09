@@ -268,3 +268,32 @@ Expected 401, got `200 OK` for `GET /protected-resource`
 
 !!! warning "Additional requests"
     This check sends extra HTTP requests per operation (one without auth, one with invalid auth).
+
+---
+
+### `sensitive_data_leak`
+
+Flags responses containing secrets, debug artefacts, or accidental disclosures such as inline SQL statements or stack traces. Applies to response bodies (JSON + text) and headers.
+
+```text
+- Sensitive data leak detected
+
+Marker: sql_statement (built-in)
+Matched: `SQL: INSERT INTO users (email, password) VALUES ('admin@example.com', '...')`
+Location: body
+```
+
+The built-in focus is on SQL debugging artefacts because they routinely leak credentials and schema details. Each hit comes with a short assessment so you know why it matters.
+
+| Name | What it catches | Example match | Assessment |
+| --- | --- | --- | --- |
+| `sql_statement` | Inline SQL logged to clients | ``SQL: INSERT INTO ...`` | Raw SQL was returned to the client; disable SQL debug logging and scrub statements. |
+
+Configuration keys:
+
+- `builtins`: marker IDs to execute (`[]` disables all built-ins).
+- `markers`: custom marker definitions (`name`, regex `pattern`, optional `assessment`).
+
+Matched snippets respect `[output.truncation]` so previews stay consistent with the rest of Schemathesis output.
+
+Disable entirely via `--exclude-checks sensitive_data_leak` or `[checks.sensitive_data_leak].enabled = false`.

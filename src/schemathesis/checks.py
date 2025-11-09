@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
-from schemathesis.config import ChecksConfig
+from schemathesis.config import ChecksConfig, OutputConfig, SensitiveDataLeakConfig
 from schemathesis.core.failures import (
     CustomFailure,
     Failure,
     FailureGroup,
     MalformedJson,
     ResponseTimeExceeded,
+    SensitiveDataLeakFailure,
     ServerError,
 )
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
 from schemathesis.generation.overrides import Override
@@ -23,6 +26,43 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
+
+_SENSITIVE_DATA_SNIPPET_LIMIT = 180
+
+
+class BuiltinMarker:
+    __slots__ = ("pattern", "assessment")
+
+    def __init__(self, pattern: re.Pattern[str], assessment: str | None = None) -> None:
+        self.pattern = pattern
+        self.assessment = assessment
+
+
+class ResolvedMarker:
+    __slots__ = ("marker_id", "pattern", "assessment")
+
+    def __init__(
+        self,
+        *,
+        marker_id: str,
+        pattern: re.Pattern[str],
+        assessment: str | None,
+    ) -> None:
+        self.marker_id = marker_id
+        self.pattern = pattern
+        self.assessment = assessment
+
+
+_SENSITIVE_DATA_BUILTIN_MARKERS: dict[str, BuiltinMarker] = {
+    "sql_statement": BuiltinMarker(
+        re.compile(
+            r"(?i)(?:SQL:\s+)?"
+            r"(?:SELECT|INSERT|UPDATE|DELETE|UPSERT|MERGE|CREATE|DROP|ALTER)\b"
+            r"(?:\s+INTO|\s+FROM|\s+TABLE|\s+DATABASE|\s+VIEW)?[^\r\n]*"
+        ),
+        assessment="Raw SQL was sent to the client; turn off SQL debug logging and scrub DB statements from responses.",
+    ),
+}
 
 
 class CheckContext:
@@ -136,6 +176,106 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
         except json.JSONDecodeError as exc:
             raise MalformedJson.from_exception(operation=case.operation.label, exc=exc) from None
     return None
+
+
+@check
+def sensitive_data_leak(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    """Detect secrets or debug artefacts in responses."""
+    config = ctx.config.sensitive_data_leak
+    if not config.enabled:
+        return None
+
+    markers = _resolve_sensitive_markers(config)
+    if not markers:
+        return None
+
+    output_config = case.operation.schema.config.output
+    failures: list[Failure] = []
+    try:
+        body_text = response.text
+    except UnicodeDecodeError:
+        body_text = None
+    if body_text:
+        matches = _collect_marker_matches(markers, body_text, output_config)
+        for marker, snippet in matches:
+            failures.append(
+                SensitiveDataLeakFailure(
+                    operation=case.operation.label,
+                    marker=marker.marker_id,
+                    matched=snippet,
+                    location="body",
+                    assessment=marker.assessment,
+                )
+            )
+
+    for header_name, values in response.headers.items():
+        name_matches = _collect_marker_matches(markers, header_name, output_config)
+        for marker, snippet in name_matches:
+            failures.append(
+                SensitiveDataLeakFailure(
+                    operation=case.operation.label,
+                    marker=marker.marker_id,
+                    matched=snippet,
+                    location=f"header name `{header_name}`",
+                    assessment=marker.assessment,
+                )
+            )
+
+        for value in values:
+            matches = _collect_marker_matches(markers, value, output_config)
+            for marker, snippet in matches:
+                failures.append(
+                    SensitiveDataLeakFailure(
+                        operation=case.operation.label,
+                        marker=marker.marker_id,
+                        matched=snippet,
+                        location=f"header `{header_name}`",
+                        assessment=marker.assessment,
+                    )
+                )
+
+    if not failures:
+        return None
+    if len(failures) == 1:
+        raise failures[0]
+    raise FailureGroup(failures)
+
+
+def _resolve_sensitive_markers(config: SensitiveDataLeakConfig) -> list[ResolvedMarker]:
+    resolved: list[ResolvedMarker] = []
+    for marker_id in config.builtins:
+        builtin = _SENSITIVE_DATA_BUILTIN_MARKERS.get(marker_id)
+        if builtin is not None:
+            resolved.append(ResolvedMarker(marker_id=marker_id, pattern=builtin.pattern, assessment=builtin.assessment))
+
+    for marker in config.markers:
+        resolved.append(ResolvedMarker(marker_id=marker.name, pattern=marker.compile(), assessment=marker.assessment))
+    return resolved
+
+
+def _collect_marker_matches(
+    markers: list[ResolvedMarker],
+    text: str,
+    output_config: OutputConfig | None,
+) -> list[tuple[ResolvedMarker, str]]:
+    matches: list[tuple[ResolvedMarker, str]] = []
+    for marker in markers:
+        for match in marker.pattern.finditer(text):
+            snippet = _clip_snippet(match.group(0), output_config=output_config)
+            if snippet:
+                matches.append((marker, snippet))
+    return matches
+
+
+def _clip_snippet(snippet: str, *, output_config: OutputConfig | None) -> str:
+    snippet = snippet.strip()
+    if not snippet:
+        return snippet
+    if output_config is not None:
+        return prepare_response_payload(snippet, config=output_config)
+    if len(snippet) <= _SENSITIVE_DATA_SNIPPET_LIMIT:
+        return snippet
+    return snippet[: _SENSITIVE_DATA_SNIPPET_LIMIT - 3] + "..."
 
 
 DEFAULT_MAX_RESPONSE_TIME = 10.0
