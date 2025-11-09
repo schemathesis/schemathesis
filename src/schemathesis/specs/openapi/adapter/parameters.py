@@ -149,6 +149,12 @@ class OpenApiComponent(ABC):
 class OpenApiParameter(OpenApiComponent):
     """OpenAPI operation parameter."""
 
+    __slots__ = ("_location",)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self._location: ParameterLocation | NotSet = NOT_SET
+
     @classmethod
     def from_definition(
         cls, *, definition: Mapping[str, Any], name_to_uri: dict[str, str], adapter: SpecificationAdapter
@@ -164,10 +170,13 @@ class OpenApiParameter(OpenApiComponent):
     @property
     def location(self) -> ParameterLocation:
         """Where this parameter is located."""
-        try:
-            return ParameterLocation(self.definition["in"])
-        except ValueError:
-            return ParameterLocation.UNKNOWN
+        if self._location is NOT_SET:
+            try:
+                self._location = ParameterLocation(self.definition["in"])
+            except ValueError:
+                self._location = ParameterLocation.UNKNOWN
+        assert not isinstance(self._location, NotSet)
+        return self._location
 
     def _get_raw_schema(self) -> JsonSchema:
         """Get raw parameter schema."""

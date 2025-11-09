@@ -606,6 +606,15 @@ class APIOperation(Generic[P, R, S]):
     query: ParameterSet[P] = field(default_factory=ParameterSet)
     body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
 
+    # Class-level mapping for parameter container lookup
+    _LOCATION_TO_CONTAINER_ATTR = {
+        "path": "path_parameters",
+        "header": "headers",
+        "cookie": "cookies",
+        "query": "query",
+        "body": "body",
+    }
+
     def __post_init__(self) -> None:
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore[unreachable]
@@ -633,13 +642,10 @@ class APIOperation(Generic[P, R, S]):
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 
     def _lookup_container(self, location: str) -> ParameterSet[P] | PayloadAlternatives[P] | None:
-        return {
-            "path": self.path_parameters,
-            "header": self.headers,
-            "cookie": self.cookies,
-            "query": self.query,
-            "body": self.body,
-        }.get(location)
+        attr_name = self._LOCATION_TO_CONTAINER_ATTR.get(location)
+        if attr_name is not None:
+            return getattr(self, attr_name)
+        return None
 
     def add_parameter(self, parameter: P) -> None:
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
