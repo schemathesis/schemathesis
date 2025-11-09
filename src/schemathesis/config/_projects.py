@@ -331,12 +331,11 @@ class ProjectConfig(DiffBase):
                 return config.warnings
         return self.warnings
 
-    def phases_for(self, *, operation: APIOperation | None) -> PhasesConfig:
+    def phases_for(self, *, operation: APIOperation | None = None) -> PhasesConfig:
         configs = []
         if operation is not None:
-            for op in self.operations.operations:
-                if op._filter_set.applies_to(operation=operation):
-                    configs.append(op.phases)
+            for op in self.operations._get_matching_configs(operation):
+                configs.append(op.phases)
         if not configs:
             return self.phases
         configs.append(self.phases)
@@ -350,12 +349,11 @@ class ProjectConfig(DiffBase):
     ) -> GenerationConfig:
         configs = []
         if operation is not None:
-            for op in self.operations.operations:
-                if op._filter_set.applies_to(operation=operation):
-                    if phase is not None:
-                        phase_config = op.phases.get_by_name(name=phase)
-                        configs.append(phase_config.generation)
-                    configs.append(op.generation)
+            for op in self.operations._get_matching_configs(operation):
+                if phase is not None:
+                    phase_config = op.phases.get_by_name(name=phase)
+                    configs.append(phase_config.generation)
+                configs.append(op.generation)
         if phase is not None:
             phases = self.phases_for(operation=operation)
             phase_config = phases.get_by_name(name=phase)
@@ -374,12 +372,11 @@ class ProjectConfig(DiffBase):
     ) -> ChecksConfig:
         configs = []
         if operation is not None:
-            for op in self.operations.operations:
-                if op._filter_set.applies_to(operation=operation):
-                    if phase is not None:
-                        phase_config = op.phases.get_by_name(name=phase)
-                        configs.append(phase_config.checks)
-                    configs.append(op.checks)
+            for op in self.operations._get_matching_configs(operation):
+                if phase is not None:
+                    phase_config = op.phases.get_by_name(name=phase)
+                    configs.append(phase_config.checks)
+                configs.append(op.checks)
         if phase is not None:
             phases = self.phases_for(operation=operation)
             phase_config = phases.get_by_name(name=phase)

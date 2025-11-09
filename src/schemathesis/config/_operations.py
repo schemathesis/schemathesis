@@ -52,11 +52,12 @@ def reraise_filter_error(attr: str) -> Generator:
 class OperationsConfig(DiffBase):
     operations: list[OperationConfig]
 
-    __slots__ = ("operations", "_cache")
+    __slots__ = ("operations", "_cache", "_matching_cache")
 
     def __init__(self, *, operations: list[OperationConfig] | None = None):
         self.operations = operations or []
         self._cache: dict[APIOperation, OperationConfig] = {}
+        self._matching_cache: dict[APIOperation, list[OperationConfig]] = {}
 
     def __repr__(self) -> str:
         if self.operations:
@@ -67,9 +68,17 @@ class OperationsConfig(DiffBase):
     def from_hierarchy(cls, configs: list[OperationsConfig]) -> OperationsConfig:  # type: ignore[override]
         return cls(operations=sum([config.operations for config in reversed(configs)], []))
 
+    def _get_matching_configs(self, operation: APIOperation) -> list[OperationConfig]:
+        """Get list of operation configs that match the given operation."""
+        if operation not in self._matching_cache:
+            self._matching_cache[operation] = [
+                config for config in self.operations if config._filter_set.applies_to(operation)
+            ]
+        return self._matching_cache[operation]
+
     def get_for_operation(self, operation: APIOperation) -> OperationConfig:
         if operation not in self._cache:
-            configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
+            configs = self._get_matching_configs(operation)
             if not configs:
                 self._cache[operation] = OperationConfig()
             else:
