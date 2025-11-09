@@ -52,10 +52,11 @@ def reraise_filter_error(attr: str) -> Generator:
 class OperationsConfig(DiffBase):
     operations: list[OperationConfig]
 
-    __slots__ = ("operations",)
+    __slots__ = ("operations", "_cache")
 
     def __init__(self, *, operations: list[OperationConfig] | None = None):
         self.operations = operations or []
+        self._cache: dict[APIOperation, OperationConfig] = {}
 
     def __repr__(self) -> str:
         if self.operations:
@@ -67,10 +68,13 @@ class OperationsConfig(DiffBase):
         return cls(operations=sum([config.operations for config in reversed(configs)], []))
 
     def get_for_operation(self, operation: APIOperation) -> OperationConfig:
-        configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
-        if not configs:
-            return OperationConfig()
-        return OperationConfig.from_hierarchy(configs)
+        if operation not in self._cache:
+            configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
+            if not configs:
+                self._cache[operation] = OperationConfig()
+            else:
+                self._cache[operation] = OperationConfig.from_hierarchy(configs)
+        return self._cache[operation]
 
     def create_filter_set(
         self,
