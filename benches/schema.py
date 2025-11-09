@@ -9,7 +9,7 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.cli.commands.run.handlers.cassettes import Finalize, Initialize, Process, vcr_writer
+from schemathesis.cli.commands.run.handlers.cassettes import Finalize, Initialize, Process, har_writer, vcr_writer
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -217,16 +217,36 @@ def _write_vcr(entries, config):
     vcr_writer(StringIO(), config, queue)
 
 
+def _write_har(entries, config):
+    queue = Queue()
+    for entry in entries:
+        queue.put(entry)
+
+    har_writer(StringIO(), config, queue)
+
+
+def _collect_cassette_entries(schema):
+    engine = from_schema(schema)
+    entries = [Initialize(seed=schema.config.seed)]
+    entries.extend(
+        Process(recorder=event.recorder) for event in engine.execute() if isinstance(event, events.ScenarioFinished)
+    )
+    entries.append(Finalize())
+    return entries
+
+
 @pytest.mark.parametrize("schema", [BBCI_SCHEMA, VMWARE_SCHEMA], ids=("bbci", "vmware"))
 @pytest.mark.benchmark
 def test_vcr(benchmark, schema):
-    engine = from_schema(schema)
-    entries = (
-        [Initialize(seed=42)]
-        + [Process(recorder=ev.recorder) for ev in engine.execute() if isinstance(ev, events.ScenarioFinished)]
-        + [Finalize()]
-    )
+    entries = _collect_cassette_entries(schema)
     benchmark(_write_vcr, entries, schema.config)
+
+
+@pytest.mark.parametrize("schema", [BBCI_SCHEMA, VMWARE_SCHEMA], ids=("bbci", "vmware"))
+@pytest.mark.benchmark
+def test_har(benchmark, schema):
+    entries = _collect_cassette_entries(schema)
+    benchmark(_write_har, entries, schema.config)
 
 
 @pytest.mark.benchmark
@@ -301,3 +321,21 @@ def _load_from_file(loader, json_string):
 def test_load_from_file(benchmark, raw_schema, loader):
     serialized = json.dumps(raw_schema)
     benchmark(_load_from_file, loader, serialized)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "raw_schema",
+    [
+        BBCI,
+        VMWARE,
+        STRIPE,
+    ],
+    ids=("bbci", "vmware", "stripe"),
+)
+def test_as_state_machine(benchmark, raw_schema):
+    def _build():
+        schema = schemathesis.openapi.from_dict(deepclone(raw_schema))
+        schema.as_state_machine()
+
+    benchmark(_build)
