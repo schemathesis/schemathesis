@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Web Fuzzing Commons authentication via `[auth.wfc]`.
 - Automatic `429` retries honoring the `Retry-After` header with `--rate-limit=auto`. [#1722](https://github.com/schemathesis/schemathesis/issues/1722)
 
 ## [4.22.4](https://github.com/schemathesis/schemathesis/compare/v4.22.3...v4.22.4) - 2026-07-08

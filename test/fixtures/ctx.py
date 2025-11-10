@@ -32,6 +32,7 @@ from test.apps.catalog.openapi import swagger_v2 as openapi_swagger_v2
 from test.apps.catalog.openapi import symfony as openapi_symfony
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.catalog.openapi import users as openapi_users
+from test.apps.catalog.openapi import wfc as openapi_wfc
 from test.apps.catalog.openapi import zod as openapi_zod
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
 
@@ -246,6 +247,15 @@ class OpenAPIApps:
 
     def linked_with_unimplemented_method(self) -> OpenAPIServer:
         return _start(self.parent, openapi_supervisor.linked_with_unimplemented_method())
+
+    def wfc_login(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_login())
+
+    def wfc_login_failing(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_login_failing())
+
+    def wfc_login_plain(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_wfc.wfc_login_plain())
 
     def planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.planted_bug())
