@@ -137,6 +137,64 @@ Works the same way for `apiKey` schemes — Schemathesis reads the parameter nam
 
 For token refresh or scope-based caching, use a [Python auth class](#dynamic-token-authentication) instead.
 
+## Web Fuzzing Commons
+
+Point Schemathesis at a [Web Fuzzing Commons](https://github.com/WebFuzzing/Commons) auth document to authenticate from it:
+
+```toml
+# schemathesis.toml
+[auth.wfc]
+path = "auth.json"
+```
+
+The document lists one or more users. Static credentials use `fixedHeaders`:
+
+```json
+{
+  "auth": [
+    {"name": "admin", "fixedHeaders": [{"name": "X-Api-Key", "value": "${API_KEY}"}]}
+  ]
+}
+```
+
+A login flow uses `loginEndpointAuth` — Schemathesis calls the endpoint, extracts the token with a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901), and applies it to every request:
+
+```json
+{
+  "auth": [
+    {
+      "name": "user",
+      "loginEndpointAuth": {
+        "verb": "POST",
+        "endpoint": "/auth/login",
+        "contentType": "application/json",
+        "payloadUserPwd": {
+          "username": "${USERNAME}",
+          "password": "${PASSWORD}",
+          "usernameField": "username",
+          "passwordField": "password"
+        },
+        "token": {
+          "extractFrom": "body",
+          "extractSelector": "/access_token",
+          "sendIn": "header",
+          "sendName": "Authorization",
+          "sendTemplate": "Bearer {token}"
+        }
+      }
+    }
+  ]
+}
+```
+
+Set `"expectCookies": true` instead of `token` when the endpoint returns a session cookie. The login result is cached for the test run.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | required | Path to the WFC auth document (JSON or YAML) |
+| `user` | first entry | `name` of the auth entry to use |
+| `refresh_interval` | `300` | Seconds before re-running the login flow |
+
 ## Dynamic Token Authentication
 
 Static options can't handle tokens that expire, so create a custom authentication class:

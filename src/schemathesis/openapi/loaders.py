@@ -237,6 +237,17 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
 
     instance = OpenApiSchema(raw_schema=schema, config=project_config)
     instance.filter_set = project_config.operations.filter_set_with(include=instance.filter_set)
+    if project_config.auth.wfc is not None:
+        from schemathesis.wfc.errors import WFCError
+        from schemathesis.wfc.integration import register_wfc_auth
+
+        try:
+            register_wfc_auth(instance, project_config.auth.wfc)
+        except WFCError as exc:
+            raise LoaderError(
+                LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
+                f"Failed to load Web Fuzzing Commons authentication: {exc}",
+            ) from exc
     dispatch_after_load_schema(GLOBAL_HOOK_DISPATCHER, context=hook_context, schema=instance)
     return instance
 

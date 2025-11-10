@@ -271,6 +271,32 @@
               "minProperties": 1
             }
           }
+        },
+        "wfc": {
+          "$ref": "#/$defs/WFCAuthConfig"
+        }
+      }
+    },
+    "WFCAuthConfig": {
+      "type": "object",
+      "description": "Web Fuzzing Commons authentication configuration.",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to a WFC authentication file (.json, .yaml, or .yml)."
+        },
+        "user": {
+          "type": "string",
+          "description": "Name of the auth entry to use when the file defines multiple users."
+        },
+        "refresh_interval": {
+          "type": "integer",
+          "description": "Seconds to cache login credentials before re-authenticating.",
+          "minimum": 0
         }
       }
     },

@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/auth.yaml",
+  "$comment": "Curated subset of the Web Fuzzing Commons auth schema. Black-box-relevant fields only; authTemplate, createUsers, and requireMockHandling are tolerated but ignored. Unknown fields are allowed.",
+  "title": "Web Fuzzing Commons Authentication",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string"
+    },
+    "auth": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AuthenticationInfo"
+      },
+      "minItems": 1
+    },
+    "configs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["auth"],
+  "$defs": {
+    "HttpVerb": {
+      "type": "string",
+      "enum": ["POST", "GET", "PATCH", "DELETE", "PUT"]
+    },
+    "Header": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": ["name", "value"]
+    },
+    "AuthenticationInfo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "fixedHeaders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Header"
+          }
+        },
+        "loginEndpointAuth": {
+          "$ref": "#/$defs/LoginEndpoint"
+        }
+      },
+      "required": ["name"]
+    },
+    "LoginEndpoint": {
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "externalEndpointURL": {
+          "type": "string"
+        },
+        "payloadRaw": {
+          "type": "string"
+        },
+        "payloadUserPwd": {
+          "$ref": "#/$defs/PayloadUsernamePassword"
+        },
+        "headers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Header"
+          }
+        },
+        "verb": {
+          "$ref": "#/$defs/HttpVerb"
+        },
+        "contentType": {
+          "type": "string"
+        },
+        "token": {
+          "$ref": "#/$defs/TokenHandling"
+        },
+        "expectCookies": {
+          "type": "boolean"
+        }
+      },
+      "required": ["verb"]
+    },
+    "TokenHandling": {
+      "type": "object",
+      "properties": {
+        "extractFrom": {
+          "type": "string",
+          "enum": ["body", "header"]
+        },
+        "extractSelector": {
+          "type": "string"
+        },
+        "sendIn": {
+          "type": "string",
+          "enum": ["header", "query"]
+        },
+        "sendName": {
+          "type": "string"
+        },
+        "sendTemplate": {
+          "type": "string",
+          "default": "{token}"
+        }
+      },
+      "required": ["extractFrom", "extractSelector", "sendIn", "sendName"]
+    },
+    "PayloadUsernamePassword": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        },
+        "usernameField": {
+          "type": "string"
+        },
+        "passwordField": {
+          "type": "string"
+        }
+      },
+      "required": ["username", "usernameField", "password", "passwordField"]
+    }
+  }
+}
