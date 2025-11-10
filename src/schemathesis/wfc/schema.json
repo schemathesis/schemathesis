@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/WebFuzzing/Commons/blob/master/src/main/resources/wfc/schemas/auth.yaml",
+  "title": "Web Fuzzing Commons Authentication",
+  "description": "Schema Definition for Web Fuzzing Commons Authentication",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "The schema version of WFC needed to use to validate and process this document."
+    },
+    "auth": {
+      "description": "List of authentication information for different users.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/AuthenticationInfo"
+      },
+      "minItems": 1
+    },
+    "authTemplate": {
+      "description": "Optional authentication information template. This is used to avoid duplication in the auth list. Entries defined in the template will be applied to all elements in the auth list that do not specify them.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/AuthenticationInfo"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "configs": {
+      "description": "Optional map of configuration parameters, in the form key:value strings. This can be useful to provide extra custom information in the same configuration file, independently of the defined authentication information.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["auth"],
+  "$defs": {
+    "HttpVerb": {
+      "type": "string",
+      "enum": ["POST", "GET", "PATCH", "DELETE", "PUT"]
+    },
+    "Header": {
+      "description": "HTTP header information",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The header name, e.g., 'Authorization'.",
+          "type": "string"
+        },
+        "value": {
+          "description": "The value of the header",
+          "type": "string"
+        }
+      },
+      "required": ["name", "value"],
+      "additionalProperties": false
+    },
+    "AuthenticationInfo": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "The name given to this authentication info. This works as a unique id for this authentication configuration.",
+          "type": "string"
+        },
+        "requireMockHandling": {
+          "description": "Specify that the authentication for this user requires setting up mock responses from an external service. This will be done as part of the fuzzing, although only possible for white-box testing.",
+          "type": "boolean"
+        },
+        "fixedHeaders": {
+          "description": "The headers needed for authentication. This is used to represent cases in which auth info is static/fixed, e.g., when passing an id or username/password through a HTTP header.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Header"
+          }
+        },
+        "loginEndpointAuth": {
+          "$ref": "#/$defs/LoginEndpoint"
+        }
+      },
+      "required": ["name"]
+    },
+    "LoginEndpoint": {
+      "description": "Used to represent the case in which a login endpoint is used to obtain the authentication credentials. These can be cookies, or a token extracted from the login endpoint's response.",
+      "type": "object",
+      "properties": {
+        "endpoint": {
+          "description": "The endpoint path (eg '/login') where to execute the login. It assumes it is on same server of API. If not, rather use 'externalEndpointURL'.",
+          "type": "string"
+        },
+        "externalEndpointURL": {
+          "description": "If the login endpoint is on a different server, here can rather specify the full URL for it.",
+          "type": "string"
+        },
+        "payloadRaw": {
+          "description": "The raw payload to send, as a string.",
+          "type": "string"
+        },
+        "payloadUserPwd": {
+          "$ref": "#/$defs/PayloadUsernamePassword"
+        },
+        "headers": {
+          "description": "HTTP headers needed when calling the login endpoint. Username/password could be passed by headers instead of by the body payload.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Header"
+          }
+        },
+        "verb": {
+          "$ref": "#/$defs/HttpVerb"
+        },
+        "contentType": {
+          "description": "Specify the format in which the payload is sent to the login endpoint. A common example is 'application/json'.",
+          "type": "string"
+        },
+        "token": {
+          "$ref": "#/$defs/TokenHandling"
+        },
+        "expectCookies": {
+          "description": "Specify if we are expecting to get cookies from the login endpoint. If so, a fuzzer can use those as auth info in following requests.",
+          "type": "boolean"
+        }
+      },
+      "required": ["verb"]
+    },
+    "TokenHandling": {
+      "description": "Specify how to extract the token from the HTTP response, and how to use it for auth in following requests. Not needed if rather expect to get back a cookie.",
+      "type": "object",
+      "properties": {
+        "extractFrom": {
+          "description": "Specify from where the token should be extracted in the HTTP response.",
+          "type": "string",
+          "enum": ["body", "header"]
+        },
+        "extractSelector": {
+          "description": "How to extract the token from the HTTP response. For a 'body' location, the selector is a JSON Pointer (RFC 6901). For a 'header' location, this is the name of the HTTP header.",
+          "type": "string"
+        },
+        "sendIn": {
+          "description": "Where the obtained auth token should be sent in following requests (e.g., header or query parameter).",
+          "type": "string",
+          "enum": ["header", "query"]
+        },
+        "sendName": {
+          "description": "Header or query name where the token should be put in the authenticated requests. Typically, for a header, this would be 'Authorization'.",
+          "type": "string",
+          "examples": ["Authorization"]
+        },
+        "sendFormat": {
+          "description": "Template with {token} placeholder. The placeholder will be interpolated with the actual token value. For example, 'Bearer {token}' or 'JWT {token}'.",
+          "type": "string",
+          "default": "{token}",
+          "examples": ["Bearer {token}", "JWT {token}"]
+        }
+      },
+      "required": ["extractFrom", "extractSelector", "sendIn", "sendName"]
+    },
+    "PayloadUsernamePassword": {
+      "description": "Payload with username and password information. It will be automatically formatted in a proper payload based on content type.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "description": "The id of the user.",
+          "type": "string"
+        },
+        "password": {
+          "description": "The password of the user, in plain-text. This must NOT be hashed.",
+          "type": "string"
+        },
+        "usernameField": {
+          "description": "The name of the field in the body payload containing the username.",
+          "type": "string"
+        },
+        "passwordField": {
+          "description": "The name of the field in the body payload containing the password",
+          "type": "string"
+        }
+      },
+      "required": ["username", "usernameField", "password", "passwordField"],
+      "additionalProperties": false
+    }
+  }
+}

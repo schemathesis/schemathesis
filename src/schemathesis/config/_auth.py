@@ -79,17 +79,44 @@ class OpenAPIAuthConfig(DiffBase):
 
 
 @dataclass(repr=False)
+class WFCAuthConfig(DiffBase):
+    """Web Fuzzing Commons authentication configuration."""
+
+    file: str
+    user: str | None
+    refresh_interval: int
+    base_url: str | None
+
+    __slots__ = ("file", "user", "refresh_interval", "base_url")
+
+    def __init__(
+        self,
+        *,
+        file: str,
+        user: str | None = None,
+        refresh_interval: int = 300,
+        base_url: str | None = None,
+    ) -> None:
+        self.file = resolve(file)
+        self.user = resolve(user) if user is not None else None
+        self.refresh_interval = refresh_interval
+        self.base_url = resolve(base_url) if base_url is not None else None
+
+
+@dataclass(repr=False)
 class AuthConfig(DiffBase):
     basic: tuple[str, str] | None
     openapi: OpenAPIAuthConfig
+    wfc: WFCAuthConfig | None
 
-    __slots__ = ("basic", "openapi")
+    __slots__ = ("basic", "openapi", "wfc")
 
     def __init__(
         self,
         *,
         basic: dict[str, str] | None = None,
         openapi: dict[str, dict[str, Any]] | None = None,
+        wfc: dict[str, Any] | None = None,
     ) -> None:
         if basic is not None:
             assert "username" in basic
@@ -103,16 +130,32 @@ class AuthConfig(DiffBase):
 
         self.openapi = OpenAPIAuthConfig(schemes=openapi)
 
+        if wfc is not None:
+            self.wfc = WFCAuthConfig(**wfc)
+        else:
+            self.wfc = None
+
         # Validate mutual exclusivity
-        if self.basic is not None and self.openapi.is_defined:
+        auth_methods = sum(
+            [
+                self.basic is not None,
+                self.openapi.is_defined,
+                self.wfc is not None,
+            ]
+        )
+        if auth_methods > 1:
+            methods = []
+            if self.basic is not None:
+                methods.append("[auth.basic] (generic basic authentication)")
+            if self.openapi.is_defined:
+                methods.append("[auth.openapi.*] (OpenAPI-aware authentication)")
+            if self.wfc is not None:
+                methods.append("[auth.wfc] (Web Fuzzing Commons authentication)")
+
             raise ConfigError(
-                "Cannot use both generic basic authentication and OpenAPI-aware authentication.\n\n"
-                "You have configured:\n"
-                "  - [auth.basic] (generic basic authentication)\n"
-                "  - [auth.openapi.*] (OpenAPI-aware authentication)\n\n"
-                "Please choose one authentication method:\n"
-                "  - Use [auth.basic] for simple basic auth on all operations\n"
-                "  - Use [auth.openapi.*] for OpenAPI security scheme-aware authentication"
+                "Cannot use multiple authentication methods simultaneously.\n\n"
+                "You have configured:\n" + "\n".join(f"  - {m}" for m in methods) + "\n\n"
+                "Please choose one authentication method."
             )
 
     def update(self, *, basic: tuple[str, str] | None = None) -> None:
@@ -127,11 +170,11 @@ class AuthConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AuthConfig:
-        return cls(basic=data.get("basic"), openapi=data.get("openapi"))
+        return cls(basic=data.get("basic"), openapi=data.get("openapi"), wfc=data.get("wfc"))
 
     @property
     def is_defined(self) -> bool:
-        return self.basic is not None or self.openapi.is_defined
+        return self.basic is not None or self.openapi.is_defined or self.wfc is not None
 
 
 def _validate_basic(username: str, password: str) -> None:
