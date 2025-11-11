@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import enum
 import re
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 from schemathesis import errors
 from schemathesis.core.errors import (

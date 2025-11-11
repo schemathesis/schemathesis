@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import textwrap
 import time
+from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass, field
 from itertools import groupby
 from json.decoder import JSONDecodeError
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
+from typing import TYPE_CHECKING, Any
 
 import click
 

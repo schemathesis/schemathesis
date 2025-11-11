@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import lru_cache, partial
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generator, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response

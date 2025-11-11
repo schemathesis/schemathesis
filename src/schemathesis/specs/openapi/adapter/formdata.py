@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.specs.openapi.adapter.parameters import COMBINED_FORM_DATA_MARKER
@@ -10,13 +10,13 @@ if TYPE_CHECKING:
 
 
 def prepare_multipart_v2(
-    operation: APIOperation, form_data: Dict[str, Any]
-) -> Tuple[Optional[List[Tuple[str, Any]]], Optional[Dict[str, Any]]]:
-    files: List[Tuple[str, Any]] = []
-    data: Dict[str, Any] = {}
+    operation: APIOperation, form_data: dict[str, Any]
+) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
+    files: list[tuple[str, Any]] = []
+    data: dict[str, Any] = {}
     is_multipart = "multipart/form-data" in operation.schema.get_request_payload_content_types(operation)
 
-    known_fields: Dict[str, Dict[str, Any]] = {}
+    known_fields: dict[str, dict[str, Any]] = {}
     for parameter in operation.body:
         if COMBINED_FORM_DATA_MARKER in parameter.definition:
             known_fields.update(parameter.definition["schema"].get("properties", {}))
@@ -41,10 +41,10 @@ def prepare_multipart_v2(
 
 
 def prepare_multipart_v3(
-    operation: APIOperation, form_data: Dict[str, Any]
-) -> Tuple[Optional[List[Tuple[str, Any]]], Optional[Dict[str, Any]]]:
-    files: List[Tuple[str, Any]] = []
-    schema: Dict[str, Any] = {}
+    operation: APIOperation, form_data: dict[str, Any]
+) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
+    files: list[tuple[str, Any]] = []
+    schema: dict[str, Any] = {}
     for body in operation.body:
         main, sub = media_types.parse(body.media_type)
         if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NotSet
 from schemathesis.core.rate_limit import ratelimit

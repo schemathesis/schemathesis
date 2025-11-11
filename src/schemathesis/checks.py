@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
+from collections.abc import Callable, Iterable, Iterator
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import (
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
 
-CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
+CheckFunction = Callable[["CheckContext", "Response", "Case"], bool | None]
 
 
 class CheckContext:

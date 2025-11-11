@@ -36,7 +36,7 @@ class DiffBase:
         if isinstance(value, list) and isinstance(default, list):
             if len(value) != len(default):
                 return True
-            return any(self._has_diff(v, d) for v, d in zip(value, default))
+            return any(self._has_diff(v, d) for v, d in zip(value, default, strict=False))
         if isinstance(value, dict) and isinstance(default, dict):
             if set(value.keys()) != set(default.keys()):
                 return True
@@ -50,7 +50,7 @@ class DiffBase:
         if isinstance(value, list) and isinstance(default, list):
             diff_items = []
             # Compare items pairwise.
-            for v, d in zip(value, default):
+            for v, d in zip(value, default, strict=False):
                 if self._has_diff(v, d):
                     diff_items.append(self._diff_repr(v, d))
             # Include any extra items in value.

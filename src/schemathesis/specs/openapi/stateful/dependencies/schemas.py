@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Mapping
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, bundle

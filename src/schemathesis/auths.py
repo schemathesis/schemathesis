@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     Protocol,
     TypeVar,
-    Union,
     overload,
     runtime_checkable,
 )
@@ -64,7 +63,7 @@ class AuthContext:
     __slots__ = ("operation", "app")
 
 
-CacheKeyFunction = Callable[["Case", "AuthContext"], Union[str, int]]
+CacheKeyFunction = Callable[["Case", "AuthContext"], str | int]
 
 
 @runtime_checkable

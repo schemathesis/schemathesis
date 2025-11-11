@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import base64
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Iterator, cast
+from typing import TYPE_CHECKING, cast
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response

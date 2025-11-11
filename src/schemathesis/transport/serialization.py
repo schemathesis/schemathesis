@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from io import StringIO
-from typing import TYPE_CHECKING, Any, Dict, List, Union
+from typing import TYPE_CHECKING, Any
 from unicodedata import normalize
 
 from schemathesis.core.errors import UnboundPrefix
@@ -74,8 +74,8 @@ def serialize_yaml(value: Any) -> dict[str, Any]:
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
-Primitive = Union[str, int, float, bool, None]
-JSON = Union[Primitive, List, Dict[str, Any]]
+Primitive = str | int | float | bool | None
+JSON = Primitive | list | dict[str, Any]
 DEFAULT_TAG_NAME = "data"
 NAMESPACE_URL = "http://example.com/schema"
 

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Iterable, Iterator, Mapping, Sequence, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet

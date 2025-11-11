@@ -3,9 +3,10 @@ from __future__ import annotations
 import enum
 import json
 import re
+from collections.abc import Mapping
 from os import PathLike
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Mapping
+from typing import IO, TYPE_CHECKING, Any
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core import media_types

@@ -54,7 +54,7 @@ def setup() -> None:
             self.schema = schema
             self.encoded = hash(json.dumps(schema, sort_keys=True))
 
-        def __eq__(self, other: "CacheableSchema") -> bool:  # type: ignore[override]
+        def __eq__(self, other: CacheableSchema) -> bool:  # type: ignore[override]
             return self.encoded == other.encoded
 
         def __hash__(self) -> int:
@@ -63,7 +63,7 @@ def setup() -> None:
     SCHEMA_KEYS = frozenset(SCHEMA_KEYS)
     SCHEMA_OBJECT_KEYS = frozenset(SCHEMA_OBJECT_KEYS)
 
-    @lru_cache()
+    @lru_cache
     def get_resolver(cache_key: CacheableSchema) -> LocalResolver:
         """LRU resolver cache."""
         return LocalResolver.from_schema(cache_key.schema)

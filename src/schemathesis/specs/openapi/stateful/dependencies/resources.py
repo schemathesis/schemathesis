@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.bundler import BundleError

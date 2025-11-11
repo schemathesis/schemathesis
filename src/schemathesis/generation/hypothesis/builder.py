@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import inspect
 import warnings
+from collections.abc import Callable, Generator, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from functools import wraps
 from itertools import combinations
 from time import perf_counter
-from typing import Any, Callable, Generator, Mapping
+from typing import Any
 
 import hypothesis
 from hypothesis import Phase, Verbosity

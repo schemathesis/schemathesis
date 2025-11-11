@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import os
 import warnings
+from collections.abc import Callable
 from json import JSONDecodeError
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from schemathesis import graphql, openapi
 from schemathesis.config import ProjectConfig

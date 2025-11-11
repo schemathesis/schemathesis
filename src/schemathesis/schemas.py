@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache, partial
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Generator,
     Generic,
-    Iterator,
     NoReturn,
     TypeVar,
 )

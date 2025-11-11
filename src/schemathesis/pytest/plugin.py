@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from collections.abc import Callable, Generator
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from _pytest import nodes
@@ -239,7 +240,7 @@ class SchemathesisCase(PyCollector):
         if module is not None and hasattr(module, "pytest_generate_tests"):
             methods.append(module.pytest_generate_tests)
         if hasattr(cls, "pytest_generate_tests"):
-            cls = cast(Type, cls)
+            cls = cast(type, cls)
             methods.append(cls().pytest_generate_tests)
         self.ihook.pytest_generate_tests.call_extra(methods, {"metafunc": metafunc})
         return metafunc

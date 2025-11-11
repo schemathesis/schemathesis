@@ -12,6 +12,10 @@
 - ~20% faster VCR cassette recording through output sanitization caching.
 - ~10% faster CLI due to caching of config lookups.
 
+### :fire: Removed
+
+- Python 3.9 support.
+
 ## [4.4.4](https://github.com/schemathesis/schemathesis/compare/v4.4.3...v4.4.4) - 2025-11-08
 
 ### :racing_car: Performance

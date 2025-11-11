@@ -3,11 +3,11 @@ from __future__ import annotations
 import http.client
 import textwrap
 import traceback
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from json import JSONDecodeError
-from typing import Any, Callable
+from typing import Any
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.compat import BaseExceptionGroup

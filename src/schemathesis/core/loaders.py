@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import http.client
-from typing import TYPE_CHECKING, Any, Callable, NoReturn
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, get_request_error_extras, get_request_error_message
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
