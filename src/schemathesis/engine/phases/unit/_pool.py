@@ -7,22 +7,25 @@ from queue import Queue
 from types import TracebackType
 from typing import TYPE_CHECKING
 
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Result
 from schemathesis.engine.phases import PhaseName
+from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.phases.unit._layered_scheduler import LayeredScheduler
     from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 
-class TaskProducer:
-    """Produces test tasks for workers to execute."""
+class DefaultScheduler:
+    """Default scheduler that processes operations in schema iteration order."""
 
-    def __init__(self, ctx: EngineContext) -> None:
-        self.operations = ctx.schema.get_all_operations()
+    def __init__(self, operations: list[Result[APIOperation, InvalidSchema]]) -> None:
+        self.operations = iter(operations)
         self.lock = threading.Lock()
 
-    def next_operation(self) -> Result | None:
+    def next_operation(self) -> Result[APIOperation, InvalidSchema] | None:
         """Get next API operation in a thread-safe manner."""
         with self.lock:
             return next(self.operations, None)
@@ -34,7 +37,7 @@ class WorkerPool:
     def __init__(
         self,
         workers_num: int,
-        producer: TaskProducer,
+        scheduler: DefaultScheduler | LayeredScheduler,
         worker_factory: Callable,
         ctx: EngineContext,
         mode: HypothesisTestMode,
@@ -42,7 +45,7 @@ class WorkerPool:
         suite_id: uuid.UUID,
     ) -> None:
         self.workers_num = workers_num
-        self.producer = producer
+        self.scheduler = scheduler
         self.worker_factory = worker_factory
         self.ctx = ctx
         self.mode = mode
@@ -61,7 +64,7 @@ class WorkerPool:
                     "mode": self.mode,
                     "phase": self.phase,
                     "events_queue": self.events_queue,
-                    "producer": self.producer,
+                    "scheduler": self.scheduler,
                     "suite_id": self.suite_id,
                 },
                 name=f"schemathesis_unit_tests_{i}",

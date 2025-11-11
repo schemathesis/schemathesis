@@ -22,8 +22,10 @@ from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._output import OutputConfig, SanitizationConfig, TruncationConfig
 from schemathesis.config._phases import (
     CoveragePhaseConfig,
+    ExamplesPhaseConfig,
+    FuzzingPhaseConfig,
     InferenceAlgorithm,
-    PhaseConfig,
+    OperationOrdering,
     PhasesConfig,
     StatefulPhaseConfig,
 )
@@ -53,11 +55,13 @@ __all__ = [
     "NotAServerErrorConfig",
     "PositiveDataAcceptanceConfig",
     "SimpleCheckConfig",
-    "PhaseConfig",
     "PhasesConfig",
+    "FuzzingPhaseConfig",
     "CoveragePhaseConfig",
+    "ExamplesPhaseConfig",
     "StatefulPhaseConfig",
     "InferenceAlgorithm",
+    "OperationOrdering",
     "ProjectsConfig",
     "ProjectConfig",
     "get_workers_count",

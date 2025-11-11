@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.5.4...HEAD) - TBD
 
+### :rocket: Added
+
+- **CLI**: Dependency-based operation ordering in non-stateful tests.
+
 ## [4.5.4](https://github.com/schemathesis/schemathesis/compare/v4.5.3...v4.5.4) - 2025-11-18
 
 ### :bug: Fixed
@@ -34,7 +38,7 @@
 
 - Support for `pytest>=9.0`. [#3312](https://github.com/schemathesis/schemathesis/issues/3312) 
 - OpenAPI-aware authentication via `[auth.openapi.<scheme>]` config. Automatically aligns with schema security definitions and warns about unused/misnamed schemes. [#1710](https://github.com/schemathesis/schemathesis/issues/1710)
-- Display configuration file path in CLI output
+- Display configuration file path in CLI output.
 
 ### :racing_car: Performance
 

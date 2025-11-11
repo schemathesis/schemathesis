@@ -11,16 +11,19 @@ import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.config import CoveragePhaseConfig, ExamplesPhaseConfig, FuzzingPhaseConfig, OperationOrdering
 from schemathesis.core.errors import AuthenticationError, InvalidSchema
-from schemathesis.core.result import Ok
+from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
+from schemathesis.engine.phases.unit._layered_scheduler import LayeredScheduler
+from schemathesis.engine.phases.unit._ordering import compute_operation_layers
+from schemathesis.engine.phases.unit._pool import DefaultScheduler, WorkerPool
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-
-from ._pool import TaskProducer, WorkerPool
+from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -28,6 +31,53 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 WORKER_TIMEOUT = 0.1
+
+
+def _create_scheduler(engine: EngineContext, phase: Phase) -> DefaultScheduler | LayeredScheduler:
+    """Create the appropriate scheduler based on ordering configuration.
+
+    Args:
+        engine: Engine context
+        phase: Current phase
+
+    Returns:
+        Task scheduler (default or layered)
+
+    """
+    operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
+    # Check if this is an OpenAPI schema (ordering only works for OpenAPI)
+    if not isinstance(engine.schema, OpenApiSchema):
+        return DefaultScheduler(operations=operations)
+
+    # Get operation ordering config for this phase
+    phase_config = engine.config.phases.get_by_name(name=phase.name.name)
+    assert isinstance(phase_config, (FuzzingPhaseConfig, CoveragePhaseConfig, ExamplesPhaseConfig))
+    ordering = phase_config.operation_ordering
+
+    # If ordering is disabled, use regular scheduler with collected operations
+    if ordering == OperationOrdering.NONE:
+        return DefaultScheduler(operations=operations)
+
+    # Extract successful operations for layer computation and collect errors
+    successes: list[APIOperation] = []
+    errors: list[InvalidSchema] = []
+    for result in operations:
+        if isinstance(result, Ok):
+            successes.append(result.ok())
+        else:
+            errors.append(result.err())
+
+    if not successes:
+        return DefaultScheduler(operations=operations)
+
+    layers = compute_operation_layers(engine.schema, successes)
+
+    # If only one layer or no layers, no coordination needed - use default scheduler
+    if len(layers) <= 1:
+        return DefaultScheduler(operations=operations)
+
+    # Pass errors so they are reported after all successful operations are processed
+    return LayeredScheduler(layers, errors=errors)
 
 
 def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
@@ -42,7 +92,9 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         mode = HypothesisTestMode.COVERAGE
     else:
         mode = HypothesisTestMode.FUZZING
-    producer = TaskProducer(engine)
+
+    # Create scheduler based on ordering configuration
+    scheduler = _create_scheduler(engine, phase)
 
     suite_started = events.SuiteStarted(phase=phase.name)
 
@@ -54,7 +106,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     try:
         with WorkerPool(
             workers_num=engine.config.workers,
-            producer=producer,
+            scheduler=scheduler,
             worker_factory=worker_task,
             ctx=engine,
             mode=mode,
@@ -108,7 +160,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 def worker_task(
     *,
     events_queue: Queue,
-    producer: TaskProducer,
+    scheduler: DefaultScheduler | LayeredScheduler,
     ctx: EngineContext,
     mode: HypothesisTestMode,
     phase: PhaseName,
@@ -116,9 +168,8 @@ def worker_task(
 ) -> None:
     from hypothesis.errors import HypothesisWarning, InvalidArgument
 
+    from schemathesis.engine.phases.unit._executor import run_test, test_func
     from schemathesis.generation.hypothesis.builder import create_test
-
-    from ._executor import run_test, test_func
 
     def on_error(error: Exception, *, method: str | None = None, path: str | None = None) -> None:
         if method and path:
@@ -155,8 +206,9 @@ def worker_task(
     with ignore_hypothesis_output():
         try:
             while not ctx.has_to_stop:
-                result = producer.next_operation()
+                result = scheduler.next_operation()
                 if result is None:
+                    # All operations exhausted
                     break
 
                 if isinstance(result, Ok):
