@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -172,3 +173,64 @@ def test(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(skipped=1)
+
+
+@pytest.mark.openapi_version("3.0")
+def test_multipart_encoding_multiple_content_types(ctx):
+    PNG_DATA = b"\x89PNG\r\n\x1a\n" + b"\x00" * 10
+    JPEG_DATA = b"\xff\xd8\xff\xe0" + b"\x00" * 10
+    schemathesis.openapi.media_type("image/png", st.just(PNG_DATA))
+    schemathesis.openapi.media_type("image/jpeg", st.just(JPEG_DATA))
+
+    spec = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"image": {"type": "string", "format": "binary"}},
+                                    "required": ["image"],
+                                },
+                                "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(spec)
+    operation = schema["/upload"]["POST"]
+    strategy = operation.as_strategy()
+
+    content_types_seen = set()
+
+    @given(strategy)
+    def test(case):
+        if isinstance(case.body, dict):
+            files, _ = case.operation.prepare_multipart(case.body, case.multipart_content_types)
+
+            if files:
+                for file_tuple in files:
+                    name = file_tuple[0]
+                    if name == "image":
+                        if len(file_tuple) > 1 and isinstance(file_tuple[1], tuple):
+                            if len(file_tuple[1]) == 3:
+                                _, _, content_type = file_tuple[1]
+                                assert content_type in ["image/png", "image/jpeg"], (
+                                    f"Got invalid content type: {content_type} (should be 'image/png' or 'image/jpeg', "
+                                    f"not the literal 'image/png, image/jpeg')"
+                                )
+                                content_types_seen.add(content_type)
+
+    test()
+
+    assert len(content_types_seen) == 2, (
+        f"Expected both content types to be selected, but only saw: {content_types_seen}"
+    )

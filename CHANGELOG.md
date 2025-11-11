@@ -15,6 +15,7 @@
 
 ### :bug: Fixed
 
+- Comma-separated Content-Type strings used literally in multipart requests instead of selecting one type (e.g., `contentType: "image/png, image/jpeg"`).
 - Missing Content-Type headers in multipart form data when encoding `contentType` is specified in OpenAPI schema.
 - False negatives in negative testing mode when custom media type strategies are used with binary format request bodies.
 

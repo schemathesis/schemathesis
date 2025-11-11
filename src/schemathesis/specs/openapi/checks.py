@@ -746,6 +746,7 @@ def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Cas
         query=query,
         body=case.body.copy() if isinstance(case.body, (list, dict)) else case.body,
         media_type=case.media_type,
+        multipart_content_types=case.multipart_content_types,
         meta=case.meta,
     )
 

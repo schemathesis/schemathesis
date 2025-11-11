@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 def prepare_multipart_v2(
-    operation: APIOperation, form_data: dict[str, Any]
+    operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
     data: dict[str, Any] = {}
@@ -41,7 +41,7 @@ def prepare_multipart_v2(
 
 
 def prepare_multipart_v3(
-    operation: APIOperation, form_data: dict[str, Any]
+    operation: APIOperation, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
     schema: dict[str, Any] = {}
@@ -55,8 +55,12 @@ def prepare_multipart_v3(
 
     for name, value in form_data.items():
         property_schema = schema.get("properties", {}).get(name)
-        # Check if there's a custom content type for this property
-        content_type = body_param.get_property_content_type(name) if body_param else None
+        # Use the selected content type if available, otherwise check encoding definition
+        content_type = None
+        if selected_content_types and name in selected_content_types:
+            content_type = selected_content_types[name]
+        elif body_param:
+            content_type = body_param.get_property_content_type(name)
 
         if property_schema:
             if isinstance(value, list):
