@@ -104,6 +104,10 @@ def _search_rest(current, variant, title, segment):
     rest = title.split(segment, 1)[1].strip(".")
     if rest:
         for rest_segment in rest.split("."):
+            if "properties" not in data or rest_segment not in data["properties"]:
+                # Field doesn't exist in this variant (e.g., operation-ordering not in StatefulPhaseConfig)
+                # This is expected for phase-specific fields
+                return
             data = data["properties"][rest_segment]
 
 

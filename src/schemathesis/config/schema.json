@@ -352,14 +352,14 @@
           "$ref": "#/$defs/CoveragePhaseConfig"
         },
         "fuzzing": {
-          "$ref": "#/$defs/PhaseConfig"
+          "$ref": "#/$defs/FuzzingPhaseConfig"
         },
         "stateful": {
           "$ref": "#/$defs/StatefulPhaseConfig"
         }
       }
     },
-    "PhaseConfig": {
+    "FuzzingPhaseConfig": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -371,6 +371,10 @@
         },
         "checks": {
           "$ref": "#/$defs/ChecksConfig"
+        },
+        "operation-ordering": {
+          "type": "string",
+          "enum": ["auto", "none"]
         }
       }
     },
@@ -389,6 +393,10 @@
         },
         "checks": {
           "$ref": "#/$defs/ChecksConfig"
+        },
+        "operation-ordering": {
+          "type": "string",
+          "enum": ["auto", "none"]
         }
       }
     },
@@ -451,6 +459,10 @@
         },
         "checks": {
           "$ref": "#/$defs/ChecksConfig"
+        },
+        "operation-ordering": {
+          "type": "string",
+          "enum": ["auto", "none"]
         }
       }
     },

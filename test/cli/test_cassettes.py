@@ -48,24 +48,44 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     )
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
-    assert interactions[0]["status"] == "SUCCESS"
+    assert len(interactions) >= 2
     assert cassette["seed"] == 1
-    if mode == "all":
-        assert interactions[0]["generation"]["mode"] in ["positive", "negative"]
-    else:
-        assert interactions[0]["generation"]["mode"] == mode
-    assert interactions[0]["phase"]["name"] in ("explicit", "coverage", "generate")
-    assert float(interactions[0]["response"]["elapsed"]) >= 0
-    if mode == "positive":
-        assert load_response_body(cassette, 0) == '{"success": true}'
+
+    # Basic validation on all interactions
     assert all("checks" in interaction for interaction in interactions)
-    assert len(interactions[0]["checks"]) == 1
-    assert interactions[0]["checks"][0] == {
-        "name": "not_a_server_error",
-        "status": "SUCCESS",
-        "message": None,
-    }
-    assert len(interactions[1]["checks"]) == 1
+    for interaction in interactions:
+        assert len(interaction["checks"]) >= 1
+        assert float(interaction["response"]["elapsed"]) >= 0
+
+    # In positive mode, verify we have the /success response
+    if mode == "positive":
+        # Find the /success interaction (operation order may vary)
+        success_idx = None
+        for idx in range(len(interactions)):
+            body = load_response_body(cassette, idx)
+            if '{"success": true}' in body:
+                success_idx = idx
+                break
+        assert success_idx is not None, "Could not find /success interaction in positive mode"
+        success_interaction = interactions[success_idx]
+        assert success_interaction["status"] == "SUCCESS"
+        assert success_interaction["generation"]["mode"] == mode
+        assert success_interaction["phase"]["name"] in ("explicit", "coverage", "generate")
+        assert len(success_interaction["checks"]) == 1
+        assert success_interaction["checks"][0] == {
+            "name": "not_a_server_error",
+            "status": "SUCCESS",
+            "message": None,
+        }
+    else:
+        # In other modes, just verify first interaction has expected properties
+        first_interaction = interactions[0]
+        assert first_interaction["status"] == "SUCCESS"
+        if mode == "all":
+            assert first_interaction["generation"]["mode"] in ["positive", "negative"]
+        else:
+            assert first_interaction["generation"]["mode"] == mode
+        assert first_interaction["phase"]["name"] in ("explicit", "coverage", "generate")
     for interaction in interactions:
         if interaction["phase"]["name"] == "coverage":
             if interaction["generation"]["mode"] == "negative" and not interaction["phase"]["data"][

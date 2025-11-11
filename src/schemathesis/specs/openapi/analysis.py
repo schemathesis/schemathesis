@@ -5,9 +5,11 @@ from collections.abc import Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING
 
 from schemathesis.config import InferenceAlgorithm
+from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.specs.openapi.stateful import dependencies
+from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
 from schemathesis.specs.openapi.warnings import detect_missing_deserializers, detect_unused_openapi_auth
 
@@ -26,6 +28,7 @@ class OpenAPIAnalysis:
         "schema",
         "_links_injected",
         "_dependency_graph",
+        "_dependency_layers",
         "_inferencer",
         "_warnings_cache",
         "_schema_warnings_cache",
@@ -35,6 +38,7 @@ class OpenAPIAnalysis:
         self.schema = schema
         self._links_injected = False
         self._dependency_graph: dependencies.DependencyGraph | None = None
+        self._dependency_layers: list[list[str]] | None | NotSet = NOT_SET
         self._inferencer: LinkInferencer | None = None
         self._warnings_cache: Mapping[str, Sequence[SchemaWarning]] | None = None
         self._schema_warnings_cache: Sequence[SchemaWarning] | None = None
@@ -45,6 +49,24 @@ class OpenAPIAnalysis:
         if self._dependency_graph is None:
             self._dependency_graph = dependencies.analyze(self.schema)
         return self._dependency_graph
+
+    @property
+    def dependency_layers(self) -> list[list[str]] | None:
+        """Lazily compute and cache operation layers based on dependencies.
+
+        Returns operations grouped into layers where each layer can execute in parallel,
+        but layers must execute sequentially. Returns None if no useful ordering exists.
+
+        Example:
+            Layer 0: [POST /users, POST /products]  # No dependencies
+            Layer 1: [GET /users/{id}, POST /orders]  # Depend on layer 0
+            Layer 2: [GET /orders/{id}]  # Depends on layer 1
+
+        """
+        if self._dependency_layers is NOT_SET:
+            self._dependency_layers = compute_dependency_layers(self.dependency_graph)
+        assert not isinstance(self._dependency_layers, NotSet)
+        return self._dependency_layers
 
     @property
     def inferencer(self) -> LinkInferencer:

@@ -1990,6 +1990,9 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
         nonlocal next_customer_id
         data = request.get_json() or {}
 
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
+
         customer_id = str(next_customer_id)
         next_customer_id += 1
 
@@ -2001,6 +2004,9 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
     def create_order():
         nonlocal next_order_id
         data = request.get_json() or {}
+
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}
 
         customer_id = data.get("customer_id")
         order_id = str(next_order_id)
