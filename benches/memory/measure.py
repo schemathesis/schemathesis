@@ -30,7 +30,7 @@ def run_memray(schema_path: str, args: list[str]) -> dict[str, Any]:
             text=True,
         )
 
-        with open(stats_output, "r") as f:
+        with open(stats_output) as f:
             stats = json.load(f)
 
         return {
@@ -53,7 +53,7 @@ HERE = Path(__file__).parent
 
 def main():
     scenarios_path = HERE / "scenarios.json"
-    with open(scenarios_path, "r") as f:
+    with open(scenarios_path) as f:
         config = json.load(f)
 
     schemas_dir = HERE / "schemas"

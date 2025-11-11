@@ -6,7 +6,7 @@ Welcome! Thank you for considering contributing to Schemathesis. Your feedback a
 
 **For code contributions**: Make sure you have the following installed:
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - `prek`
 - `tox`
 - `curl` (required by some integration tests; install via your OS package manager, e.g., `apt install curl` or `brew install curl`)

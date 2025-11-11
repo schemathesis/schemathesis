@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError

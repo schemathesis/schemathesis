@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from inspect import getfullargspec
-from typing import TYPE_CHECKING, Any, Callable, NoReturn, Union
+from typing import TYPE_CHECKING, Any, NoReturn, Union
 
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
@@ -53,7 +54,9 @@ def merge_given_args(func: Callable, args: tuple, kwargs: dict[str, Any]) -> dic
     """
     if args:
         argspec = getfullargspec(func)
-        for name, strategy in zip(reversed([arg for arg in argspec.args if arg != "case"]), reversed(args)):
+        for name, strategy in zip(
+            reversed([arg for arg in argspec.args if arg != "case"]), reversed(args), strict=False
+        ):
             kwargs[name] = strategy
     return kwargs
 

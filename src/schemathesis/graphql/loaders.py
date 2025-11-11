@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from functools import lru_cache
 from os import PathLike
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, TypeVar, cast
+from typing import IO, TYPE_CHECKING, Any, NoReturn, TypeVar, cast
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
@@ -187,7 +188,7 @@ def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) 
         #  - `document` is a valid schema, because otherwise `build_schema` will rise an error;
         #  - `INTROSPECTION_QUERY` is a valid query - it is known upfront;
         # Therefore the execution result is always valid at this point and `result.data` is not `None`
-        schema = cast(Dict[str, Any], result.data)
+        schema = cast(dict[str, Any], result.data)
     except Exception as exc:
         try:
             schema = json.loads(data)

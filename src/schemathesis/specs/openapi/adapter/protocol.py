@@ -1,17 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Iterable,
-    Iterator,
-    List,
-    Mapping,
-    Optional,
     Protocol,
-    Sequence,
-    Tuple,
     Union,
 )
 
@@ -30,10 +23,10 @@ ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", Non
 ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
 PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "RefResolver", str, str], "JsonSchema"]
 ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
-GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], Union[str, None]]
-ResolveResponseMediaType = Callable[[Mapping[str, Any], Union[str, None]], Union[str, None]]
+GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], str | None]
+ResolveResponseMediaType = Callable[[Mapping[str, Any], str | None], str | None]
 ExtractSchemaForMediaType = Callable[
-    [Mapping[str, Any], Union[str, None], "RefResolver", str, str], Union["JsonSchema", None]
+    [Mapping[str, Any], str | None, "RefResolver", str, str], Union["JsonSchema", None]
 ]
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
@@ -42,14 +35,14 @@ ExtractSecurityParameters = Callable[
 ]
 PrepareMultipart = Callable[
     ["APIOperation", dict[str, Any]],
-    Tuple[Optional[List[Tuple[str, Any]]], Optional[dict[str, Any]]],
+    tuple[list[tuple[str, Any]] | None, dict[str, Any] | None],
 ]
-GetResponseContentTypes = Callable[["APIOperation", "Response"], List[str]]
-GetRequestPayloadContentTypes = Callable[["APIOperation"], List[str]]
-GetDefaultMediaTypes = Callable[[Mapping[str, Any]], List[str]]
+GetResponseContentTypes = Callable[["APIOperation", "Response"], list[str]]
+GetRequestPayloadContentTypes = Callable[["APIOperation"], list[str]]
+GetDefaultMediaTypes = Callable[[Mapping[str, Any]], list[str]]
 GetBasePath = Callable[[Mapping[str, Any]], str]
 ValidateSchema = Callable[[Mapping[str, Any]], None]
-GetParameterSerializer = Callable[[List[dict[str, Any]]], Optional[Callable]]
+GetParameterSerializer = Callable[[list[dict[str, Any]]], Callable | None]
 IterParameters = Callable[
     [
         Mapping[str, Any],

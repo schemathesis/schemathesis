@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from functools import lru_cache, wraps
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar
 
 import pytest
 import requests

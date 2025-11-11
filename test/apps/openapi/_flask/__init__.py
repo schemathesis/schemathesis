@@ -2,7 +2,6 @@ import csv
 import json
 import logging
 from time import sleep
-from typing import Tuple
 from uuid import uuid4
 
 import jsonschema
@@ -27,7 +26,7 @@ def expect_content_type(value: str):
 
 
 def create_app(
-    operations: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
+    operations: tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
 ) -> Flask:
     app = Flask("test_app")
     app.config["should_fail"] = True

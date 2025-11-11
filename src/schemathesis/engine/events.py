@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING
 
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning

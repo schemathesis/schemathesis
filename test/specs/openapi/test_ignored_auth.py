@@ -1,4 +1,3 @@
-import sys
 from typing import Annotated
 from unittest.mock import Mock
 
@@ -269,7 +268,6 @@ def test_proper_session(ignores_auth):
         (False, "API accepts invalid authentication"),
     ],
 )
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
 def test_accepts_any_auth_if_explicit_is_present(ignores_auth, expected):
     app = FastAPI()
 
@@ -378,7 +376,6 @@ def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
     )
 
 
-@pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
 def test_custom_auth():
     app = FastAPI()
     token = "TEST"

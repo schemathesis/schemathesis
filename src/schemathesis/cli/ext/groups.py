@@ -3,7 +3,8 @@ from __future__ import annotations
 import os
 import sys
 import textwrap
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import click
 
@@ -57,7 +58,7 @@ class OptionGroup:
 
 OPTION_COLOR = "cyan"
 # Use default terminal color for better readability
-HELP_COLOR: Optional[str] = None
+HELP_COLOR: str | None = None
 SECTION_COLOR = "green"
 
 

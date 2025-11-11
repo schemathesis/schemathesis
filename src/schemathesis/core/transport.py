@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import TYPE_CHECKING, Any, Mapping
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 

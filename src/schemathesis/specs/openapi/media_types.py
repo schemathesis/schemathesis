@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Collection
+from collections.abc import Collection
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.transport import SerializationContext
 from schemathesis.transport.asgi import ASGI_TRANSPORT

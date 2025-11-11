@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import threading
 import uuid
+from collections.abc import Callable
 from queue import Queue
 from types import TracebackType
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from schemathesis.core.result import Result
 from schemathesis.engine.phases import PhaseName

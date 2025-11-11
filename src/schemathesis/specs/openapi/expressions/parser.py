@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Generator
 from functools import lru_cache
-from typing import Generator
 
 from . import extractors, lexer, nodes
 from .errors import RuntimeExpressionError, UnknownToken

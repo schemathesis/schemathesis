@@ -144,7 +144,7 @@ def assert_parameters():
             right_attr = getattr(right, field.name)
             if isinstance(left_attr, list):
                 assert len(left_attr) == len(right_attr)
-                for sub_left, sub_right in zip(left_attr, right_attr):
+                for sub_left, sub_right in zip(left_attr, right_attr, strict=True):
                     _compare(sub_left, sub_right)
             else:
                 assert left_attr == right_attr

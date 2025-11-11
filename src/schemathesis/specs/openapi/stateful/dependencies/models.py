@@ -3,10 +3,9 @@ from __future__ import annotations
 import difflib
 import enum
 from collections import defaultdict
+from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Iterator, Mapping
-
-from typing_extensions import TypeAlias
+from typing import Any, TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer

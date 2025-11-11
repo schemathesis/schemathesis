@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, overload
+from collections.abc import Callable
+from typing import Any, overload
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from schemathesis.config import ProjectConfig
 from schemathesis.core import Specification

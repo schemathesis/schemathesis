@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from functools import lru_cache
-from typing import Generator, Tuple
 
 from schemathesis.core.errors import MalformedMediaType
 
-YAML_MEDIA_TYPES: Tuple[str, ...] = (
+YAML_MEDIA_TYPES: tuple[str, ...] = (
     "text/yaml",
     "text/x-yaml",
     "application/x-yaml",

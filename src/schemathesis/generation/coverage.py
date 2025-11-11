@@ -20,8 +20,9 @@ try:
 except ImportError:
     c_make_encoder = None
 
+from collections.abc import Callable, Generator, Iterator
 from json.encoder import JSONEncoder, encode_basestring_ascii
-from typing import Any, Callable, Generator, Iterator, TypeVar, cast
+from typing import Any, TypeVar, cast
 from urllib.parse import quote_plus
 
 import jsonschema.protocols
@@ -692,7 +693,7 @@ def cover_schema_iter(
                             negative = [case.value for case in cover_schema_iter(ctx, schema["items"])]
                             positive = [case.value for case in cover_schema_iter(ctx.with_positive(), schema["items"])]
                             # Interleave positive & negative values
-                            array_value = [value for pair in zip(positive, negative) for value in pair][
+                            array_value = [value for pair in zip(positive, negative, strict=False) for value in pair][
                                 :NEGATIVE_MODE_MAX_ITEMS
                             ]
                         else:
