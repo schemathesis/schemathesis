@@ -5,10 +5,11 @@ from __future__ import annotations
 import enum
 import re
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass
 from textwrap import indent
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Callable, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from schemathesis.core.output import truncate_json
 

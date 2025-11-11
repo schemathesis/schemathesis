@@ -97,7 +97,7 @@ class Case:
         headers: CaseInsensitiveDict | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: list | dict[str, Any] | str | int | float | bool | bytes | "NotSet" = NOT_SET,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
         _auth: requests.auth.AuthBase | None = None,

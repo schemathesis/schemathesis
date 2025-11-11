@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import ItemsView, Iterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ItemsView, Iterator, Mapping, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError, RefResolver

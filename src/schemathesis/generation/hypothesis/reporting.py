@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from hypothesis import HealthCheck
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable

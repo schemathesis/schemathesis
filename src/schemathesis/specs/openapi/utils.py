@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import string
+from collections.abc import Generator
 from itertools import chain, product
-from typing import Generator
 
 
 def expand_status_code(status_code: str | int) -> Generator[int, None, None]:

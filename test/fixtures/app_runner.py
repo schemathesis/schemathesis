@@ -6,10 +6,11 @@ import socket
 import subprocess
 import sys
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from time import sleep, time
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import requests

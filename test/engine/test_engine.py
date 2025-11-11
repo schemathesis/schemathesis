@@ -936,7 +936,9 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
 def test_graphql(graphql_url):
     schema = schemathesis.graphql.from_url(graphql_url)
     stream = EventStream(schema, max_examples=5).execute()
-    for event, expected in zip(stream.find_all(events.ScenarioFinished), ["Query.getBooks", "Query.getAuthors"]):
+    for event, expected in zip(
+        stream.find_all(events.ScenarioFinished), ["Query.getBooks", "Query.getAuthors"], strict=False
+    ):
         assert event.recorder.label == expected
         for case in event.recorder.cases.values():
             assert case.value.operation.label == expected

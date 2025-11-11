@@ -4,10 +4,11 @@ import datetime
 import json
 import sys
 import threading
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from queue import Queue
-from typing import IO, Callable, Iterator
+from typing import IO
 from urllib.parse import parse_qsl, urlparse
 
 import harfile

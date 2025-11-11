@@ -1,8 +1,7 @@
-import sys
-
 import hypothesis.errors
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
+from hypothesis_openapi import openapis
 
 import schemathesis
 import schemathesis.engine
@@ -10,11 +9,6 @@ from schemathesis.config import HealthCheck as SchemathesisHealthCheck
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.engine import events
-
-if sys.version_info < (3, 10):
-    pytest.skip("Required Python 3.10+", allow_module_level=True)
-
-from hypothesis_openapi import openapis
 
 IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, InvalidSchema, hypothesis.errors.FailedHealthCheck)
 config = SchemathesisConfig.from_dict({})

@@ -1,5 +1,3 @@
-from typing import List, Tuple
-
 import strawberry
 
 
@@ -12,7 +10,7 @@ class Book:
 @strawberry.type
 class Author:
     name: str
-    books: List[Book]
+    books: list[Book]
 
 
 TOLKIEN = Author(name="J.R.R Tolkien", books=[])
@@ -39,15 +37,15 @@ AUTHORS = {
 @strawberry.type
 class Query:
     @strawberry.field
-    def getBooks(self) -> List[Book]:
+    def getBooks(self) -> list[Book]:
         return list(BOOKS.values())
 
     @strawberry.field
-    def getAuthors(self) -> List[Author]:
+    def getAuthors(self) -> list[Author]:
         return list(AUTHORS.values())
 
 
-def get_or_create_author(name: str) -> Tuple[int, Author]:
+def get_or_create_author(name: str) -> tuple[int, Author]:
     for author_id, author in AUTHORS.items():  # noqa: B007
         if author.name == name:
             break

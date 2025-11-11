@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from functools import lru_cache
-from typing import Any, Callable, Dict, Union
+from typing import Any
 from urllib.request import urlopen
 
 import requests
@@ -66,7 +67,7 @@ def load_remote_uri(uri: str) -> Any:
     return document
 
 
-JSONType = Union[None, bool, float, str, list, Dict[str, Any]]
+JSONType = None | bool | float | str | list | dict[str, Any]
 
 
 class ReferenceResolver(RefResolver):

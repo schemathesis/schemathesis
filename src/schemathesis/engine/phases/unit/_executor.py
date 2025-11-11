@@ -3,7 +3,8 @@ from __future__ import annotations
 import time
 import unittest
 import uuid
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 from warnings import WarningMessage, catch_warnings
 
 import requests

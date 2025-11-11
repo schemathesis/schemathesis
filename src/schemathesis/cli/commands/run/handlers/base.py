@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Generator
 from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Generator, Protocol, Union
+from typing import IO, TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from schemathesis.cli.commands.run.context import ExecutionContext
@@ -28,7 +29,7 @@ class WritableText(Protocol):
     def flush(self) -> None: ...  # pragma: no cover
 
 
-TextOutput = Union[IO[str], StringIO, Path]
+TextOutput = IO[str] | StringIO | Path
 
 
 @contextmanager

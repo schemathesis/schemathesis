@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Mapping, Union
+from collections.abc import Mapping
+from typing import Any, Literal, TypeAlias
 
-from typing_extensions import NotRequired, TypeAlias, TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 from schemathesis.specs.openapi.types.common import Reference, SchemaOrRef, _SecurityTypeKey
 
@@ -61,7 +62,7 @@ class NonBodyParameterWithIn(NonBodyParameter, _NonBodyParameterIn):
     pass
 
 
-Parameter: TypeAlias = Union[BodyParameterWithIn, NonBodyParameterWithIn, Reference]
+Parameter: TypeAlias = BodyParameterWithIn | NonBodyParameterWithIn | Reference
 """Swagger 2.0 parameter (body, non-body, or reference)."""
 
 
@@ -88,7 +89,7 @@ class Header(TypedDict):
     multipleOf: NotRequired[float]
 
 
-HeaderOrRef: TypeAlias = Union[Header, Reference]
+HeaderOrRef: TypeAlias = Header | Reference
 """Header definition or reference."""
 
 Headers: TypeAlias = Mapping[str, HeaderOrRef]
@@ -104,7 +105,7 @@ class Response(TypedDict):
     examples: NotRequired[dict[str, Any]]
 
 
-ResponseOrRef: TypeAlias = Union[Response, Reference]
+ResponseOrRef: TypeAlias = Response | Reference
 """Response definition or reference."""
 
 Responses: TypeAlias = Mapping[str, ResponseOrRef]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import time
+from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass
 from difflib import get_close_matches
 from enum import unique
@@ -9,12 +10,7 @@ from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Generator,
-    Iterator,
-    Mapping,
     NoReturn,
-    Union,
     cast,
 )
 from urllib.parse import urlsplit
@@ -385,7 +381,7 @@ def graphql_cases(
             location=None,
         ),
     }[phase]
-    phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData], _phase_data)
+    phase_data = cast(ExamplesPhaseData | FuzzingPhaseData, _phase_data)
     instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,

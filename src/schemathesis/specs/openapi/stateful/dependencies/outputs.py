@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from schemathesis.specs.openapi.stateful.dependencies.models import CanonicalizationCache, OutputSlot, ResourceMap
 from schemathesis.specs.openapi.stateful.dependencies.resources import extract_resources_from_responses

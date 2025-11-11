@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Mapping, cast
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-@lru_cache()
+@lru_cache
 def get_default_headers() -> CaseInsensitiveDict:
     from requests.utils import default_headers
 

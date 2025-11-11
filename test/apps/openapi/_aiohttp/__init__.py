@@ -1,6 +1,6 @@
 import warnings
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, Tuple
 
 import yaml
 from aiohttp import web
@@ -11,7 +11,7 @@ from . import handlers
 
 
 def create_app(
-    operations: Tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
+    operations: tuple[str, ...] = ("success", "failure"), version: OpenAPIVersion = OpenAPIVersion("2.0")
 ) -> web.Application:
     """Factory for aioHTTP app.
 
@@ -80,7 +80,7 @@ def create_app(
 
 def reset_app(
     app: web.Application,
-    operations: Tuple[str, ...] = ("success", "failure"),
+    operations: tuple[str, ...] = ("success", "failure"),
     version: OpenAPIVersion = OpenAPIVersion("2.0"),
 ) -> None:
     """Clean up all internal containers of the application and resets its config."""

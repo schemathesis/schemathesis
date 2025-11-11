@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import enum
 import http.client
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from http.cookies import SimpleCookie
-from typing import TYPE_CHECKING, Any, Iterator, Mapping, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
 import schemathesis
@@ -87,7 +88,7 @@ def requires_case_meta(func: CheckFunction) -> CheckFunction:
     return wrapper
 
 
-def _get_openapi_schema(case: Case) -> "OpenApiSchema":
+def _get_openapi_schema(case: Case) -> OpenApiSchema:
     return cast("OpenApiSchema", case.operation.schema)
 
 
@@ -793,7 +794,7 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
     if len(lhs_parts) > len(rhs_parts):
         return False
 
-    for left, right in zip(lhs_parts, rhs_parts):
+    for left, right in zip(lhs_parts, rhs_parts, strict=False):
         if left.startswith("{") and right.startswith("{"):
             if str(lhs.get(left)) != str(rhs.get(right)):
                 return False

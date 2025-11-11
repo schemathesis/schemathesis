@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import SerializationNotPossible
@@ -110,7 +111,7 @@ class BaseTransport(Generic[S]):
         return pair[1]
 
 
-_Serializer = Callable[[SerializationContext, Any], Union[bytes, None]]
+_Serializer = Callable[[SerializationContext, Any], bytes | None]
 
 
 class SerializerRegistry:

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from typing import TYPE_CHECKING
 
 from schemathesis.config import InferenceAlgorithm
 from schemathesis.core.result import Ok

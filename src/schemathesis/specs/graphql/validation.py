@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, cast
+from typing import Any, cast
 
 from schemathesis.generation.case import Case
 from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError, UnexpectedGraphQLResponse
@@ -20,7 +20,7 @@ def validate_graphql_response(case: Case, payload: Any) -> None:
             type_name=str(type(payload)),
         )
 
-    errors = cast(List[GraphQLFormattedError], payload.get("errors"))
+    errors = cast(list[GraphQLFormattedError], payload.get("errors"))
     if errors is not None and len(errors) > 0:
         data = payload.get("data")
         # There is no `path` pointing to some part of the input query, assuming client error

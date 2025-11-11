@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, Generator, List
+from collections.abc import Callable, Generator
+from typing import Any
 
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.schemas import APIOperation
 
-Generated = Dict[str, Any]
-Definition = Dict[str, Any]
-DefinitionList = List[Definition]
+Generated = dict[str, Any]
+Definition = dict[str, Any]
+DefinitionList = list[Definition]
 MapFunction = Callable[[Generated], Generated]
 
 

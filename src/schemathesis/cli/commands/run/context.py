@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable, Generator
+from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.events import LoadingFinished
 from schemathesis.config import ProjectConfig

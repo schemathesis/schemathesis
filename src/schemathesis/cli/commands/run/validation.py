@@ -3,9 +3,9 @@ from __future__ import annotations
 import codecs
 import operator
 import pathlib
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from functools import reduce
-from typing import Callable, Generator
 from urllib.parse import urlparse
 
 import click

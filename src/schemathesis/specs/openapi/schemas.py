@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import string
+from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cached_property, lru_cache
 from json import JSONDecodeError
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterator, Mapping, NoReturn, Sequence, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 import jsonschema
 from packaging import version
@@ -57,7 +58,7 @@ HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "pa
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
 
-@lru_cache()
+@lru_cache
 def get_template_fields(template: str) -> set[str]:
     """Extract named placeholders from a string template."""
     try:

@@ -1,7 +1,7 @@
-from typing import Any, Union
+from typing import Any
 
 JsonSchemaObject = dict[str, Any]
-JsonSchema = Union[JsonSchemaObject, bool]
+JsonSchema = JsonSchemaObject | bool
 
 ANY_TYPE = ["null", "boolean", "number", "string", "array", "object"]
 ALL_TYPES = ["null", "boolean", "integer", "number", "string", "array", "object"]

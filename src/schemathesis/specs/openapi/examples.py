@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Generator, Iterator
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import cycle, islice
-from typing import TYPE_CHECKING, Any, Generator, Iterator, Union, cast, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
 import requests
 from hypothesis_jsonschema import from_schema
@@ -54,7 +55,7 @@ class BodyExample:
     __slots__ = ("value", "media_type")
 
 
-Example = Union[ParameterExample, BodyExample]
+Example = ParameterExample | BodyExample
 
 
 def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:

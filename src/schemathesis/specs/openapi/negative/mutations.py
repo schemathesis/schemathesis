@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Optional, Sequence, TypeVar
+from typing import Any, TypeAlias, TypeVar
 
 from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
-from typing_extensions import TypeAlias
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
 from schemathesis.core.jsonschema.types import JsonSchemaObject
@@ -57,7 +57,7 @@ class MutationResult(int, enum.Enum):
         return other
 
 
-Mutation: TypeAlias = Callable[["MutationContext", Draw, Schema], tuple[MutationResult, Optional[MutationMetadata]]]
+Mutation: TypeAlias = Callable[["MutationContext", Draw, Schema], tuple[MutationResult, MutationMetadata | None]]
 ANY_TYPE_KEYS = {"$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type"}
 TYPE_SPECIFIC_KEYS = {
     "number": ("multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum"),

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Generator
 from contextlib import nullcontext
 from dataclasses import dataclass
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Callable, Generator, Type
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from hypothesis.core import HypothesisHandle
@@ -252,8 +253,8 @@ class LazySchema:
             sig = signature(test_func)
             if "self" in sig.parameters:
                 # For methods, wrap with staticmethod to prevent pytest from passing self
-                wrapped_test = staticmethod(wrapped_test)  # type: ignore[assignment]
-                wrapped_func = wrapped_test.__func__  # type: ignore[attr-defined]
+                wrapped_test = staticmethod(wrapped_test)
+                wrapped_func = wrapped_test.__func__
             else:
                 wrapped_func = wrapped_test
 
@@ -278,7 +279,7 @@ def _copy_marks(source: Callable, target: Callable) -> None:
     target.pytestmark.extend(marks)  # type: ignore[attr-defined]
 
 
-def _get_capturemanager(request: FixtureRequest) -> Generator | Type[nullcontext]:
+def _get_capturemanager(request: FixtureRequest) -> Generator | type[nullcontext]:
     capturemanager = request.node.config.pluginmanager.get_plugin("capturemanager")
     if capturemanager is not None:
         return capturemanager.global_and_fixture_disabled

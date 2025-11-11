@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Mapping, Union
+from collections.abc import Mapping
+from typing import Any, Literal, TypeAlias
 
-from typing_extensions import NotRequired, TypeAlias, TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 from schemathesis.specs.openapi.types.common import Reference, SchemaOrRef, _SecurityTypeKey
 
@@ -42,33 +43,33 @@ class RequestBody(TypedDict):
     required: NotRequired[bool]
 
 
-_ResponsesBase = Mapping[str, Union[Response, Reference]]
+_ResponsesBase = Mapping[str, Response | Reference]
 
 
 class Responses(_ResponsesBase):
     pass
 
 
-_HeadersBase = Mapping[str, Union[Header, Reference]]
+_HeadersBase = Mapping[str, Header | Reference]
 
 
 class Headers(_HeadersBase):
     pass
 
 
-ExampleOrRef: TypeAlias = Union[Example, Reference]
+ExampleOrRef: TypeAlias = Example | Reference
 """Example definition or reference."""
 
-HeaderOrRef: TypeAlias = Union[Header, Reference]
+HeaderOrRef: TypeAlias = Header | Reference
 """Header definition or reference."""
 
-LinkOrRef: TypeAlias = Union[Link, Reference]
+LinkOrRef: TypeAlias = Link | Reference
 """Link definition or reference."""
 
-ResponseOrRef: TypeAlias = Union[Response, Reference]
+ResponseOrRef: TypeAlias = Response | Reference
 """Response definition or reference."""
 
-RequestBodyOrRef: TypeAlias = Union[RequestBody, Reference]
+RequestBodyOrRef: TypeAlias = RequestBody | Reference
 """Request body definition or reference."""
 
 
@@ -113,7 +114,7 @@ class ParameterWithContentAndIn(ParameterWithContent, _ParameterIn):
     pass
 
 
-Parameter: TypeAlias = Union[ParameterWithSchemaAndIn, ParameterWithContentAndIn, Reference]
+Parameter: TypeAlias = ParameterWithSchemaAndIn | ParameterWithContentAndIn | Reference
 """OpenAPI 3.x parameter (with schema, with content, or reference)."""
 
 

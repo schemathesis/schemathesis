@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, Union, cast
+from typing import Any, cast
 from urllib.parse import quote_plus
 
 import jsonschema.protocols
@@ -49,7 +50,7 @@ from .negative.utils import can_negate
 
 SLASH = "/"
 StrategyFactory = Callable[
-    [JsonSchema, str, ParameterLocation, Optional[str], GenerationConfig, type[jsonschema.protocols.Validator]],
+    [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema.protocols.Validator]],
     st.SearchStrategy,
 ]
 
@@ -209,7 +210,7 @@ def openapi_cases(
                     location=metadata.location,
                 ),
             }[phase]
-            phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+            phase_data = cast(ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData, _phase_data)
         else:
             _phase_data = {
                 TestPhase.EXAMPLES: ExamplesPhaseData(
@@ -231,7 +232,7 @@ def openapi_cases(
                     location=None,
                 ),
             }[phase]
-            phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+            phase_data = cast(ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData, _phase_data)
     else:
         _phase_data = {
             TestPhase.EXAMPLES: ExamplesPhaseData(
@@ -253,7 +254,7 @@ def openapi_cases(
                 location=None,
             ),
         }[phase]
-        phase_data = cast(Union[ExamplesPhaseData, FuzzingPhaseData, StatefulPhaseData], _phase_data)
+        phase_data = cast(ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData, _phase_data)
 
     instance = operation.Case(
         media_type=media_type,

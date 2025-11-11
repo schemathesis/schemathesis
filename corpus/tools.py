@@ -5,7 +5,8 @@ import os
 import pathlib
 import re
 import tarfile
-from typing import Any, Dict, Generator
+from collections.abc import Generator
+from typing import Any
 
 import yaml
 
@@ -70,7 +71,7 @@ def construct_mapping(self: SafeLoader, node: yaml.Node, deep: bool = False) -> 
 Loader.construct_mapping = construct_mapping  # type: ignore[attr-defined]
 
 
-def create_tar_gz(schemas: Dict[str, Dict[str, Any]], output_dir: pathlib.Path) -> None:
+def create_tar_gz(schemas: dict[str, dict[str, Any]], output_dir: pathlib.Path) -> None:
     """Create compressed API schemas corpus."""
     os.makedirs(output_dir, exist_ok=True)
 
@@ -89,15 +90,15 @@ def create_tar_gz(schemas: Dict[str, Dict[str, Any]], output_dir: pathlib.Path) 
                 tar_gz.addfile(info, io.BytesIO(json_data))
 
 
-def parse_schemas(directory: pathlib.Path) -> Dict[str, Dict[str, Any]]:
-    schemas: Dict[str, Dict[str, Any]] = {}
+def parse_schemas(directory: pathlib.Path) -> dict[str, dict[str, Any]]:
+    schemas: dict[str, dict[str, Any]] = {}
 
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith("swagger.yaml") or file.endswith("openapi.yaml"):
                 file_path = os.path.join(root, file)
                 try:
-                    with open(file_path, "r") as fd:
+                    with open(file_path) as fd:
                         schema = yaml.load(fd, Loader)
                     version = get_schema_version(schema)
                     schema_name = (
@@ -115,7 +116,7 @@ def parse_schemas(directory: pathlib.Path) -> Dict[str, Dict[str, Any]]:
     return schemas
 
 
-def get_schema_version(schema: Dict[str, Any]) -> str:
+def get_schema_version(schema: dict[str, Any]) -> str:
     """Extract the schema version from the parsed schema."""
     if "openapi" in schema:
         return schema["openapi"][:3]

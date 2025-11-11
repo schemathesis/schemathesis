@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, Dict, Iterator, TextIO
+from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
 from schemathesis.core import media_types
 from schemathesis.core.transport import Response
@@ -33,7 +34,7 @@ class DeserializationContext:
 
 ResponseDeserializer = Callable[[DeserializationContext, Response], Any]
 
-_DESERIALIZERS: Dict[str, ResponseDeserializer] = {}
+_DESERIALIZERS: dict[str, ResponseDeserializer] = {}
 
 
 def _iter_matching_deserializers(media_type: str) -> Iterator[tuple[str, ResponseDeserializer]]:

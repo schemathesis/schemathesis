@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from schemathesis.core import NOT_SET, NotSet
 

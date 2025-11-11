@@ -12,7 +12,7 @@ This tutorial shows how to integrate Schemathesis into your `pytest` test suite 
 - **[Git](https://git-scm.com/downloads){target=_blank}** - to clone the example API repository
 - **[Docker Compose](https://docs.docker.com/get-docker/){target=_blank}** - Install Docker Desktop which includes Docker Compose  
  - **[uv](https://docs.astral.sh/uv/getting-started/installation/){target=_blank}** - Python package manager to install pytest and Schemathesis
-- **Python 3.9+** - this tutorial uses Python 3.13
+- **Python 3.10+** - this tutorial uses Python 3.13
 
 **Install dependencies:**
 

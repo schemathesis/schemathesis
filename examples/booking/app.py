@@ -1,5 +1,4 @@
 import uuid
-from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
@@ -9,7 +8,7 @@ app = FastAPI(title="Booking API", version="1.0.0")
 BOOKINGS: dict[str, dict] = {}
 
 
-def verify_token(authorization: Optional[str] = Header(None)) -> bool:
+def verify_token(authorization: str | None = Header(None)) -> bool:
     if not authorization or authorization != "Bearer secret-token":
         raise HTTPException(status_code=401, detail="Invalid or missing token")
     return True

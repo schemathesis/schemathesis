@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Callable, List, Protocol, Union
+from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transforms import resolve_pointer
@@ -21,8 +22,8 @@ class HasAPIOperation(Protocol):
 
 
 MatcherFunc = Callable[[HasAPIOperation], bool]
-FilterValue = Union[str, List[str]]
-RegexValue = Union[str, re.Pattern]
+FilterValue = str | list[str]
+RegexValue = str | re.Pattern
 ERROR_EXPECTED_AND_REGEX = "Passing expected value and regex simultaneously is not allowed"
 ERROR_EMPTY_FILTER = "Filter can not be empty"
 ERROR_FILTER_EXISTS = "Filter already exists"

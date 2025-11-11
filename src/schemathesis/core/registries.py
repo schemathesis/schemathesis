@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Callable, Generic, Sequence, TypeVar, Union
+from collections.abc import Callable, Sequence
+from typing import Generic, TypeVar
 
-T = TypeVar("T", bound=Union[Callable, type])
+T = TypeVar("T", bound=Callable | type)
 
 
 class Registry(Generic[T]):

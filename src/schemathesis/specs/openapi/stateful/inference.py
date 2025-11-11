@@ -13,8 +13,9 @@ When a `Location` header points to `/users/123`, the inference:
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Mapping, Union
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
 from werkzeug.exceptions import MethodNotAllowed, NotFound
@@ -57,7 +58,7 @@ class OperationByRef:
         return {"operationRef": self.value, SCHEMATHESIS_LINK_EXTENSION: {"is_inferred": True}}
 
 
-OperationReference = Union[OperationById, OperationByRef]
+OperationReference = OperationById | OperationByRef
 # Method, path, response code, sorted path parameter names
 SeenLinkKey = tuple[str, str, int, tuple[str, ...]]
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import platform
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 

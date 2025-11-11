@@ -1,8 +1,8 @@
 """Lexical analysis of runtime expressions."""
 
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Callable, Generator
 
 
 @unique

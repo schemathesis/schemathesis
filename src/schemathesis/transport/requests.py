@@ -3,8 +3,9 @@ from __future__ import annotations
 import binascii
 import inspect
 import os
+from collections.abc import MutableMapping
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, MutableMapping
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from schemathesis.core import NotSet

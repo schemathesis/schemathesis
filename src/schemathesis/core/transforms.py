@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterator, List, Mapping, TypeVar, Union, overload
+from collections.abc import Callable, Iterator, Mapping
+from typing import Any, TypeVar, overload
 
 T = TypeVar("T")
 
@@ -70,7 +71,7 @@ def merge_at(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> None:
     data[data_key] = original
 
 
-JsonValue = Union[Dict[str, Any], List, str, float, int]
+JsonValue = dict[str, Any] | list | str | float | int
 
 
 @overload
