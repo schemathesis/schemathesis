@@ -13,7 +13,7 @@ import trustme
 import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
-from flask import Flask, jsonify, redirect, url_for
+from flask import Flask, jsonify, redirect, request, url_for
 
 from schemathesis.core.shell import ShellType
 from schemathesis.schemas import APIOperation
@@ -922,6 +922,61 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
     if last_decoded:
         assert b'Content-Disposition: form-data; name="files"; filename="files"\r\n' in last_decoded
     # NOTE, that the actual API operation is not checked in this test
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.parametrize(
+    "field_name,field_schema,content_type",
+    [
+        ("image", {"type": "string", "format": "binary"}, "image/png"),
+        ("metadata", {"type": "string"}, "application/json"),
+        ("files", {"type": "array", "items": {"type": "string", "format": "binary"}}, "image/jpeg"),
+    ],
+    ids=["binary", "string", "array"],
+)
+def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, field_name, field_schema, content_type):
+    app = Flask(__name__)
+    schema_def = {
+        "type": "object",
+        "properties": {field_name: field_schema},
+        "required": [field_name],
+    }
+    spec = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": schema_def,
+                                "encoding": {field_name: {"contentType": content_type}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        return jsonify(spec)
+
+    @app.route("/upload", methods=["POST"])
+    def upload():
+        # Check if field exists (could be in files or form)
+        if field_name in request.files:
+            file_obj = request.files[field_name]
+            if file_obj.content_type != content_type:
+                return jsonify({"error": f"Expected {content_type}, got: {file_obj.content_type}"}), 500
+        # Accept any request as long as content type is correct when field is present
+        return jsonify({"status": "ok"}), 200
+
+    port = app_runner.run_flask_app(app)
+    schema_url = f"http://127.0.0.1:{port}/openapi.json"
+    assert cli.run(schema_url, "--phases=fuzzing", "--max-examples=5", "--checks=not_a_server_error") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
