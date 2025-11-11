@@ -19,7 +19,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 
 from .types import Draw, Schema
-from .utils import can_negate
+from .utils import can_negate, is_binary_format
 
 T = TypeVar("T")
 
@@ -268,6 +268,10 @@ def change_type(
     # therefore it can't be negated.
     old_types = get_type(schema)
     if "string" in old_types and (ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location):
+        return MutationResult.FAILURE, None
+    # For binary format in body, type: string accepts any bytes data (no effective constraint).
+    # Similar to stringified params, we can't generate truly invalid data with just type mutations.
+    if "string" in old_types and is_binary_format(schema) and ctx.location == ParameterLocation.BODY:
         return MutationResult.FAILURE, None
     candidates = _get_type_candidates(ctx, schema)
     if not candidates:

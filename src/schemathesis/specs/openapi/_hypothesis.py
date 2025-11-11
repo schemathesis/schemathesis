@@ -33,6 +33,7 @@ from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter.parameters import FORM_MEDIA_TYPES, OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
+from schemathesis.specs.openapi.negative.utils import is_binary_format
 
 from ... import auths
 from ...generation import GenerationMode
@@ -293,6 +294,21 @@ def openapi_cases(
 OPTIONAL_BODY_RATE = 0.05
 
 
+def _maybe_set_optional_body(
+    strategy: st.SearchStrategy,
+    parameter: OpenApiBody,
+    draw: st.DrawFn,
+) -> st.SearchStrategy:
+    """Add NOT_SET option to strategy for optional body parameters."""
+    if (
+        not parameter.is_required
+        and draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
+        < OPTIONAL_BODY_RATE
+    ):
+        strategy |= st.just(NOT_SET)
+    return strategy
+
+
 def _find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | None:
     """Find a registered strategy for a content type, supporting wildcard patterns."""
     # Try exact match first
@@ -359,6 +375,13 @@ def _build_form_strategy_with_encoding(
                     strategies_for_types.append(strategy)
 
             if strategies_for_types:
+                # In negative mode with binary format, custom strategies always produce valid data
+                # Skip them to allow structural mutations instead
+                if generation_mode.is_negative:
+                    prop_schema = properties.get(property_name, {})
+                    if isinstance(prop_schema, dict) and is_binary_format(prop_schema):
+                        # Skip custom strategy - use default negative generation
+                        continue
                 custom_property_strategies[property_name] = st.one_of(*strategies_for_types)
 
     if not custom_property_strategies:
@@ -420,19 +443,21 @@ def _get_body_strategy(
     # Check for custom media type strategy
     custom_strategy = _find_media_type_strategy(parameter.media_type)
     if custom_strategy is not None:
+        # Custom strategies always generate valid data for their media type.
+        # In negative mode with permissive schemas (like type: string, format: binary),
+        # any bytes data is valid, so custom strategies can't produce truly invalid data.
+        # Use positive mode strategy instead to avoid false negatives.
+        if generation_mode.is_negative:
+            schema = parameter.definition.get("schema", {})
+            if isinstance(schema, dict) and is_binary_format(schema):
+                # Use default strategy generation which can produce structural invalidity
+                strategy = parameter.get_strategy(operation, generation_config, generation_mode)
+                return _maybe_set_optional_body(strategy, parameter, draw)
         return custom_strategy
 
     # Use the cached strategy from the parameter
     strategy = parameter.get_strategy(operation, generation_config, generation_mode)
-
-    # It is likely will be rejected, hence choose it rarely
-    if (
-        not parameter.is_required
-        and draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
-        < OPTIONAL_BODY_RATE
-    ):
-        strategy |= st.just(NOT_SET)
-    return strategy
+    return _maybe_set_optional_body(strategy, parameter, draw)
 
 
 def get_parameters_value(
