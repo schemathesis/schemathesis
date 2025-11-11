@@ -649,9 +649,9 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(cli, schema_url, mocker, snapshot_cli):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
-    from schemathesis.engine.phases.unit import TaskProducer
+    from schemathesis.engine.phases.unit import DefaultScheduler
 
-    original = TaskProducer.next_operation
+    original = DefaultScheduler.next_operation
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -661,7 +661,7 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker, snapshot_cli):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.engine.phases.unit.TaskProducer.next_operation", wraps=mocked)
+    mocker.patch("schemathesis.engine.phases.unit.DefaultScheduler.next_operation", wraps=mocked)
     assert cli.run(schema_url, "--workers=2", "--generation-deterministic") == snapshot_cli
 
 
@@ -2214,6 +2214,146 @@ class EventCounter(cli.EventHandler):
             hooks=module,
         )
         == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize(
+    "ordering_mode,expected_order",
+    [
+        pytest.param("none", ["GET /users/{id}", "DELETE /users/{id}", "POST /users", "GET /users"], id="none"),
+        # auto mode: Layer 0 (sorted): GET /users, POST /users -> Layer 1: GET /users/{id} -> Layer 2: DELETE /users/{id}
+        pytest.param("auto", ["GET /users", "POST /users", "GET /users/{id}", "DELETE /users/{id}"], id="auto"),
+    ],
+)
+def test_operation_ordering(ctx, cli, app_runner, tmp_path, ordering_mode, expected_order):
+    # Test operation ordering: "none" uses schema iteration order, "auto" uses dependency order
+    # CRITICAL FIX: Import schemas module to prevent class identity mismatch caused by pytester plugin.
+    # Root cause: The pytester plugin (loaded in test/conftest.py) cleans up sys.modules between
+    # parametrized test runs for isolation. This causes the schemas module to reload with a new
+    # OpenApiSchema class (different id()). The isinstance() check in _create_scheduler then fails
+    # because it compares class identity (memory address), not class name.
+    # This import keeps the module loaded in sys.modules, preventing the reload.
+    # See PYTESTER_MODULE_CLEANUP_INVESTIGATION.md for full details.
+    from schemathesis.specs.openapi import schemas as _  # noqa: F401
+
+    app = Flask(__name__)
+
+    spec = ctx.openapi.build_schema(
+        {
+            "/users/{id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                        }
+                    },
+                },
+                "delete": {
+                    "operationId": "deleteUser",
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "No Content"}},
+                },
+            },
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            },
+                            "links": {
+                                "GetUser": {
+                                    "operationId": "getUser",
+                                    "parameters": {"id": "$response.body#/id"},
+                                },
+                                "DeleteUser": {
+                                    "operationId": "deleteUser",
+                                    "parameters": {"id": "$response.body#/id"},
+                                },
+                            },
+                        }
+                    },
+                },
+                "get": {"operationId": "listUsers", "responses": {"200": {"description": "OK"}}},
+            },
+        },
+        version="3.0.0",
+    )
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        # Don't use jsonify() as it sorts keys - we need to preserve order for testing
+        import json
+
+        response = app.response_class(
+            response=json.dumps(spec, sort_keys=False), status=200, mimetype="application/json"
+        )
+        return response
+
+    @app.route("/users/<int:user_id>", methods=["GET"])
+    def get_user(user_id):
+        return jsonify({"id": user_id})
+
+    @app.route("/users/<int:user_id>", methods=["DELETE"])
+    def delete_user(user_id):
+        return "", 204
+
+    @app.route("/users", methods=["GET", "POST"])
+    def users():
+        return jsonify({"success": True}), 200 if request.method == "GET" else 201
+
+    port = app_runner.run_flask_app(app)
+
+    # Track execution order via custom CLI handler
+    module = ctx.write_pymodule(
+        """
+from schemathesis import cli, engine
+
+@cli.handler()
+class OperationOrderTracker(cli.EventHandler):
+    def __init__(self, *args, **params):
+        self.operations = []
+
+    def handle_event(self, ctx, event):
+        if isinstance(event, engine.events.ScenarioFinished):
+            self.operations.append(event.label)
+        elif isinstance(event, engine.events.EngineFinished):
+            ctx.add_summary_line(f"OPERATION_ORDER: {','.join(self.operations)}")
+        """
+    )
+
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--max-examples=1",
+        "--workers=1",
+        "--continue-on-failure",
+        "--phases=fuzzing",
+        hooks=module,
+        config={"phases": {"fuzzing": {"operation-ordering": ordering_mode}}},
+    )
+
+    # Extract operation order from the marker line
+    for line in result.stdout.split("\n"):
+        if line.startswith("OPERATION_ORDER:"):
+            actual_order = line.split(":", 1)[1].strip().split(",")
+            break
+    else:
+        raise AssertionError("OPERATION_ORDER marker not found in output")
+
+    assert len(actual_order) == 4, f"Expected 4 operations, got {len(actual_order)}: {actual_order}"
+    assert actual_order == expected_order, (
+        f"Operation order mismatch for mode={ordering_mode}\nExpected: {expected_order}\nActual:   {actual_order}"
     )
 
 

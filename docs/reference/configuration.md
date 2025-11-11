@@ -461,6 +461,29 @@ These settings can only be applied at the project level.
     enabled = false
     ```
 
+#### `phases.<phase>.operation-ordering`
+
+!!! note ""
+
+    **Type**: `String`
+    **Default**: `"auto"`
+
+    Controls the execution order of API operations during testing phases.
+
+    Possible values:
+
+    - `"auto"`: Attempt dependency-based ordering using OpenAPI links and resource analysis, falling back to RESTful heuristics (POST/PUT -> GET/PATCH -> DELETE)
+    - `"none"`: Execute operations in schema iteration order without reordering
+
+    Dependency-based ordering ensures operations that create resources run before operations that read them, increasing the likelihood that later tests interact with already-created resources rather than empty storage.
+
+    ```toml
+    [phases.fuzzing]
+    operation-ordering = "none"
+    ```
+
+    CLI-only. Only available for non-stateful phases (examples, coverage, fuzzing).
+
 #### `phases.examples.fill-missing`
 
 !!! note "" 

@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(fuzzing=FuzzingPhaseConfig(operation_ordering=<OperationOrdering.NONE: 'none'>)))))

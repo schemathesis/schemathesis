@@ -4,14 +4,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Mapping
 
-from jsonschema.exceptions import RefResolutionError
-
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import OperationNotFound
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.references import ReferenceResolver
-
-    from .schemas import APIOperation, OpenApiSchema
+    from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
 @dataclass(frozen=True)
