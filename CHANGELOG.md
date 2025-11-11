@@ -12,6 +12,10 @@
 - ~20% faster VCR cassette recording through output sanitization caching.
 - ~10% faster CLI due to caching of config lookups.
 
+### :bug: Fixed
+
+- Missing Content-Type headers in multipart form data when encoding `contentType` is specified in OpenAPI schema.
+
 ### :fire: Removed
 
 - Python 3.9 support.
