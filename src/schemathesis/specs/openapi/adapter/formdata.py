@@ -45,23 +45,43 @@ def prepare_multipart_v3(
 ) -> tuple[list[tuple[str, Any]] | None, dict[str, Any] | None]:
     files: list[tuple[str, Any]] = []
     schema: dict[str, Any] = {}
+    body_param = None
     for body in operation.body:
         main, sub = media_types.parse(body.media_type)
         if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
             schema = body.definition.get("schema", {}) or {}
+            body_param = body
             break
 
     for name, value in form_data.items():
         property_schema = schema.get("properties", {}).get(name)
+        # Check if there's a custom content type for this property
+        content_type = body_param.get_property_content_type(name) if body_param else None
+
         if property_schema:
             if isinstance(value, list):
-                files.extend((name, item) for item in value)
+                if content_type:
+                    files.extend((name, (None, item, content_type)) for item in value)
+                else:
+                    files.extend((name, item) for item in value)
             elif property_schema.get("format") in ("binary", "base64"):
-                files.append((name, value))
+                if content_type:
+                    files.append((name, (None, value, content_type)))
+                else:
+                    files.append((name, value))
+            else:
+                if content_type:
+                    files.append((name, (None, value, content_type)))
+                else:
+                    files.append((name, (None, value)))
+        elif isinstance(value, list):
+            if content_type:
+                files.extend((name, (None, item, content_type)) for item in value)
+            else:
+                files.extend((name, item) for item in value)
+        else:
+            if content_type:
+                files.append((name, (None, value, content_type)))
             else:
                 files.append((name, (None, value)))
-        elif isinstance(value, list):
-            files.extend((name, item) for item in value)
-        else:
-            files.append((name, (None, value)))
     return files or None, None
