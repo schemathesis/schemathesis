@@ -16,6 +16,7 @@
 ### :bug: Fixed
 
 - Missing Content-Type headers in multipart form data when encoding `contentType` is specified in OpenAPI schema.
+- False negatives in negative testing mode when custom media type strategies are used with binary format request bodies.
 
 ### :fire: Removed
 
