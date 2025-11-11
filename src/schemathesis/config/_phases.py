@@ -12,13 +12,24 @@ from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
 DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace"}
 
 
+class OperationOrdering(str, Enum):
+    """Strategy for ordering API operations during test execution."""
+
+    AUTO = "auto"
+    """Try dependency graph first, fallback to RESTful heuristic"""
+
+    NONE = "none"
+    """No ordering - operations execute in schema iteration order"""
+
+
 @dataclass(repr=False)
-class PhaseConfig(DiffBase):
+class FuzzingPhaseConfig(DiffBase):
     enabled: bool
     generation: GenerationConfig
     checks: ChecksConfig
+    operation_ordering: OperationOrdering
 
-    __slots__ = ("enabled", "generation", "checks", "_is_default")
+    __slots__ = ("enabled", "generation", "checks", "operation_ordering", "_is_default")
 
     def __init__(
         self,
@@ -26,18 +37,25 @@ class PhaseConfig(DiffBase):
         enabled: bool = True,
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
+        operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
     ) -> None:
         self.enabled = enabled
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
-        self._is_default = enabled and generation is None and checks is None
+        self.operation_ordering = (
+            OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
+        )
+        self._is_default = (
+            enabled and generation is None and checks is None and self.operation_ordering == OperationOrdering.AUTO
+        )
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> PhaseConfig:
+    def from_dict(cls, data: dict[str, Any]) -> FuzzingPhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
+            operation_ordering=data.get("operation-ordering", "auto"),
         )
 
 
@@ -47,8 +65,9 @@ class ExamplesPhaseConfig(DiffBase):
     fill_missing: bool
     generation: GenerationConfig
     checks: ChecksConfig
+    operation_ordering: OperationOrdering
 
-    __slots__ = ("enabled", "fill_missing", "generation", "checks", "_is_default")
+    __slots__ = ("enabled", "fill_missing", "generation", "checks", "operation_ordering", "_is_default")
 
     def __init__(
         self,
@@ -57,12 +76,22 @@ class ExamplesPhaseConfig(DiffBase):
         fill_missing: bool = False,
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
+        operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
     ) -> None:
         self.enabled = enabled
         self.fill_missing = fill_missing
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
-        self._is_default = enabled and not fill_missing and generation is None and checks is None
+        self.operation_ordering = (
+            OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
+        )
+        self._is_default = (
+            enabled
+            and not fill_missing
+            and generation is None
+            and checks is None
+            and self.operation_ordering == OperationOrdering.AUTO
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ExamplesPhaseConfig:
@@ -71,6 +100,7 @@ class ExamplesPhaseConfig(DiffBase):
             fill_missing=data.get("fill-missing", False),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
+            operation_ordering=data.get("operation-ordering", "auto"),
         )
 
 
@@ -81,6 +111,7 @@ class CoveragePhaseConfig(DiffBase):
     generation: GenerationConfig
     checks: ChecksConfig
     unexpected_methods: set[str]
+    operation_ordering: OperationOrdering
 
     __slots__ = (
         "enabled",
@@ -88,6 +119,7 @@ class CoveragePhaseConfig(DiffBase):
         "generation",
         "checks",
         "unexpected_methods",
+        "operation_ordering",
         "_is_default",
     )
 
@@ -99,18 +131,23 @@ class CoveragePhaseConfig(DiffBase):
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
         unexpected_methods: set[str] | None = None,
+        operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
     ) -> None:
         self.enabled = enabled
         self.generate_duplicate_query_parameters = generate_duplicate_query_parameters
         self.unexpected_methods = unexpected_methods if unexpected_methods is not None else DEFAULT_UNEXPECTED_METHODS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
+        self.operation_ordering = (
+            OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
+        )
         self._is_default = (
             enabled
             and not generate_duplicate_query_parameters
             and generation is None
             and checks is None
             and unexpected_methods is None
+            and self.operation_ordering == OperationOrdering.AUTO
         )
 
     @classmethod
@@ -123,6 +160,7 @@ class CoveragePhaseConfig(DiffBase):
             else None,
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
+            operation_ordering=data.get("operation-ordering", "auto"),
         )
 
 
@@ -202,7 +240,7 @@ class StatefulPhaseConfig(DiffBase):
 class PhasesConfig(DiffBase):
     examples: ExamplesPhaseConfig
     coverage: CoveragePhaseConfig
-    fuzzing: PhaseConfig
+    fuzzing: FuzzingPhaseConfig
     stateful: StatefulPhaseConfig
 
     __slots__ = ("examples", "coverage", "fuzzing", "stateful")
@@ -212,15 +250,17 @@ class PhasesConfig(DiffBase):
         *,
         examples: ExamplesPhaseConfig | None = None,
         coverage: CoveragePhaseConfig | None = None,
-        fuzzing: PhaseConfig | None = None,
+        fuzzing: FuzzingPhaseConfig | None = None,
         stateful: StatefulPhaseConfig | None = None,
     ) -> None:
         self.examples = examples or ExamplesPhaseConfig()
         self.coverage = coverage or CoveragePhaseConfig()
-        self.fuzzing = fuzzing or PhaseConfig()
+        self.fuzzing = fuzzing or FuzzingPhaseConfig()
         self.stateful = stateful or StatefulPhaseConfig()
 
-    def get_by_name(self, *, name: str) -> PhaseConfig | CoveragePhaseConfig | StatefulPhaseConfig:
+    def get_by_name(
+        self, *, name: str
+    ) -> FuzzingPhaseConfig | ExamplesPhaseConfig | CoveragePhaseConfig | StatefulPhaseConfig:
         return {
             "examples": self.examples,
             "coverage": self.coverage,
@@ -242,7 +282,7 @@ class PhasesConfig(DiffBase):
         return cls(
             examples=ExamplesPhaseConfig.from_dict(merge(data.get("examples", {}))),
             coverage=CoveragePhaseConfig.from_dict(merge(data.get("coverage", {}))),
-            fuzzing=PhaseConfig.from_dict(merge(data.get("fuzzing", {}))),
+            fuzzing=FuzzingPhaseConfig.from_dict(merge(data.get("fuzzing", {}))),
             stateful=StatefulPhaseConfig.from_dict(merge(data.get("stateful", {}))),
         )
 

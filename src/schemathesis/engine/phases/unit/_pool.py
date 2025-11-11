@@ -12,20 +12,30 @@ from schemathesis.engine.phases import PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.phases.unit._layered_scheduler import LayeredScheduler
     from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 
-class TaskProducer:
-    """Produces test tasks for workers to execute."""
+class DefaultScheduler:
+    """Default scheduler that processes operations in schema iteration order."""
 
-    def __init__(self, ctx: EngineContext) -> None:
-        self.operations = ctx.schema.get_all_operations()
+    def __init__(self, ctx: EngineContext | None = None, operations: list | None = None) -> None:
+        if operations is not None:
+            self.operations = iter(operations)
+        elif ctx is not None:
+            self.operations = ctx.schema.get_all_operations()
+        else:
+            raise ValueError("Either ctx or operations must be provided")
         self.lock = threading.Lock()
 
     def next_operation(self) -> Result | None:
         """Get next API operation in a thread-safe manner."""
         with self.lock:
             return next(self.operations, None)
+
+    def worker_stopped(self) -> None:
+        """Hook for schedulers that need to react to worker termination."""
+        return None
 
 
 class WorkerPool:
@@ -34,7 +44,7 @@ class WorkerPool:
     def __init__(
         self,
         workers_num: int,
-        producer: TaskProducer,
+        scheduler: DefaultScheduler | LayeredScheduler,
         worker_factory: Callable,
         ctx: EngineContext,
         mode: HypothesisTestMode,
@@ -42,7 +52,7 @@ class WorkerPool:
         suite_id: uuid.UUID,
     ) -> None:
         self.workers_num = workers_num
-        self.producer = producer
+        self.scheduler = scheduler
         self.worker_factory = worker_factory
         self.ctx = ctx
         self.mode = mode
@@ -61,7 +71,7 @@ class WorkerPool:
                     "mode": self.mode,
                     "phase": self.phase,
                     "events_queue": self.events_queue,
-                    "producer": self.producer,
+                    "scheduler": self.scheduler,
                     "suite_id": self.suite_id,
                 },
                 name=f"schemathesis_unit_tests_{i}",
