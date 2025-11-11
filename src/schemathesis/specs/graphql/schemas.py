@@ -261,6 +261,7 @@ class GraphQLSchema(BaseSchema):
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:
         return Case(
@@ -273,6 +274,7 @@ class GraphQLSchema(BaseSchema):
             query=query or {},
             body=body,
             media_type=media_type or "application/json",
+            multipart_content_types=multipart_content_types,
             meta=meta,
         )
 

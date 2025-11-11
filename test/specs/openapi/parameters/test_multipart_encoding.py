@@ -659,3 +659,103 @@ def test_encoding_with_invalid_content_type_format():
         assert "file" in case.body
 
     test()
+
+
+def test_multipart_comma_separated_without_custom_strategy():
+    # Comma-separated content types should work even without custom strategies
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "image": {"type": "string", "format": "binary"},
+                                        },
+                                        "required": ["image"],
+                                    },
+                                    "encoding": {"image": {"contentType": "image/png, image/jpeg"}},
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+
+    content_types_seen = set()
+
+    @given(case=operation.as_strategy())
+    def test(case):
+        if isinstance(case.body, dict):
+            files, _ = case.operation.prepare_multipart(case.body, case.multipart_content_types)
+
+            if files:
+                for file_tuple in files:
+                    name = file_tuple[0]
+                    if name == "image":
+                        if len(file_tuple) > 1 and isinstance(file_tuple[1], tuple):
+                            if len(file_tuple[1]) == 3:
+                                _, _, content_type = file_tuple[1]
+                                assert content_type in ["image/png", "image/jpeg"], (
+                                    f"Expected single content type, got: {content_type}"
+                                )
+                                content_types_seen.add(content_type)
+
+    test()
+    assert len(content_types_seen) == 2, f"Expected both content types, got: {content_types_seen}"
+
+
+def test_multipart_optional_encoding_not_always_present():
+    # Optional fields with custom encoding should not always be present
+    xml_strategy = st.just(b"<data/>")
+    schemathesis.openapi.media_type("text/xml", xml_strategy)
+
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "required_field": {"type": "string"},
+                                            "optional_file": {"type": "string", "format": "binary"},
+                                        },
+                                        "required": ["required_field"],
+                                    },
+                                    "encoding": {"optional_file": {"contentType": "text/xml"}},
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+
+    @given(case=operation.as_strategy())
+    def test(case):
+        # Required field must always be present
+        assert "required_field" in case.body
+        # Optional field may or may not be present - both are valid
+
+    test()

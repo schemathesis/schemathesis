@@ -398,7 +398,7 @@ class BaseSchema(Mapping):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
-        self, form_data: dict[str, Any], operation: APIOperation
+        self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:
         raise NotImplementedError
 
@@ -417,6 +417,7 @@ class BaseSchema(Mapping):
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:
         raise NotImplementedError
@@ -724,8 +725,10 @@ class APIOperation(Generic[P, R, S]):
     def get_parameter_serializer(self, location: str) -> Callable | None:
         return self.schema.get_parameter_serializer(self, location)
 
-    def prepare_multipart(self, form_data: dict[str, Any]) -> tuple[list | None, dict[str, Any] | None]:
-        return self.schema.prepare_multipart(form_data, self)
+    def prepare_multipart(
+        self, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None
+    ) -> tuple[list | None, dict[str, Any] | None]:
+        return self.schema.prepare_multipart(form_data, self, selected_content_types=selected_content_types)
 
     def get_request_payload_content_types(self) -> list[str]:
         return self.schema.get_request_payload_content_types(self)
@@ -789,6 +792,7 @@ class APIOperation(Generic[P, R, S]):
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        multipart_content_types: dict[str, str] | None = None,
         _meta: CaseMetadata | None = None,
     ) -> Case:
         """Create a test case with specific data instead of generated values.
@@ -801,6 +805,7 @@ class APIOperation(Generic[P, R, S]):
             query: Override query parameters.
             body: Override request body.
             media_type: Override media type.
+            multipart_content_types: Selected content types for multipart form properties.
 
         """
         from requests.structures import CaseInsensitiveDict
@@ -814,6 +819,7 @@ class APIOperation(Generic[P, R, S]):
             query=query or {},
             body=body,
             media_type=media_type,
+            multipart_content_types=multipart_content_types,
             meta=_meta,
         )
 

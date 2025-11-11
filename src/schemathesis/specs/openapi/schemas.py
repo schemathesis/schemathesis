@@ -580,9 +580,9 @@ class OpenApiSchema(BaseSchema):
         return operation.definition.raw.get("tags")
 
     def prepare_multipart(
-        self, form_data: dict[str, Any], operation: APIOperation
+        self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:
-        return self.adapter.prepare_multipart(operation, form_data)
+        return self.adapter.prepare_multipart(operation, form_data, selected_content_types)
 
     def make_case(
         self,
@@ -596,6 +596,7 @@ class OpenApiSchema(BaseSchema):
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
     ) -> Case:
         if body is not NOT_SET and media_type is None:
@@ -610,6 +611,7 @@ class OpenApiSchema(BaseSchema):
             query=query or {},
             body=body,
             media_type=media_type,
+            multipart_content_types=multipart_content_types,
             meta=meta,
         )
 

@@ -248,7 +248,7 @@ def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any
         return {"data": value}
     if isinstance(value, dict):
         multipart = _prepare_form_data(value)
-        files, data = ctx.case.operation.prepare_multipart(multipart)
+        files, data = ctx.case.operation.prepare_multipart(multipart, ctx.case.multipart_content_types)
         return {"files": files, "data": data}
     # Uncommon schema. For example - `{"type": "string"}`
     boundary = choose_boundary()

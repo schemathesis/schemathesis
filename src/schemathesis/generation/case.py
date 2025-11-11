@@ -60,6 +60,8 @@ class Case:
     """Generated request body"""
     media_type: str | None
     """Media type from OpenAPI schema (e.g., "multipart/form-data")"""
+    multipart_content_types: dict[str, str] | None
+    """Selected content types for multipart form properties (e.g., {"image": "image/png"})"""
 
     _meta: CaseMetadata | None
 
@@ -79,6 +81,7 @@ class Case:
         "query",
         "body",
         "media_type",
+        "multipart_content_types",
         "_meta",
         "_auth",
         "_has_explicit_auth",
@@ -99,6 +102,7 @@ class Case:
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        multipart_content_types: dict[str, str] | None = None,
         meta: CaseMetadata | None = None,
         _auth: requests.auth.AuthBase | None = None,
         _has_explicit_auth: bool = False,
@@ -114,6 +118,7 @@ class Case:
         object.__setattr__(self, "query", query if query is not None else {})
         object.__setattr__(self, "body", body)
         object.__setattr__(self, "media_type", media_type)
+        object.__setattr__(self, "multipart_content_types", multipart_content_types)
         object.__setattr__(self, "_meta", meta)
         object.__setattr__(self, "_auth", _auth)
         object.__setattr__(self, "_has_explicit_auth", _has_explicit_auth)
