@@ -5,6 +5,7 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from inspect import signature
 from typing import TYPE_CHECKING, Any
+from unittest import SkipTest
 
 import pytest
 from hypothesis.core import HypothesisHandle
@@ -291,7 +292,10 @@ def run_subtest(operation: APIOperation, fixtures: dict[str, Any], sub_test: Cal
     __tracebackhide__ = True
 
     with subtests.test(label=operation.label):
-        sub_test(**fixtures)
+        try:
+            sub_test(**fixtures)
+        except SkipTest as exc:
+            raise pytest.skip.Exception(str(exc)).with_traceback(exc.__traceback__) from None
 
 
 SEPARATOR = "\n===================="

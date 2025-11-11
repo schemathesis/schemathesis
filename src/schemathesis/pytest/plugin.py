@@ -12,6 +12,8 @@ from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
+from pluggy import Result as PluggyResult
+from pytest_subtests.plugin import SubTestReport
 
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
@@ -47,6 +49,7 @@ from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
+    from _pytest.terminal import TerminalReporter
 
     from schemathesis.schemas import BaseSchema
 
@@ -266,6 +269,46 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
         outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name, schema=schema))
     except Exception:
         outcome.get_result()
+
+
+@hookimpl(tryfirst=True)  # type: ignore[misc]
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    if isinstance(report, SubTestReport) and report.passed:
+        report._schemathesis_ignore_in_summary = True
+
+
+@hookimpl(tryfirst=True, hookwrapper=True)  # type: ignore[misc]
+def pytest_terminal_summary(terminalreporter: "TerminalReporter") -> Generator[None, None, None]:
+    passed = terminalreporter.stats.get("passed", [])
+    if passed:
+        terminalreporter.stats["passed"] = [
+            report for report in passed if not getattr(report, "_schemathesis_ignore_in_summary", False)
+        ]
+    yield
+
+
+@hookimpl(hookwrapper=True, trylast=True)  # type: ignore[misc]
+def pytest_report_teststatus(
+    report: pytest.TestReport,
+    config: pytest.Config,
+) -> Generator[None, None, None]:
+    outcome = yield
+    result = cast(PluggyResult[tuple[str, str, str] | None], outcome)
+    if not isinstance(report, SubTestReport):
+        return
+
+    description = report.sub_test_description()
+    shortletter = getattr(config.option, "no_subtests_shortletter", False)
+
+    if report.passed:
+        short = "" if shortletter else ","
+        result.force_result(("passed", short, f"{description} SUBPASS"))
+    elif report.skipped:
+        short = "" if shortletter else "-"
+        result.force_result(("skipped", short, f"{description} SUBSKIP"))
+    elif report.outcome == "failed":
+        short = "" if shortletter else "u"
+        result.force_result(("failed", short, f"{description} SUBFAIL"))
 
 
 @pytest.hookimpl(tryfirst=True)  # type: ignore[misc]
