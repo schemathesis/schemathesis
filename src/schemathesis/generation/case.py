@@ -477,13 +477,21 @@ class Case:
 
         """
         __tracebackhide__ = True
-        response = self.call(base_url, session, headers, **kwargs)
+        call_kwargs = dict(kwargs)
+        response = self.call(base_url, session, headers, **call_kwargs)
+        transport_kwargs = dict(kwargs)
+        if base_url is not None:
+            transport_kwargs["base_url"] = base_url
+        if session is not None:
+            transport_kwargs.setdefault("session", session)
+        if headers is not None:
+            transport_kwargs.setdefault("headers", dict(headers))
         self.validate_response(
             response,
             checks,
             headers=headers,
             additional_checks=additional_checks,
             excluded_checks=excluded_checks,
-            transport_kwargs=kwargs,
+            transport_kwargs=transport_kwargs,
         )
         return response

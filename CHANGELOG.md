@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.5.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Fix propagation of `base_url` / session data from `Case.call_and_validate`, so auth checks no longer crash when schemas are loaded from files. [#3318](https://github.com/schemathesis/schemathesis/issues/3318)
+
 ## [4.5.0](https://github.com/schemathesis/schemathesis/compare/v4.4.4...v4.5.0) - 2025-11-12
 
 ### :rocket: Added

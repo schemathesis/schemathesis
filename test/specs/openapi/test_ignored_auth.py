@@ -1,3 +1,4 @@
+import json
 from typing import Annotated
 from unittest.mock import Mock
 
@@ -16,12 +17,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
 from schemathesis.engine.phases import PhaseName
-from schemathesis.specs.openapi.checks import (
-    AuthKind,
-    _contains_auth,
-    ignored_auth,
-    remove_auth,
-)
+from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
 from schemathesis.transport.requests import RequestsTransport
 from test.utils import EventStream
 
@@ -112,6 +108,19 @@ def test_keep_tls_verification(schema_url, mocker):
     for call in send.mock_calls:
         assert call.kwargs["timeout"] == 5
         assert not call.kwargs["verify"]
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("ignored_auth")
+def test_file_loaded_schema_requires_explicit_base_url(openapi3_schema, openapi3_base_url, tmp_path):
+    # See GH-3318
+    schema_path = tmp_path / "schema.json"
+    schema_path.write_text(json.dumps(openapi3_schema.raw_schema))
+    schema = schemathesis.openapi.from_path(schema_path)
+    case = schema["/ignored_auth"]["get"].Case(headers={"Authorization": "Basic dGVzdDp0ZXN0"})
+    with pytest.raises(FailureGroup) as exc_info:
+        case.call_and_validate(base_url=openapi3_base_url, checks=[ignored_auth])
+    assert any(isinstance(failure, IgnoredAuth) for failure in exc_info.value.exceptions)
 
 
 @pytest.mark.parametrize(
