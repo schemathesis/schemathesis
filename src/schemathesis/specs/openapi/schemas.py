@@ -44,6 +44,7 @@ from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from ._hypothesis import openapi_cases
+from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
 from .references import ReferenceResolver
 from .stateful import create_state_machine
@@ -81,6 +82,7 @@ class OpenApiSchema(BaseSchema):
         self.analysis = OpenAPIAnalysis(self)
         self._bundler = Bundler()
         self._bundle_cache: BundleCache = {}
+        self._operation_lookup = OperationLookup(self, HTTP_METHODS)
 
     def _initialize_adapter(self) -> None:
         swagger_version = self.raw_schema.get("swagger")
@@ -485,40 +487,14 @@ class OpenApiSchema(BaseSchema):
 
     def find_operation_by_id(self, operation_id: str) -> APIOperation:
         """Find an `APIOperation` instance by its `operationId`."""
-        resolve = self.resolver.resolve
-        default_scope = self.resolver.resolution_scope
-        paths = self._get_paths()
-        if paths is None:
-            self._on_missing_operation(operation_id, None, [])
-        assert paths is not None
-        for path, path_item in paths.items():
-            # If the path is behind a reference we have to keep the scope
-            # The scope is used to resolve nested components later on
-            if "$ref" in path_item:
-                scope, path_item = resolve(path_item["$ref"])
-            else:
-                scope = default_scope
-            for method, operation in path_item.items():
-                if method not in HTTP_METHODS:
-                    continue
-                if "operationId" in operation and operation["operationId"] == operation_id:
-                    parameters = self._iter_parameters(operation, path_item.get("parameters", []))
-                    return self.make_operation(path, method, parameters, operation, scope)
-        self._on_missing_operation(operation_id, None, [])
+        return self._operation_lookup.find_by_id(operation_id)
 
     def find_operation_by_reference(self, reference: str) -> APIOperation:
         """Find local or external `APIOperation` instance by reference.
 
         Reference example: #/paths/~1users~1{user_id}/patch
         """
-        scope, operation = self.resolver.resolve(reference)
-        path, method = scope.rsplit("/", maxsplit=2)[-2:]
-        path = path.replace("~1", "/").replace("~0", "~")
-        parent_ref, _ = reference.rsplit("/", maxsplit=1)
-        _, path_item = self.resolver.resolve(parent_ref)
-        with in_scope(self.resolver, scope):
-            parameters = self._iter_parameters(operation, path_item.get("parameters", []))
-        return self.make_operation(path, method, parameters, operation, scope)
+        return self._operation_lookup.find_by_reference(reference)
 
     def find_operation_by_path(self, method: str, path: str) -> APIOperation | None:
         """Find an `APIOperation` by matching an actual request path.
