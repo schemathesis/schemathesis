@@ -9,6 +9,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
+from schemathesis.specs.openapi._operation_lookup import OperationLookup
 
 
 @pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
@@ -363,6 +364,24 @@ def test_get_operation(operation_id, reference, path, method):
         operation = getter(key)
         assert operation.path == path
         assert operation.method.upper() == method
+
+
+def test_operation_lookup_cache_built_once(monkeypatch):
+    schema = schemathesis.openapi.from_dict(SCHEMA)
+    calls = 0
+    original = OperationLookup._build_tables
+
+    def tracking(self: OperationLookup) -> None:
+        nonlocal calls
+        calls += 1
+        return original(self)
+
+    monkeypatch.setattr(OperationLookup, "_build_tables", tracking)
+
+    schema.find_operation_by_id("getFoo")
+    schema.find_operation_by_reference("#/paths/~1foo/get")
+
+    assert calls == 1
 
 
 def test_find_operation_by_id_in_referenced_path(ctx):
