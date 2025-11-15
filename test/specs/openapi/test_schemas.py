@@ -1,6 +1,7 @@
 import pytest
 
 import schemathesis
+from schemathesis.core.errors import OperationNotFound
 from schemathesis.schemas import APIOperation
 
 
@@ -84,3 +85,57 @@ def test_find_operation_by_path_no_match(method, path):
 
     operation = schema.find_operation_by_path(method, path)
     assert operation is None
+
+
+@pytest.mark.parametrize(
+    ("paths", "reference", "expected"),
+    [
+        (
+            {
+                "/users": {
+                    "parameters": [{"in": "query", "name": "common", "required": True}],
+                    "get": {"operationId": "get_users", "responses": {"200": {"description": "OK"}}},
+                },
+                "x-codegen-contextRoot": "/apis/registry/v2",
+            },
+            "#/paths/~1users/get",
+            "/users",
+        ),
+        (
+            {
+                "/users": {
+                    "parameters": [{"in": "query", "name": "common", "required": True}],
+                    "get": {"operationId": "get_users", "responses": {"200": {"description": "OK"}}},
+                },
+                "/alias": {"$ref": "#/paths/~1vendor"},
+                "/vendor": "invalid",
+            },
+            "#/paths/~1users/get",
+            "/users",
+        ),
+    ],
+)
+def test_operation_lookup_ignores_invalid_entries(ctx, paths, reference, expected):
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(paths))
+    schema.as_state_machine()
+    assert schema.find_operation_by_reference(reference).path == expected
+
+
+@pytest.mark.parametrize(
+    "paths",
+    [
+        {
+            "/alias": "invalid",
+            "/users": {"get": {"operationId": "get_users", "responses": {"200": {"description": "OK"}}}},
+        },
+        {
+            "/alias": {"$ref": "#/paths/~1vendor"},
+            "/vendor": "invalid",
+            "/users": {"get": {"operationId": "get_users", "responses": {"200": {"description": "OK"}}}},
+        },
+    ],
+)
+def test_operation_lookup_non_mapping_shared_params(ctx, paths):
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(paths))
+    with pytest.raises(OperationNotFound):
+        schema.find_operation_by_reference("#/paths/~1alias/get")
