@@ -13,13 +13,24 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
 
-__all__ = ["is_given_applied", "given_proxy", "merge_given_args", "GivenInput", "GivenArgsMark", "GivenKwargsMark"]
+__all__ = [
+    "is_given_applied",
+    "given_proxy",
+    "merge_given_args",
+    "GivenInput",
+    "GivenArgsMark",
+    "GivenKwargsMark",
+    "GIVEN_TARGET_ATTR",
+    "GIVEN_REFRESH_ATTR",
+]
 
 EllipsisType = type(...)
 GivenInput = Union["SearchStrategy", EllipsisType]  # type: ignore[valid-type]
 
 GivenArgsMark = Mark[tuple](attr_name="given_args", default=())
 GivenKwargsMark = Mark[dict[str, Any]](attr_name="given_kwargs", default=dict)
+GIVEN_TARGET_ATTR = "_schemathesis_given_target"
+GIVEN_REFRESH_ATTR = "_schemathesis_given_refresh"
 
 
 def is_given_applied(func: Callable) -> bool:
@@ -42,6 +53,13 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[Callable],
 
         GivenArgsMark.set(func, args)
         GivenKwargsMark.set(func, kwargs)
+        target = getattr(func, GIVEN_TARGET_ATTR, None)
+        if target is not None:
+            GivenArgsMark.set(target, args)
+            GivenKwargsMark.set(target, kwargs)
+        refresh = getattr(func, GIVEN_REFRESH_ATTR, None)
+        if refresh is not None:
+            refresh()
         return func
 
     return wrapper

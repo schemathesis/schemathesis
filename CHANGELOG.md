@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.5.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- `schema.given` now works with fixture-backed schemas regardless of decorator order. [#3320](https://github.com/schemathesis/schemathesis/discussions/3320)
+
 ## [4.5.1](https://github.com/schemathesis/schemathesis/compare/v4.5.0...v4.5.1) - 2025-11-12
 
 ### :bug: Fixed

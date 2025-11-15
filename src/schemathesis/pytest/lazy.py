@@ -17,6 +17,8 @@ from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
+    GIVEN_REFRESH_ATTR,
+    GIVEN_TARGET_ATTR,
     GivenArgsMark,
     GivenInput,
     GivenKwargsMark,
@@ -167,20 +169,30 @@ class LazySchema:
 
     def parametrize(self) -> Callable:
         def wrapper(test_func: Callable) -> Callable:
-            if is_given_applied(test_func):
-                # The user wrapped the test function with `@schema.given`
-                # These args & kwargs go as extra to the underlying test generator
+            given_kwargs: dict[str, GivenInput] = {}
+            invalid_test: Callable | None = None
+
+            def refresh_given_state() -> None:
+                nonlocal invalid_test
+                if not is_given_applied(test_func):
+                    given_kwargs.clear()
+                    invalid_test = None
+                    return
                 given_args = GivenArgsMark.get(test_func)
-                given_kwargs = GivenKwargsMark.get(test_func)
+                given_kwargs_mark = GivenKwargsMark.get(test_func)
                 assert given_args is not None
-                assert given_kwargs is not None
-                test_function = validate_given_args(test_func, given_args, given_kwargs)
+                assert given_kwargs_mark is not None
+                test_function = validate_given_args(test_func, given_args, given_kwargs_mark)
                 if test_function is not None:
-                    return test_function
-                given_kwargs = merge_given_args(test_func, given_args, given_kwargs)
-                del given_args
-            else:
-                given_kwargs = {}
+                    invalid_test = test_function
+                    given_kwargs.clear()
+                else:
+                    invalid_test = None
+                    merged = merge_given_args(test_func, given_args, dict(given_kwargs_mark))
+                    given_kwargs.clear()
+                    given_kwargs.update(merged)
+
+            refresh_given_state()
 
             def wrapped_test(*args: Any, request: FixtureRequest, **kwargs: Any) -> None:
                 """The actual test, which is executed by pytest."""
@@ -190,6 +202,9 @@ class LazySchema:
                 from schemathesis.checks import load_all_checks
 
                 load_all_checks()
+                if invalid_test is not None:
+                    invalid_test()
+                    return  # pragma: no cover
 
                 schema = get_schema(
                     request=request,
@@ -266,7 +281,12 @@ class LazySchema:
             wrapped_func.is_hypothesis_test = True
             wrapped_func.hypothesis = HypothesisHandle(test_func, wrapped_func, given_kwargs)
 
-            return wrapped_test if "self" in sig.parameters else wrapped_func
+            result = wrapped_test if "self" in sig.parameters else wrapped_func
+
+            setattr(result, GIVEN_TARGET_ATTR, test_func)
+            setattr(result, GIVEN_REFRESH_ATTR, refresh_given_state)
+
+            return result
 
         return wrapper
 

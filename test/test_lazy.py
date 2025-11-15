@@ -247,6 +247,39 @@ def teardown_module(module):
     result.assert_outcomes(passed=1)
 
 
+def test_schema_given_before_parametrize(testdir):
+    # See GH-3320
+    # When `schema.given` is applied before `schema.parametrize`
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+
+@lazy_schema.given(user_id=st.sampled_from([1, 2, 3]))
+@lazy_schema.parametrize()
+def test_user_id(case, user_id):
+    pass
+        """,
+        paths={
+            "/users/{user_id}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "user_id",
+                            "in": "path",
+                            "required": True,
+                            "type": "integer",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_invalid_given_usage(testdir):
     # When `schema.given` is used incorrectly (e.g. called without arguments)
     testdir.make_test(
