@@ -4,6 +4,10 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Collection, Iterator, Mapping
 
+from jsonschema.exceptions import RefResolutionError
+
+from schemathesis.core.errors import OperationNotFound
+
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.references import ReferenceResolver
 
@@ -75,11 +79,15 @@ class OperationLookup:
         resolve = self.schema.resolver.resolve
         default_scope = self.schema.resolver.resolution_scope
         for path, path_item in paths.items():
+            if not isinstance(path_item, dict):
+                continue
             if "$ref" in path_item:
                 scope, resolved_path_item = resolve(path_item["$ref"])
             else:
                 scope = default_scope
                 resolved_path_item = path_item
+            if not isinstance(resolved_path_item, dict):
+                continue
             shared_parameters = tuple(resolved_path_item.get("parameters", []))
             for method, definition in resolved_path_item.items():
                 if method not in self._http_methods:
@@ -100,7 +108,10 @@ class OperationLookup:
         self._operations_by_reference = operations_by_reference
 
     def _resolve_reference_entry(self, reference: str) -> OperationLookupEntry:
-        scope, definition = self.schema.resolver.resolve(reference)
+        try:
+            scope, definition = self.schema.resolver.resolve(reference)
+        except RefResolutionError:
+            raise OperationNotFound(f"Operation '{reference}' not found", reference) from None
         path, method = scope.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
