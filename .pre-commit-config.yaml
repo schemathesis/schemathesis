@@ -33,7 +33,7 @@ repos:
         additional_dependencies: [types-requests, types-PyYAML]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.4
+    rev: v0.14.5
     hooks:
       - id: ruff-format
       - id: ruff-check
