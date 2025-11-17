@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.5.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Positive test cases generated without required body. [#3327](https://github.com/schemathesis/schemathesis/issues/3327)
+
 ## [4.5.2](https://github.com/schemathesis/schemathesis/compare/v4.5.1...v4.5.2) - 2025-11-15
 
 ### :bug: Fixed
