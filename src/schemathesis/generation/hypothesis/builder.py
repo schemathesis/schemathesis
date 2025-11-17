@@ -24,6 +24,7 @@ from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import (
+    IncorrectUsage,
     InfiniteRecursiveReference,
     InvalidSchema,
     MalformedMediaType,
@@ -39,7 +40,7 @@ from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
-from schemathesis.generation.hypothesis.given import GivenInput
+from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -167,6 +168,22 @@ def create_test(
         and specification.supports_feature(SpecificationFeature.EXAMPLES)
     ):
         phases_config = config.project.phases_for(operation=operation)
+        # Check if user provided custom strategies via @schema.given()
+        # AND the operation actually has examples
+        # These are incompatible because examples only provide 'case' while custom strategies require additional parameters
+        if config.given_kwargs:
+            # Check if there are actually examples to add
+            try:
+                example_strategies = list(operation.get_strategies_from_examples(**strategy_kwargs))
+            except Exception:
+                # If we can't get examples (invalid schema, etc), let add_examples handle it
+                example_strategies = []
+
+            if example_strategies:
+                # Get the parameter names from given_kwargs to show in error message
+                param_names = ", ".join(sorted(config.given_kwargs.keys()))
+                raise IncorrectUsage(format_given_and_schema_examples_error(param_names))
+
         hypothesis_test = add_examples(
             hypothesis_test,
             operation,
