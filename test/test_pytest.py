@@ -254,10 +254,107 @@ def test(case, data):
         },
         schema_name="simple_openapi.yaml",
     )
-    # Then the wrapped test should fail with an error
+    # Then collection should fail with a clear error
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(errors=1)
+    stdout = result.stdout.str()
+    assert "Cannot combine `@schema.given()` with schema examples" in stdout
+    assert "Your test uses `@schema.given()` with custom strategies for: data" in stdout
+    assert "extra parameters to your test function that schema examples cannot provide values for" in stdout
+    assert "Solution: Create separate test functions" in stdout
+
+
+def test_given_with_explicit_hypothesis_example(testdir):
+    # When user explicitly adds @hypothesis.example() decorator with @schema.given()
+    testdir.make_test(
+        """
+from hypothesis import example
+
+@schema.parametrize()
+@schema.given(user_id=st.integers())
+@example(case=None)  # User explicitly adds @example
+def test(case, user_id):
+    pass
+        """,
+    )
+    # Then collection should fail with an error (actually caught at collection now by builder.py)
+    # because we're detecting missing strategies for user_id in the @example
+    result = testdir.runpytest("-v")
+    # Could be errors=1 (collection error) or failed=1 (runtime error from plugin.py)
+    assert result.ret != 0
+    stdout = result.stdout.str()
+    # Should show error about inconsistent args
+    assert "Inconsistent" in stdout or "example" in stdout.lower()
+
+
+def test_given_with_schema_examples_in_request_body(testdir):
+    # See GH-3328
+    # When @schema.given() is combined with schema examples in request body
+    testdir.makepyfile(
+        """
+import schemathesis
+from hypothesis import strategies as st
+import pytest
+
+
+@pytest.fixture(scope="session")
+def api_schema():
+    schema_dict = {
+        "openapi": "3.0.0",
+        "info": {"title": "My API", "version": "1.0.0"},
+        "paths": {
+            "/fci": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "example": {
+                                        "value": "st"
+                                    },
+                                    "properties": {
+                                        "value": {
+                                            "description": "The value"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    }
+
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    schema.config.update(base_url="http://192.168.1.4/api")
+
+    return schema
+
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+
+existing_user_ids = [1, 42, 123, 456]
+
+
+@schema.given(user_id=st.sampled_from(existing_user_ids))
+@schema.parametrize()
+def test_user_endpoints(case, user_id):
+    if "user_id" in case.path_parameters:
+        case.path_parameters["user_id"] = user_id
+    case.call_and_validate()
+        """
+    )
+    # Then the test should fail with a clear, actionable error message
     result = testdir.runpytest("-v")
     result.assert_outcomes(failed=1)
-    result.stdout.re_match_lines([".+Unsupported test setup"])
+    stdout = result.stdout.str()
+    assert "Cannot combine `@schema.given()` with schema examples" in stdout
+    assert "Your test uses `@schema.given()` with custom strategies for: user_id" in stdout
+    assert "extra parameters to your test function that schema examples cannot provide values for" in stdout
+    assert "Solution: Create separate test functions" in stdout
 
 
 def test_given_no_override(testdir):

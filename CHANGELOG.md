@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Positive test cases generated without required body. [#3327](https://github.com/schemathesis/schemathesis/issues/3327)
+- Incorrect error message when combining `@schema.given()` with schema examples. [#3328](https://github.com/schemathesis/schemathesis/issues/3328)
 
 ## [4.5.2](https://github.com/schemathesis/schemathesis/compare/v4.5.1...v4.5.2) - 2025-11-15
 
