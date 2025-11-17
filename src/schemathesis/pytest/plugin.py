@@ -53,11 +53,6 @@ if TYPE_CHECKING:
 
     from schemathesis.schemas import BaseSchema
 
-GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (
-    "Unsupported test setup. Tests using `@schema.given` cannot be combined with explicit schema examples in the same "
-    "function. Separate these tests into distinct functions to avoid conflicts."
-)
-
 
 def _is_schema(value: object) -> bool:
     from schemathesis.schemas import BaseSchema
@@ -376,7 +371,9 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
                 yield
         except InvalidArgument as exc:
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
-                raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
+                from schemathesis.generation.hypothesis.given import GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE
+
+                raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLE_ERROR_MESSAGE) from None
             raise InvalidSchema(exc.args[0]) from None
         except (SkipTest, unittest.SkipTest) as exc:
             if UnsatisfiableExampleMark.is_set(pyfuncitem.obj):

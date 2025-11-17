@@ -61,6 +61,31 @@ def test_user_endpoints(case, user_id):
 
 Each test will run multiple Hypothesis examples, so your custom data will be sampled repeatedly across different generated test cases.
 
+!!! warning "Schema Examples and @schema.given()"
+
+    If your schema contains examples (in parameters or request bodies), you cannot use `@schema.given()` with custom strategies on the same test function. Schema examples only provide the `case` parameter, while custom strategies require additional parameters, creating a parameter mismatch.
+
+    **Solution**: Create separate test functions with different phases:
+
+    ```python
+    from hypothesis import Phase, settings
+
+    # 1. One for schema examples (without @schema.given()):
+    @schema.parametrize()
+    @settings(phases=[Phase.explicit])
+    def test_user_endpoints_with_examples(case):
+        case.call_and_validate()
+
+    # 2. One for property-based testing with your custom strategies:
+    @schema.given(user_id=st.sampled_from(existing_user_ids))
+    @schema.parametrize()
+    @settings(phases=[Phase.generate])
+    def test_user_endpoints_with_custom_data(case, user_id):
+        if "user_id" in case.path_parameters:
+            case.path_parameters["user_id"] = user_id
+        case.call_and_validate()
+    ```
+
 ### Database Setup with Cleanup
 
 ```python
