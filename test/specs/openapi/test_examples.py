@@ -13,6 +13,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
 from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.examples import (
+    BodyExample,
     ParameterExample,
     extract_from_schemas,
     extract_inner_examples,
@@ -2268,3 +2269,81 @@ def test_nested_allof_with_property_refs():
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/items"]["PUT"]
     assert operation.get_strategies_from_examples() == []
+
+
+def test_allof_with_required_field_should_not_use_incomplete_property_examples(ctx):
+    # GH-3333
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/resource": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/resource"}}},
+                    },
+                    "responses": {"204": {"description": "Done"}},
+                }
+            }
+        },
+        version="3.0.3",
+        components={
+            "schemas": {
+                "resource": {
+                    "type": "object",
+                    "allOf": [{"$ref": "#/components/schemas/base_resource"}],
+                    "properties": {"choice": {"$ref": "#/components/schemas/choice"}},
+                    "example": {
+                        "name": "example-name",
+                        "choice": "option2",
+                    },
+                },
+                "base_resource": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "minLength": 1,
+                        }
+                    },
+                    "example": {"name": "example-name"},
+                },
+                "choice": {
+                    "type": "string",
+                    "enum": ["option1", "option2", "option3"],
+                    "example": "option2",
+                },
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/resource"]["POST"]
+
+    extracted = list(extract_from_schemas(operation))
+
+    assert len(extracted) == 1
+    example = extracted[0]
+    assert isinstance(example, BodyExample)
+
+    body_alternative = list(operation.body)[0]
+    body_schema = body_alternative.optimized_schema
+
+    validation_error = None
+    try:
+        jsonschema.validate(example.value, body_schema)
+    except jsonschema.ValidationError as e:
+        validation_error = e
+
+    assert validation_error is None, (
+        f"Example {example.value} is invalid (missing required 'name' from allOf). "
+        f"Property-level examples should not be extracted when they violate schema constraints."
+    )
+
+    strategies = operation.get_strategies_from_examples()
+    for strategy in strategies:
+        case = examples.generate_one(strategy)
+        try:
+            jsonschema.validate(case.body, body_schema)
+        except jsonschema.ValidationError as e:
+            pytest.fail(f"Generated invalid case {case.body}: {e}")

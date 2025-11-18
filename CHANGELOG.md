@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.5.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- Invalid examples extracted from schemas with `allOf` and required fields. [#3333](https://github.com/schemathesis/schemathesis/issues/3333)
+
 ## [4.5.3](https://github.com/schemathesis/schemathesis/compare/v4.5.2...v4.5.3) - 2025-11-17
 
 ### :bug: Fixed
