@@ -98,7 +98,7 @@ class OpenAPIAnalysis:
         """
         if self._links_injected:
             return 0
-        injected = dependencies._inject_links(self.schema, self.dependency_graph)
+        injected = dependencies.inject_links(self.schema)
         self._links_injected = True
         return injected
 
