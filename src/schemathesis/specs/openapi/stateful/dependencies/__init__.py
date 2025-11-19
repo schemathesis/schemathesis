@@ -105,13 +105,8 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
 
 def inject_links(schema: OpenApiSchema) -> int:
-    graph = analyze(schema)
-    return _inject_links(schema, graph)
-
-
-def _inject_links(schema: OpenApiSchema, graph: DependencyGraph) -> int:
     injected = 0
-    for response_links in graph.iter_links():
+    for response_links in schema.analysis.dependency_graph.iter_links():
         operation = schema.find_operation_by_reference(response_links.producer_operation_ref)
         response = operation.responses.get(response_links.status_code)
         links = response.definition.setdefault(schema.adapter.links_keyword, {})

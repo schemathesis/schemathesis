@@ -1,4 +1,5 @@
 import http.client
+import json
 import os
 import pathlib
 import platform
@@ -2218,24 +2219,14 @@ class EventCounter(cli.EventHandler):
 
 
 @pytest.mark.parametrize(
-    "ordering_mode,expected_order",
+    ["ordering_mode", "expected"],
     [
         pytest.param("none", ["GET /users/{id}", "DELETE /users/{id}", "POST /users", "GET /users"], id="none"),
         # auto mode: Layer 0 (sorted): GET /users, POST /users -> Layer 1: GET /users/{id} -> Layer 2: DELETE /users/{id}
         pytest.param("auto", ["GET /users", "POST /users", "GET /users/{id}", "DELETE /users/{id}"], id="auto"),
     ],
 )
-def test_operation_ordering(ctx, cli, app_runner, tmp_path, ordering_mode, expected_order):
-    # Test operation ordering: "none" uses schema iteration order, "auto" uses dependency order
-    # CRITICAL FIX: Import schemas module to prevent class identity mismatch caused by pytester plugin.
-    # Root cause: The pytester plugin (loaded in test/conftest.py) cleans up sys.modules between
-    # parametrized test runs for isolation. This causes the schemas module to reload with a new
-    # OpenApiSchema class (different id()). The isinstance() check in _create_scheduler then fails
-    # because it compares class identity (memory address), not class name.
-    # This import keeps the module loaded in sys.modules, preventing the reload.
-    # See PYTESTER_MODULE_CLEANUP_INVESTIGATION.md for full details.
-    from schemathesis.specs.openapi import schemas as _  # noqa: F401
-
+def test_operation_ordering(ctx, cli, app_runner, ordering_mode, expected):
     app = Flask(__name__)
 
     spec = ctx.openapi.build_schema(
@@ -2293,13 +2284,7 @@ def test_operation_ordering(ctx, cli, app_runner, tmp_path, ordering_mode, expec
 
     @app.route("/openapi.json")
     def openapi_spec():
-        # Don't use jsonify() as it sorts keys - we need to preserve order for testing
-        import json
-
-        response = app.response_class(
-            response=json.dumps(spec, sort_keys=False), status=200, mimetype="application/json"
-        )
-        return response
+        return app.response_class(response=json.dumps(spec, sort_keys=False), status=200, mimetype="application/json")
 
     @app.route("/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
@@ -2315,7 +2300,6 @@ def test_operation_ordering(ctx, cli, app_runner, tmp_path, ordering_mode, expec
 
     port = app_runner.run_flask_app(app)
 
-    # Track execution order via custom CLI handler
     module = ctx.write_pymodule(
         """
 from schemathesis import cli, engine
@@ -2343,7 +2327,6 @@ class OperationOrderTracker(cli.EventHandler):
         config={"phases": {"fuzzing": {"operation-ordering": ordering_mode}}},
     )
 
-    # Extract operation order from the marker line
     for line in result.stdout.split("\n"):
         if line.startswith("OPERATION_ORDER:"):
             actual_order = line.split(":", 1)[1].strip().split(",")
@@ -2351,9 +2334,8 @@ class OperationOrderTracker(cli.EventHandler):
     else:
         raise AssertionError("OPERATION_ORDER marker not found in output")
 
-    assert len(actual_order) == 4, f"Expected 4 operations, got {len(actual_order)}: {actual_order}"
-    assert actual_order == expected_order, (
-        f"Operation order mismatch for mode={ordering_mode}\nExpected: {expected_order}\nActual:   {actual_order}"
+    assert actual_order == expected, (
+        f"Operation order mismatch for mode={ordering_mode}\nExpected: {expected}\nActual:   {actual_order}"
     )
 
 
