@@ -7,8 +7,13 @@
 - **CLI**: Dependency-based operation ordering in non-stateful tests.
 - **CLI**: Capture and reuse of successful API responses in the fuzzing phase.
 
+### :racing_car: Performance
+
+- Response deserialization caching for YAML and custom formats.
+
 ### :bug: Fixed
 
+- Stateful testing now supports custom deserializers for non-JSON response formats.
 - Crash in coverage phase when encountering `items: false` with `prefixItems` in OpenAPI 3.1.0 schemas.
 - Custom media type strategies now apply when `encoding.contentType` is an array. [#3339](https://github.com/schemathesis/schemathesis/issues/3339)
 - False positives for `format: binary` and `format: byte` in negative testing.

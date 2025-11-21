@@ -1,0 +1,73 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       3 selected / 3 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 4 selected / 4 total (4 inferred)
+
+     ✅ N passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+________________________________ Stateful tests ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    None is not of type 'string'
+
+    Schema at /properties/full_name:
+
+        {
+            "type": "string"
+        }
+
+    Value:
+
+        null
+
+[200] OK:
+
+    `id=1
+    full_name=None`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 3
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ❌ Stateful
+
+Failures:
+  ❌ Response violates schema: 1
+
+Test cases:
+  N generated, N found N unique failures, N skipped
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

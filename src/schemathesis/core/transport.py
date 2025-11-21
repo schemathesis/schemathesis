@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from itertools import product
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core import NOT_SET
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 if TYPE_CHECKING:
@@ -67,7 +68,7 @@ class Response:
         "request",
         "elapsed",
         "verify",
-        "_json",
+        "_deserialized",
         "message",
         "http_version",
         "encoding",
@@ -95,7 +96,7 @@ class Response:
         self.request = request
         self.elapsed = elapsed
         self.verify = verify
-        self._json = None
+        self._deserialized = NOT_SET
         self._encoded_body: str | None = None
         self.message = message
         self.http_version = http_version
@@ -209,9 +210,9 @@ class Response:
             json.JSONDecodeError: If content is not valid JSON
 
         """
-        if self._json is None:
-            self._json = json.loads(self.text)
-        return self._json
+        if self._deserialized is NOT_SET:
+            self._deserialized = json.loads(self.text)
+        return self._deserialized
 
     @property
     def body_size(self) -> int | None:
