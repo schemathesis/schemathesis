@@ -34,6 +34,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -266,7 +267,7 @@ class CoverageContext:
             )
         )
 
-    def can_be_negated(self, schema: dict[str, Any]) -> bool:
+    def can_be_negated(self, schema: JsonSchemaObject) -> bool:
         # Path, query, header, and cookie parameters will be stringified anyway
         # If there are no constraints, then anything will match the original schema after serialization
         if self.will_be_serialized_to_string():
@@ -281,7 +282,7 @@ class CoverageContext:
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
         return cached_draw(strategy)
 
-    def generate_from_schema(self, schema: dict | bool) -> Any:
+    def generate_from_schema(self, schema: JsonSchema) -> Any:
         if isinstance(schema, dict) and "$ref" in schema:
             reference = schema["$ref"]
             # Deep clone to avoid circular references in Python objects
@@ -358,7 +359,7 @@ class CoverageContext:
 
         if keys == ["allOf"]:
             for idx, sub_schema in enumerate(schema["allOf"]):
-                if "$ref" in sub_schema:
+                if isinstance(sub_schema, dict) and "$ref" in sub_schema:
                     schema["allOf"][idx] = self.resolve_ref(sub_schema["$ref"])
 
             schema = canonicalish(schema)
@@ -428,7 +429,7 @@ class HashSet:
 
 
 def _cover_positive_for_type(
-    ctx: CoverageContext, schema: dict, ty: str | None, seen: HashSet | None = None
+    ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty)
@@ -454,7 +455,7 @@ def _cover_positive_for_type(
             else:
                 with suppress(jsonschema.SchemaError):
                     for idx, sub_schema in enumerate(all_of):
-                        if "$ref" in sub_schema:
+                        if isinstance(sub_schema, dict) and "$ref" in sub_schema:
                             all_of[idx] = ctx.resolve_ref(sub_schema["$ref"])
                     canonical = canonicalish(schema)
                     yield from cover_schema_iter(ctx, canonical)
@@ -508,7 +509,7 @@ def _ignore_unfixable(
 
 
 def cover_schema_iter(
-    ctx: CoverageContext, schema: dict | bool, seen: HashSet | None = None
+    ctx: CoverageContext, schema: JsonSchema, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
     if seen is None:
         seen = HashSet()
@@ -818,7 +819,7 @@ def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema.Valid
     return valid_count == 0
 
 
-def _get_properties(schema: dict | bool) -> dict | bool:
+def _get_properties(schema: JsonSchema) -> JsonSchema:
     if isinstance(schema, dict):
         if "example" in schema:
             return {"const": schema["example"]}
@@ -834,7 +835,7 @@ def _get_properties(schema: dict | bool) -> dict | bool:
     return schema
 
 
-def _get_template_schema(schema: dict, ty: str) -> dict:
+def _get_template_schema(schema: JsonSchemaObject, ty: str) -> JsonSchemaObject:
     if ty == "object":
         properties = schema.get("properties")
         if properties is not None:
@@ -847,23 +848,31 @@ def _get_template_schema(schema: dict, ty: str) -> dict:
     return {**schema, "type": ty}
 
 
-def _ensure_valid_path_parameter_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def _get_not_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
+    """Safely get the 'not' schema as a dict, handling boolean schemas."""
+    not_schema = schema.get("not", {})
+    if isinstance(not_schema, dict):
+        return not_schema.copy()
+    return {}
+
+
+def _ensure_valid_path_parameter_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
     # Path parameters should have at least 1 character length and don't contain any characters with special treatment
     # on the transport level.
     # The implementation below sneaks into `not` to avoid clashing with existing `pattern` keyword
-    not_ = schema.get("not", {}).copy()
+    not_ = _get_not_schema(schema)
     not_["pattern"] = r"[/{}]"
     return {**schema, "minLength": 1, "not": not_}
 
 
-def _ensure_valid_headers_schema(schema: dict[str, Any]) -> dict[str, Any]:
+def _ensure_valid_headers_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
     # Reject any character that is not A-Z, a-z, or 0-9 for simplicity
-    not_ = schema.get("not", {}).copy()
+    not_ = _get_not_schema(schema)
     not_["pattern"] = r"[^A-Za-z0-9]"
     return {**schema, "not": not_}
 
 
-def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
+def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Boundary and near boundary values
     schema = {"type": "string", **schema}
@@ -977,7 +986,7 @@ def closest_multiple_greater_than(y: int, x: int) -> int:
     return x * (quotient + 1)
 
 
-def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
+def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive integer values."""
     # Boundary and near boundary values
     schema = {"type": "number", **schema}
@@ -1054,7 +1063,9 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             )
 
 
-def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
+def _positive_array(
+    ctx: CoverageContext, schema: JsonSchemaObject, template: list
+) -> Generator[GeneratedValue, None, None]:
     example = schema.get("example")
     examples = schema.get("examples")
     default = schema.get("default")
@@ -1117,7 +1128,13 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
                     value, scenario=CoverageScenario.NEAR_BOUNDARY_ITEMS_ARRAY, description="Near-boundary items array"
                 )
 
-    if "items" in schema and "enum" in schema["items"] and isinstance(schema["items"]["enum"], list) and max_items != 0:
+    if (
+        "items" in schema
+        and isinstance(schema["items"], dict)
+        and "enum" in schema["items"]
+        and isinstance(schema["items"]["enum"], list)
+        and max_items != 0
+    ):
         # Ensure there is enough items to pass `minItems` if it is specified
         length = min_items or 1
         for variant in schema["items"]["enum"]:
@@ -1139,7 +1156,9 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             )
 
 
-def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:
+def _positive_object(
+    ctx: CoverageContext, schema: JsonSchemaObject, template: dict
+) -> Generator[GeneratedValue, None, None]:
     example = schema.get("example")
     examples = schema.get("examples")
     default = schema.get("default")
@@ -1262,7 +1281,7 @@ def _negative_pattern_properties(
                 )
 
 
-def _negative_items(ctx: CoverageContext, schema: dict[str, Any] | bool) -> Generator[GeneratedValue, None, None]:
+def _negative_items(ctx: CoverageContext, schema: JsonSchema) -> Generator[GeneratedValue, None, None]:
     """Arrays not matching the schema."""
     nctx = ctx.with_negative()
     for value in cover_schema_iter(nctx, schema):
@@ -1299,7 +1318,7 @@ def _negative_pattern(
     )
 
 
-def _with_negated_key(schema: dict, key: str, value: Any) -> dict:
+def _with_negated_key(schema: JsonSchemaObject, key: str, value: Any) -> JsonSchemaObject:
     return {"allOf": [{k: v for k, v in schema.items() if k != key}, {"not": {key: value}}]}
 
 
@@ -1314,7 +1333,7 @@ def _negative_multiple_of(
     )
 
 
-def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
+def _negative_unique_items(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     unique = jsonify(ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1}))
     yield NegativeValue(
         unique + unique,
@@ -1345,7 +1364,9 @@ def _is_invalid_format(v: Any, format: str) -> bool:
     return not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
 
 
-def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generator[GeneratedValue, None, None]:
+def _negative_format(
+    ctx: CoverageContext, schema: JsonSchemaObject, format: str
+) -> Generator[GeneratedValue, None, None]:
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format.setdefault("type", "string")
@@ -1515,15 +1536,15 @@ def _flip_generation_mode_for_not(
         )
 
 
-def push_examples_to_properties(schema: dict[str, Any]) -> None:
+def push_examples_to_properties(schema: JsonSchemaObject) -> None:
     """Push examples from the top-level 'examples' field to the corresponding properties."""
     if "examples" in schema and "properties" in schema:
         properties = schema["properties"]
         for example in schema["examples"]:
             if isinstance(example, dict):
                 for prop, value in example.items():
-                    if prop in properties:
+                    if prop in properties and isinstance(properties[prop], dict):
                         if "examples" not in properties[prop]:
                             properties[prop]["examples"] = []
-                        if value not in schema["properties"][prop]["examples"]:
+                        if value not in properties[prop]["examples"]:
                             properties[prop]["examples"].append(value)
