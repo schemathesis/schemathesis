@@ -32,7 +32,9 @@ Failed to extract data from response:
 
     GET /users/{userId} -> [200] DeleteUser -> DELETE /users/{userId}
 
-        Failed to parse JSON from response
+        NotImplementedError: Cannot deserialize response with Content-Type: 'text/plain'
+
+Register a deserializer with @schemathesis.deserializer() to handle this media type
 
         [201] curl -X POST -H 'Content-Type: application/json' -d '{"name": "fixed-name"}' http://127.0.0.1/users
         [200] curl -X GET http://127.0.0.1/users/192

@@ -169,7 +169,14 @@ class BodyResponse(Node):
         self.pointer = pointer
 
     def evaluate(self, output: StepOutput) -> Any:
-        document = output.response.json()
+        from schemathesis.core.deserialization import DeserializationContext, deserialize_response
+
+        response = output.response
+        content_type = response.headers.get("content-type", ["application/json"])[0]
+
+        context = DeserializationContext(operation=output.case.operation, case=output.case)
+        document = deserialize_response(response, content_type, context=context)
+
         if self.pointer is None:
             # We need the parsed document - data will be serialized before sending to the application
             return document
