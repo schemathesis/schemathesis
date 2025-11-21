@@ -102,7 +102,6 @@ def test_iter_operations(benchmark, raw_schema, loader):
 @pytest.mark.parametrize(
     "raw_schema, loader",
     [
-        (BBCI, schemathesis.openapi.from_dict),
         (VMWARE, schemathesis.openapi.from_dict),
         (STRIPE, schemathesis.openapi.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
@@ -112,7 +111,7 @@ def test_iter_operations(benchmark, raw_schema, loader):
         (ML_WEBSERVICES, schemathesis.openapi.from_dict),
         (AZURE_NETWORK, schemathesis.openapi.from_dict),
     ],
-    ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
+    ids=("vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_measure_statistic(benchmark, raw_schema, loader):
     schema = loader(raw_schema, config=CONFIG)
@@ -236,7 +235,7 @@ def _collect_cassette_entries(schema):
     return entries
 
 
-@pytest.mark.parametrize("schema", [BBCI_SCHEMA, VMWARE_SCHEMA], ids=("bbci", "vmware"))
+@pytest.mark.parametrize("schema", [VMWARE_SCHEMA], ids=("vmware",))
 @pytest.mark.benchmark
 def test_vcr(benchmark, schema):
     entries = _collect_cassette_entries(schema)
@@ -288,11 +287,10 @@ def test_dependency_analysis(benchmark, schema):
 @pytest.mark.parametrize(
     "schema",
     [
-        BBCI_SCHEMA,
         VMWARE_SCHEMA,
         STRIPE_SCHEMA,
     ],
-    ids=("bbci", "vmware", "stripe"),
+    ids=("vmware", "stripe"),
 )
 def test_link_generation(benchmark, schema):
     graph = dependencies.analyze(schema)
