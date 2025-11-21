@@ -573,7 +573,9 @@ def cover_schema_iter(
                     max_length = schema.get("maxLength")
                     yield from _negative_pattern(ctx, value, min_length=min_length, max_length=max_length)
                 elif key == "format" and ("string" in types or not types):
-                    yield from _negative_format(ctx, schema, value)
+                    # Binary formats accept any bytes - no meaningful format violations
+                    if value not in ("binary", "byte"):
+                        yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
                     next = value + 1
                     if seen.insert(next):
@@ -1450,6 +1452,9 @@ def _negative_type(
         types = [ty]
     else:
         types = ty
+    # Binary formats accept any bytes - type mutations are ineffective
+    if "string" in types and ctx.location == ParameterLocation.BODY and schema.get("format") in ("binary", "byte"):
+        return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
 
     filter_func = {

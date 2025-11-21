@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, unquote
 
 import jsonschema
 import pytest
+from flask import Flask, jsonify, request
 from hypothesis import Phase, settings
 from jsonschema import ValidationError
 from requests import Request
@@ -2636,3 +2637,55 @@ def _validate_serialized_items_are_negative(serialized_items, parameter, case):
         except ValidationError:
             # Validation failed - this is expected for negative cases
             pass
+
+
+def test_binary_format_should_not_generate_empty_string_as_invalid(ctx, app_runner, cli, snapshot_cli):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/files/{filename}": {
+                "put": {
+                    "parameters": [{"in": "path", "name": "filename", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary",
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {"description": "Created"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/files/<path:filename>", methods=["PUT"])
+    def upload_file(filename):
+        data = request.get_data()
+        return jsonify({"message": "File added successfully", "size": len(data)}), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "-c",
+            "negative_data_rejection",
+            "--mode=negative",
+            "--max-examples=50",
+            "--phases=coverage",
+        )
+        == snapshot_cli
+    )
