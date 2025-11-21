@@ -9,6 +9,7 @@
 
 ### :bug: Fixed
 
+- Crash in coverage phase when encountering `items: false` with `prefixItems` in OpenAPI 3.1.0 schemas.
 - Custom media type strategies now apply when `encoding.contentType` is an array. [#3339](https://github.com/schemathesis/schemathesis/issues/3339)
 
 ## [4.5.4](https://github.com/schemathesis/schemathesis/compare/v4.5.3...v4.5.4) - 2025-11-18

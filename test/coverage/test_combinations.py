@@ -1905,3 +1905,14 @@ def test_not_schema_generation_modes_consistency(
     assert len(negative_only_positive) == 0, (
         f"Negative mode should not generate positive cases, but got {len(negative_only_positive)}"
     )
+
+
+def test_items_false_with_prefix_items(pctx):
+    schema = {
+        "type": "array",
+        "items": False,
+        "prefixItems": [{"type": "string"}, {"type": "string"}],
+    }
+    covered = cover_schema(pctx, schema)
+    assert_unique(covered)
+    assert_conform(covered, schema)
