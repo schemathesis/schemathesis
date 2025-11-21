@@ -1455,6 +1455,13 @@ def _negative_type(
     # Binary formats accept any bytes - type mutations are ineffective
     if "string" in types and ctx.location == ParameterLocation.BODY and schema.get("format") in ("binary", "byte"):
         return
+    # Form-urlencoded body-level type mutations serialize to empty body
+    if (
+        "object" in types
+        and ctx.location == ParameterLocation.BODY
+        and ctx.media_type == ("application", "x-www-form-urlencoded")
+    ):
+        return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
 
     filter_func = {
@@ -1469,6 +1476,11 @@ def _negative_type(
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
     if ctx.location == ParameterLocation.QUERY:
+        strategies.pop("object", None)
+    # Form-urlencoded property-level mutations with null/array/object serialize to empty
+    if ctx.location == ParameterLocation.BODY and ctx.media_type == ("application", "x-www-form-urlencoded"):
+        strategies.pop("null", None)
+        strategies.pop("array", None)
         strategies.pop("object", None)
     if filter_func is not None:
         for ty, strategy in strategies.items():
