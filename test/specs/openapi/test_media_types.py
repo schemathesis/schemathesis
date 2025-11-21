@@ -234,3 +234,45 @@ def test_multipart_encoding_multiple_content_types(ctx):
     assert len(content_types_seen) == 2, (
         f"Expected both content types to be selected, but only saw: {content_types_seen}"
     )
+
+
+@pytest.mark.openapi_version("3.0")
+def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
+    pdf_data = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"
+    schemathesis.openapi.media_type("application/pdf", st.just(pdf_data))
+
+    spec = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"attachment": {"type": "string", "format": "binary"}},
+                                    "required": ["attachment"],
+                                },
+                                "encoding": {"attachment": {"contentType": ["application/pdf"]}},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(spec)
+    operation = schema["/upload"]["POST"]
+    strategy = operation.as_strategy()
+
+    @given(strategy)
+    def test(case):
+        assert isinstance(case.body, dict)
+        assert case.body["attachment"] == pdf_data
+        # Content type should match the value from the encoding array, not be omitted
+        assert case.multipart_content_types["attachment"] == "application/pdf"
+
+    test()

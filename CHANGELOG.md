@@ -7,6 +7,10 @@
 - **CLI**: Dependency-based operation ordering in non-stateful tests.
 - **CLI**: Capture and reuse of successful API responses in the fuzzing phase.
 
+### :bug: Fixed
+
+- Custom media type strategies now apply when `encoding.contentType` is an array. [#3339](https://github.com/schemathesis/schemathesis/issues/3339)
+
 ## [4.5.4](https://github.com/schemathesis/schemathesis/compare/v4.5.3...v4.5.4) - 2025-11-18
 
 ### :bug: Fixed

@@ -425,15 +425,16 @@ def _build_form_strategy_with_encoding(
     property_content_type_selections: dict[str, list[str]] = {}
 
     for property_name in properties:
-        content_type = parameter.get_property_content_type(property_name)
+        raw_content_type = parameter.get_property_content_type(property_name)
 
-        if content_type is not None and not isinstance(content_type, str):
-            # Happens in broken schemas
-            continue  # type: ignore[unreachable]
+        # contentType can be a string (or comma-separated list) or an array of strings per the spec
+        content_types: list[str] = []
+        if isinstance(raw_content_type, str):
+            content_types = [ct.strip() for ct in raw_content_type.split(",")]
+        elif isinstance(raw_content_type, list):
+            content_types = [ct.strip() for ct in raw_content_type if isinstance(ct, str)]
 
-        if content_type:
-            # Handle multiple content types (e.g., "image/png, image/jpeg")
-            content_types = [ct.strip() for ct in content_type.split(",")]
+        if content_types:
             strategies_for_types = []
             for ct in content_types:
                 strategy = _find_media_type_strategy(ct)
