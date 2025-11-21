@@ -2979,3 +2979,190 @@ def test_inject_links_invalid_link_missing_operation_ref_and_id(ctx):
 
     with pytest.raises(InvalidSchema, match="Link definition is missing both.*operationRef.*operationId"):
         dependencies.inject_links(schema)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@flaky(max_runs=5, min_passes=1)
+def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapshot_cli, ctx):
+    @schemathesis.deserializer("application/vnd.custom")
+    def deserialize_custom(ctx, response):
+        text = response.content.decode(response.encoding or "utf-8")
+        result = {}
+        for line in text.strip().split("\n"):
+            if "=" in line:
+                key, value = line.split("=", 1)
+                result[key] = None if value == "None" else value
+        return result
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"first_name": {"type": "string"}, "last_name": {"type": "string"}},
+                                    "required": ["first_name", "last_name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "User created",
+                            "content": {
+                                "application/vnd.custom": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/users/{user_id}": {
+                "parameters": [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}}],
+                "get": {
+                    "operationId": "getUser",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/vnd.custom": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}, "full_name": {"type": "string"}},
+                                        "required": ["id", "full_name"],
+                                    }
+                                }
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                },
+                "patch": {
+                    "operationId": "updateUser",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "first_name": {"type": "string"},
+                                        "last_name": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/vnd.custom": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "string"},
+                                            "first_name": {"type": "string"},
+                                            "last_name": {"type": "string"},
+                                        },
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                },
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    users = {}
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        nonlocal next_id
+        data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}, 400
+
+        user_id = str(next_id)
+        next_id += 1
+        users[user_id] = {
+            "id": user_id,
+            "first_name": str(data.get("first_name", "")),
+            "last_name": str(data.get("last_name", "")),
+            "corrupted": False,
+        }
+
+        return f"id={user_id}", 201, {"Content-Type": "application/vnd.custom"}
+
+    @app.route("/users/<user_id>", methods=["GET"])
+    def get_user(user_id):
+        if user_id not in users:
+            return "", 404
+
+        user = users[user_id]
+
+        # If user is corrupted, return None for full_name (violates schema expecting string)
+        if user.get("corrupted"):
+            return f"id={user['id']}\nfull_name=None", 200, {"Content-Type": "application/vnd.custom"}
+
+        full_name = user["first_name"] + " " + user["last_name"]
+        return f"id={user['id']}\nfull_name={full_name}", 200, {"Content-Type": "application/vnd.custom"}
+
+    @app.route("/users/<user_id>", methods=["PATCH"])
+    def update_user(user_id):
+        if user_id not in users:
+            return "", 404
+
+        data = request.get_json() or {}
+        if not isinstance(data, dict):
+            return {"error": "Invalid input"}, 400
+
+        user = users[user_id]
+
+        # PATCH with empty body corrupts internal state (bug!)
+        if not data.get("first_name") and not data.get("last_name"):
+            user["corrupted"] = True
+        else:
+            if "first_name" in data:
+                user["first_name"] = str(data["first_name"])
+            if "last_name" in data:
+                user["last_name"] = str(data["last_name"])
+
+        # Always return success (bug hidden in response)
+        response_first = str(user.get("first_name", ""))
+        response_last = str(user.get("last_name", ""))
+        return (
+            f"id={user['id']}\nfirst_name={response_first}\nlast_name={response_last}",
+            200,
+            {"Content-Type": "application/vnd.custom"},
+        )
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=10",
+            "-c response_schema_conformance",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--mode=positive",
+            "--phases=stateful",
+        )
+        == snapshot_cli
+    )

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, BinaryIO, TextIO
 
-from schemathesis.core import media_types
+from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
@@ -192,11 +192,18 @@ def deserialize_response(
     *,
     context: DeserializationContext,
 ) -> Any:
+    # Check cache first to avoid re-parsing the same response
+    if response._deserialized is not NOT_SET:
+        return response._deserialized
+
     for _, deserializer in _iter_matching_deserializers(content_type):
-        return deserializer(context, response)
+        data = deserializer(context, response)
+        # Cache the result for future calls
+        response._deserialized = data
+        return data
     raise NotImplementedError(
-        f"Unsupported Content-Type: {content_type!r}. "
-        f"Registered deserializers: {', '.join(sorted(_DESERIALIZERS)) or 'none'}."
+        f"Cannot deserialize response with Content-Type: {content_type!r}\n\n"
+        f"Register a deserializer with @schemathesis.deserializer() to handle this media type"
     )
 
 
