@@ -127,7 +127,7 @@ def create_test(
 
     ApiOperationMark.set(hypothesis_test, operation)
 
-    if config.seed is not None:
+    if config.seed is not None and not hasattr(test_func, "_hypothesis_internal_use_seed"):
         hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
 
     default = hypothesis.settings.default
