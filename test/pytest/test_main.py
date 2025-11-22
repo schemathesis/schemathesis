@@ -66,6 +66,8 @@ def test_b(case):
     )
     result = testdir.runpytest("-v", "-s")
     assert "The `base_url` argument is required when specifying a schema via a file" in result.stdout.str()
+    # But it should NOT include reproduction code since this is a configuration error, not an API failure
+    assert "Reproduce with:" not in result.stdout.str()
 
 
 def test_pytest_parametrize_class_fixture(testdir):

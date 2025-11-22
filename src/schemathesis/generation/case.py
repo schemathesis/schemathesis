@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis import transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, load_all_checks, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transport import Response
@@ -364,8 +365,11 @@ class Case:
                 cookies=cookies,
                 **kwargs,
             )
+        except IncorrectUsage:
+            # Configuration errors - don't add reproduction code
+            raise
         except Exception as exc:
-            # May happen in ASGI / WSGI apps
+            # Add reproduction code for check failures and app errors (e.g., ASGI/WSGI internal errors)
             if not hasattr(exc, "__notes__"):
                 exc.__notes__ = []  # type: ignore[attr-defined]
             verify = kwargs.get("verify", True)

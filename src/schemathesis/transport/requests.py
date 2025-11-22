@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from schemathesis.core import NotSet
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
@@ -178,7 +179,7 @@ def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
             if frame.function == "call_and_validate":
                 method_name = "call_and_validate"
                 break
-        raise RuntimeError(
+        raise IncorrectUsage(
             "The `base_url` argument is required when specifying a schema via a file, so Schemathesis knows where to send the data. \n"
             f"Pass `base_url` either to the `schemathesis.openapi.from_*` loader or to the `Case.{method_name}`.\n"
             f"If you use the ASGI integration, please supply your test client "
