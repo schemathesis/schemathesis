@@ -17,6 +17,7 @@
 - **pytest**: Seed from schema config is now properly applied to tests.
 - **pytest**: Proxy from schema config is now properly applied to tests.
 - **pytest**: Fuzzing phase-specific generation config (e.g., `max_examples`) is now properly applied to tests.
+- `schemathesis.openapi.from_url()` now uses `wait_for_schema` from config when not explicitly provided.
 - Stateful testing now supports custom deserializers for non-JSON response formats.
 - Crash in coverage phase when encountering `items: false` with `prefixItems` in OpenAPI 3.1.0 schemas.
 - Custom media type strategies now apply when `encoding.contentType` is an array. [#3339](https://github.com/schemathesis/schemathesis/issues/3339)

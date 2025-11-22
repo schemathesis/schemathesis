@@ -112,6 +112,11 @@ def from_url(
     """
     import requests
 
+    if wait_for_schema is None:
+        if config is None:
+            config = SchemathesisConfig.discover()
+        wait_for_schema = config.wait_for_schema
+
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=url)
     schema = load_content(response.text, content_type)
