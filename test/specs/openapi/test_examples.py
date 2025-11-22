@@ -2347,3 +2347,57 @@ def test_allof_with_required_field_should_not_use_incomplete_property_examples(c
             jsonschema.validate(case.body, body_schema)
         except jsonschema.ValidationError as e:
             pytest.fail(f"Generated invalid case {case.body}: {e}")
+
+
+def test_allof_not_referencing_root_schema(ctx):
+    # It used to lead to infinite recursion
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/first": {
+                "put": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Base",
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/second": {
+                "get": {
+                    "parameters": [
+                        {
+                            "schema": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/Bar",
+                                    }
+                                ]
+                            },
+                            "name": "key",
+                            "in": "query",
+                        }
+                    ]
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Base": {
+                    "foo": {"$ref": "#/components/schemas/Foo"},
+                    "bar": {
+                        "$ref": "#/components/schemas/Bar",
+                    },
+                },
+                "Foo": {},
+                "Bar": {},
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/second"]["GET"]
+
+    assert list(extract_top_level(operation)) == []
