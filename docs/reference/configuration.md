@@ -87,6 +87,9 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     color = false
     ```
 
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command.
+
 #### `suppress-health-check`
 
 !!! note ""
@@ -125,6 +128,9 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     ```toml
     max-failures = 42
     ```
+
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command. For pytest, use pytest's own `-x` or `--maxfail` options instead.
 
 #### `warnings`
 
@@ -174,7 +180,13 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     - `missing_deserializer`: Response has structured schema but no registered deserializer for validation
     - `unused_openapi_auth`: Configured OpenAPI auth scheme is not defined in the schema
 
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command. The pytest plugin uses pytest's own warning system.
+
 ### Reporting
+
+!!! info "CLI Only"
+    These options only apply when using the `schemathesis run` command. Reports are not generated when using the pytest plugin, as pytest has its own reporting mechanisms.
 
 #### `reports.directory`
 
@@ -402,6 +414,9 @@ These settings can only be applied at the project level.
     workers = "auto"  # Allocate workers based on the number of available CPU cores
     ```
 
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command. For parallel execution with pytest, use `pytest-xdist`.
+
 #### `wait-for-schema`
 
 !!! note ""
@@ -427,6 +442,9 @@ These settings can only be applied at the project level.
     ```toml
     continue-on-failure = true
     ```
+
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command.
 
 ### Phases
 
@@ -482,7 +500,8 @@ These settings can only be applied at the project level.
     operation-ordering = "none"
     ```
 
-    CLI-only. Only available for non-stateful phases (examples, coverage, fuzzing).
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command for non-stateful phases (examples, coverage, fuzzing). The pytest plugin uses its own test execution model via `@schema.parametrize()`.
 
 #### `phases.<phase>.extra-data-sources`
 
@@ -498,7 +517,8 @@ These settings can only be applied at the project level.
     responses = false  # Disable using response data
     ```
 
-    CLI-only. Only available for fuzzing phase.
+!!! info "CLI Only"
+    This option only applies when using the `schemathesis run` command for the fuzzing phase.
 
     **Available sources:**
 
