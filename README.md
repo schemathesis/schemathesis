@@ -92,6 +92,14 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 
 > "_Schemathesis is the best tool for fuzz testing of REST APIs on the market. We at Red Hat use it for examining our applications in functional and integration testing levels._" - Dmitry Misharov, RedHat
 
+## See it in action
+
+🔬 **[Live Benchmarks](https://workbench.schemathesis.io)** showing continuous testing results from real-world APIs:
+
+- Code & API schema coverage achieved
+- Issues found with detailed categorization
+- Performance across different fuzzing strategies
+
 ## Documentation
 
 📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference.
