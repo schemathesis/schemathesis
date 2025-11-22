@@ -318,7 +318,7 @@ def test_call_and_validate_for_asgi(fastapi_app):
     @given(case=api_schema["/users"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
     def test(case):
-        with pytest.raises(RuntimeError, match="If you use the ASGI integration"):
+        with pytest.raises(IncorrectUsage, match="If you use the ASGI integration"):
             case.call_and_validate()
 
     test()
