@@ -69,3 +69,38 @@ def test_seed(case):
     test_func = spy.call_args.kwargs["test_func"]
     assert hasattr(test_func, "_hypothesis_internal_use_seed")
     assert test_func._hypothesis_internal_use_seed == 42
+
+
+@pytest.mark.parametrize("is_lazy", [False, True])
+def test_config_proxy_is_used(testdir, is_lazy, openapi3_base_url):
+    proxy_url = "http://127.0.0.1:8080"
+    if is_lazy:
+        schema_setup = f"""
+@pytest.fixture
+def api_schema():
+    config = SchemathesisConfig()
+    config.projects.default.update(proxy="{proxy_url}", base_url="{openapi3_base_url}")
+    return schemathesis.openapi.from_dict(raw_schema, config=config)
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+"""
+    else:
+        schema_setup = f"""
+config = SchemathesisConfig()
+config.projects.default.update(proxy="{proxy_url}", base_url="{openapi3_base_url}")
+schema = schemathesis.openapi.from_dict(raw_schema, config=config)
+"""
+
+    testdir.make_test(
+        f"""
+{schema_setup}
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_proxy(case):
+    with pytest.raises(requests.exceptions.ProxyError):
+        case.call()
+"""
+    )
+    result = testdir.runpytest("-q")
+    result.assert_outcomes(passed=1)
