@@ -24,6 +24,7 @@
 - False positives for `format: binary` and `format: byte` in negative testing.
 - False positives for `application/x-www-form-urlencoded` bodies in negative testing. [#3338](https://github.com/schemathesis/schemathesis/issues/3338)
 - Internal error during negative testing of `application/x-www-form-urlencoded` with WSGI apps.
+- Infinite recursion during the examples phase if `allOf` contained `$ref` that required bundling.
 
 ## [4.5.4](https://github.com/schemathesis/schemathesis/compare/v4.5.3...v4.5.4) - 2025-11-18
 

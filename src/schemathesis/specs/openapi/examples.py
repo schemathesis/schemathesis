@@ -290,11 +290,10 @@ def _expand_subschemas(
                 subschema.pop("examples", None)
 
             for key, value in schema.items():
-                if key == "allOf":
+                if key in ("allOf", "example", "examples", BUNDLE_STORAGE_KEY):
                     # Skip the allOf itself, we already processed it
-                    continue
-                elif key in ("example", "examples"):
                     # Skip parent's examples - they were already yielded
+                    # Skip bundled schemas too to avoid infinite recursion
                     continue
                 elif key == "properties":
                     # Merge parent properties (parent overrides allOf)
