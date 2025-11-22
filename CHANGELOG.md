@@ -16,6 +16,7 @@
 - **pytest**: Reproduction code is no longer shown for configuration errors like missing `base_url`.
 - **pytest**: Seed from schema config is now properly applied to tests.
 - **pytest**: Proxy from schema config is now properly applied to tests.
+- **pytest**: Fuzzing phase-specific generation config (e.g., `max_examples`) is now properly applied to tests.
 - Stateful testing now supports custom deserializers for non-JSON response formats.
 - Crash in coverage phase when encountering `items: false` with `prefixItems` in OpenAPI 3.1.0 schemas.
 - Custom media type strategies now apply when `encoding.contentType` is an array. [#3339](https://github.com/schemathesis/schemathesis/issues/3339)

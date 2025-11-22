@@ -58,7 +58,15 @@ class FuzzingPhaseConfig(DiffBase):
     operation_ordering: OperationOrdering
     extra_data_sources: ExtraDataSourcesConfig
 
-    __slots__ = ("enabled", "generation", "checks", "operation_ordering", "extra_data_sources", "_is_default")
+    __slots__ = (
+        "enabled",
+        "generation",
+        "checks",
+        "operation_ordering",
+        "extra_data_sources",
+        "_checks_is_default",
+        "_extra_data_sources_is_default",
+    )
 
     def __init__(
         self,
@@ -76,12 +84,23 @@ class FuzzingPhaseConfig(DiffBase):
             OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
         )
         self.extra_data_sources = extra_data_sources or ExtraDataSourcesConfig()
-        self._is_default = (
-            enabled
-            and generation is None
-            and checks is None
+        # Track whether nested configs were provided or created as defaults
+        self._checks_is_default = checks is None
+        self._extra_data_sources_is_default = extra_data_sources is None
+
+    @property
+    def _is_default(self) -> bool:
+        """Check if this config is still in default state.
+
+        A config is default if enabled is True, operation_ordering is AUTO,
+        and all nested configs are in their default state.
+        """
+        return (
+            self.enabled
+            and self.generation._is_default
+            and self._checks_is_default
             and self.operation_ordering == OperationOrdering.AUTO
-            and extra_data_sources is None
+            and self._extra_data_sources_is_default
         )
 
     @classmethod

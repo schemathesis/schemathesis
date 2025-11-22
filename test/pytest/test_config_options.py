@@ -104,3 +104,58 @@ def test_proxy(case):
     )
     result = testdir.runpytest("-q")
     result.assert_outcomes(passed=1)
+
+
+@pytest.mark.parametrize("is_lazy", [False, True])
+def test_fuzzing_phase_max_examples_is_used(testdir, is_lazy):
+    max_examples = 3
+    if is_lazy:
+        schema_setup = f"""
+@pytest.fixture
+def api_schema():
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.phases.fuzzing.generation.update(max_examples={max_examples})
+    schema.config.phases.examples.enabled = False
+    schema.config.phases.coverage.enabled = False
+    schema.config.phases.stateful.enabled = False
+    return schema
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+"""
+    else:
+        schema_setup = f"""
+schema = schemathesis.openapi.from_dict(raw_schema)
+schema.config.phases.fuzzing.generation.update(max_examples={max_examples})
+schema.config.phases.examples.enabled = False
+schema.config.phases.coverage.enabled = False
+schema.config.phases.stateful.enabled = False
+"""
+
+    testdir.make_test(
+        f"""
+{schema_setup}
+
+@schema.include(path_regex="test").parametrize()
+def test_max_examples(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+    pass
+""",
+        paths={
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 0, "maximum": 1000},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
+    result.stdout.re_match_lines([rf"Hypothesis calls: {max_examples}"])
