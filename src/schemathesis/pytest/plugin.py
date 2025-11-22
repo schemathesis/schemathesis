@@ -170,6 +170,7 @@ class SchemathesisCase(PyCollector):
                         given_kwargs=self.given_kwargs,
                         project=self.schema.config,
                         as_strategy_kwargs=as_strategy_kwargs,
+                        seed=self.schema.config.seed,
                     ),
                 )
                 if inspect.iscoroutinefunction(self.test_function):

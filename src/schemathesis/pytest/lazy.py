@@ -41,10 +41,10 @@ def get_all_tests(
     *,
     schema: BaseSchema,
     test_func: Callable,
-    settings: hypothesis.settings | None = None,
-    seed: int | None = None,
-    as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None,
-    given_kwargs: dict[str, GivenInput] | None = None,
+    settings: hypothesis.settings | None,
+    seed: int | None,
+    as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None,
+    given_kwargs: dict[str, GivenInput] | None,
 ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
     """Generate all operations and Hypothesis tests for them."""
     for result in schema.get_all_operations():
@@ -250,6 +250,7 @@ class LazySchema:
                         settings=settings,
                         as_strategy_kwargs=as_strategy_kwargs,
                         given_kwargs=given_kwargs,
+                        seed=schema.config.seed,
                     )
                 )
                 if not tests:
