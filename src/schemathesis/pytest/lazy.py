@@ -65,11 +65,13 @@ def get_all_tests(
             if phases.coverage.enabled:
                 modes.append(HypothesisTestMode.COVERAGE)
 
+            # Use fuzzing phase settings if fuzzing is enabled, since only fuzzing uses max_examples
+            phase = "fuzzing" if HypothesisTestMode.FUZZING in modes else None
             test = create_test(
                 operation=operation,
                 test_func=test_func,
                 config=HypothesisTestConfig(
-                    settings=settings or schema.config.get_hypothesis_settings(operation=operation),
+                    settings=settings or schema.config.get_hypothesis_settings(operation=operation, phase=phase),
                     modes=modes,
                     seed=seed,
                     project=schema.config,
