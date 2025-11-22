@@ -97,6 +97,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         timeout = config.request_timeout_for(operation=case.operation)
         verify = config.tls_verify_for(operation=case.operation)
         cert = config.request_cert_for(operation=case.operation)
+        proxies = config.proxy_for(operation=case.operation)
 
         if session is not None and session.headers:
             # These headers are explicitly provided via config or CLI args.
@@ -120,6 +121,8 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             if key not in ("headers", "cookies", "params") or key not in data:
                 data[key] = value
         data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
+        if proxies is not None:
+            data.setdefault("proxies", {"all": proxies})
 
         current_session_headers: MutableMapping[str, Any] = {}
         current_session_auth = None
