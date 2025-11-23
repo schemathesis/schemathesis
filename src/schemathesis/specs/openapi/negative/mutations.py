@@ -559,8 +559,11 @@ def negate_constraints(
     if is_negated:
         # Build concise description from negated constraints
         descriptions = []
+        parameter = None
         for key in negated_keys:
             value = copied[key]
+            if key == "required" and len(value) == 1:
+                parameter = value[0]
             # Special case: format required properties list nicely with quoted names
             if key == "required" and isinstance(value, list) and len(value) <= 3:
                 props = ", ".join(f"`{prop}`" for prop in value)
@@ -571,7 +574,7 @@ def negate_constraints(
 
         constraint_desc = ", ".join(descriptions)
         metadata = MutationMetadata(
-            parameter=None,
+            parameter=parameter,
             description=f"Violates {constraint_desc}",
             location=None,
         )

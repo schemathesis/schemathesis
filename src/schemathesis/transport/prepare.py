@@ -11,7 +11,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData, StatefulPhaseData
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
@@ -40,14 +40,29 @@ def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseIn
 
 
 def get_exclude_headers(case: Case) -> list[str]:
+    if case.meta is None:
+        return []
+
+    phase_data = case.meta.phase.data
+
+    # Exclude headers that are intentionally missing
+
     if (
-        case.meta is not None
-        and isinstance(case.meta.phase.data, CoveragePhaseData)
-        and case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
-        and case.meta.phase.data.parameter_location == ParameterLocation.HEADER
-        and case.meta.phase.data.parameter is not None
+        isinstance(phase_data, CoveragePhaseData)
+        and phase_data.scenario == CoverageScenario.MISSING_PARAMETER
+        and phase_data.parameter_location == ParameterLocation.HEADER
+        and phase_data.parameter is not None
     ):
-        return [case.meta.phase.data.parameter]
+        return [phase_data.parameter]
+
+    if (
+        isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData))
+        and case.meta.generation.mode.is_negative
+        and phase_data.parameter_location == ParameterLocation.HEADER
+        and phase_data.parameter is not None
+    ):
+        return [phase_data.parameter]
+
     return []
 
 
