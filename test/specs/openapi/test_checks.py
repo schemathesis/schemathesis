@@ -19,6 +19,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
+    _body_negation_becomes_valid_after_serialization,
     _is_prefix_operation,
     has_only_additional_properties_in_non_body_parameters,
     negative_data_rejection,
@@ -214,6 +215,51 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         )
         is None
     )
+
+
+@pytest.mark.parametrize(
+    ("media_type", "body_mode", "query_mode", "header_mode", "expected"),
+    [
+        ("text/plain", GenerationMode.NEGATIVE, None, None, True),
+        ("application/octet-stream", GenerationMode.NEGATIVE, None, None, True),
+        ("application/json", GenerationMode.NEGATIVE, None, None, False),
+        ("text/plain", GenerationMode.NEGATIVE, GenerationMode.NEGATIVE, None, False),
+        ("text/plain", GenerationMode.NEGATIVE, None, GenerationMode.NEGATIVE, False),
+        ("text/plain", GenerationMode.NEGATIVE, GenerationMode.NEGATIVE, GenerationMode.NEGATIVE, False),
+        ("text/plain", None, GenerationMode.NEGATIVE, None, False),
+    ],
+)
+def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_mode, query_mode, header_mode, expected):
+    text_plain_schema = ctx.openapi.build_schema(
+        {
+            "/endpoint": {
+                "put": {
+                    "parameters": [
+                        {"in": "query", "name": "key", "schema": {"type": "integer"}},
+                        {"in": "header", "name": "X-Key", "schema": {"type": "integer"}},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {media_type: {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(text_plain_schema)
+    operation = schema["/endpoint"]["PUT"]
+    case = operation.Case(
+        _meta=build_metadata(
+            body=body_mode,
+            query=query_mode,
+            headers=header_mode,
+            generation_mode=GenerationMode.NEGATIVE,
+        ),
+        body={},
+        media_type=media_type,
+    )
+    assert _body_negation_becomes_valid_after_serialization(case) is expected
 
 
 def test_response_schema_conformance_with_unspecified_method(response_factory, sample_schema):

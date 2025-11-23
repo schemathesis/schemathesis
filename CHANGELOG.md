@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.0...HEAD) - TBD
 
+### :bug: Fixed
+
+  - False positive in `negative_data_rejection` check for `text/plain` and `application/octet-stream` endpoints where non-string values become valid after serialization.
+
 ## [4.6.0](https://github.com/schemathesis/schemathesis/compare/v4.5.4...v4.6.0) - 2025-11-22
 
 ### :rocket: Added
