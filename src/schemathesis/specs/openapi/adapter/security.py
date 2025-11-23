@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ApiKeyAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
+from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
 from schemathesis.specs.openapi.auths import ApiKeyAuthProvider, HttpBasicAuthProvider, HttpBearerAuthProvider
 
 if TYPE_CHECKING:
@@ -14,6 +16,29 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 
 ORIGINAL_SECURITY_TYPE_KEY = "x-original-security-type"
+
+
+def _matches_security_parameter(
+    definition: Mapping[str, Any],
+    param_name: str,
+    param_location: ParameterLocation,
+) -> bool:
+    """Check if security definition would set the given parameter."""
+    ty = definition.get("type")
+
+    if ty == "http":
+        return param_name == "Authorization" and param_location == ParameterLocation.HEADER
+
+    if ty == "apiKey":
+        location_map = {
+            "header": ParameterLocation.HEADER,
+            "query": ParameterLocation.QUERY,
+            "cookie": ParameterLocation.COOKIE,
+        }
+        loc = definition.get("in")
+        return isinstance(loc, str) and param_name == definition.get("name") and param_location == location_map.get(loc)
+
+    return False
 
 
 class OpenApiSecurity:
@@ -70,6 +95,21 @@ class OpenApiSecurity:
             configured_schemes: Dict of configured auth schemes from config
 
         """
+        # Check if a security parameter was intentionally removed during negative testing
+        meta = case.meta
+        if meta and meta.generation.mode.is_negative:
+            phase_data = meta.phase.data
+            if isinstance(phase_data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
+                mutated_param = phase_data.parameter
+                mutated_location = phase_data.parameter_location
+                if mutated_param and mutated_location:
+                    # Check if any security scheme would set this parameter
+                    security_definitions = self.security_definitions
+                    for definition in security_definitions.values():
+                        if _matches_security_parameter(definition, mutated_param, mutated_location):
+                            # Don't re-apply auth that was intentionally removed for testing
+                            return False
+
         # Get security requirements for this operation
         operation_definition = case.operation.definition.raw
 
