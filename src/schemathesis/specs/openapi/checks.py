@@ -241,6 +241,58 @@ def response_schema_conformance(ctx: CheckContext, response: Response, case: Cas
     return case.operation.validate_response(response, case=case)
 
 
+def _is_stringifying_media_type(media_type: str) -> bool:
+    """Check if media type serializes all values to strings.
+
+    Media types like text/plain and application/octet-stream convert any value
+    to a string representation during serialization (via str(value)).
+    This means negative-generated non-string values become valid strings after serialization.
+    """
+    return media_types.is_plain_text(media_type) or media_type == "application/octet-stream"
+
+
+def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
+    """Check if body negation becomes valid after serialization.
+
+    For media types like text/plain, any value gets stringified during serialization,
+    making it valid for string schemas. Skip negative_data_rejection ONLY if:
+    1. The body is the only negative component
+    2. AND the media type is stringifying
+
+    If there are other negative components (query, headers, etc.), we should still
+    check them even if the body negation is neutralized by serialization.
+    """
+    meta = case.meta
+    if meta is None:
+        return False
+
+    body_meta = meta.components.get(ParameterLocation.BODY)
+    if body_meta is None or not body_meta.mode.is_negative:
+        return False
+
+    media_type = case.media_type
+    if media_type is None:
+        return False
+
+    if not _is_stringifying_media_type(media_type):
+        return False
+
+    # Check if there are other negative components besides body
+    for location in (
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+        ParameterLocation.PATH,
+    ):
+        component = meta.components.get(location)
+        if component is not None and component.mode.is_negative:
+            # There's another negative component, don't skip the check
+            return False
+
+    # Only the body is negative and it's a stringifying media type
+    return True
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -256,6 +308,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         meta.generation.mode.is_negative
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
+        and not _body_negation_becomes_valid_after_serialization(case)
     ):
         extra_info = ""
         phase = meta.phase
