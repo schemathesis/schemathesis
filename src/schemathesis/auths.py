@@ -18,8 +18,10 @@ from typing import (
 
 from schemathesis.core.errors import AuthenticationError, IncorrectUsage
 from schemathesis.core.marks import Mark
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
 from schemathesis.generation.case import Case
+from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
 
 if TYPE_CHECKING:
     import requests.auth
@@ -462,6 +464,19 @@ def apply_basic_auth(case: Case, username: str, password: str) -> None:
     case._has_explicit_auth = True
 
 
+def _should_skip_auth_for_negative_testing(case: Case, param_name: str, param_location: ParameterLocation) -> bool:
+    """Check if auth should be skipped because the parameter was intentionally removed for testing."""
+    meta = case.meta
+    if not meta or not meta.generation.mode.is_negative:
+        return False
+
+    phase_data = meta.phase.data
+    if not isinstance(phase_data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
+        return False
+
+    return phase_data.parameter == param_name and phase_data.parameter_location == param_location
+
+
 def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | None) -> None:
     """Set authentication data on this case.
 
@@ -482,7 +497,9 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
     # 2. Generic auth (CLI overrides or config - applies to all operations)
     basic_auth = case.operation.schema.config.auth_for(operation=case.operation)
     if basic_auth is not None:
-        apply_basic_auth(case, *basic_auth)
+        # Don't apply auth if Authorization was intentionally removed for negative testing
+        if not _should_skip_auth_for_negative_testing(case, "Authorization", ParameterLocation.HEADER):
+            apply_basic_auth(case, *basic_auth)
         return
 
     if case.operation.schema.auth.is_defined:

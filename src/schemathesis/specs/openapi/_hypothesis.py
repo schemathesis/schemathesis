@@ -232,9 +232,9 @@ def openapi_cases(
             metadata = negated_container.meta
             location_map = {
                 "query": ParameterLocation.QUERY,
-                "path_parameters": ParameterLocation.PATH,
-                "headers": ParameterLocation.HEADER,
-                "cookies": ParameterLocation.COOKIE,
+                "path": ParameterLocation.PATH,
+                "header": ParameterLocation.HEADER,
+                "cookie": ParameterLocation.COOKIE,
                 "body": ParameterLocation.BODY,
             }
             parameter_location = location_map.get(negated_container.location)
