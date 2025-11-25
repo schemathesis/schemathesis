@@ -1177,7 +1177,9 @@ def _positive_object(
             and not (examples is not None and any(default == ex for ex in examples))
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    else:
+    elif template or not (
+        ctx.is_required and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
+    ):
         yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
 
     properties = schema.get("properties", {})
