@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Incomplete fix for false positive `API rejected schema-compliant request` for `application/x-www-form-urlencoded` with required body. [#3360](https://github.com/schemathesis/schemathesis/issues/3360)
+
 ## [4.6.2](https://github.com/schemathesis/schemathesis/compare/v4.6.1...v4.6.2) - 2025-11-25
 
 ### :bug: Fixed
