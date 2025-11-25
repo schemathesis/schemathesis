@@ -1205,11 +1205,16 @@ def _positive_object(
     # Generate only required properties
     if set(properties) != required:
         only_required = {k: v for k, v in template.items() if k in required}
-        yield PositiveValue(
-            only_required,
-            scenario=CoverageScenario.OBJECT_ONLY_REQUIRED,
-            description="Object with only required properties",
-        )
+        # Skip empty object for required form bodies - {} serializes to no content
+        # which violates requestBody.required
+        if only_required or not (
+            ctx.is_required and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
+        ):
+            yield PositiveValue(
+                only_required,
+                scenario=CoverageScenario.OBJECT_ONLY_REQUIRED,
+                description="Object with only required properties",
+            )
     seen = HashSet()
     for name, sub_schema in properties.items():
         seen.insert(template.get(name))
