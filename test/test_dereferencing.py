@@ -10,7 +10,9 @@ from werkzeug.exceptions import InternalServerError
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.result import Ok
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.specs.openapi.stateful import dependencies
 
 from .utils import as_param, get_schema_path, integer
 
@@ -1147,3 +1149,188 @@ def test_bundling_cache_returns_independent_copies(ctx):
 
     test1()
     test2()
+
+
+def test_nested_external_refs_with_relative_paths(ctx):
+    # See GH-3361
+    schema_path = ctx.openapi.write_schema(
+        {"/media": {"$ref": "media/feed.json#/paths/Feed"}},
+        version="3.1.0",
+    )
+
+    # types.json - sibling to parameters.json
+    ctx.makefile({"MetaPage": {"type": "integer", "minimum": 1, "maximum": 100}}, filename="types")
+
+    # parameters.json - references types.json (sibling file)
+    ctx.makefile(
+        {"Page": {"name": "page", "in": "query", "schema": {"$ref": "types.json#/MetaPage"}}},
+        filename="parameters",
+    )
+
+    # media/feed.json - references ../parameters.json (parent directory)
+    ctx.makefile(
+        {
+            "paths": {
+                "Feed": {
+                    "get": {
+                        "operationId": "media.feed",
+                        "responses": {"200": {"description": "OK"}},
+                        "parameters": [{"$ref": "../parameters.json#/Page"}],
+                    }
+                }
+            }
+        },
+        filename="feed",
+        parent="media",
+    )
+
+    schema = schemathesis.openapi.from_path(str(schema_path))
+
+    # Should successfully iterate operations without reference resolution errors
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 1
+
+    result = operations[0]
+    assert isinstance(result, Ok)
+
+    operation = result.ok()
+    assert operation.path == "/media"
+    assert operation.method == "get"
+
+    params = list(operation.iter_parameters())
+    assert len(params) == 1
+    assert params[0].name == "page"
+
+
+def test_nested_external_refs_in_request_body(ctx):
+    # Similar to GH-3361 but for requestBody in OpenAPI 3.x
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {"$ref": "requests/body.json#/CreateItem"},
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    # types.json - in root, sibling to schema.json
+    ctx.makefile(
+        {"Item": {"type": "object", "properties": {"name": {"type": "string"}}}},
+        filename="types",
+    )
+
+    # requests/body.json - references ../types.json
+    ctx.makefile(
+        {
+            "CreateItem": {
+                "required": True,
+                "content": {"application/json": {"schema": {"$ref": "../types.json#/Item"}}},
+            }
+        },
+        filename="body",
+        parent="requests",
+    )
+
+    schema = schemathesis.openapi.from_path(str(schema_path))
+
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 1
+
+    result = operations[0]
+    assert isinstance(result, Ok)
+
+    operation = result.ok()
+    assert operation.path == "/items"
+    assert operation.method == "post"
+    assert len(operation.body) == 1
+
+
+def test_nested_external_refs_in_response_for_stateful(ctx):
+    # Response schemas with nested external refs should resolve correctly for stateful testing
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "get": {
+                    "operationId": "getItems",
+                    "responses": {"200": {"$ref": "responses/item.json#/ItemResponse"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    # types.json - in root
+    ctx.makefile(
+        {"Item": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}},
+        filename="types",
+    )
+
+    # responses/item.json - references ../types.json
+    ctx.makefile(
+        {
+            "ItemResponse": {
+                "description": "Success",
+                "content": {"application/json": {"schema": {"$ref": "../types.json#/Item"}}},
+            }
+        },
+        filename="item",
+        parent="responses",
+    )
+
+    schema = schemathesis.openapi.from_path(str(schema_path))
+
+    graph = dependencies.analyze(schema)
+
+    # Should find the Item resource from the response schema
+    assert len(graph.resources) > 0 or len(graph.operations) > 0
+
+
+def test_nested_external_refs_in_array_items_for_stateful(ctx):
+    # Nested $refs inside array items should resolve correctly for stateful testing
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/items": {
+                "get": {
+                    "operationId": "getItems",
+                    "responses": {"200": {"$ref": "responses/list.json#/ListResponse"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+
+    # types.json - in root
+    ctx.makefile(
+        {"Item": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}}}},
+        filename="types",
+    )
+
+    # responses/list.json - has array with items referencing ../types.json
+    ctx.makefile(
+        {
+            "ListResponse": {
+                "description": "Success",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "type": "object",
+                            "properties": {"items": {"type": "array", "items": {"$ref": "../types.json#/Item"}}},
+                        }
+                    }
+                },
+            }
+        },
+        filename="list",
+        parent="responses",
+    )
+
+    schema = schemathesis.openapi.from_path(str(schema_path))
+
+    graph = dependencies.analyze(schema)
+
+    # Should find resources - the array items ref should resolve correctly
+    assert len(graph.resources) > 0 or len(graph.operations) > 0

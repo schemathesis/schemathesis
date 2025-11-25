@@ -92,87 +92,92 @@ def iter_resources_from_response(
         # Ignore invalid schemas
         return None
 
-    parent_ref = schema.get("$ref")
-    _, resolved = maybe_resolve(schema, resolver, "")
+    # Push the response's scope so all nested $refs are resolved relative to the response's location
+    resolver.push_scope(response.scope)
+    try:
+        parent_ref = schema.get("$ref")
+        _, resolved = maybe_resolve(schema, resolver, "")
 
-    # Sometimes data is wrapped in a single wrapper field
-    # Common patterns: {data: {...}}, {result: {...}}, {response: {...}}
-    pointer = None
-    properties = resolved.get("properties", {})
-    if properties and len(properties) == 1:
-        wrapper_field = list(properties)[0]
-        # Check if it's a known wrapper field name
-        common_wrappers = {"data", "result", "response", "payload"}
-        if wrapper_field.lower() in common_wrappers:
-            pointer = f"/{wrapper_field}"
-            resolved = properties[wrapper_field]
+        # Sometimes data is wrapped in a single wrapper field
+        # Common patterns: {data: {...}}, {result: {...}}, {response: {...}}
+        pointer = None
+        properties = resolved.get("properties", {})
+        if properties and len(properties) == 1:
+            wrapper_field = list(properties)[0]
+            # Check if it's a known wrapper field name
+            common_wrappers = {"data", "result", "response", "payload"}
+            if wrapper_field.lower() in common_wrappers:
+                pointer = f"/{wrapper_field}"
+                resolved = properties[wrapper_field]
 
-    resolved = try_unwrap_composition(resolved, resolver)
+        resolved = try_unwrap_composition(resolved, resolver)
 
-    if "allOf" in resolved:
-        if parent_ref is not None and parent_ref in canonicalization_cache:
-            canonicalized = canonicalization_cache[parent_ref]
+        if "allOf" in resolved:
+            if parent_ref is not None and parent_ref in canonicalization_cache:
+                canonicalized = canonicalization_cache[parent_ref]
+            else:
+                try:
+                    canonicalized = canonicalize(cast(dict, resolved), resolver)
+                except (InfiniteRecursiveReference, BundleError):
+                    canonicalized = resolved
+                if parent_ref is not None:
+                    canonicalization_cache[parent_ref] = canonicalized
         else:
-            try:
-                canonicalized = canonicalize(cast(dict, resolved), resolver)
-            except (InfiniteRecursiveReference, BundleError):
-                canonicalized = resolved
-            if parent_ref is not None:
-                canonicalization_cache[parent_ref] = canonicalized
-    else:
-        canonicalized = resolved
+            canonicalized = resolved
 
-    # Detect wrapper pattern and navigate to data
-    unwrapped = unwrap_schema(schema=canonicalized, path=path, parent_ref=parent_ref, resolver=resolver)
+        # Detect wrapper pattern and navigate to data
+        unwrapped = unwrap_schema(schema=canonicalized, path=path, parent_ref=parent_ref, resolver=resolver)
 
-    # Recover $ref lost during allOf canonicalization
-    recovered_ref = None
-    if unwrapped.pointer != ROOT_POINTER and "allOf" in resolved:
-        recovered_ref = _recover_ref_from_allof(
-            branches=resolved["allOf"],
-            pointer=unwrapped.pointer,
+        # Recover $ref lost during allOf canonicalization
+        recovered_ref = None
+        if unwrapped.pointer != ROOT_POINTER and "allOf" in resolved:
+            recovered_ref = _recover_ref_from_allof(
+                branches=resolved["allOf"],
+                pointer=unwrapped.pointer,
+                resolver=resolver,
+            )
+
+        # Extract resource and determine cardinality
+        result = _extract_resource_and_cardinality(
+            schema=unwrapped.schema,
+            path=path,
+            resources=resources,
+            updated_resources=updated_resources,
             resolver=resolver,
+            parent_ref=recovered_ref or unwrapped.ref or parent_ref,
         )
 
-    # Extract resource and determine cardinality
-    result = _extract_resource_and_cardinality(
-        schema=unwrapped.schema,
-        path=path,
-        resources=resources,
-        updated_resources=updated_resources,
-        resolver=resolver,
-        parent_ref=recovered_ref or unwrapped.ref or parent_ref,
-    )
-
-    if result is not None:
-        resource, cardinality = result
-        if pointer:
-            if unwrapped.pointer != ROOT_POINTER:
-                pointer += unwrapped.pointer
-        else:
-            pointer = unwrapped.pointer
-        yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
-        # Look for sub-resources
-        properties = unwrapped.schema.get("properties")
-        if isinstance(properties, dict):
-            for field, subschema in properties.items():
-                if isinstance(subschema, dict):
-                    reference = subschema.get("$ref")
-                    if isinstance(reference, str):
-                        result = _extract_resource_and_cardinality(
-                            schema=subschema,
-                            path=path,
-                            resources=resources,
-                            updated_resources=updated_resources,
-                            resolver=resolver,
-                            parent_ref=reference,
-                        )
-                        if result is not None:
-                            subresource, cardinality = result
-                            subresource_pointer = extend_pointer(pointer, field, cardinality=cardinality)
-                            yield ExtractedResource(
-                                resource=subresource, cardinality=cardinality, pointer=subresource_pointer
+        if result is not None:
+            resource, cardinality = result
+            if pointer:
+                if unwrapped.pointer != ROOT_POINTER:
+                    pointer += unwrapped.pointer
+            else:
+                pointer = unwrapped.pointer
+            yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
+            # Look for sub-resources
+            properties = unwrapped.schema.get("properties")
+            if isinstance(properties, dict):
+                for field, subschema in properties.items():
+                    if isinstance(subschema, dict):
+                        reference = subschema.get("$ref")
+                        if isinstance(reference, str):
+                            result = _extract_resource_and_cardinality(
+                                schema=subschema,
+                                path=path,
+                                resources=resources,
+                                updated_resources=updated_resources,
+                                resolver=resolver,
+                                parent_ref=reference,
                             )
+                            if result is not None:
+                                subresource, cardinality = result
+                                subresource_pointer = extend_pointer(pointer, field, cardinality=cardinality)
+                                yield ExtractedResource(
+                                    resource=subresource, cardinality=cardinality, pointer=subresource_pointer
+                                )
+    finally:
+        resolver.pop_scope()
 
 
 def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: RefResolver) -> str | None:
