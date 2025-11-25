@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Nested external `$ref` links in multi-file schemas not resolving relative to their containing file. [#3361](https://github.com/schemathesis/schemathesis/issues/3361)
+- False positive `API rejected schema-compliant request` for `application/x-www-form-urlencoded` with required body but no required properties. [#3360](https://github.com/schemathesis/schemathesis/issues/3360)
 
 ## [4.6.1](https://github.com/schemathesis/schemathesis/compare/v4.6.0...v4.6.1) - 2025-11-23
 
