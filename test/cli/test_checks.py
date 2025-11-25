@@ -876,10 +876,21 @@ def test_negative_data_rejection_fuzzing_phase_metadata(ctx, app_runner, cli, sn
     )
 
 
-def test_positive_data_acceptance_required_form_body_with_optional_properties_no_false_positive(
-    ctx, app_runner, cli, snapshot_cli
-):
-    # GH-3360: When requestBody.required=true but inner schema has no required properties,
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        pytest.param(
+            {"type": "object", "properties": {"my_param": {"type": "number"}}},
+            id="optional_properties",
+        ),
+        pytest.param(
+            {"type": "object"},
+            id="no_properties",
+        ),
+    ],
+)
+def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, app_runner, cli, snapshot_cli, body_schema):
+    # When requestBody.required=true but inner schema allows empty object,
     # coverage generates {} which serializes to no body content for form-urlencoded.
     # This should NOT trigger a false positive "API rejected schema-compliant request".
     raw_schema = ctx.openapi.build_schema(
@@ -888,17 +899,7 @@ def test_positive_data_acceptance_required_form_body_with_optional_properties_no
                 "post": {
                     "requestBody": {
                         "required": True,
-                        "content": {
-                            "application/x-www-form-urlencoded": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "my_param": {"type": "number"},
-                                    },
-                                    # Note: no "required" array - my_param is optional
-                                }
-                            }
-                        },
+                        "content": {"application/x-www-form-urlencoded": {"schema": body_schema}},
                     },
                     "responses": {
                         "200": {"description": "OK"},
@@ -917,8 +918,6 @@ def test_positive_data_acceptance_required_form_body_with_optional_properties_no
 
     @app.route("/my-method", methods=["POST"])
     def my_method():
-        # Server correctly rejects requests without body content
-        # For form-urlencoded, request.form will be empty if no body was sent
         if not request.data and not request.form:
             return jsonify({"error": "Request body is required"}), 400
         return jsonify({"result": "ok"}), 200
