@@ -364,11 +364,13 @@ def _bundle_parameter(
         cached_definition, cached_name_to_uri = bundle_cache[param_id]
         return deepclone(cached_definition), dict(cached_name_to_uri)
 
-    _, definition = maybe_resolve(parameter, resolver, "")
+    scope, definition = maybe_resolve(parameter, resolver, "")
     schema = definition.get("schema")
     name_to_uri = {}
     if schema is not None:
         definition = {k: v for k, v in definition.items() if k != "schema"}
+        # Push the resolved scope so nested $refs are resolved relative to the parameter's location
+        resolver.push_scope(scope)
         try:
             bundled = bundler.bundle(schema, resolver, inline_recursive=True)
             definition["schema"] = bundled.schema
@@ -377,6 +379,8 @@ def _bundle_parameter(
             location = parameter.get("in", "")
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
+        finally:
+            resolver.pop_scope()
 
     definition_ = cast(dict, definition)
     result = definition_, name_to_uri
@@ -469,7 +473,7 @@ def iter_parameters_v3(
     if request_body_or_ref is not None:
         scope, request_body_or_ref = maybe_resolve(request_body_or_ref, resolver, "")
         # It could be an object inside `requestBodies`, which could be a reference itself
-        _, request_body = maybe_resolve(request_body_or_ref, resolver, scope)
+        body_scope, request_body = maybe_resolve(request_body_or_ref, resolver, scope)
 
         required = request_body.get("required", False)
         for media_type, content in request_body["content"].items():
@@ -480,6 +484,8 @@ def iter_parameters_v3(
                 content = dict(content)
                 if "$ref" in schema:
                     resource_name = resource_name_from_ref(schema["$ref"])
+                # Push the resolved scope so nested $refs are resolved relative to the requestBody's location
+                resolver.push_scope(body_scope)
                 try:
                     to_bundle = cast(dict[str, Any], schema)
                     bundled = bundler.bundle(to_bundle, resolver, inline_recursive=True)
@@ -487,6 +493,8 @@ def iter_parameters_v3(
                     name_to_uri = bundled.name_to_uri
                 except BundleError as exc:
                     raise InvalidSchema.from_bundle_error(exc, "body") from exc
+                finally:
+                    resolver.pop_scope()
             yield OpenApiBody.from_definition(
                 definition=content,
                 is_required=required,
