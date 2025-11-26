@@ -5,6 +5,7 @@ import pathlib
 import platform
 import sys
 import time
+from http.client import RemoteDisconnected
 from urllib.parse import urljoin
 
 import hypothesis
@@ -15,6 +16,7 @@ import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
 from flask import Flask, jsonify, redirect, request, url_for
+from urllib3.exceptions import ProtocolError
 
 from schemathesis.core.shell import ShellType
 from schemathesis.schemas import APIOperation
@@ -512,6 +514,26 @@ def test_remote_disconnected_error(mocker, cli, schema_url, snapshot_cli):
         "http.client.HTTPResponse.begin",
         side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
     )
+    assert cli.run(schema_url) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_remote_disconnected_error_with_empty_header(mocker, cli, schema_url, snapshot_cli):
+    # When a request has an empty header value and the server disconnects
+    # Regression test for IndexError when extracting headers from PreparedRequest with empty values
+    protocol_error = ProtocolError("Connection aborted.", RemoteDisconnected("Remote end closed connection"))
+
+    def raise_connection_error(self, **kwargs):
+        req = requests.Request("GET", "http://127.0.0.1/success", headers={"X-Empty": ""})
+        prepared = req.prepare()
+        conn_error = requests.ConnectionError(protocol_error)
+        conn_error.request = prepared
+        conn_error.__context__ = protocol_error
+        raise conn_error
+
+    mocker.patch("schemathesis.generation.case.Case.call", raise_connection_error)
+    # Then it should not crash with IndexError on empty header value
     assert cli.run(schema_url) == snapshot_cli
 
 
