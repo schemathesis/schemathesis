@@ -547,13 +547,17 @@ def negate_constraints(
             if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
                 negated_keys.append(key)
-                negated = schema.setdefault("not", {})
-                negated[key] = value
-                if key in DEPENDENCIES:
-                    # If this keyword has a dependency, then it should be also negated
-                    dependency = DEPENDENCIES[key]
-                    if dependency not in negated and dependency in copied:
-                        negated[dependency] = copied[dependency]
+                # `format` is handled specially: removing it allows generating arbitrary strings
+                # that likely won't match the format. Using `not: {format: ...}` doesn't work
+                # because hypothesis-jsonschema treats format as annotation-only.
+                if key != "format":
+                    negated = schema.setdefault("not", {})
+                    negated[key] = value
+                    if key in DEPENDENCIES:
+                        # If this keyword has a dependency, then it should be also negated
+                        dependency = DEPENDENCIES[key]
+                        if dependency not in negated and dependency in copied:
+                            negated[dependency] = copied[dependency]
         else:
             schema[key] = value
     if is_negated:

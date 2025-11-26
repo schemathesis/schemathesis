@@ -1,3 +1,4 @@
+import uuid
 from urllib.parse import urlparse
 
 import pytest
@@ -581,3 +582,43 @@ def test_bundled_references(ctx, app_runner, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def is_valid_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_format_generates_invalid_values(ctx):
+    # When a path parameter has `format: uuid`
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "string", "format": "uuid"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    invalid_uuid_found = False
+
+    @given(case=schema["/items/{id}"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        nonlocal invalid_uuid_found
+        id_value = case.path_parameters["id"]
+        # Negative mode should generate values that DON'T match UUID format
+        if not is_valid_uuid(id_value):
+            invalid_uuid_found = True
+
+    test()
+    # Then at least some generated values should be invalid UUIDs
+    assert invalid_uuid_found, "Negative mode should generate invalid UUID values"
