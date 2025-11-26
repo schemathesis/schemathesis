@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- Crash when handling connection errors with empty header values.
+
 ## [4.6.3](https://github.com/schemathesis/schemathesis/compare/v4.6.2...v4.6.3) - 2025-11-26
 
 ### :bug: Fixed
