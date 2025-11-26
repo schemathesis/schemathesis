@@ -56,7 +56,10 @@ class CacheKey:
 def get_validator(cache_key: CacheKey) -> jsonschema.Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
-    return cache_key.validator_cls(cache_key.schema)
+    return cache_key.validator_cls(
+        cache_key.schema,
+        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+    )
 
 
 @lru_cache
