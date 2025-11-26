@@ -397,7 +397,7 @@ def cached_test_func(f: Callable) -> Callable:
                 # Server likely has crashed and does not accept any connections at all
                 # Don't report these error - only the original crash should be reported
                 if exc.request is not None:
-                    headers = {key: value[0] for key, value in exc.request.headers.items()}
+                    headers = dict(exc.request.headers)
                 else:
                     headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
                 verify = transport_kwargs.get("verify", True)

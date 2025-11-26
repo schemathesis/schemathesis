@@ -138,7 +138,7 @@ def execute_state_machine_loop(
                 ) and is_unrecoverable_network_error(exc):
                     transport_kwargs = engine.get_transport_kwargs(operation=input.case.operation)
                     if exc.request is not None:
-                        headers = {key: value[0] for key, value in exc.request.headers.items()}
+                        headers = dict(exc.request.headers)
                     else:
                         headers = {**dict(input.case.headers or {}), **transport_kwargs.get("headers", {})}
                     verify = transport_kwargs.get("verify", True)
