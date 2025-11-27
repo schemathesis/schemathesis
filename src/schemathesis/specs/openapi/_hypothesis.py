@@ -543,18 +543,9 @@ def _get_body_strategy(
     # Check for custom media type strategy
     custom_strategy = _find_media_type_strategy(parameter.media_type)
     if custom_strategy is not None:
-        # Custom strategies always generate valid data for their media type.
-        # In negative mode with permissive schemas (like type: string, format: binary),
-        # any bytes data is valid, so custom strategies can't produce truly invalid data.
-        # Use positive mode strategy instead to avoid false negatives.
-        if generation_mode.is_negative:
-            schema = parameter.definition.get("schema", {})
-            if is_binary_format(schema):
-                # Use default strategy generation which can produce structural invalidity
-                strategy = parameter.get_strategy(
-                    operation, generation_config, generation_mode, extra_data_source=extra_data_source
-                )
-                return _maybe_set_optional_body(strategy, parameter, draw)
+        # Always use custom strategies for raw bodies - they produce transmittable bytes.
+        # In negative mode, bypassing them would generate non-bytes values (e.g., integers)
+        # that can't be sent over HTTP for raw binary media types like application/x-tar.
         return custom_strategy
 
     # Use the cached strategy from the parameter

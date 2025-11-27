@@ -6,6 +6,7 @@
 
 - Crash when handling connection errors with empty header values.
 - Fuzzing phase not generating format-violating values for custom string formats.
+- Fuzzing phase generating non-bytes values for custom binary media types like `application/x-tar`.
 
 ## [4.6.3](https://github.com/schemathesis/schemathesis/compare/v4.6.2...v4.6.3) - 2025-11-26
 
