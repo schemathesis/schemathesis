@@ -67,3 +67,35 @@ def test_binary_format_negative_mutations(encoding):
         assert is_structural_mutation(case.body, "file") or is_type_mutation(case.body, "file", bytes)
 
     check()
+
+
+def test_custom_media_type_raw_binary_body_in_negative_mode():
+    schemathesis.openapi.media_type("application/x-tar", st.just(b""))
+
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.3",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "content": {"application/x-tar": {"schema": {"type": "string", "format": "binary"}}},
+                            "required": True,
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+
+    operation = schema["/upload"]["POST"]
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
+
+    @given(case=strategy)
+    @settings(max_examples=10)
+    def check(case):
+        assert isinstance(case.body, bytes)
+
+    check()
