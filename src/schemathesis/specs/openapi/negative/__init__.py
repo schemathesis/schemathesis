@@ -45,20 +45,51 @@ class CacheKey:
     location: str
     schema: JsonSchema
     validator_cls: type[jsonschema.Validator]
+    custom_format_names: frozenset[str]
 
-    __slots__ = ("operation_name", "location", "schema", "validator_cls")
+    __slots__ = ("operation_name", "location", "schema", "validator_cls", "custom_format_names")
 
     def __hash__(self) -> int:
-        return hash((self.operation_name, self.location))
+        return hash((self.operation_name, self.location, self.custom_format_names))
+
+
+def _always_invalid(value: Any) -> bool:
+    """A format check that always fails."""
+    return False
+
+
+@lru_cache
+def _build_format_checker(custom_format_names: frozenset[str]) -> jsonschema.FormatChecker:
+    """Build a format checker that handles both standard and custom formats.
+
+    For custom formats not in the standard checker, we add a check that always fails.
+    This is because arbitrary strings are almost certainly not valid for custom formats
+    (e.g., uuid4, phone numbers, etc.).
+    """
+    checker = jsonschema.FormatChecker()
+    standard = jsonschema.Draft202012Validator.FORMAT_CHECKER
+
+    # Copy all standard checks
+    for name in standard.checkers:
+        func, raises = standard.checkers[name]
+        checker.checkers[name] = (func, raises)
+
+    # For custom formats not in standard checker, add "always invalid" checks
+    for name in custom_format_names:
+        if name not in checker.checkers:
+            checker.checkers[name] = (_always_invalid, ())
+
+    return checker
 
 
 @lru_cache
 def get_validator(cache_key: CacheKey) -> jsonschema.Validator:
     """Get JSON Schema validator for the given schema."""
     # Each operation / location combo has only a single schema, therefore could be cached
+    format_checker = _build_format_checker(cache_key.custom_format_names)
     return cache_key.validator_cls(
         cache_key.schema,
-        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+        format_checker=format_checker,
     )
 
 
@@ -96,7 +127,7 @@ def negative_schema(
     """
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
-    cache_key = CacheKey(operation_name, location, schema, validator_cls)
+    cache_key = CacheKey(operation_name, location, schema, validator_cls, frozenset(custom_formats))
     validator = get_validator(cache_key)
     keywords, non_keywords = split_schema(cache_key)
 
