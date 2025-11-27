@@ -622,3 +622,45 @@ def test_negative_format_generates_invalid_values(ctx):
     test()
     # Then at least some generated values should be invalid UUIDs
     assert invalid_uuid_found, "Negative mode should generate invalid UUID values"
+
+
+def is_valid_uuid4(value: str) -> bool:
+    try:
+        parsed = uuid.UUID(value)
+        return parsed.version == 4
+    except ValueError:
+        return False
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_custom_format_generates_invalid_values(ctx):
+    # When a user registers a custom format (uuid4)
+    schemathesis.openapi.format("uuid4", st.uuids(version=4).map(str))
+    # And a path parameter uses that custom format
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "string", "format": "uuid4"}}
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    invalid_uuid4_found = False
+
+    @given(case=schema["/items/{id}"]["GET"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        nonlocal invalid_uuid4_found
+        id_value = case.path_parameters["id"]
+        # Negative mode should generate values that DON'T match the custom uuid4 format
+        if not is_valid_uuid4(id_value):
+            invalid_uuid4_found = True
+
+    test()
+    # Then at least some generated values should be invalid UUID4s
+    assert invalid_uuid4_found, "Negative mode should generate invalid UUID4 values for custom formats"
