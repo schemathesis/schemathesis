@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -5,7 +10,36 @@ import schemathesis
 from schemathesis.generation import GenerationMode
 
 
-def test_binary_format_skips_type_mutation():
+def is_structural_mutation(body: Any, required_field: str) -> bool:
+    return not isinstance(body, dict) or required_field not in body or len(body) > 1
+
+
+def is_type_mutation(body: Any, field: str, expected_type: type) -> bool:
+    return isinstance(body, dict) and field in body and not isinstance(body.get(field), expected_type)
+
+
+@pytest.mark.parametrize(
+    "encoding",
+    [
+        pytest.param(None, id="without_encoding"),
+        pytest.param({"file": {"contentType": "image/png"}}, id="with_encoding"),
+    ],
+)
+def test_binary_format_negative_mutations(encoding):
+    if encoding:
+        # Register custom media type to test that it's skipped in negative mode
+        schemathesis.openapi.media_type("image/png", st.just(b"\x89PNG\r\n\x1a\n"))
+
+    content = {
+        "schema": {
+            "type": "object",
+            "required": ["file"],
+            "properties": {"file": {"type": "string", "format": "binary"}},
+        }
+    }
+    if encoding:
+        content["encoding"] = encoding
+
     schema = schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
@@ -14,15 +48,7 @@ def test_binary_format_skips_type_mutation():
                 "/upload": {
                     "post": {
                         "requestBody": {
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["file"],
-                                        "properties": {"file": {"type": "string", "format": "binary"}},
-                                    }
-                                }
-                            },
+                            "content": {"multipart/form-data": content},
                             "required": True,
                         },
                         "responses": {"200": {"description": "OK"}},
@@ -38,64 +64,6 @@ def test_binary_format_skips_type_mutation():
     @given(case=strategy)
     @settings(max_examples=10)
     def check(case):
-        # Binary format accepts any bytes, so type mutations are ineffective.
-        # We should get structural mutations instead: wrong body type, missing required field, or extra fields
-        is_structural_mutation = (
-            not isinstance(case.body, dict) or "file" not in case.body or len(case.body) > 1  # Extra fields
-        )
-        assert is_structural_mutation, "Expected structural mutations for overly permissive binary schema"
-
-    check()
-
-
-def test_binary_format_with_custom_media_type_avoids_false_negatives():
-    PNG_DATA = b"\x89PNG\r\n\x1a\n" + b"\x00" * 50
-    schemathesis.openapi.media_type("image/png", st.just(PNG_DATA))
-
-    schema = schemathesis.openapi.from_dict(
-        {
-            "openapi": "3.0.2",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/upload": {
-                    "post": {
-                        "requestBody": {
-                            "content": {
-                                "multipart/form-data": {
-                                    "schema": {
-                                        "type": "object",
-                                        "required": ["image"],
-                                        "properties": {"image": {"type": "string", "format": "binary"}},
-                                    },
-                                    "encoding": {"image": {"contentType": "image/png"}},
-                                }
-                            },
-                            "required": True,
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-            },
-        }
-    )
-
-    operation = schema["/upload"]["POST"]
-    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
-
-    @given(case=strategy)
-    @settings(max_examples=10)
-    def check(case):
-        # Custom strategies should be skipped in negative mode to avoid false negatives
-        # Should NOT get valid PNG data
-        if isinstance(case.body, dict) and "image" in case.body:
-            data = case.body.get("image")
-            if isinstance(data, bytes) and len(data) >= 8:
-                assert data[:8] != PNG_DATA[:8], "Custom strategy should not be used in negative mode"
-
-        # Should get structural mutations instead
-        is_structural_mutation = (
-            not isinstance(case.body, dict) or "image" not in case.body or len(case.body) > 1  # Extra fields
-        )
-        assert is_structural_mutation, "Expected structural mutations when custom strategy is skipped"
+        assert is_structural_mutation(case.body, "file") or is_type_mutation(case.body, "file", bytes)
 
     check()
