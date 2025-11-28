@@ -40,7 +40,12 @@ Schemathesis looks for `schemathesis.toml` in:
 
 1. Current directory
 2. Parent directories (up to repository root)
-3. A path you pass with `--config-file` (this takes precedence)
+
+To use a config file from a different location, pass `--config-file` before the `run` command:
+
+```bash
+schemathesis --config-file /path/to/config.toml run https://api.example.com/openapi.json
+```
 
 ## Common configuration scenarios
 
