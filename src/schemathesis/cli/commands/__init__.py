@@ -41,15 +41,15 @@ def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
         ctx.exit()
 
 
-@click.group(context_settings=ROOT_CONTEXT_SETTINGS, cls=StyledGroup)  # type: ignore[misc]
-@click.option(  # type: ignore[misc]
+@click.group(context_settings=ROOT_CONTEXT_SETTINGS, cls=StyledGroup)  # type: ignore[untyped-decorator]
+@click.option(  # type: ignore[untyped-decorator]
     "--config-file",
     "config_file",
     help="The path to `schemathesis.toml` file to use for configuration",
     metavar="PATH",
     type=str,
 )
-@click.option(  # type: ignore[misc]
+@click.option(  # type: ignore[untyped-decorator]
     "--no-color",
     is_flag=True,
     help="Disable colored output",
@@ -57,9 +57,9 @@ def _show_help(ctx: click.Context, param: click.Parameter, value: bool) -> None:
     callback=_set_no_color,
     expose_value=False,
 )
-@click.pass_context  # type: ignore[misc]
-@click.version_option()  # type: ignore[misc]
-@click.option(  # type: ignore[misc]
+@click.pass_context  # type: ignore[untyped-decorator]
+@click.version_option()  # type: ignore[untyped-decorator]
+@click.option(  # type: ignore[untyped-decorator]
     "-h",
     "--help",
     is_flag=True,

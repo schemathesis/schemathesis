@@ -189,7 +189,7 @@ def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
                         for method in config.modes
                     }
 
-                    @st.composite  # type: ignore[misc]
+                    @st.composite  # type: ignore[untyped-decorator]
                     def case_strategy_factory(
                         draw: st.DrawFn, strategies: dict[GenerationMode, st.SearchStrategy] = _strategies
                     ) -> Case:
@@ -253,7 +253,7 @@ def into_step_input(
     """A single transition between API operations."""
 
     def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
-        @st.composite  # type: ignore[misc]
+        @st.composite  # type: ignore[untyped-decorator]
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
             random = draw(st.randoms(use_true_random=True))
 

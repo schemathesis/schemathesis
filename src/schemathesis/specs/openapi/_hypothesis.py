@@ -57,7 +57,7 @@ StrategyFactory = Callable[
 ]
 
 
-@st.composite  # type: ignore[misc]
+@st.composite  # type: ignore[untyped-decorator]
 def openapi_cases(
     draw: st.DrawFn,
     *,
@@ -487,7 +487,7 @@ def _build_form_strategy_with_encoding(
     required_strategies = {k: v for k, v in property_strategies.items() if k in required}
     optional_strategies = {k: st.just(NOT_SET) | v for k, v in property_strategies.items() if k not in required}
 
-    @st.composite  # type: ignore[misc]
+    @st.composite  # type: ignore[untyped-decorator]
     def build_body(draw: st.DrawFn) -> FormBodyWithContentTypes:
         body: dict[str, Any] = {}
         selected_content_types: dict[str, str] = {}
