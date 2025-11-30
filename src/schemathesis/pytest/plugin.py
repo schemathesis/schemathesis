@@ -257,7 +257,7 @@ class SchemathesisCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-@hookimpl(hookwrapper=True)  # type: ignore[misc]
+@hookimpl(hookwrapper=True)  # type: ignore[untyped-decorator]
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
@@ -269,13 +269,13 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
         outcome.get_result()
 
 
-@hookimpl(tryfirst=True)  # type: ignore[misc]
+@hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
     if isinstance(report, SubTestReport) and report.passed:
         report._schemathesis_ignore_in_summary = True
 
 
-@hookimpl(tryfirst=True, hookwrapper=True)  # type: ignore[misc]
+@hookimpl(tryfirst=True, hookwrapper=True)  # type: ignore[untyped-decorator]
 def pytest_terminal_summary(terminalreporter: "TerminalReporter") -> Generator[None, None, None]:
     passed = terminalreporter.stats.get("passed", [])
     if passed:
@@ -285,7 +285,7 @@ def pytest_terminal_summary(terminalreporter: "TerminalReporter") -> Generator[N
     yield
 
 
-@hookimpl(hookwrapper=True, trylast=True)  # type: ignore[misc]
+@hookimpl(hookwrapper=True, trylast=True)  # type: ignore[untyped-decorator]
 def pytest_report_teststatus(
     report: pytest.TestReport,
     config: pytest.Config,
@@ -309,7 +309,7 @@ def pytest_report_teststatus(
         result.force_result(("failed", short, f"{description} SUBFAIL"))
 
 
-@pytest.hookimpl(tryfirst=True)  # type: ignore[misc]
+@pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
 def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pytest.TestReport) -> None:
     if call.excinfo:
         if issubclass(call.excinfo.type, SchemathesisError) and hasattr(call.excinfo.value, "__notes__"):

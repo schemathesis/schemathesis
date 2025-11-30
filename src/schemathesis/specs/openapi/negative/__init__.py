@@ -180,7 +180,7 @@ def is_non_empty_query(query: dict[str, Any]) -> bool:
     return urlencode(result, doseq=True) != ""
 
 
-@st.composite  # type: ignore[misc]
+@st.composite  # type: ignore[untyped-decorator]
 def mutated(
     draw: Draw,
     *,

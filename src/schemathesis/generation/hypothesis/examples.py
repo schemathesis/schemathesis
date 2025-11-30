@@ -43,8 +43,8 @@ def add_single_example(
     if suppress_health_check is not None:
         applied_settings = settings(applied_settings, suppress_health_check=suppress_health_check)
 
-    @given(strategy)  # type: ignore[misc]
-    @applied_settings  # type: ignore[misc]
+    @given(strategy)  # type: ignore[untyped-decorator]
+    @applied_settings  # type: ignore[untyped-decorator]
     def example_generating_inner_function(ex: T) -> None:
         examples.append(ex)
 
