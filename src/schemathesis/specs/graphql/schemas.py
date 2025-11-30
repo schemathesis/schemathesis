@@ -327,7 +327,7 @@ class FieldMap(Mapping):
             raise KeyError(message) from exc
 
 
-@st.composite  # type: ignore[misc]
+@st.composite  # type: ignore[untyped-decorator]
 def graphql_cases(
     draw: Callable,
     *,

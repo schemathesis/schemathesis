@@ -39,7 +39,7 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
 DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 
 
-@click.argument(  # type: ignore[misc]
+@click.argument(  # type: ignore[untyped-decorator]
     "location",
     type=str,
     callback=validation.validate_schema_location,
@@ -414,7 +414,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 @group("Global options")
 @grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
 @grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
-@click.pass_context  # type: ignore[misc]
+@click.pass_context  # type: ignore[untyped-decorator]
 def run(
     ctx: click.Context,
     *,
