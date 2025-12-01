@@ -517,3 +517,65 @@ def test_method_not_allowed(ctx, cli, openapi3_base_url, snapshot_cli, path, met
         )
         == snapshot_cli
     )
+
+
+def test_negative_data_rejection_single_element_array_serialization(ctx, response_factory):
+    # When a single-element array is generated for negative testing (e.g., [67] for an integer parameter),
+    # it serializes to the same query string as a single integer (page=67).
+    # The API correctly accepts this as valid, so negative_data_rejection should not fail.
+
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/job_info/scroll": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "page",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer"},
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "Success"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/job_info/scroll"]["GET"]
+
+    # Simulate negative testing where a single-element array [67] is generated
+    # for an integer parameter
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+        ),
+        query={"page": [67]},  # Single-element array
+    )
+
+    # Create a successful response (200 OK)
+    response = response_factory.requests(status_code=200)
+
+    # The check should NOT raise an error because:
+    # 1. The single-element array [67] serializes to "67"
+    # 2. This is valid for an integer parameter
+    # 3. The API correctly returns 200
+    result = negative_data_rejection(
+        CheckContext(
+            override=None,
+            auth=None,
+            headers=None,
+            config=ChecksConfig(),
+            transport_kwargs=None,
+        ),
+        response,
+        case,
+    )
+
+    # Should return None (no error) because the serialized value is valid
+    assert result is None
