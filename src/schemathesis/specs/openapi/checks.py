@@ -293,6 +293,81 @@ def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
     return True
 
 
+def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
+    """Check if single-element array negation becomes valid after serialization.
+
+    In query/header/cookie parameters, single-element arrays serialize to the same
+    string as scalar values:
+    - Array: [67] -> serialized: "67"
+    - Scalar: 67 -> serialized: "67"
+
+    This makes single-element arrays indistinguishable from scalars after serialization.
+    If the schema expects a scalar type (integer, string, etc.), the serialized value
+    is actually valid.
+
+    Example:
+    - Schema: {"type": "integer"}
+    - Generated negative: [67] (array, should be invalid)
+    - Serialized: "67" (valid for integer after parsing)
+    - API correctly accepts it -> should not trigger negative_data_rejection
+
+    """
+    from schemathesis.core.jsonschema import get_type
+
+    meta = case.meta
+    if meta is None:
+        return False
+
+    # Check query, header, and cookie parameters
+    for location in (
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+    ):
+        component = meta.components.get(location)
+        if component is None or not component.mode.is_negative:
+            continue
+
+        # Get the container (query, headers, cookies)
+        value = getattr(case, location.container_name)
+        if value is None:
+            continue
+
+        # Get the parameter definitions
+        container = getattr(case.operation, location.container_name)
+
+        # Check each parameter in the container
+        for param_name, param_value in value.items():
+            if param_name not in container:
+                # This is an additional property, not a schema-defined parameter
+                continue
+
+            # Check if this is a single-element array
+            if not isinstance(param_value, list) or len(param_value) != 1:
+                continue
+
+            # Get the parameter definition
+            param = container.get(param_name)
+            if param is None:
+                continue
+
+            # Get the parameter schema from definition
+            param_def = param.definition if hasattr(param, "definition") else {}
+            schema = param_def.get("schema", {})
+
+            # Get the expected type(s) from the schema
+            expected_types = get_type(schema)
+
+            # If the schema expects a scalar type (not array), then the single-element
+            # array will serialize to a valid scalar value
+            if "array" not in expected_types and expected_types:
+                # This is a single-element array for a scalar parameter
+                # After serialization, it becomes indistinguishable from a scalar
+                return True
+
+    return False
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -309,6 +384,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
         and not _body_negation_becomes_valid_after_serialization(case)
+        and not _single_element_array_becomes_valid_after_serialization(case)
     ):
         extra_info = ""
         phase = meta.phase
