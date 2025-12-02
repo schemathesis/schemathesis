@@ -13,6 +13,7 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import Failure
+from schemathesis.core.jsonschema import get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -312,7 +313,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     - API correctly accepts it -> should not trigger negative_data_rejection
 
     """
-    from schemathesis.core.jsonschema import get_type
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
     meta = case.meta
     if meta is None:
@@ -352,8 +353,8 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
                 continue
 
             # Get the parameter schema from definition
-            param_def = param.definition if hasattr(param, "definition") else {}
-            schema = param_def.get("schema", {})
+            assert isinstance(param, OpenApiParameter)
+            schema = param.definition.get("schema", {})
 
             # Get the expected type(s) from the schema
             expected_types = get_type(schema)
