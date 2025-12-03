@@ -29,7 +29,7 @@ class MutationMetadata:
     """Metadata about a mutation that was applied."""
 
     parameter: str | None
-    description: str
+    description: str | None
     location: str | None
 
     __slots__ = ("parameter", "description", "location")
@@ -160,13 +160,24 @@ class MutationContext:
         # for performance reasons
         always_applied_mutation = draw(st.sampled_from(mutations))
         result, metadata = always_applied_mutation(self, draw, new_schema)
+        num_successful = 1 if result == MutationResult.SUCCESS else 0
         for mutation in mutations:
             if mutation is not always_applied_mutation and enabled_mutations.is_enabled(mutation.__name__):
                 mut_result, mut_metadata = mutation(self, draw, new_schema)
                 result |= mut_result
-                # Keep first successful mutation's metadata
-                if metadata is None and mut_metadata is not None:
-                    metadata = mut_metadata
+                if mut_result == MutationResult.SUCCESS:
+                    num_successful += 1
+                    if metadata is None:
+                        metadata = mut_metadata
+        # When multiple mutations succeed, they can conflict (e.g., one mutates a property, another removes it).
+        # Merging metadata from multiple mutations is non-trivial, so clear the description to avoid misleading
+        # error messages. We preserve `parameter` and `parameter_location` as they're used for auth exclusion logic
+        if num_successful > 1 and metadata is not None:
+            metadata = MutationMetadata(
+                parameter=metadata.parameter,
+                description=None,
+                location=metadata.location,
+            )
         if result == MutationResult.FAILURE:
             # If we failed to apply anything, then reject the whole case
             reject()
