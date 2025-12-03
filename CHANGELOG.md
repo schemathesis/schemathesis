@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive in `negative_data_rejection` check when multiple mutations conflict. [#3367](https://github.com/schemathesis/schemathesis/issues/3367)
+- Path parameters containing `/` in their string representation routing requests to wrong endpoints during negative testing.
 
 ## [4.6.5](https://github.com/schemathesis/schemathesis/compare/v4.6.4...v4.6.5) - 2025-12-03
 
