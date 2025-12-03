@@ -5,12 +5,13 @@ Infers which operations must run before others by tracking resource creation and
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
+from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     extract_inputs,
     merge_related_resources,
@@ -133,8 +134,9 @@ def inject_links(schema: OpenApiSchema) -> int:
     return injected
 
 
-def _normalize_link(link: dict[str, Any], schema: OpenApiSchema) -> NormalizedLink:
+def _normalize_link(link: Mapping[str, Any], schema: OpenApiSchema) -> NormalizedLink:
     """Normalize a link definition for comparison."""
+    _, link = maybe_resolve(link, schema.resolver, "")
     operation = _resolve_link_operation(link, schema)
 
     normalized_params = _normalize_parameter_keys(link.get("parameters", {}), operation)
@@ -166,7 +168,7 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
     return normalized
 
 
-def _resolve_link_operation(link: dict, schema: OpenApiSchema) -> APIOperation:
+def _resolve_link_operation(link: Mapping[str, Any], schema: OpenApiSchema) -> APIOperation:
     """Resolve link to operation."""
     if "operationRef" in link:
         return schema.find_operation_by_reference(link["operationRef"])

@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive in `negative_data_rejection` check when single-element arrays serialize to scalar values for query/header/cookie parameters. [#3375](https://github.com/schemathesis/schemathesis/pull/3375)
+- Support `$ref` inside link definitions in Open API 3.1. [#3377](https://github.com/schemathesis/schemathesis/pull/3377)
 
 ## [4.6.4](https://github.com/schemathesis/schemathesis/compare/v4.6.3...v4.6.4) - 2025-11-28
 
