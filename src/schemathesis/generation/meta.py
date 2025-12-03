@@ -98,7 +98,7 @@ class ComponentInfo:
 class FuzzingPhaseData:
     """Metadata specific to fuzzing phase."""
 
-    description: str
+    description: str | None
     parameter: str | None
     parameter_location: ParameterLocation | None
     location: str | None

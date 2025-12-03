@@ -664,3 +664,42 @@ def test_negative_custom_format_generates_invalid_values(ctx):
     test()
     # Then at least some generated values should be invalid UUID4s
     assert invalid_uuid4_found, "Negative mode should generate invalid UUID4 values for custom formats"
+
+
+@pytest.mark.hypothesis_nested
+def test_multiple_mutations_clear_description():
+    # GH-3367: When multiple mutations are applied to a schema, they can conflict
+    # (e.g., one mutation changes a property's type, another removes that property).
+    # In such cases, keeping the first mutation's description is misleading.
+    # This test verifies that when multiple mutations succeed, description is cleared.
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "value": {"type": "integer"},
+        },
+        "required": ["name", "value"],
+    }
+    ctx = MutationContext(
+        keywords=schema,
+        non_keywords={},
+        location=ParameterLocation.HEADER,
+        media_type=None,
+        allow_extra_parameters=False,
+    )
+    description_cleared_found = False
+
+    @given(data=st.data())
+    @settings(deadline=None, max_examples=50, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(data):
+        nonlocal description_cleared_found
+        draw = data.draw
+        _, metadata = ctx.mutate(draw)
+        if metadata is not None and metadata.description is None:
+            description_cleared_found = True
+        if metadata is not None:
+            # Description should never be "Schema mutated" - that's a downstream fallback
+            assert metadata.description != "Schema mutated"
+
+    test()
+    assert description_cleared_found, "Expected some cases with cleared description"

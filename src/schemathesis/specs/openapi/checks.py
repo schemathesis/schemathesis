@@ -17,7 +17,7 @@ from schemathesis.core.jsonschema import get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -369,6 +369,28 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     return False
 
 
+def _has_unverifiable_mutations(case: Case) -> bool:
+    """Check if mutations cannot be verified as actually producing invalid data.
+
+    When multiple mutations are applied, they can conflict (e.g., one mutates a property's type,
+    another removes that property entirely). In such cases, metadata.description is cleared
+    because we can't accurately describe what was mutated. More importantly, we can't verify
+    that the mutation actually resulted in invalid data being sent - the removed property
+    won't be in the request at all, making the request potentially valid.
+
+    To avoid false positives, skip the check when we can't verify the mutation.
+    """
+    meta = case.meta
+    if meta is None:
+        return False
+
+    phase_data = meta.phase.data
+    if isinstance(phase_data, FuzzingPhaseData) and phase_data.description is None:
+        return True
+
+    return False
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -386,6 +408,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not has_only_additional_properties_in_non_body_parameters(case)
         and not _body_negation_becomes_valid_after_serialization(case)
         and not _single_element_array_becomes_valid_after_serialization(case)
+        and not _has_unverifiable_mutations(case)
     ):
         extra_info = ""
         phase = meta.phase
