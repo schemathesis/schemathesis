@@ -2981,6 +2981,44 @@ def test_inject_links_invalid_link_missing_operation_ref_and_id(ctx):
         dependencies.inject_links(schema)
 
 
+def test_inject_links_with_reference_to_components(ctx):
+    schema_dict = {
+        "/users": {
+            "post": {
+                "operationId": "createUser",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {"application/json": {"schema": SCHEMA_WITH_ID}},
+                        "links": {"InvalidLink": {"$ref": "#/components/links/ExampleLink"}},
+                    }
+                },
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+
+    raw_schema = ctx.openapi.build_schema(
+        schema_dict,
+        components={
+            "links": {
+                "ExampleLink": {
+                    "operationId": "getUser",
+                }
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    assert dependencies.inject_links(schema) == 1
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
 def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapshot_cli, ctx):
