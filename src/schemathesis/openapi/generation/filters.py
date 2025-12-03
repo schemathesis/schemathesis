@@ -26,19 +26,24 @@ def is_valid_path(parameters: dict[str, object]) -> bool:
 
 
 def is_invalid_path_parameter(value: Any) -> bool:
-    return (
-        value in ("/", "")
-        or contains_unicode_surrogate_pair(value)
-        or (
-            isinstance(value, str)
-            and (
-                ("/" in value or "}" in value or "{" in value)
-                # Avoid situations when the path parameter contains only NULL bytes
-                # Many webservers remove such bytes and as the result, the test can target a different API operation
-                or (len(value) == value.count("\x00"))
-            )
-        )
-    )
+    if value in ("/", ""):
+        return True
+    if contains_unicode_surrogate_pair(value):
+        return True
+
+    # Get string representation for checking problematic characters.
+    # For non-strings (dicts, lists), their str() is what appears in the URL
+    str_value = value if isinstance(value, str) else str(value)
+
+    if "/" in str_value or "}" in str_value or "{" in str_value:
+        return True
+
+    # Avoid situations when the path parameter contains only NULL bytes.
+    # Many webservers remove such bytes and as the result, the test can target a different API operation
+    if isinstance(value, str) and len(value) == value.count("\x00"):
+        return True
+
+    return False
 
 
 def is_valid_header(headers: dict[str, object]) -> bool:
