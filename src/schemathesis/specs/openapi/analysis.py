@@ -14,7 +14,11 @@ from schemathesis.specs.openapi.resources import build_descriptors
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 from schemathesis.specs.openapi.stateful.inference import LinkInferencer
-from schemathesis.specs.openapi.warnings import detect_missing_deserializers, detect_unused_openapi_auth
+from schemathesis.specs.openapi.warnings import (
+    detect_missing_deserializers,
+    detect_unsupported_regex,
+    detect_unused_openapi_auth,
+)
 
 if TYPE_CHECKING:
     from schemathesis.resources import ResourceDescriptor
@@ -164,9 +168,10 @@ class OpenAPIAnalysis:
         for result in self.schema.get_all_operations():
             if isinstance(result, Ok):
                 operation = result.ok()
-                # Iterate to avoid type issues with list variance
                 for warning in detect_missing_deserializers(operation):
                     warnings_map[operation.label].append(warning)
+                for regex_warning in detect_unsupported_regex(operation):
+                    warnings_map[operation.label].append(regex_warning)
         return warnings_map
 
     def _collect_schema_warnings(self) -> Sequence[SchemaWarning]:

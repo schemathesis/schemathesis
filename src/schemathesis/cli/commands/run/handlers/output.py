@@ -331,6 +331,7 @@ class WarningData:
     validation_mismatch: set[str]
     missing_deserializer: dict[str, set[str]]
     unused_openapi_auth: set[str]
+    unsupported_regex: dict[str, set[str]]
 
     __slots__ = (
         "missing_auth",
@@ -338,6 +339,7 @@ class WarningData:
         "validation_mismatch",
         "missing_deserializer",
         "unused_openapi_auth",
+        "unsupported_regex",
     )
 
     def __init__(
@@ -347,12 +349,14 @@ class WarningData:
         validation_mismatch: set[str] | None = None,
         missing_deserializer: dict[str, set[str]] | None = None,
         unused_openapi_auth: set[str] | None = None,
+        unsupported_regex: dict[str, set[str]] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
         self.validation_mismatch = validation_mismatch or set()
         self.missing_deserializer = missing_deserializer or {}
         self.unused_openapi_auth = unused_openapi_auth or set()
+        self.unsupported_regex = unsupported_regex or {}
 
     @property
     def is_empty(self) -> bool:
@@ -362,6 +366,7 @@ class WarningData:
             or self.validation_mismatch
             or self.missing_deserializer
             or self.unused_openapi_auth
+            or self.unsupported_regex
         )
 
 
@@ -1182,6 +1187,14 @@ class OutputHandler(EventHandler):
 
         return record
 
+    def _record_unsupported_regex_warning(self, operation_label: str, message: str) -> Callable[[], None]:
+        """Create a callback that records an unsupported regex warning."""
+
+        def record() -> None:
+            self.warnings.unsupported_regex.setdefault(operation_label, set()).add(message)
+
+        return record
+
     def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
         # warnings, then remove them from warnings
@@ -1211,6 +1224,13 @@ class OutputHandler(EventHandler):
                     ctx,
                     warning.kind,
                     self._record_unused_openapi_auth_warning(warning.message),
+                )
+            elif warning.kind is SchemathesisWarning.UNSUPPORTED_REGEX:
+                assert warning.operation_label is not None
+                self._handle_warning(
+                    ctx,
+                    warning.kind,
+                    self._record_unsupported_regex_warning(warning.operation_label, warning.message),
                 )
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
@@ -1407,6 +1427,15 @@ class OutputHandler(EventHandler):
                 suffix_text=" not defined in the schema",
                 tips=[],
                 entity_name="configured auth scheme",
+            )
+
+        if self.warnings.unsupported_regex:
+            self._display_detailed_warning_block(
+                title="Unsupported regex patterns",
+                warnings=self.warnings.unsupported_regex,
+                entity_name="operation",
+                suffix_text=" contain regex patterns not supported by Python and were removed",
+                tips=["💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html"],
             )
 
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
@@ -1721,6 +1750,16 @@ class OutputHandler(EventHandler):
                 click.echo(
                     _style(
                         f"  ⚠️ Unused OpenAPI auth: {bold(str(count))} configured auth scheme{suffix} not used in the schema",
+                        fg="yellow",
+                    )
+                )
+
+            if self.warnings.unsupported_regex:
+                count = len(self.warnings.unsupported_regex)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had regex patterns removed",
                         fg="yellow",
                     )
                 )

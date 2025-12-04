@@ -16,48 +16,71 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- 🚫  Examples (in 0.00s)
+ ❌  Examples (in 0.00s)
 
-     🚫 1 error
+     ❌ 1 failed
 
- ⏭   Coverage (in 0.00s)
+ ❌  Coverage (in 0.00s)
 
-     ⏭  1 skipped
+     ❌ 1 failed
 
- 🚫  Fuzzing (in 0.00s)
+ ❌  Fuzzing (in 0.00s)
 
-     🚫 1 error
+     ❌ 1 failed
 
-==================================== ERRORS ====================================
+=================================== FAILURES ===================================
 ________________________________ POST /success _________________________________
-Schema Error
+1. Test Case ID: <PLACEHOLDER>
 
-Failed to generate test cases from examples for this API operation because of unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`
+- API rejected schema-compliant request
 
-Tip: Ensure your regex is compatible with Python's syntax.
-For guidance, visit: https://docs.python.org/3/library/re.html
+    Valid data should have been accepted
+    Expected: 2xx, 401, 403, 404, 5xx
 
-Need more help?
-    Join our Discord server: https://discord.gg/R9ASRAmHnA
+- Undocumented HTTP status code
+
+    Received: 405
+    Documented: 200
+
+[405] Method Not Allowed:
+
+    `405: Method Not Allowed`
+
+Reproduce with:
+
+    curl -X POST -H 'Content-Type: application/json' -d '{"region": null}' 'http://127.0.0.1/api/success?key=%5BFiltered%5D'
+
+=================================== WARNINGS ===================================
+
+Unsupported regex patterns: 1 operation contain regex patterns not supported by Python and were removed
+
+  - POST /success
+    Unsupported regex `^[\w\s\-\/\pL,.#;:()']+$` was removed
+
+💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html
+
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 0
-  Errored: 1
+  Tested: 1
 
 Test Phases:
-  🚫 Examples
-  ⏭  Coverage
-  🚫 Fuzzing
+  ❌ Examples
+  ❌ Coverage
+  ❌ Fuzzing
   ⏭  Stateful (not applicable)
 
-Errors:
-  🚫 Schema Error: 1
+Failures:
+  ❌ API rejected schema-compliant request: 1
+  ❌ Undocumented HTTP status code: 1
+
+Warnings:
+  ⚠️ Unsupported regex: 1 operation had regex patterns removed
 
 Test cases:
-  No test cases were generated
+  N generated, N found N unique failures
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+============================= 2 failures in 1.00s ==============================

@@ -1,4 +1,4 @@
-Exit code: 1
+Exit code: 0
 ---
 Stdout:
 Schemathesis dev
@@ -22,53 +22,50 @@ Schemathesis dev
 
  ✅  Coverage (in 0.00s)
 
-     ✅ 1 passed  ⏭  1 skipped
+     ✅ 2 passed
 
- 🚫  Fuzzing (in 0.00s)
+ ✅  Fuzzing (in 0.00s)
 
-     ✅ 1 passed  🚫 1 error
+     ✅ 2 passed
 
-==================================== ERRORS ====================================
-__________________________________ POST /foo ___________________________________
-Schema Error
-
-Invalid regular expression. Pattern `\\p{Alpha}` is not recognized - `bad escape \p at position 0`
-
-Tip: Ensure your regex is compatible with Python's syntax.
-For guidance, visit: https://docs.python.org/3/library/re.html
-
-Need more help?
-    Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== WARNINGS ===================================
 
-Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
   - POST /bar
+  - POST /foo
 
 💡 Provide realistic parameter values in your config file so tests can access existing resources
+
+Unsupported regex patterns: 2 operations contain regex patterns not supported by Python and were removed
+
+  - POST /bar
+    Unsupported regex `\p{Alpha}` was removed
+
+  - POST /foo
+    Unsupported regex `\p{Alpha}` was removed
+
+💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html
 
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 2/2
-  Tested: 1
-  Errored: 1
+  Tested: 2
 
 Test Phases:
   ⏭  Examples
   ✅ Coverage
-  🚫 Fuzzing
+  ✅ Fuzzing
   ⏭  Stateful (not applicable)
 
-Errors:
-  🚫 Schema Error: 1
-
 Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Missing valid test data: 2 operations repeatedly returned 404 responses
+  ⚠️ Unsupported regex: 2 operations had regex patterns removed
 
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-=============================== 1 error in 1.00s ===============================
+=========================== No issues found in 1.00s ===========================
