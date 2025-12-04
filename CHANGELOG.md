@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.7...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive in `negative_data_rejection` check when numeric strings are generated for integer/number path parameters.
+
 ## [4.6.7](https://github.com/schemathesis/schemathesis/compare/v4.6.6...v4.6.7) - 2025-12-04
 
 ### :wrench: Changed
