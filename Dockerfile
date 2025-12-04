@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.14-alpine
 
 LABEL Name=Schemathesis
 
@@ -21,6 +21,6 @@ RUN chown -R 1000:1000 /app
 
 USER schemathesis
 
-ENV SCHEMATHESIS_DOCKER_IMAGE=3.12-alpine
+ENV SCHEMATHESIS_DOCKER_IMAGE=3.14-alpine
 
 ENTRYPOINT ["schemathesis"]
