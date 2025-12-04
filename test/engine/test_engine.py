@@ -729,25 +729,8 @@ def test_non_serializable_example(ctx, phases, expected):
     assert expected in str(errors[0].info)
 
 
-@pytest.mark.parametrize(
-    ("phases", "expected"),
-    [
-        (
-            [PhaseName.FUZZING],
-            "Failed to generate test cases for this API operation because of "
-            r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
-        ),
-        (
-            [PhaseName.EXAMPLES],
-            (
-                "Failed to generate test cases from examples for this API operation because of "
-                r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`"
-            ),
-        ),
-    ],
-)
-def test_invalid_regex_example(ctx, phases, expected):
-    # When filling missing properties during examples generation contains invalid regex
+def test_unsupported_regex_removed_with_warning(ctx):
+    # When a schema contains an unsupported regex pattern
     schema = ctx.openapi.build_schema(
         {
             "/success": {
@@ -778,15 +761,37 @@ def test_invalid_regex_example(ctx, phases, expected):
             }
         }
     )
-    # Then the testing process should not raise an internal error
+    # Then the pattern is removed and a warning is emitted
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
-    stream = EventStream(schema, phases=phases, max_examples=1).execute()
-    # And the tests are failing because of the invalid regex error
-    stream.assert_errors()
-    errors = list(set(stream.find_all(events.NonFatalError)))
-    assert len(errors) == len(phases)
-    assert expected in str(errors[0].info)
+    warnings = list(schema.analysis.iter_warnings())
+    assert len(warnings) > 0
+    assert any("^[\\w\\s\\-\\/\\pL,.#;:()']+$" in w.message for w in warnings)
+
+
+def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
+    # When a parameter schema contains an unsupported regex pattern
+    schema = ctx.openapi.build_schema(
+        {
+            "/users/{id}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "\\p{Alpha}+"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    # Then the pattern is removed and a warning is emitted
+    schema = schemathesis.openapi.from_dict(schema)
+    warnings = list(schema.analysis.iter_warnings())
+    assert len(warnings) > 0
+    assert any("\\p{Alpha}+" in w.message for w in warnings)
 
 
 def test_invalid_header_in_example(ctx, openapi3_base_url):

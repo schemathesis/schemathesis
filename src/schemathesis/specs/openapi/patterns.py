@@ -5,6 +5,16 @@ from functools import lru_cache
 
 from schemathesis.core.errors import InternalError
 
+
+def is_valid_python_regex(pattern: str) -> bool:
+    """Check if a pattern is valid Python regex."""
+    try:
+        re.compile(pattern)
+        return True
+    except re.error:
+        return False
+
+
 try:  # pragma: no cover
     import re._constants as sre
     import re._parser as sre_parse

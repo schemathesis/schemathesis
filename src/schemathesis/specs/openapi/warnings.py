@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import difflib
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
-from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema.types import get_type
+from schemathesis.specs.openapi.patterns import is_valid_python_regex
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -131,3 +133,60 @@ def _find_closest_match(value: str, candidates: list[str]) -> str | None:
     """Find the closest matching string from candidates."""
     matches = difflib.get_close_matches(value, candidates, n=1, cutoff=0.6)
     return matches[0] if matches else None
+
+
+@dataclass
+class UnsupportedRegexWarning:
+    """Warning for regex patterns not supported by Python."""
+
+    operation_label: str | None
+    """Label of the operation (e.g., 'GET /users')."""
+
+    pattern: str
+    """The unsupported regex pattern."""
+
+    __slots__ = ("operation_label", "pattern")
+
+    @property
+    def kind(self) -> SchemathesisWarning:
+        return SchemathesisWarning.UNSUPPORTED_REGEX
+
+    @property
+    def message(self) -> str:
+        return f"Unsupported regex `{self.pattern}` was removed"
+
+
+def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWarning]:
+    """Detect regex patterns not supported by Python."""
+    warnings: list[UnsupportedRegexWarning] = []
+
+    # Check all parameters
+    for param in operation.iter_parameters():
+        try:
+            raw_schema = param.raw_schema
+        except InvalidSchema:
+            continue
+        for pattern in _iter_patterns(raw_schema):
+            if not is_valid_python_regex(pattern):
+                warnings.append(UnsupportedRegexWarning(operation_label=operation.label, pattern=pattern))
+
+    # Check body schemas
+    for body in operation.body:
+        for pattern in _iter_patterns(body.raw_schema):
+            if not is_valid_python_regex(pattern):
+                warnings.append(UnsupportedRegexWarning(operation_label=operation.label, pattern=pattern))
+
+    return warnings
+
+
+def _iter_patterns(schema: Any) -> Iterator[str]:
+    """Yield all pattern values from a schema."""
+    if isinstance(schema, dict):
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str):
+            yield pattern
+        for value in schema.values():
+            yield from _iter_patterns(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            yield from _iter_patterns(item)

@@ -2,10 +2,13 @@ import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 
+# Malformed regex - bad character range `\\-.`
 MALFORMED_REGEX = "^[A-Za-z0-9 \\\\-.'À-ÿ]+$"
 
 
-def test_skip_positive_cases_when_required_body_cannot_be_generated(ctx):
+def test_malformed_regex_removed_allows_body_generation(ctx):
+    # When a body schema contains a malformed regex pattern, it is removed during conversion
+    # allowing data generation to proceed
     schema_dict = ctx.openapi.build_schema(
         {
             "/api/orders/{orderId}": {
@@ -61,4 +64,5 @@ def test_skip_positive_cases_when_required_body_cannot_be_generated(ctx):
         )
     )
 
-    assert len(cases) == 0, f"Expected 0 cases but got {len(cases)} cases with body={[c.body for c in cases]}"
+    # Cases are generated because the malformed pattern is removed
+    assert len(cases) > 0

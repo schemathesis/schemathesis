@@ -6,7 +6,7 @@ from typing import Any, overload
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import deepclone
-from schemathesis.specs.openapi.patterns import update_quantifier
+from schemathesis.specs.openapi.patterns import is_valid_python_regex, update_quantifier
 
 
 @overload
@@ -68,6 +68,10 @@ def _to_json_schema(
     if schema_type == "file":
         schema["type"] = "string"
         schema["format"] = "binary"
+    # Remove unsupported regex patterns
+    pattern = schema.get("pattern")
+    if pattern is not None and not is_valid_python_regex(pattern):
+        del schema["pattern"]
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value

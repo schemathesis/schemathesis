@@ -953,28 +953,14 @@ def test(case):
     )
 
 
-@pytest.mark.parametrize(
-    ("phases", "expected"),
-    [
-        (
-            "Phase.explicit",
-            "Failed to generate test cases from examples for this API operation because of "
-            r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
-        ),
-        (
-            "Phase.explicit, Phase.generate",
-            "Failed to generate test cases for this API operation because of "
-            r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
-        ),
-    ],
-)
-def test_invalid_regex_example(testdir, openapi3_base_url, phases, expected):
+def test_unsupported_regex_pattern_removed(testdir, openapi3_base_url):
+    # When a schema contains an unsupported regex pattern, it is removed and tests can proceed
     testdir.make_test(
         f"""
 schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="success").parametrize()
-@settings(phases=[{phases}])
+@settings(phases=[Phase.explicit, Phase.generate])
 def test(case):
     pass
 """,
@@ -1010,8 +996,8 @@ def test(case):
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest()
-    result.assert_outcomes(failed=1)
-    assert expected in result.stdout.str()
+    # Test passes because the unsupported pattern is removed during schema conversion
+    result.assert_outcomes(passed=1)
 
 
 @pytest.mark.parametrize(
