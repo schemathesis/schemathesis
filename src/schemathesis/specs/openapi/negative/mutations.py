@@ -292,6 +292,7 @@ def change_type(
         new_type = candidates.pop()
         schema["type"] = new_type
         _ensure_query_serializes_to_non_empty(ctx, schema)
+        _ensure_path_string_not_numeric(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
     else:
         # Choose one type that will be present in the final candidates list
@@ -305,6 +306,7 @@ def change_type(
         new_type = draw(st.sampled_from(remaining_candidates))
         schema["type"] = new_type
         _ensure_query_serializes_to_non_empty(ctx, schema)
+        _ensure_path_string_not_numeric(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
 
     old_type_str = " | ".join(sorted(old_types)) if len(old_types) > 1 else old_types[0]
@@ -321,6 +323,22 @@ def _ensure_query_serializes_to_non_empty(ctx: MutationContext, schema: Schema) 
         # Query parameters with empty arrays or arrays of `None` or empty arrays / objects will not appear in the final URL
         schema["minItems"] = schema.get("minItems") or 1
         schema.setdefault("items", {}).update({"not": {"enum": [None, [], {}]}})
+
+
+def _ensure_path_string_not_numeric(ctx: MutationContext, schema: Schema, old_types: list[str]) -> None:
+    """Exclude numeric strings when mutating integer/number to string for path parameters.
+
+    Numeric strings like "7" serialize to the same URL as integer 7,
+    making them indistinguishable and causing false positive failures.
+    """
+    if not ctx.is_path_location:
+        return
+    if schema.get("type") != "string":
+        return
+    if "integer" not in old_types and "number" not in old_types:
+        return
+    # Exclude strings that look like numbers (integers or floats, positive or negative)
+    schema["not"] = {"pattern": r"^-?\d+\.?\d*$"}
 
 
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
