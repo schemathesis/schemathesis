@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.6...HEAD) - TBD
 
+### :wrench: Changed
+
+- Use Python 3.14 in Docker images.
+
 ## [4.6.6](https://github.com/schemathesis/schemathesis/compare/v4.6.5...v4.6.6) - 2025-12-03
 
 ### :bug: Fixed
