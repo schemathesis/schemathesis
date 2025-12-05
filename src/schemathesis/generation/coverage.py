@@ -382,7 +382,8 @@ class CoverageContext:
             schema = dict(schema)
             schema[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
 
-        return self.generate_from(from_schema(schema, custom_formats=self.custom_formats))
+        # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
+        return self.generate_from(from_schema(deepclone(schema), custom_formats=self.custom_formats))
 
 
 T = TypeVar("T")
@@ -773,7 +774,11 @@ def cover_schema_iter(
                             yield from cover_schema_iter(nctx, canonical, seen)
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
-                    validators = [jsonschema.validators.validator_for(sub_schema)(sub_schema) for sub_schema in value]
+                    resolver = ctx.resolver
+                    validators = [
+                        jsonschema.validators.validator_for(sub_schema)(sub_schema, resolver=resolver)
+                        for sub_schema in value
+                    ]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -783,7 +788,11 @@ def cover_schema_iter(
                                 yield value
                 elif key == "oneOf":
                     nctx = ctx.with_negative()
-                    validators = [jsonschema.validators.validator_for(sub_schema)(sub_schema) for sub_schema in value]
+                    resolver = ctx.resolver
+                    validators = [
+                        jsonschema.validators.validator_for(sub_schema)(sub_schema, resolver=resolver)
+                        for sub_schema in value
+                    ]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
