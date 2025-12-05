@@ -449,9 +449,26 @@ class UnrecoverableNetworkError:
 
 @dataclass
 class TestingState:
-    unrecoverable_network_error: UnrecoverableNetworkError | None
+    # Dict keyed by exception id to handle hypothesis reporting any of the encountered errors
+    _unrecoverable_network_errors: dict[int, UnrecoverableNetworkError]
 
-    __slots__ = ("unrecoverable_network_error",)
+    __slots__ = ("_unrecoverable_network_errors",)
 
     def __init__(self) -> None:
-        self.unrecoverable_network_error = None
+        self._unrecoverable_network_errors = {}
+
+    def store_unrecoverable_network_error(self, error: UnrecoverableNetworkError) -> None:
+        """Store an unrecoverable network error keyed by exception identity."""
+        self._unrecoverable_network_errors[id(error.error)] = error
+
+    def get_code_sample_for(self, exc: BaseException) -> str | None:
+        """Get the code sample for a matching exception, if any."""
+        error = self._unrecoverable_network_errors.get(id(exc))
+        return error.code_sample if error is not None else None
+
+    @property
+    def unrecoverable_network_error(self) -> UnrecoverableNetworkError | None:
+        """Return any stored unrecoverable network error (for backward compatibility)."""
+        if self._unrecoverable_network_errors:
+            return next(iter(self._unrecoverable_network_errors.values()))
+        return None

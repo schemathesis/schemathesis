@@ -142,9 +142,11 @@ def execute_state_machine_loop(
                     else:
                         headers = {**dict(input.case.headers or {}), **transport_kwargs.get("headers", {})}
                     verify = transport_kwargs.get("verify", True)
-                    state.unrecoverable_network_error = UnrecoverableNetworkError(
-                        error=exc,
-                        code_sample=input.case.as_curl_command(headers=headers, verify=verify),
+                    state.store_unrecoverable_network_error(
+                        UnrecoverableNetworkError(
+                            error=exc,
+                            code_sample=input.case.as_curl_command(headers=headers, verify=verify),
+                        )
                     )
 
                 if generation.unique_inputs:

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.8...HEAD) - TBD
 
+### :bug: Fixed
+
+- Missing curl reproduction commands for network errors with Hypothesis 6.148.7+.
+
 ## [4.6.8](https://github.com/schemathesis/schemathesis/compare/v4.6.7...v4.6.8) - 2025-12-04
 
 ### :bug: Fixed

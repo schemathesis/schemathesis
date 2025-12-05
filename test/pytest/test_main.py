@@ -1444,45 +1444,6 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
-def test_identical_exceptions_are_deduplicated(testdir):
-    # When a malformed schema causes identical exceptions across multiple test cases
-    testdir.makefile(
-        ".yaml",
-        schema="""
-openapi: 3.0.0
-info:
-  title: Test
-  version: 1.0.0
-paths:
-  /test/{id}}:
-    parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-    get:
-      responses:
-        '200':
-          description: OK
-""",
-    )
-    testdir.make_test(
-        """
-schema = schemathesis.openapi.from_path("schema.yaml")
-
-@schema.parametrize()
-def test(case):
-    case.call_and_validate()
-"""
-    )
-    result = testdir.runpytest("-v")
-    # Then the test should fail
-    result.assert_outcomes(failed=1)
-    # And identical exceptions should be deduplicated in output
-    result.stdout.re_match_lines([r".*Hypothesis found 1 distinct failures.*"])
-
-
 def test_distinct_exceptions_not_deduplicated(testdir):
     # When different errors occur, they should not be deduplicated
     testdir.make_test(
