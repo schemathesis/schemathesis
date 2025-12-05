@@ -165,8 +165,14 @@ def run_test(
             status = Status.ERROR
         else:
             status = Status.FAILURE
-    except BaseExceptionGroup:
+    except BaseExceptionGroup as exc:
         status = Status.ERROR
+        # Check if any exception in the group is an unrecoverable network error
+        for sub_exc in exc.exceptions:
+            code_sample = state.get_code_sample_for(sub_exc)
+            if code_sample is not None:
+                clear_hypothesis_notes(sub_exc)
+                yield non_fatal_error(sub_exc, code_sample=code_sample)
     except hypothesis.errors.FailedHealthCheck as exc:
         status = Status.ERROR
         yield non_fatal_error(build_health_check_error(operation, exc, with_tip=False))
@@ -245,9 +251,7 @@ def run_test(
                 )
             )
         else:
-            code_sample: str | None = None
-            if state.unrecoverable_network_error is not None and state.unrecoverable_network_error.error is exc:
-                code_sample = state.unrecoverable_network_error.code_sample
+            code_sample = state.get_code_sample_for(exc)
             yield non_fatal_error(exc, code_sample=code_sample)
     if (
         status == Status.SUCCESS
@@ -401,9 +405,12 @@ def cached_test_func(f: Callable) -> Callable:
                 else:
                     headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
                 verify = transport_kwargs.get("verify", True)
-                state.unrecoverable_network_error = UnrecoverableNetworkError(
-                    error=exc,
-                    code_sample=case.as_curl_command(headers=headers, verify=verify),
+                code_sample = case.as_curl_command(headers=headers, verify=verify)
+                state.store_unrecoverable_network_error(
+                    UnrecoverableNetworkError(
+                        error=exc,
+                        code_sample=code_sample,
+                    )
                 )
                 raise
             errors.append(exc)
