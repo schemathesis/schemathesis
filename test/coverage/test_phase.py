@@ -2689,3 +2689,81 @@ def test_binary_format_should_not_generate_empty_string_as_invalid(ctx, app_runn
         )
         == snapshot_cli
     )
+
+
+def test_negative_type_violation_for_const_property(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "actions": {
+                                            "type": "array",
+                                            "items": {
+                                                "anyOf": [
+                                                    {"$ref": "#/components/schemas/DoNothing"},
+                                                    {"$ref": "#/components/schemas/CallWebhook"},
+                                                ]
+                                            },
+                                        }
+                                    },
+                                    "required": ["actions"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "DoNothing": {
+                    "type": "object",
+                    "properties": {
+                        "type": {"const": "do-nothing", "type": "string"},
+                    },
+                },
+                "CallWebhook": {
+                    "type": "object",
+                    "properties": {
+                        "block_document_id": {"format": "uuid", "type": "string"},
+                        "type": {"const": "call-webhook", "type": "string"},
+                    },
+                    "required": ["block_document_id"],
+                },
+            }
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/test"]["POST"]
+
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_negative_test(operation, collect)
+
+    # Should generate type violations (non-string) for the `type` property
+    type_violations = [
+        c
+        for c in cases
+        if isinstance(c.body, dict)
+        and isinstance(c.body.get("actions"), list)
+        and len(c.body["actions"]) == 1
+        and isinstance(c.body["actions"][0], dict)
+        and "type" in c.body["actions"][0]
+        and not isinstance(c.body["actions"][0]["type"], str)
+    ]
+    assert len(type_violations) > 0, (
+        f"Should generate type violations (non-string) for type property. "
+        f"Got bodies: {[c.body for c in cases if isinstance(c.body, dict) and c.body.get('actions')]}"
+    )
