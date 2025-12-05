@@ -1334,3 +1334,55 @@ def test_nested_external_refs_in_array_items_for_stateful(ctx):
 
     # Should find resources - the array items ref should resolve correctly
     assert len(graph.resources) > 0 or len(graph.operations) > 0
+
+
+@pytest.mark.hypothesis_nested
+def test_prefix_items_with_ref(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/v1/customers/": {
+                "patch": {
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/CustomerUpdate"}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "CustomerUpdate": {
+                    "properties": {
+                        "key": {
+                            "anyOf": [
+                                {
+                                    "prefixItems": [{"$ref": "#/components/schemas/TaxIDFormat"}],
+                                    "minItems": 2,
+                                    "maxItems": 2,
+                                    "type": "array",
+                                },
+                                {"type": "null"},
+                            ]
+                        }
+                    },
+                    "type": "object",
+                },
+                "TaxIDFormat": {"type": "string"},
+            }
+        },
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+
+    @given(case=schema["/v1/customers/"]["PATCH"].as_strategy())
+    @settings(max_examples=50)
+    def test(case):
+        key = case.body.get("key")
+        if key is not None:
+            assert isinstance(key, list)
+            assert len(key) == 2
+            assert isinstance(key[0], str)
+
+    test()

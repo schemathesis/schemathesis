@@ -8,6 +8,47 @@ from schemathesis.specs.openapi.converter import is_read_only, is_write_only, re
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [
+        pytest.param(
+            {"type": "array", "prefixItems": [{"type": "string"}, {"type": "integer"}]},
+            {"type": "array", "items": [{"type": "string"}, {"type": "integer"}]},
+            id="prefixItems_only",
+        ),
+        pytest.param(
+            {"type": "array", "prefixItems": [{"type": "string"}], "items": {"type": "number"}},
+            {"type": "array", "items": [{"type": "string"}], "additionalItems": {"type": "number"}},
+            id="prefixItems_with_items_schema",
+        ),
+        pytest.param(
+            {"type": "array", "prefixItems": [{"type": "string"}], "items": False},
+            {"type": "array", "items": [{"type": "string"}], "additionalItems": False},
+            id="prefixItems_with_items_false",
+        ),
+        pytest.param(
+            {
+                "type": "object",
+                "properties": {"data": {"type": "array", "prefixItems": [{"type": "string"}]}},
+            },
+            {
+                "type": "object",
+                "properties": {"data": {"type": "array", "items": [{"type": "string"}]}},
+            },
+            id="prefixItems_nested_in_properties",
+        ),
+        pytest.param(
+            {"type": "array", "prefixItems": [{"type": "string"}, {"$ref": "#/$defs/MyType"}]},
+            {"type": "array", "items": [{"type": "string"}, {"$ref": "#/$defs/MyType"}]},
+            id="prefixItems_with_ref",
+        ),
+    ],
+)
+def test_prefix_items_to_items_array(schema, expected):
+    result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
         (
             {
                 "type": "object",

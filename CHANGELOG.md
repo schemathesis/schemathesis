@@ -6,6 +6,7 @@
 
 - Missing curl reproduction commands for network errors with Hypothesis 6.148.7+.
 - Missing type violations in coverage phase for properties with both `const` and `type` keywords.
+- `PointerToNowhere` error when `prefixItems` contains `$ref` in Open API 3.1 schemas.
 
 ## [4.6.8](https://github.com/schemathesis/schemathesis/compare/v4.6.7...v4.6.8) - 2025-12-04
 
