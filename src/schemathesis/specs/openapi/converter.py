@@ -99,6 +99,15 @@ def _to_json_schema(
 
     ensure_required_properties(schema)
 
+    # Convert JSON Schema Draft 2020-12 prefixItems to Draft 4/7 items array form
+    # hypothesis-jsonschema only supports Draft 4/6/7
+    if "prefixItems" in schema:
+        prefix_items = schema.pop("prefixItems")
+        if "items" in schema:
+            # When both prefixItems and items exist, items becomes additionalItems
+            schema["additionalItems"] = schema.pop("items")
+        schema["items"] = prefix_items
+
     for keyword, value in schema.items():
         if keyword in IN_VALUE and isinstance(value, dict):
             schema[keyword] = _to_json_schema(
@@ -167,7 +176,6 @@ IN_ITEM = frozenset(
 )
 IN_CHILD = frozenset(
     (
-        "prefixItems",
         "$defs",
         "definitions",
         "dependentSchemas",
