@@ -580,6 +580,8 @@ def cover_schema_iter(
                     yield from _negative_pattern_properties(ctx, template, value)
                 elif key == "items" and isinstance(value, dict):
                     yield from _negative_items(ctx, value)
+                elif key == "items" and isinstance(value, list):
+                    yield from _negative_prefix_items(ctx, value)
                 elif key == "pattern":
                     min_length = schema.get("minLength")
                     max_length = schema.get("maxLength")
@@ -840,10 +842,8 @@ def cover_schema_iter(
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
                     resolver = ctx.resolver
-                    validators = [
-                        jsonschema.validators.validator_for(sub_schema)(sub_schema, resolver=resolver)
-                        for sub_schema in value
-                    ]
+                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems → items)
+                    validators = [jsonschema.Draft7Validator(sub_schema, resolver=resolver) for sub_schema in value]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -854,10 +854,8 @@ def cover_schema_iter(
                 elif key == "oneOf":
                     nctx = ctx.with_negative()
                     resolver = ctx.resolver
-                    validators = [
-                        jsonschema.validators.validator_for(sub_schema)(sub_schema, resolver=resolver)
-                        for sub_schema in value
-                    ]
+                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems → items)
+                    validators = [jsonschema.Draft7Validator(sub_schema, resolver=resolver) for sub_schema in value]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -1388,6 +1386,35 @@ def _negative_items(ctx: CoverageContext, schema: JsonSchema) -> Generator[Gener
                 description=f"Array with invalid items: {value.description}",
                 location=nctx.current_path,
             )
+
+
+def _negative_prefix_items(
+    ctx: CoverageContext, item_schemas: list[JsonSchema]
+) -> Generator[GeneratedValue, None, None]:
+    """Arrays with invalid items at specific positions (tuple validation)."""
+    if not item_schemas:
+        return
+    # Generate valid values for each position
+    pctx = ctx.with_positive()
+    valid_items = []
+    for item_schema in item_schemas:
+        try:
+            valid_items.append(pctx.generate_from_schema(item_schema))
+        except (InvalidArgument, Unsatisfiable):
+            return
+    # For each position, generate negative values and yield arrays with one invalid item
+    nctx = ctx.with_negative()
+    for idx, item_schema in enumerate(item_schemas):
+        for neg_value in cover_schema_iter(nctx, item_schema):
+            items = valid_items.copy()
+            items[idx] = neg_value.value
+            if ctx.leads_to_negative_test_case(items):
+                yield NegativeValue(
+                    items,
+                    scenario=neg_value.scenario,
+                    description=f"Array with invalid item at index {idx}: {neg_value.description}",
+                    location=nctx.current_path,
+                )
 
 
 def _not_matching_pattern(value: str, pattern: re.Pattern) -> bool:

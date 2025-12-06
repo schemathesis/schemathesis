@@ -1916,3 +1916,37 @@ def test_items_false_with_prefix_items(pctx):
     covered = cover_schema(pctx, schema)
     assert_unique(covered)
     assert_conform(covered, schema)
+
+
+def test_negative_prefix_items(nctx):
+    schema = {
+        "type": "array",
+        "items": [{"type": "integer"}, {"type": "boolean"}],
+    }
+    covered = cover_schema(nctx, schema)
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
+    # Should have negative cases for each position
+    arrays = [v for v in covered if isinstance(v, list)]
+    assert len(arrays) > 0
+    # Each array should have exactly 2 items (matching prefixItems length)
+    for arr in arrays:
+        assert len(arr) == 2
+
+
+@pytest.mark.parametrize("keyword", ["anyOf", "oneOf"])
+def test_anyof_oneof_with_items_as_list(nctx, keyword):
+    schema = {
+        "type": "object",
+        "properties": {
+            "data": {
+                keyword: [
+                    {"type": "array", "items": [{"type": "string"}]},
+                    {"type": "null"},
+                ]
+            }
+        },
+    }
+    covered = cover_schema(nctx, schema)
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
