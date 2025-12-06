@@ -2767,3 +2767,111 @@ def test_negative_type_violation_for_const_property(ctx):
         f"Should generate type violations (non-string) for type property. "
         f"Got bodies: {[c.body for c in cases if isinstance(c.body, dict) and c.body.get('actions')]}"
     )
+
+
+def test_additional_properties_with_schema_positive(ctx):
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                    }
+                }
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/foo"]["post"]
+
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    # Should generate objects with string values
+    with_string_values = [
+        c for c in cases if isinstance(c.body, dict) and any(isinstance(v, str) for v in c.body.values())
+    ]
+    assert len(with_string_values) > 0, (
+        f"Should generate objects with string values. Got bodies: {[c.body for c in cases]}"
+    )
+
+
+def test_additional_properties_with_schema_negative(ctx):
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string"},
+                    }
+                }
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/foo"]["post"]
+
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_negative_test(operation, collect)
+
+    # Should generate objects with non-string values (type violations)
+    with_invalid_values = [
+        c for c in cases if isinstance(c.body, dict) and any(not isinstance(v, str) for v in c.body.values())
+    ]
+    assert len(with_invalid_values) > 0, (
+        f"Should generate objects with non-string values. Got bodies: {[c.body for c in cases]}"
+    )
+
+
+def test_additional_properties_anyof_positive(ctx):
+    schema = build_schema(
+        ctx,
+        request_body={
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "anyOf": [
+                                {"type": "string"},
+                                {"type": "array", "items": {"type": "string"}},
+                            ]
+                        },
+                    }
+                }
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/foo"]["post"]
+
+    cases = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            cases.append(case)
+
+    run_positive_test(operation, collect)
+
+    # Should generate both string values and array values
+    with_string = [c for c in cases if isinstance(c.body, dict) and any(isinstance(v, str) for v in c.body.values())]
+    with_array = [c for c in cases if isinstance(c.body, dict) and any(isinstance(v, list) for v in c.body.values())]
+    assert len(with_string) > 0, f"Should generate objects with string values. Got bodies: {[c.body for c in cases]}"
+    assert len(with_array) > 0, f"Should generate objects with array values. Got bodies: {[c.body for c in cases]}"

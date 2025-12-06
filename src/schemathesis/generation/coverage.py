@@ -90,6 +90,17 @@ FORMAT_STRATEGIES = {**BUILT_IN_STRING_FORMATS, **get_default_format_strategies(
 
 UNKNOWN_PROPERTY_KEY = "x-schemathesis-unknown-property"
 UNKNOWN_PROPERTY_VALUE = 42
+ADDITIONAL_PROPERTY_KEY_BASE = "x-schemathesis-additional"
+
+
+def _generate_additional_property_key(existing_keys: set[str]) -> str:
+    """Generate a key for additional properties that doesn't conflict with existing keys."""
+    key = ADDITIONAL_PROPERTY_KEY_BASE
+    counter = 0
+    while key in existing_keys:
+        counter += 1
+        key = f"{ADDITIONAL_PROPERTY_KEY_BASE}{counter}"
+    return key
 
 
 @dataclass
@@ -744,25 +755,36 @@ def cover_schema_iter(
                             )
                     except (InvalidArgument, Unsatisfiable):
                         pass
-                elif (
-                    key == "additionalProperties"
-                    and not value
-                    and "pattern" not in schema
-                    and schema.get("type") in ["object", None]
-                ):
-                    if not ctx.allow_extra_parameters and ctx.location in (
-                        ParameterLocation.QUERY,
-                        ParameterLocation.HEADER,
-                        ParameterLocation.COOKIE,
-                    ):
-                        continue
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
-                    yield NegativeValue(
-                        {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
-                        scenario=CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
-                        description="Object with unexpected properties",
-                        location=ctx.current_path,
-                    )
+                elif key == "additionalProperties" and schema.get("type") in ["object", None]:
+                    if not value and "pattern" not in schema:
+                        # additionalProperties: false - add unexpected property
+                        if not ctx.allow_extra_parameters and ctx.location in (
+                            ParameterLocation.QUERY,
+                            ParameterLocation.HEADER,
+                            ParameterLocation.COOKIE,
+                        ):
+                            continue
+                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                        yield NegativeValue(
+                            {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
+                            scenario=CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
+                            description="Object with unexpected properties",
+                            location=ctx.current_path,
+                        )
+                    elif isinstance(value, dict):
+                        # additionalProperties with schema - generate invalid values for the schema
+                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                        existing_keys = set(schema.get("properties", {}).keys()) | set(template.keys())
+                        additional_key = _generate_additional_property_key(existing_keys)
+                        nctx = ctx.with_negative()
+                        with nctx.at(additional_key):
+                            for invalid in cover_schema_iter(nctx, value, seen):
+                                yield NegativeValue(
+                                    {**template, additional_key: invalid.value},
+                                    scenario=invalid.scenario,
+                                    description=f"Object with invalid additional property: {invalid.description}",
+                                    location=nctx.current_path,
+                                )
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
@@ -1237,6 +1259,18 @@ def _positive_object(
                     description=f"Object with valid '{name}' value: {new.description}",
                 )
         seen.clear()
+    # Handle additionalProperties with schema
+    additional_properties = schema.get("additionalProperties")
+    if isinstance(additional_properties, dict):
+        existing_keys = set(properties.keys()) | set(template.keys())
+        additional_key = _generate_additional_property_key(existing_keys)
+        for new in cover_schema_iter(ctx, additional_properties):
+            if seen.insert(new.value):
+                yield PositiveValue(
+                    {**template, additional_key: new.value},
+                    scenario=CoverageScenario.OBJECT_ADDITIONAL_PROPERTY,
+                    description=f"Object with additional property: {new.description}",
+                )
 
 
 def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
