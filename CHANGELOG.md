@@ -6,9 +6,11 @@
 
 - Coverage phase now generates test cases for `additionalProperties` with schema constraints.
 - Coverage phase now generates test cases for `maxProperties` and `minProperties` constraints.
+- Coverage phase now generates negative test cases for `prefixItems`.
 
 ### :bug: Fixed
 
+- Coverage phase crash when `anyOf`/`oneOf` contains array schemas with tuple validation (`items` as list).
 - Missing curl reproduction commands for network errors with Hypothesis 6.148.7+.
 - Missing type violations in coverage phase for properties with both `const` and `type` keywords.
 - `PointerToNowhere` error when `prefixItems` contains `$ref` in Open API 3.1 schemas.
