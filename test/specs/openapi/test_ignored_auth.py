@@ -452,6 +452,24 @@ async def data(api_key: str = Depends(get_api_key)):
         """
 
 
+def test_explicit_auth_tuple_in_call_and_validate():
+    # GH-3386: `auth` kwarg passed to `call_and_validate` is not forwarded to CheckContext
+    app = FastAPI()
+    api_key = APIKeyHeader(name="Authorization", auto_error=False)
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}})
+    def root(credentials: Annotated[str | None, Security(api_key)]):
+        if credentials is None or credentials != "Basic dGVzdDp0ZXN0":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+        return {"message": "OK"}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+    case = schema["/"]["GET"].Case()
+    client = TestClient(app)
+    # Valid auth passed as tuple - should NOT raise IgnoredAuth
+    case.call_and_validate(session=client, auth=("test", "test"), checks=[ignored_auth])
+
+
 @pytest.mark.parametrize("location", ["query", "cookie", "header"])
 def test_auth_via_setitem(testdir, location):
     app = make_app(location)
