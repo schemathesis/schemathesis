@@ -50,6 +50,7 @@ class CoverageScenario(str, Enum):
     # Positive scenarios - Objects
     OBJECT_ONLY_REQUIRED = "object_only_required"
     OBJECT_REQUIRED_AND_OPTIONAL = "object_required_and_optional"
+    OBJECT_ADDITIONAL_PROPERTY = "object_additional_property"
 
     # Positive scenarios - Default test case
     DEFAULT_POSITIVE_TEST = "default_positive_test"

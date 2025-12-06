@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.6.8...HEAD) - TBD
 
+### :rocket: Added
+
+- Coverage phase now generates test cases for `additionalProperties` with schema constraints.
+
 ### :bug: Fixed
 
 - Missing curl reproduction commands for network errors with Hypothesis 6.148.7+.
