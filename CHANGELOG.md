@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Coverage phase now generates test cases for `additionalProperties` with schema constraints.
+- Coverage phase now generates test cases for `maxProperties` and `minProperties` constraints.
 
 ### :bug: Fixed
 

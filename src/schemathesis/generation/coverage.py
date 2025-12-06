@@ -785,6 +785,49 @@ def cover_schema_iter(
                                     description=f"Object with invalid additional property: {invalid.description}",
                                     location=nctx.current_path,
                                 )
+                elif key == "maxProperties" and isinstance(value, int) and value >= 0:
+                    additional_properties = schema.get("additionalProperties", True)
+                    # Skip if additionalProperties is false - can't add more properties cleanly
+                    if additional_properties is False:
+                        continue
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                    obj_value = dict(template)
+                    existing_keys = set(obj_value.keys())
+                    needed = value + 1 - len(existing_keys)
+                    if needed > 0:
+                        for _ in range(needed):
+                            new_key = _generate_additional_property_key(existing_keys)
+                            existing_keys.add(new_key)
+                            # Generate value based on additionalProperties schema, or use a default
+                            if isinstance(additional_properties, dict):
+                                obj_value[new_key] = ctx.generate_from_schema(additional_properties)
+                            else:
+                                obj_value[new_key] = UNKNOWN_PROPERTY_VALUE
+                    if len(obj_value) > value and seen.insert(obj_value):
+                        yield NegativeValue(
+                            obj_value,
+                            scenario=CoverageScenario.OBJECT_ABOVE_MAX_PROPERTIES,
+                            description="Object with more properties than allowed by maxProperties",
+                            location=ctx.current_path,
+                        )
+                elif key == "minProperties" and isinstance(value, int) and value > 0:
+                    try:
+                        required = schema.get("required", [])
+                        if value == 1 and not required:
+                            # Only use empty object if no required properties
+                            obj_value = {}
+                        else:
+                            new_schema = {**schema, "minProperties": value - 1, "maxProperties": value - 1}
+                            obj_value = ctx.generate_from_schema(new_schema)
+                        if seen.insert(obj_value):
+                            yield NegativeValue(
+                                obj_value,
+                                scenario=CoverageScenario.OBJECT_BELOW_MIN_PROPERTIES,
+                                description="Object with fewer properties than allowed by minProperties",
+                                location=ctx.current_path,
+                            )
+                    except (InvalidArgument, Unsatisfiable):
+                        pass
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:

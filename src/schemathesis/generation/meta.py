@@ -67,6 +67,10 @@ class CoverageScenario(str, Enum):
     ARRAY_ABOVE_MAX_ITEMS = "array_above_max_items"
     ARRAY_BELOW_MIN_ITEMS = "array_below_min_items"
 
+    # Negative scenarios - Boundary violations for objects
+    OBJECT_ABOVE_MAX_PROPERTIES = "object_above_max_properties"
+    OBJECT_BELOW_MIN_PROPERTIES = "object_below_min_properties"
+
     # Negative scenarios - Constraint violations
     OBJECT_UNEXPECTED_PROPERTIES = "object_unexpected_properties"
     OBJECT_MISSING_REQUIRED_PROPERTY = "object_missing_required_property"
