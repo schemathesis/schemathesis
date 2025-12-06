@@ -11,6 +11,7 @@
 ### :bug: Fixed
 
 - Coverage phase crash when `anyOf`/`oneOf` contains array schemas with tuple validation (`items` as list).
+- Missing type violations in coverage phase for properties with `format: binary` in JSON request bodies.
 - Missing curl reproduction commands for network errors with Hypothesis 6.148.7+.
 - Missing type violations in coverage phase for properties with both `const` and `type` keywords.
 - `PointerToNowhere` error when `prefixItems` contains `$ref` in Open API 3.1 schemas.

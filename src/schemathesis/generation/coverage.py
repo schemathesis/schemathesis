@@ -1572,8 +1572,16 @@ def _negative_type(
         types = [ty]
     else:
         types = ty
-    # Binary formats accept any bytes - type mutations are ineffective
-    if "string" in types and ctx.location == ParameterLocation.BODY and schema.get("format") in ("binary", "byte"):
+    # Root-level binary/byte format with non-JSON content types - type mutations don't produce meaningful wire violations
+    # Path is ['type'] at root level, vs ['properties', 'fieldname', 'type'] for nested properties
+    if (
+        "string" in types
+        and ctx.location == ParameterLocation.BODY
+        and schema.get("format") in ("binary", "byte")
+        and ctx.path == ["type"]
+        and ctx.media_type is not None
+        and ctx.media_type[1] not in ("json",)
+    ):
         return
     # Form-urlencoded body-level type mutations serialize to empty body
     if (
