@@ -1950,3 +1950,24 @@ def test_anyof_oneof_with_items_as_list(nctx, keyword):
     covered = cover_schema(nctx, schema)
     assert_unique(covered)
     assert_not_conform(covered, schema)
+
+
+def test_negative_binary_string_type_violation(ctx_factory):
+    # Binary format strings should still generate non-string type violations
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    schema = {
+        "type": "object",
+        "properties": {
+            "key": {"type": "string"},
+            "value": {"type": "string", "format": "binary"},
+        },
+        "required": ["key", "value"],
+    }
+    covered = cover_schema(ctx, schema)
+    assert_unique(covered)
+    # Check that we generate non-string values for the binary property
+    non_string_values = [
+        v for v in covered if isinstance(v, dict) and "value" in v and not isinstance(v["value"], (str, bytes))
+    ]
+    assert len(non_string_values) > 0, "Should generate non-string type violations for binary format"
+    assert_not_conform(covered, schema)
