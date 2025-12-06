@@ -430,7 +430,7 @@ class Case:
 
         ctx = CheckContext(
             override=self._override,
-            auth=None,
+            auth=transport_kwargs.get("auth") if transport_kwargs else None,
             headers=CaseInsensitiveDict(headers) if headers else None,
             config=config,
             transport_kwargs=transport_kwargs,

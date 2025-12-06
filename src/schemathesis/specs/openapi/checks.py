@@ -733,8 +733,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
-            kwargs = ctx._transport_kwargs or {}
-            kwargs.copy()
+            kwargs = (ctx._transport_kwargs or {}).copy()
             for location, container_name in (
                 ("header", "headers"),
                 ("cookie", "cookies"),
@@ -745,6 +744,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                     _remove_auth_from_container(container, security_parameters, location=location)
                     kwargs[container_name] = container
             kwargs.pop("session", None)
+            kwargs.pop("auth", None)
             if case.operation.app is not None:
                 kwargs.setdefault("app", case.operation.app)
             ctx._record_case(parent_id=case.id, case=no_auth_case)
