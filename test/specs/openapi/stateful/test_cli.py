@@ -544,3 +544,79 @@ def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snap
         )
         == snapshot_cli
     )
+
+
+def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
+    # GH-3394: Links with nested $refs should be fully resolved
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "get": {
+                    "operationId": "getFoo",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                    }
+                                }
+                            },
+                            "links": {
+                                "Top": {"$ref": "#/components/links/Middle"},
+                            },
+                        }
+                    },
+                }
+            },
+            "/foo/{id}": {
+                "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                "get": {
+                    "operationId": "get-by-id",
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        version="3.1.0",
+        components={
+            "links": {
+                "Bottom": {
+                    "operationId": "get-by-id",
+                    "parameters": {"id": "$response.body#/id"},
+                },
+                "Middle": {"$ref": "#/components/links/Bottom"},
+            }
+        },
+    )
+
+    app = Flask(__name__)
+    next_id = 1
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/foo", methods=["GET"])
+    def get_foo():
+        nonlocal next_id
+        result = {"id": next_id}
+        next_id += 1
+        return jsonify(result), 200
+
+    @app.route("/foo/<int:id>", methods=["GET"])
+    def get_foo_by_id(id):
+        return jsonify({"id": id}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "--max-examples=5",
+            "-c not_a_server_error",
+        )
+        == snapshot_cli
+    )
