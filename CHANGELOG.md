@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Stateful testing crash on links with nested `$ref`s. [#3394](https://github.com/schemathesis/schemathesis/issues/3394)
+
 ## [4.7.0](https://github.com/schemathesis/schemathesis/compare/v4.6.8...v4.7.0) - 2025-12-06
 
 ### :rocket: Added

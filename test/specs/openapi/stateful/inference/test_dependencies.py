@@ -3019,6 +3019,105 @@ def test_inject_links_with_reference_to_components(ctx):
     assert dependencies.inject_links(schema) == 1
 
 
+def test_iter_links_with_nested_refs(ctx):
+    # GH-3394: Links with nested $refs should be fully resolved
+    # Schema with link chain: Top -> Middle -> Bottom
+    schema_dict = {
+        "/foo": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}},
+                                }
+                            }
+                        },
+                        "links": {
+                            "Top": {"$ref": "#/components/links/Middle"},
+                        },
+                    }
+                }
+            }
+        },
+        "/foo/{id}": {
+            "parameters": [{"name": "id", "in": "path", "schema": {"type": "integer"}}],
+            "get": {
+                "operationId": "get-by-id",
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+
+    raw_schema = ctx.openapi.build_schema(
+        schema_dict,
+        version="3.1.0",
+        components={
+            "links": {
+                "Bottom": {
+                    "operationId": "get-by-id",
+                    "parameters": {"id": "$response.body#/id"},
+                },
+                "Middle": {"$ref": "#/components/links/Bottom"},
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    # Verify that recursive $refs are fully resolved when iterating links
+    for result in schema.get_all_operations():
+        if isinstance(result, schemathesis.core.result.Ok):
+            operation = result.ok()
+            for _, response in operation.responses.items():
+                for name, link in response.iter_links():
+                    # Link should have operationId after resolving all $ref levels
+                    assert "operationId" in link or "operationRef" in link, (
+                        f"Link '{name}' was not fully resolved: {link}"
+                    )
+
+
+def test_iter_links_with_circular_refs(ctx):
+    # Circular $refs in links should not cause infinite recursion
+    schema_dict = {
+        "/foo": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "links": {
+                            "Circular": {"$ref": "#/components/links/A"},
+                        },
+                    }
+                }
+            }
+        },
+    }
+
+    raw_schema = ctx.openapi.build_schema(
+        schema_dict,
+        version="3.1.0",
+        components={
+            "links": {
+                "A": {"$ref": "#/components/links/B"},
+                "B": {"$ref": "#/components/links/A"},
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    # Should not hang or crash - circular refs are gracefully handled
+    for result in schema.get_all_operations():
+        if isinstance(result, schemathesis.core.result.Ok):
+            operation = result.ok()
+            for _, response in operation.responses.items():
+                for _, link in response.iter_links():
+                    # Circular ref will not be fully resolved, but shouldn't crash
+                    assert "$ref" in link
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
 def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapshot_cli, ctx):
