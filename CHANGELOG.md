@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Hypothesis `database` setting from `@settings` decorator or loaded profiles being ignored with `@schema.parametrize()`.
+- `AttributeError` when using Schemathesis with HypoFuzz due to uninitialized `_override` attribute in `ProjectsConfig`.
 
 ## [4.7.1](https://github.com/schemathesis/schemathesis/compare/v4.7.0...v4.7.1) - 2025-12-07
 

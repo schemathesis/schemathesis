@@ -2,8 +2,9 @@ import datetime
 from base64 import b64decode
 
 import pytest
-from hypothesis import HealthCheck, assume, find, given, settings
+from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
+from hypothesis.internal.observability import with_observability_callback
 
 import schemathesis
 from schemathesis.core import NOT_SET
@@ -603,3 +604,17 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3
         )
         == snapshot_cli
     )
+
+
+def test_hypothesis_observability_serialization(ctx):
+    # Hypothesis observability serializes all dataclass fields on generated values
+    schema = ctx.openapi.build_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema = schemathesis.openapi.from_dict(schema)
+
+    @given(case=schema["/test"]["GET"].as_strategy())
+    @settings(max_examples=1, database=None, phases=[Phase.generate])
+    def test(case):
+        pass
+
+    with with_observability_callback(lambda _: None):
+        test()
