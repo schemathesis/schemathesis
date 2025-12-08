@@ -1,8 +1,15 @@
 import re
 
 import pytest
+from hypothesis import settings
 
 from schemathesis.generation.modes import GenerationMode
+
+
+@pytest.fixture
+def reload_profile():
+    yield
+    settings.load_profile("default")
 
 
 def test_default(testdir):
@@ -875,3 +882,70 @@ def test_api(case):
     assert "POST /users" not in result.stdout.str()
     assert "GET /users" in result.stdout.str()
     assert "GET /products" in result.stdout.str()
+
+
+@pytest.mark.usefixtures("reload_profile")
+def test_hypothesis_settings_database_from_profile_lazy(testdir):
+    # When a hypothesis profile with a custom database is loaded
+    # And lazy schema parametrize is used
+    testdir.make_test(
+        """
+import tempfile
+from hypothesis import settings as hyp_settings, database
+
+# Create a custom database in a temporary directory
+custom_db_path = tempfile.mkdtemp()
+custom_db = database.DirectoryBasedExampleDatabase(custom_db_path)
+
+# Register and load the profile (derandomize=False is required when using a database)
+hyp_settings.register_profile("custom_db_profile", database=custom_db, derandomize=False)
+hyp_settings.load_profile("custom_db_profile")
+
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+@hyp_settings(max_examples=1)
+def test_(case):
+    # hypothesis.settings() returns the loaded profile, which has our custom db
+    import hypothesis
+    current_settings = hypothesis.settings()
+    assert current_settings.database is not None, "Database should not be None"
+    assert str(current_settings.database.path) == custom_db_path, (
+        f"Expected database path {custom_db_path}, got {current_settings.database.path}"
+    )
+""",
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then the custom database from the profile should be used
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.usefixtures("reload_profile")
+def test_hypothesis_settings_decorator_database_lazy(testdir):
+    # When @settings decorator with a custom database is applied to a test
+    # And lazy schema parametrize is used
+    testdir.make_test(
+        """
+import tempfile
+from hypothesis import settings as hyp_settings, database
+
+# Create a custom database in a temporary directory
+custom_db_path = tempfile.mkdtemp()
+custom_db = database.DirectoryBasedExampleDatabase(custom_db_path)
+
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+@hyp_settings(max_examples=1, database=custom_db, derandomize=False)
+def test_(case):
+    import hypothesis
+    current_settings = hypothesis.settings()
+    assert current_settings.database is not None, "Database should not be None"
+    assert str(current_settings.database.path) == custom_db_path, (
+        f"Expected database path {custom_db_path}, got {current_settings.database.path}"
+    )
+""",
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then the custom database from the decorator should be used
+    result.assert_outcomes(passed=1)

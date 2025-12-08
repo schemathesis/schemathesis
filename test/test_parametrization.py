@@ -8,6 +8,12 @@ from schemathesis.schemas import PayloadAlternatives
 from .utils import assert_requests_call, integer
 
 
+@pytest.fixture
+def reload_profile():
+    yield
+    settings.load_profile("default")
+
+
 def test_parametrization(testdir):
     # When `schema.parametrize` is specified on a test function
     testdir.make_test(
@@ -778,3 +784,77 @@ def test_(case):
     )
     result = testdir.runpytest()
     assert "timed out" in result.stdout.str()
+
+
+@pytest.mark.usefixtures("reload_profile")
+def test_hypothesis_settings_database_from_profile(testdir):
+    # When a hypothesis profile with a custom database is loaded
+    # And @schema.parametrize() is used
+    testdir.make_test(
+        """
+import tempfile
+from hypothesis import settings as hyp_settings, database
+
+# Create a custom database in a temporary directory
+custom_db_path = tempfile.mkdtemp()
+custom_db = database.DirectoryBasedExampleDatabase(custom_db_path)
+
+# Register and load the profile (derandomize=False is required when using a database)
+hyp_settings.register_profile("custom_db_profile", database=custom_db, derandomize=False)
+hyp_settings.load_profile("custom_db_profile")
+
+@schema.parametrize()
+@hyp_settings(max_examples=1)
+def test_(case):
+    # hypothesis.settings() returns the loaded profile, which has our custom db
+    import hypothesis
+    current_settings = hypothesis.settings()
+    assert current_settings.database is not None, "Database should not be None"
+    assert str(current_settings.database.path) == custom_db_path, (
+        f"Expected database path {custom_db_path}, got {current_settings.database.path}"
+    )
+""",
+    )
+    result = testdir.runpytest("-v", "-s")
+    # Then the custom database from the profile should be used
+    result.assert_outcomes(passed=1)
+
+
+@pytest.mark.usefixtures("reload_profile")
+def test_hypothesis_settings_decorator_database(testdir):
+    # When @settings decorator with a custom database is applied to a test
+    # And @schema.parametrize() is used
+    testdir.make_test(
+        """
+import tempfile
+from hypothesis import settings as hyp_settings, database
+import pytest
+
+# Create a custom database in a temporary directory
+custom_db_path = tempfile.mkdtemp()
+custom_db = database.DirectoryBasedExampleDatabase(custom_db_path)
+
+@schema.parametrize()
+@hyp_settings(max_examples=1, database=custom_db, derandomize=False)
+def test_(case):
+    pass
+
+@pytest.fixture(scope="session", autouse=True)
+def verify_settings_after_collection(request):
+    # After collection, verify that the parametrized test has the correct database
+    yield
+    for item in request.session.items:
+        if "test_[GET /users]" in item.nodeid:
+            settings_attr = getattr(item.obj, '_hypothesis_internal_use_settings', None)
+            assert settings_attr is not None, "Test should have hypothesis settings"
+            assert settings_attr.database is not None, "Database should not be None"
+            assert str(settings_attr.database.path) == custom_db_path, (
+                f"Expected database path {custom_db_path}, got {settings_attr.database.path}"
+            )
+            break
+    else:
+        pytest.fail("Could not find the schemathesis test item")
+""",
+    )
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=1)
