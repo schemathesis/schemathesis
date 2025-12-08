@@ -18,7 +18,7 @@ from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._report import ReportsConfig
 from schemathesis.config._warnings import WarningsConfig
-from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, hooks
+from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, NOT_SET, NotSet, hooks
 from schemathesis.core.validation import validate_base_url
 
 if TYPE_CHECKING:
@@ -497,7 +497,6 @@ def _validate_base_url(base_url: str) -> None:
 class ProjectsConfig(DiffBase):
     default: ProjectConfig
     named: dict[str, ProjectConfig]
-    _override: ProjectConfig
 
     __slots__ = ("default", "named", "_override")
 
@@ -509,10 +508,11 @@ class ProjectsConfig(DiffBase):
     ) -> None:
         self.default = default or ProjectConfig()
         self.named = named or {}
+        self._override: ProjectConfig | NotSet = NOT_SET
 
     @property
     def override(self) -> ProjectConfig:
-        if not hasattr(self, "_override"):
+        if isinstance(self._override, NotSet):
             self._override = ProjectConfig()
             self._override._parent = self.default._parent
         return self._override
@@ -538,7 +538,7 @@ class ProjectsConfig(DiffBase):
         # Highest priority goes to `override`, then config specifically
         # for the given project, then the "default" project config
         configs = []
-        if hasattr(self, "_override"):
+        if not isinstance(self._override, NotSet):
             configs.append(self._override)
         title = schema.get("info", {}).get("title")
         if title is not None:
