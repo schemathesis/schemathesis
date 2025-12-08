@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.2...HEAD) - TBD
 
+### :wrench: Changed
+
+- Add `409` to `positive_data_acceptance` check's default expected statuses to handle conflict responses (e.g., duplicate entries).
+
 ### :bug: Fixed
 
 - Response schema validation errors displaying internal bundled refs like `#/x-bundled/schema1` instead of original refs like `#/components/schemas/Item`.
