@@ -4,13 +4,14 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from hypothesis import HealthCheck
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from hypothesis.reporting import with_reporter
 
 from schemathesis.config import OutputConfig
+from schemathesis.core.jsonschema.bundler import unbundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.output import truncate_json
 from schemathesis.core.parameters import ParameterLocation
@@ -84,53 +85,9 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
                     name = parameter.media_type
                 else:
                     name = parameter.name
-                schema = unbundle_schema_refs(parameter.optimized_schema, parameter.name_to_uri)
+                schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
                 return UnsatisfiableParameter(location=location, name=name, schema=schema)
     return None
-
-
-def unbundle_schema_refs(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str]) -> JsonSchema:
-    if isinstance(schema, dict):
-        result: dict[str, Any] = {}
-        for key, value in schema.items():
-            if key == "$ref" and isinstance(value, str) and value.startswith("#/x-bundled/"):
-                # Extract bundled name (e.g., "schema1" from "#/x-bundled/schema1")
-                bundled_name = value.split("/")[-1]
-                if bundled_name in name_to_uri:
-                    original_uri = name_to_uri[bundled_name]
-                    # Extract fragment after # (e.g., "#/components/schemas/ObjectType")
-                    if "#" in original_uri:
-                        result[key] = "#" + original_uri.split("#", 1)[1]
-                    else:
-                        # Fallback if no fragment
-                        result[key] = value
-                else:
-                    result[key] = value
-            elif key == "x-bundled" and isinstance(value, dict):
-                # Replace x-bundled with proper components/schemas structure
-                components: dict[str, dict[str, Any]] = {"schemas": {}}
-                for bundled_name, bundled_schema in value.items():
-                    if bundled_name in name_to_uri:
-                        original_uri = name_to_uri[bundled_name]
-                        # Extract schema name (e.g., "ObjectType" from "...#/components/schemas/ObjectType")
-                        if "#/components/schemas/" in original_uri:
-                            schema_name = original_uri.split("#/components/schemas/")[1]
-                            components["schemas"][schema_name] = unbundle_schema_refs(bundled_schema, name_to_uri)
-                        else:
-                            # Fallback: keep bundled name if URI doesn't match expected pattern
-                            components["schemas"][bundled_name] = unbundle_schema_refs(bundled_schema, name_to_uri)
-                    else:
-                        components["schemas"][bundled_name] = unbundle_schema_refs(bundled_schema, name_to_uri)
-                result["components"] = components
-            elif isinstance(value, (dict, list)):
-                # Recursively process all other values
-                result[key] = unbundle_schema_refs(value, name_to_uri)
-            else:
-                result[key] = value
-        return result
-    elif isinstance(schema, list):
-        return [unbundle_schema_refs(item, name_to_uri) for item in schema]  # type: ignore[return-value]
-    return schema
 
 
 def build_unsatisfiable_error(operation: APIOperation, *, with_tip: bool) -> Unsatisfiable:
@@ -245,7 +202,7 @@ def find_slow_parameter(operation: APIOperation, reason: HealthCheck) -> SlowPar
                 else:
                     name = parameter.name
 
-                schema = unbundle_schema_refs(parameter.optimized_schema, parameter.name_to_uri)
+                schema = unbundle(parameter.optimized_schema, parameter.name_to_uri)
                 return SlowParameter(location=location, name=name, schema=schema, original=reason)
     return None
 

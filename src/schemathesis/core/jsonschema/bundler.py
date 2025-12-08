@@ -187,3 +187,44 @@ class Bundler:
 def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> Bundle:
     """Bundle a JSON Schema by embedding all references."""
     return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
+
+
+def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str]) -> JsonSchema:
+    """Restore original $ref paths in a bundled schema for display purposes."""
+    if isinstance(schema, dict):
+        result: dict[str, Any] = {}
+        for key, value in schema.items():
+            if key == "$ref" and isinstance(value, str) and value.startswith(REFERENCE_TO_BUNDLE_PREFIX):
+                bundled_name = value.split("/")[-1]
+                if bundled_name in name_to_uri:
+                    original_uri = name_to_uri[bundled_name]
+                    if "#" in original_uri:
+                        result[key] = "#" + original_uri.split("#", 1)[1]
+                    else:
+                        result[key] = value
+                else:
+                    result[key] = value
+            elif key == BUNDLE_STORAGE_KEY and isinstance(value, dict):
+                components: dict[str, dict[str, Any]] = {"schemas": {}}
+                for bundled_name, bundled_schema in value.items():
+                    if bundled_name in name_to_uri:
+                        original_uri = name_to_uri[bundled_name]
+                        if "#/components/schemas/" in original_uri:
+                            schema_name = original_uri.split("#/components/schemas/")[1]
+                            components["schemas"][schema_name] = unbundle(bundled_schema, name_to_uri)
+                        elif "#/definitions/" in original_uri:
+                            schema_name = original_uri.split("#/definitions/")[1]
+                            components["schemas"][schema_name] = unbundle(bundled_schema, name_to_uri)
+                        else:
+                            components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)
+                    else:
+                        components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)
+                result["components"] = components
+            elif isinstance(value, (dict, list)):
+                result[key] = unbundle(value, name_to_uri)
+            else:
+                result[key] = value
+        return result
+    elif isinstance(schema, list):
+        return [unbundle(item, name_to_uri) for item in schema]  # type: ignore[return-value]
+    return schema

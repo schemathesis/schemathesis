@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
-from schemathesis.core.jsonschema.bundler import bundle
+from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
@@ -26,20 +26,22 @@ _NO_MEDIA_TYPE = ""
 class ResolvedSchema:
     """Schema and media type resolved for a specific response."""
 
-    __slots__ = ("schema", "media_type")
+    __slots__ = ("schema", "media_type", "name_to_uri")
 
     schema: JsonSchema | None
     media_type: str | None
+    name_to_uri: dict[str, str]
 
 
 @dataclass
 class CachedValidation:
     """Cached schema and validator for a media type."""
 
-    __slots__ = ("schema", "validator")
+    __slots__ = ("schema", "validator", "name_to_uri")
 
     schema: JsonSchema | None
     validator: Validator | None
+    name_to_uri: dict[str, str]
 
 
 @dataclass
@@ -84,14 +86,19 @@ class OpenApiResponse:
         cache_key = self._get_cache_key(resolved_media_type)
 
         if cache_key not in self._validation_cache:
-            schema = self.adapter.extract_schema_for_media_type(
+            bundled = self.adapter.extract_schema_for_media_type(
                 self.definition, resolved_media_type, self.resolver, self.scope, self.adapter.nullable_keyword
             )
             # Create cache entry with schema but no validator yet (lazy validator creation)
-            self._validation_cache[cache_key] = CachedValidation(schema=schema, validator=None)
+            if bundled is not None:
+                self._validation_cache[cache_key] = CachedValidation(
+                    schema=bundled.schema, validator=None, name_to_uri=bundled.name_to_uri
+                )
+            else:
+                self._validation_cache[cache_key] = CachedValidation(schema=None, validator=None, name_to_uri={})
 
         cached = self._validation_cache[cache_key]
-        return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type)
+        return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type, name_to_uri=cached.name_to_uri)
 
     def _build_validator(self, schema: JsonSchema) -> Validator | None:
         from jsonschema import Draft202012Validator
@@ -115,9 +122,9 @@ class OpenApiResponse:
 
         cache_key = self._get_cache_key(resolved_media_type)
 
-        # Ensure cache entry exists
+        # Ensure cache entry exists (should already exist from get_schema call)
         if cache_key not in self._validation_cache:
-            self._validation_cache[cache_key] = CachedValidation(schema=schema, validator=None)
+            self._validation_cache[cache_key] = CachedValidation(schema=schema, validator=None, name_to_uri={})
 
         cached = self._validation_cache[cache_key]
 
@@ -265,7 +272,7 @@ def _iter_resolved_responses(
 
 def extract_response_schema_v2(
     response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema | None:
+) -> Bundle | None:
     """Extract and prepare response schema for Swagger 2.0."""
     schema = extract_raw_response_schema_v2(response)
     if schema is not None:
@@ -280,7 +287,7 @@ def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | 
 
 def extract_response_schema_v3(
     response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema | None:
+) -> Bundle | None:
     schema = extract_raw_response_schema_v3(response)
     if schema is not None:
         return _prepare_schema(schema, resolver, scope, nullable_keyword)
@@ -296,15 +303,18 @@ def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | 
     return None
 
 
-def _prepare_schema(schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str) -> JsonSchema:
-    schema = _bundle_in_scope(schema, resolver, scope)
+def _prepare_schema(schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str) -> Bundle:
+    bundled = _bundle_in_scope(schema, resolver, scope)
     # Do not clone the schema, as bundling already does it
-    return to_json_schema(schema, nullable_keyword, is_response_schema=True, update_quantifiers=False, clone=False)
+    converted = to_json_schema(
+        bundled.schema, nullable_keyword, is_response_schema=True, update_quantifiers=False, clone=False
+    )
+    return Bundle(schema=converted, name_to_uri=bundled.name_to_uri)
 
 
 def prepare_response_media_type_schema(
     schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema:
+) -> Bundle:
     """Prepare schema for a specific media type entry."""
     return _prepare_schema(schema, resolver, scope, nullable_keyword)
 
@@ -321,7 +331,7 @@ def resolve_response_media_type_v2(response: Mapping[str, Any], media_type: str 
 
 def extract_schema_for_media_type_v2(
     response: Mapping[str, Any], media_type: str | None, resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema | None:
+) -> Bundle | None:
     """Swagger 2.0 has single schema regardless of media type."""
     return extract_response_schema_v2(response, resolver, scope, nullable_keyword)
 
@@ -378,7 +388,7 @@ def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str 
 
 def extract_schema_for_media_type_v3(
     response: Mapping[str, Any], media_type: str | None, resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema | None:
+) -> Bundle | None:
     """Extract schema for specific media type from OpenAPI 3.x response."""
     content = response.get("content")
     if media_type is None or not isinstance(content, dict) or not content:
@@ -396,10 +406,10 @@ def extract_schema_for_media_type_v3(
     return prepare_response_media_type_schema(schema, resolver, scope, nullable_keyword)
 
 
-def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> JsonSchema:
+def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> Bundle:
     resolver.push_scope(scope)
     try:
-        return bundle(schema, resolver, inline_recursive=False).schema
+        return bundle(schema, resolver, inline_recursive=False)
     except RefResolutionError as exc:
         raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
     finally:
@@ -431,25 +441,34 @@ class OpenApiResponseHeader:
     scope: str
     adapter: SpecificationAdapter
 
-    __slots__ = ("name", "definition", "resolver", "scope", "adapter", "_schema", "_validator")
+    __slots__ = ("name", "definition", "resolver", "scope", "adapter", "_bundle", "_validator")
 
     def __post_init__(self) -> None:
-        self._schema: JsonSchema | NotSet = NOT_SET
+        self._bundle: Bundle | NotSet = NOT_SET
         self._validator: Validator | NotSet = NOT_SET
 
     @property
     def is_required(self) -> bool:
         return self.definition.get(self.adapter.header_required_keyword, False)
 
+    def _get_bundle(self) -> Bundle:
+        """Get the bundled schema for this header."""
+        if self._bundle is NOT_SET:
+            self._bundle = self.adapter.extract_header_schema(
+                self.definition, self.resolver, self.scope, self.adapter.nullable_keyword
+            )
+        assert not isinstance(self._bundle, NotSet)
+        return self._bundle
+
     @property
     def schema(self) -> JsonSchema:
         """The header schema extracted from its definition."""
-        if self._schema is NOT_SET:
-            self._schema = self.adapter.extract_header_schema(
-                self.definition, self.resolver, self.scope, self.adapter.nullable_keyword
-            )
-        assert not isinstance(self._schema, NotSet)
-        return self._schema
+        return self._get_bundle().schema
+
+    @property
+    def name_to_uri(self) -> dict[str, str]:
+        """Mapping from bundled schema names to original URIs."""
+        return self._get_bundle().name_to_uri
 
     @property
     def validator(self) -> Validator:
@@ -486,13 +505,13 @@ def _iter_resolved_headers(
 
 def extract_header_schema_v2(
     header: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema:
+) -> Bundle:
     return _prepare_schema(cast(dict, header), resolver, scope, nullable_keyword)
 
 
 def extract_header_schema_v3(
     header: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
-) -> JsonSchema:
+) -> Bundle:
     schema = header.get("schema", {})
     return _prepare_schema(schema, resolver, scope, nullable_keyword)
 
