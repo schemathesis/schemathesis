@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Response schema validation errors displaying internal bundled refs like `#/x-bundled/schema1` instead of original refs like `#/components/schemas/Item`.
+
 ## [4.7.2](https://github.com/schemathesis/schemathesis/compare/v4.7.1...v4.7.2) - 2025-12-08
 
 ### :bug: Fixed

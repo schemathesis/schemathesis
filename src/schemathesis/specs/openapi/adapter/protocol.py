@@ -13,21 +13,19 @@ if TYPE_CHECKING:
 
     from schemathesis.core.adapter import OperationParameter
     from schemathesis.core.compat import RefResolver
-    from schemathesis.core.jsonschema.bundler import BundleCache, Bundler
+    from schemathesis.core.jsonschema.bundler import Bundle, BundleCache, Bundler
     from schemathesis.core.jsonschema.types import JsonSchema
     from schemathesis.core.transport import Response
     from schemathesis.schemas import APIOperation
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
-ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["JsonSchema", None]]
-PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "RefResolver", str, str], "JsonSchema"]
-ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "JsonSchema"]
+ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["Bundle", None]]
+PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "RefResolver", str, str], "Bundle"]
+ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "Bundle"]
 GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], str | None]
 ResolveResponseMediaType = Callable[[Mapping[str, Any], str | None], str | None]
-ExtractSchemaForMediaType = Callable[
-    [Mapping[str, Any], str | None, "RefResolver", str, str], Union["JsonSchema", None]
-]
+ExtractSchemaForMediaType = Callable[[Mapping[str, Any], str | None, "RefResolver", str, str], Union["Bundle", None]]
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
     [Mapping[str, Any], Mapping[str, Any], "RefResolver"],

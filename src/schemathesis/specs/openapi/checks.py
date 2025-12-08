@@ -200,6 +200,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                         operation=case.operation.label,
                         exc=exc,
                         config=case.operation.schema.config.output,
+                        name_to_uri=header.name_to_uri,
                     )
                 )
         elif header.is_required:
