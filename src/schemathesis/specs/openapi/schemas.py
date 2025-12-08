@@ -688,6 +688,7 @@ class OpenApiSchema(BaseSchema):
                     operation=operation.label,
                     exc=exc,
                     config=operation.schema.config.output,
+                    name_to_uri=resolved.name_to_uri,
                 )
             )
         _maybe_raise_one_or_more(failures)
