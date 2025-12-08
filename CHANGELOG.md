@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Hypothesis `database` setting from `@settings` decorator or loaded profiles being ignored with `@schema.parametrize()`.
+
 ## [4.7.1](https://github.com/schemathesis/schemathesis/compare/v4.7.0...v4.7.1) - 2025-12-07
 
 ### :bug: Fixed

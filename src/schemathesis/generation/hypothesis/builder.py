@@ -130,23 +130,42 @@ def create_test(
     if config.seed is not None and not hasattr(test_func, "_hypothesis_internal_use_seed"):
         hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
 
-    default = hypothesis.settings.default
-    settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
-    assert settings is not None
+    # Get user's explicit settings from their @settings decorator (if present)
+    user_explicit_settings = getattr(test_func, SETTINGS_ATTRIBUTE_NAME, None)
 
-    if settings.verbosity == default.verbosity:
-        settings = hypothesis.settings(settings, verbosity=Verbosity.quiet)
+    # Get settings from the @given wrapper (inherits from loaded profile or default)
+    given_settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
+    assert given_settings is not None
+
+    # Determine the source of user's settings:
+    # - User's @settings decorator takes priority
+    # - Otherwise use @given settings (which inherit from loaded profile or default)
+    if user_explicit_settings is not None:
+        user_settings = user_explicit_settings
+    else:
+        user_settings = given_settings
+
+    default = hypothesis.settings.default
+    if user_settings.verbosity == default.verbosity:
+        user_settings = hypothesis.settings(user_settings, verbosity=Verbosity.quiet)
 
     if config.settings is not None:
-        # Merge the user-provided settings with the current ones
-        settings = hypothesis.settings(
-            config.settings,
-            **{
-                item: getattr(settings, item)
-                for item in all_settings
-                if getattr(settings, item) != getattr(default, item)
-            },
-        )
+        # Get hypothesis' built-in defaults (not affected by loaded profiles)
+        hypothesis_defaults = hypothesis.settings.get_profile("default")
+
+        # Merge strategy:
+        # - Use schemathesis' config.settings as base (provides operational defaults)
+        # - Override with user's customizations (values that differ from hypothesis built-in defaults)
+        # This respects both @settings decorators and loaded profiles while allowing
+        # schemathesis to set its operational requirements (deadline, verbosity, etc.)
+        overrides = {
+            item: getattr(user_settings, item)
+            for item in all_settings
+            if getattr(user_settings, item) != getattr(hypothesis_defaults, item)
+        }
+        settings = hypothesis.settings(config.settings, **overrides)
+    else:
+        settings = user_settings
 
     if Phase.explain in settings.phases:
         phases = tuple(phase for phase in settings.phases if phase != Phase.explain)
