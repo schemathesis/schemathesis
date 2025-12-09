@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.3...HEAD) - TBD
 
+### :bug: Fixed
+
+- `Binary` class causing JSON serialization errors in Hypofuzz due to `dataclasses.asdict()` exposing raw bytes.
+
 ## [4.7.3](https://github.com/schemathesis/schemathesis/compare/v4.7.2...v4.7.3) - 2025-12-08
 
 ### :wrench: Changed
