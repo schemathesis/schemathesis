@@ -1,4 +1,6 @@
 import csv
+import dataclasses
+import json
 import platform
 import re
 import string
@@ -19,6 +21,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.transforms import deepclone
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
+from schemathesis.transport.serialization import Binary
 from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
 from test.utils import assert_requests_call
 
@@ -921,3 +924,20 @@ def test_serializer_alias_validation(target, source, expected_error):
 def test_serializer_alias_empty_target_in_list():
     with pytest.raises(ValueError, match="Target media type cannot be empty"):
         schemathesis.serializer.alias(["application/custom", ""], "application/json")
+
+
+def test_binary_not_a_dataclass():
+    # Binary should not be a dataclass to prevent `dataclasses.asdict()` from
+    # expanding it and exposing raw bytes that break JSON serialization.
+    # This is important for compatibility with tools like Hypofuzz.
+    assert not dataclasses.is_dataclass(Binary(b"test"))
+
+    # Should be JSON serializable when used with dataclasses.asdict on a container
+    @dataclasses.dataclass
+    class Container:
+        value: Binary
+
+    container = Container(value=Binary(b"test data"))
+    # asdict should not expose raw bytes
+    as_dict = dataclasses.asdict(container)
+    json.dumps(as_dict)

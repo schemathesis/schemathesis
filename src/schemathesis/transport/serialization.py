@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from io import StringIO
 from typing import TYPE_CHECKING, Any
 from unicodedata import normalize
@@ -14,7 +13,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-@dataclass
 class Binary(str):
     """A wrapper around `bytes` to resolve OpenAPI and JSON Schema `format` discrepancies.
 
@@ -22,12 +20,19 @@ class Binary(str):
     that JSON Schema expects to be strings.
     """
 
-    data: bytes
-
     __slots__ = ("data",)
+
+    def __new__(cls, data: bytes) -> Binary:
+        return super().__new__(cls)
+
+    def __init__(self, data: bytes) -> None:
+        self.data = data
 
     def __hash__(self) -> int:
         return hash(self.data)
+
+    def __repr__(self) -> str:
+        return f"Binary(data={self.data!r})"
 
 
 def serialize_json(value: Any) -> dict[str, Any]:
