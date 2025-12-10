@@ -487,6 +487,9 @@ def _build_form_strategy_with_encoding(
     required_strategies = {k: v for k, v in property_strategies.items() if k in required}
     optional_strategies = {k: st.just(NOT_SET) | v for k, v in property_strategies.items() if k not in required}
 
+    def _unwrap(value: Any) -> Any:
+        return value.value if isinstance(value, GeneratedValue) else value
+
     @st.composite  # type: ignore[untyped-decorator]
     def build_body(draw: st.DrawFn) -> FormBodyWithContentTypes:
         body: dict[str, Any] = {}
@@ -494,10 +497,10 @@ def _build_form_strategy_with_encoding(
 
         # Generate required properties
         for key, strategy in required_strategies.items():
-            body[key] = draw(strategy)
+            body[key] = _unwrap(draw(strategy))
         # Generate optional properties, filtering out NOT_SET
         for key, strategy in optional_strategies.items():
-            value = draw(strategy)
+            value = _unwrap(draw(strategy))
             if value is not NOT_SET:
                 body[key] = value
 
