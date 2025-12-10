@@ -2,6 +2,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.generation import GenerationMode
 from schemathesis.transport.serialization import Binary
 
 
@@ -757,5 +758,37 @@ def test_multipart_optional_encoding_not_always_present():
         # Required field must always be present
         assert "required_field" in case.body
         # Optional field may or may not be present - both are valid
+
+    test()
+
+
+def test_multipart_encoding_with_negative_mode():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/test": {
+                    "put": {
+                        "requestBody": {
+                            "content": {
+                                "multipart/form-data": {
+                                    "encoding": {"captionfile": {"contentType": "text/vtt, application/x-subrip"}},
+                                    "schema": {"properties": {"captionfile": {"format": "binary"}}},
+                                }
+                            }
+                        },
+                        "responses": {"default": {}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/test"]["PUT"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    def test(case):
+        # Should not raise "unhashable type: 'GeneratedValue'"
+        pass
 
     test()
