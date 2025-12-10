@@ -397,7 +397,19 @@ def extract_from_schema(
     # If schema has allOf, we need to get merged properties and required fields from allOf items
     # This handles cases where parent has properties alongside allOf
     properties_to_process = schema.get("properties", {})
-    required = schema.get("required", [])
+    required = list(schema.get("required", []))
+
+    # For anyOf/oneOf with required constraints, pick the first branch's required fields
+    # This ensures at least one branch is satisfied (e.g., anyOf: [{required: [name]}, {required: [id]}])
+    for key in ("anyOf", "oneOf"):
+        sub_schemas = schema.get(key)
+        if sub_schemas:
+            for sub_schema in sub_schemas:
+                if isinstance(sub_schema, dict) and "required" in sub_schema:
+                    for field in sub_schema["required"]:
+                        if field not in required and field in properties_to_process:
+                            required.append(field)
+                    break
 
     if "allOf" in schema and "properties" in schema:
         # Get the merged allOf schema which includes properties and required fields from all allOf items

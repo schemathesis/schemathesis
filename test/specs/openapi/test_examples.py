@@ -2349,6 +2349,53 @@ def test_allof_with_required_field_should_not_use_incomplete_property_examples(c
             pytest.fail(f"Generated invalid case {case.body}: {e}")
 
 
+def test_anyof_with_required_constraints(ctx):
+    # See GH-3404
+    # When a schema uses `anyOf` with `required` constraints (but no properties inside anyOf branches)
+    # to express "either field A or field B must be present", generated examples must satisfy the
+    # anyOf constraint by including fields from the first branch
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Item"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+        components={
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "anyOf": [
+                        {"required": ["name"]},
+                        {"required": ["id"]},
+                    ],
+                    "properties": {
+                        "type": {"type": "string", "example": "item"},
+                        "id": {"type": "string", "format": "uuid"},
+                        "name": {"type": "string"},
+                    },
+                }
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["POST"]
+
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
+    assert extracted == [
+        {"media_type": "application/json", "value": {"type": "item", "name": ""}},
+    ]
+
+    body_schema = list(operation.body)[0].optimized_schema
+    for example in extracted:
+        jsonschema.validate(example["value"], body_schema)
+
+
 def test_allof_not_referencing_root_schema(ctx):
     # It used to lead to infinite recursion
     raw_schema = ctx.openapi.build_schema(
