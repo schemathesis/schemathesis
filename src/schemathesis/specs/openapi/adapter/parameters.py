@@ -413,14 +413,17 @@ def iter_parameters_v2(
     form_name_to_uri = {}
     for parameter in chain(definition.get("parameters", []), shared_parameters):
         parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
-        if parameter["in"] in HEADER_LOCATIONS:
+        location = parameter.get("in")
+        if not isinstance(location, str):
+            continue
+        if location in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
-        if parameter["in"] == "formData":
+        if location == "formData":
             # We need to gather form parameters first before creating a composite parameter for them
             form_parameters.append(parameter)
             form_name_to_uri.update(name_to_uri)
-        elif parameter["in"] == ParameterLocation.BODY:
+        elif location == ParameterLocation.BODY:
             # Take the original definition & extract the resource_name from there
             resource_name = None
             for param in chain(definition.get("parameters", []), shared_parameters):
@@ -464,7 +467,10 @@ def iter_parameters_v3(
 
     for parameter in chain(definition.get("parameters", []), shared_parameters):
         parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
-        if parameter["in"] in HEADER_LOCATIONS:
+        location = parameter.get("in")
+        if not isinstance(location, str):
+            continue
+        if location in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 
         yield OpenApiParameter.from_definition(definition=parameter, name_to_uri=name_to_uri, adapter=adapter)

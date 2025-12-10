@@ -139,3 +139,29 @@ def test_operation_lookup_non_mapping_shared_params(ctx, paths):
     schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(paths))
     with pytest.raises(OperationNotFound):
         schema.find_operation_by_reference("#/paths/~1alias/get")
+
+
+def test_non_string_parameter_location():
+    # When a parameter has an invalid non-string `in` value (e.g., empty dict),
+    # schema loading should skip the invalid parameter without crashing
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Test", "version": "1.0.0"},
+        "paths": {
+            "/test": {
+                "put": {
+                    "parameters": [{"$ref": "#/components/parameters/idOrUUID"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        "components": {
+            "parameters": {
+                "idOrUUID": {"in": {}}  # Invalid: should be string like "path", "query", etc.
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["PUT"]
+    # Should not raise TypeError: unhashable type: 'dict'
+    assert list(operation.iter_parameters()) == []
