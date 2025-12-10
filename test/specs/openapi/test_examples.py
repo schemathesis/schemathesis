@@ -2396,6 +2396,39 @@ def test_anyof_with_required_constraints(ctx):
         jsonschema.validate(example["value"], body_schema)
 
 
+def test_non_string_pattern_in_schema(ctx):
+    # When a schema contains an invalid non-string `pattern` value (e.g., integer),
+    # examples extraction should proceed gracefully without crashing
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "patch": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {
+                                            "type": "string",
+                                            "pattern": 0,  # Invalid: should be string
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["PATCH"]
+    # Should not raise TypeError
+    assert list(extract_from_schemas(operation)) == []
+
+
 def test_allof_not_referencing_root_schema(ctx):
     # It used to lead to infinite recursion
     raw_schema = ctx.openapi.build_schema(
