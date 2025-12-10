@@ -340,7 +340,11 @@ def extract_from_schemas(
 ) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     for parameter in operation.iter_parameters():
-        schema = parameter.optimized_schema
+        try:
+            schema = parameter.optimized_schema
+        except TypeError:
+            # Invalid schema (e.g., non-string pattern value)
+            continue
         if isinstance(schema, bool):
             continue
         resolver = RefResolver.from_schema(schema)
@@ -358,7 +362,11 @@ def extract_from_schemas(
             yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
-        schema = body.optimized_schema
+        try:
+            schema = body.optimized_schema
+        except TypeError:
+            # Invalid schema (e.g., non-string pattern value)
+            continue
         if isinstance(schema, bool):
             continue
         resolver = RefResolver.from_schema(schema)
