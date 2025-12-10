@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Crash when parameter has non-string `in` value.
+- Crash during examples phase when schema contains non-string `pattern` value.
 - Examples phase generating invalid data for schemas with `anyOf`/`oneOf` containing only `required` constraints. [#3404](https://github.com/schemathesis/schemathesis/issues/3404)
 - Fuzzing phase failing with `unhashable type: 'GeneratedValue'` for `multipart/form-data` with custom encoding.
 
