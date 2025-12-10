@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Examples phase generating invalid data for schemas with `anyOf`/`oneOf` containing only `required` constraints. [#3404](https://github.com/schemathesis/schemathesis/issues/3404)
+- Fuzzing phase failing with `unhashable type: 'GeneratedValue'` for `multipart/form-data` with custom encoding.
 
 ## [4.7.4](https://github.com/schemathesis/schemathesis/compare/v4.7.3...v4.7.4) - 2025-12-10
 
