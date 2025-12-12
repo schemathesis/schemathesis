@@ -1,11 +1,14 @@
+import json
 import pathlib
 import sys
 from io import StringIO
 from typing import NoReturn
 from unittest.mock import patch
+from urllib.parse import urlencode
 
 import pytest
 import requests
+import tracecov
 from jsonschema.exceptions import SchemaError
 
 import schemathesis
@@ -365,7 +368,7 @@ def combined_check(ctx, response, case):
 
 
 def test_default(corpus, filename):
-    schema = _load_schema(corpus, filename)
+    schema, _, _ = _load_schema(corpus, filename)
     schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
     schema.config.checks.update(included_check_names=[combined_check.__name__])
@@ -392,22 +395,37 @@ def test_default(corpus, filename):
 def test_coverage_phase(corpus, filename):
     if filename in SLOW_COVERAGE:
         pytest.skip("Data generation is extremely slow for this schema")
-    schema = _load_schema(corpus, filename)
+    schema, raw_schema, base_path = _load_schema(corpus, filename)
+
+    cov = tracecov.CoverageMap.from_dict(raw_schema, base_path=base_path)
+    resp = tracecov.HttpResponse(status_code=200, elapsed=0.1)
+
     modes = list(GenerationMode)
+    interactions_by_op: dict[tuple[str, str], list[tracecov.HttpInteraction]] = {}
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
-            for _ in _iter_coverage_cases(
-                operation=operation.ok(),
+            op = operation.ok()
+            for case in _iter_coverage_cases(
+                operation=op,
                 generation_modes=modes,
                 generate_duplicate_query_parameters=False,
                 unexpected_methods=set(),
                 generation_config=schema.config.generation,
             ):
-                pass
+                interaction = _case_to_tracecov_interaction(case, resp)
+                key = (case.method.upper(), op.full_path)
+                interactions_by_op.setdefault(key, []).append(interaction)
+
+    for (method, path), batch in interactions_by_op.items():
+        cov.record_schemathesis_interactions(method, path, batch)
+
+    gaps = cov.coverage_gaps()
+    meaningful_gaps = [g for g in gaps if g.get("satisfiability") == "Normal"]
+    assert not meaningful_gaps, f"Coverage gaps: {meaningful_gaps}"
 
 
 def test_stateful(corpus, filename):
-    schema = _load_schema(corpus, filename)
+    schema, _, _ = _load_schema(corpus, filename)
 
     # Test state machine creation and execution
     try:
@@ -437,12 +455,33 @@ def _load_schema(corpus, filename):
     raw_schema = json_loads(raw_content)
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
-        schema.config.update(base_url="http://127.0.0.1:8080/")
+        base_path = schema.base_path
+        schema.config.update(base_url=f"http://127.0.0.1:8080{base_path}")
         schema.config.generation.update(database="none", max_examples=1)
         schema.config.output.sanitization.update(enabled=False)
-        return schema
+        return schema, raw_schema, base_path
     except LoaderError as exc:
         assert_invalid_schema(exc)
+
+
+def _case_to_tracecov_interaction(case, response: tracecov.HttpResponse) -> tracecov.HttpInteraction:
+    kwargs = case.as_transport_kwargs()
+    url = kwargs["url"]
+    if kwargs.get("params"):
+        url += "?" + urlencode(kwargs["params"], doseq=True)
+    body = kwargs.get("data") or kwargs.get("json")
+    if body is not None and not isinstance(body, bytes):
+        body = json.dumps(body).encode() if isinstance(body, (dict, list)) else str(body).encode()
+    return tracecov.HttpInteraction(
+        request=tracecov.HttpRequest(
+            method=kwargs["method"],
+            url=url,
+            body=body,
+            headers={k: str(v) for k, v in kwargs.get("headers", {}).items()},
+        ),
+        response=response,
+        timestamp=0.0,
+    )
 
 
 def assert_invalid_schema(exc: LoaderError) -> NoReturn:
