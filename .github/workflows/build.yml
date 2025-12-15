@@ -64,7 +64,7 @@ jobs:
         run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5.5.1
+        uses: codecov/codecov-action@v5.5.2
         with:
           files: coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
