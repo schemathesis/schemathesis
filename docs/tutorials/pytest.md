@@ -43,7 +43,7 @@ The API lives in the [Schemathesis repository](https://github.com/schemathesis/s
 
 ```console
 git clone https://github.com/schemathesis/schemathesis.git
-cd schemathesis/examples/basic
+cd schemathesis/examples/booking
 docker compose up -d
 ```
 !!! success "Verify the API is running"
