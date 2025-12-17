@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.5...HEAD) - TBD
 
+### :wrench: Changed
+
+- Hook runtime errors are now reported as "Hook Error" instead of misleading "Schema Error".
+
 ## [4.7.5](https://github.com/schemathesis/schemathesis/compare/v4.7.4...v4.7.5) - 2025-12-10
 
 ### :bug: Fixed

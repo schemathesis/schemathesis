@@ -2,6 +2,7 @@
 
 from schemathesis.core.errors import (
     HookError,
+    HookExecutionError,
     IncorrectUsage,
     InfiniteRecursiveReference,
     InternalError,
@@ -25,6 +26,7 @@ from schemathesis.core.errors import (
 
 __all__ = [
     "HookError",
+    "HookExecutionError",
     "IncorrectUsage",
     "InfiniteRecursiveReference",
     "InternalError",

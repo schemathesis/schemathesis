@@ -50,3 +50,18 @@ def after_call(context, case, response):
     )
     # Then the tests should fail
     assert cli.main("run", schema_url, "-c", "all", hooks=module) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_hook_execution_error(ctx, cli, schema_url, snapshot_cli):
+    # When a hook raises an exception during schema initialization
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def before_init_operation(context, operation):
+    raise AttributeError("test hook error")
+        """
+    )
+    # Then it should be reported as a hook error, not a schema error
+    assert cli.main("run", schema_url, hooks=module) == snapshot_cli
