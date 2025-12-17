@@ -201,6 +201,22 @@ class HookError(SchemathesisError):
         return f"Failed to load Schemathesis extensions from `{self.module_path}`"
 
 
+class HookExecutionError(SchemathesisError):
+    """Raised when a user-defined hook raises an exception during execution."""
+
+    hook_name: str
+    original_error: Exception
+
+    __slots__ = ("hook_name", "original_error")
+
+    def __init__(self, hook_name: str, original_error: Exception) -> None:
+        self.hook_name = hook_name
+        self.original_error = original_error
+
+    def __str__(self) -> str:
+        return f"Error in `{self.hook_name}` hook: {type(self.original_error).__name__}: {self.original_error}"
+
+
 class InvalidRegexType(InvalidSchema):
     """Raised when an invalid type is used where a regex pattern is expected."""
 

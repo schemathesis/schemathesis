@@ -9,6 +9,7 @@ from enum import Enum, unique
 from functools import lru_cache, partial
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
+from schemathesis.core.errors import HookExecutionError
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
 from schemathesis.filters import FilterSet, attach_filter_chain
@@ -247,11 +248,14 @@ class HookDispatcher:
         for hook in self.get_all_by_name(name):
             if _should_skip_hook(hook, context):
                 continue
-            # NOTE: It is a backward-compat shim to support calling `before_call` with `**kwargs` OR with `kwargs`.
-            if _with_dual_style_kwargs and not has_var_keyword(hook):
-                hook(context, *args, kwargs)
-            else:
-                hook(context, *args, **kwargs)
+            try:
+                # NOTE: It is a backward-compat shim to support calling `before_call` with `**kwargs` OR with `kwargs`.
+                if _with_dual_style_kwargs and not has_var_keyword(hook):
+                    hook(context, *args, kwargs)
+                else:
+                    hook(context, *args, **kwargs)
+            except Exception as exc:
+                raise HookExecutionError(name, exc) from exc
 
     def unregister(self, hook: Callable) -> None:
         """Unregister a specific hook."""

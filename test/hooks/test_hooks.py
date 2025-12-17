@@ -437,6 +437,25 @@ def test_a(case):
     result.assert_outcomes(passed=1)
 
 
+def test_hook_error_not_converted_to_schema_error(testdir, simple_openapi):
+    testdir.make_test(
+        """
+@schema.hook
+def before_init_operation(context, operation):
+    raise AttributeError("test hook error")
+
+@schema.parametrize()
+def test_(case):
+    pass
+""",
+        schema=simple_openapi,
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(errors=1)
+    # Should show hook error message, not schema error
+    result.stdout.re_match_lines([r".*Error in.*before_init_operation.*hook.*AttributeError.*test hook error.*"])
+
+
 def test_graphql_body(graphql_schema):
     @graphql_schema.hook
     def map_body(context, body):

@@ -17,7 +17,7 @@ from schemathesis.config import (
     FuzzingPhaseConfig,
     OperationOrdering,
 )
-from schemathesis.core.errors import AuthenticationError, InvalidSchema
+from schemathesis.core.errors import AuthenticationError, HookExecutionError, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
@@ -99,7 +99,14 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         mode = HypothesisTestMode.FUZZING
 
     # Create scheduler based on ordering configuration
-    scheduler = _create_scheduler(engine, phase)
+    try:
+        scheduler = _create_scheduler(engine, phase)
+    except HookExecutionError as exc:
+        yield events.NonFatalError(
+            error=exc, phase=phase.name, label=f"`{exc.hook_name}` hook", related_to_operation=False
+        )
+        yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
+        return
 
     suite_started = events.SuiteStarted(phase=phase.name)
 

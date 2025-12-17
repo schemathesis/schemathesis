@@ -1,0 +1,67 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ 🚫  Examples (in 0.00s)
+
+     No tests were run
+
+ 🚫  Coverage (in 0.00s)
+
+     No tests were run
+
+ 🚫  Fuzzing (in 0.00s)
+
+     No tests were run
+
+==================================== ERRORS ====================================
+_________________________ `before_init_operation` hook _________________________
+Hook Error
+
+Error in `before_init_operation` hook: AttributeError: test hook error
+
+    Traceback (most recent call last):
+      File "/package-root/hooks.py", line XXX, in dispatch
+        hook(context, *args, **kwargs)
+      File "/tmp/module.py", line XXX, in before_init_operation
+        raise AttributeError("test hook error")
+    AttributeError: test hook error
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Skipped: 1
+
+Test Phases:
+  🚫 Examples
+  🚫 Coverage
+  🚫 Fuzzing
+  🚫 Stateful
+
+Errors:
+  🚫 Hook Error: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================
