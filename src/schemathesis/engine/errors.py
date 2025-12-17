@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, cast
 from schemathesis import errors
 from schemathesis.core.errors import (
     AuthenticationError,
+    HookExecutionError,
     InfiniteRecursiveReference,
     InvalidTransition,
     SerializationNotPossible,
@@ -105,6 +106,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX: "XML serialization error",
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE: "Serialization not possible",
             RuntimeErrorKind.AUTHENTICATION_ERROR: "Authentication Error",
+            RuntimeErrorKind.HOOK_EXECUTION_ERROR: "Hook Error",
         }.get(self._kind, "Runtime Error")
 
     @property
@@ -168,6 +170,9 @@ class EngineErrorInfo:
         # For AuthenticationError, show only the original exception's traceback
         if isinstance(self._error, AuthenticationError) and self._error.__cause__ is not None:
             return format_exception(self._error.__cause__, with_traceback=True)
+        # For HookExecutionError, show only the original exception's traceback
+        if isinstance(self._error, HookExecutionError):
+            return format_exception(self._error.original_error, with_traceback=True)
         return format_exception(self._error, with_traceback=True)
 
     def format(self, *, bold: Callable[[str], str] = str, indent: str = "    ") -> str:
@@ -280,6 +285,8 @@ class RuntimeErrorKind(str, enum.Enum):
     SCHEMA_NO_LINKS_FOUND = "schema_no_links_found"
     SCHEMA_GENERIC = "schema_generic"
 
+    HOOK_EXECUTION_ERROR = "hook_execution_error"
+
     SERIALIZATION_NOT_POSSIBLE = "serialization_not_possible"
     SERIALIZATION_UNBOUNDED_PREFIX = "serialization_unbounded_prefix"
 
@@ -326,6 +333,10 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
     if isinstance(error, hypothesis.errors.InvalidArgument) and str(error).startswith("Scalar "):
         # Comes from `hypothesis-graphql`
         return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
+
+    # Hook errors
+    if isinstance(error, errors.HookExecutionError):
+        return RuntimeErrorKind.HOOK_EXECUTION_ERROR
 
     # Schema errors
     if isinstance(error, errors.InvalidSchema):
