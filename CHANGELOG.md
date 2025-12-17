@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.5...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.6...HEAD) - TBD
+
+## [4.7.6](https://github.com/schemathesis/schemathesis/compare/v4.7.5...v4.7.6) - 2025-12-17
 
 ### :wrench: Changed
 
