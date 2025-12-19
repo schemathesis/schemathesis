@@ -4,6 +4,14 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
 ## Integrations
 
+- [TraceCov](https://docs.tracecov.sh) by **@Stranger6667**
+
+    - **Description**: Schema-level API coverage analysis. Measures test coverage at the constraint level (minLength, pattern, enum, etc.) rather than just endpoints.
+
+    - **Documentation**: [docs.tracecov.sh](https://docs.tracecov.sh)
+
+    - **Installation**: `uv pip install tracecov`
+
 - [Robot Framework SchemathesisLibrary](https://github.com/aaltat/robotframework-schemathesis) by **@aaltat**
 
     - **Description**: Robot Framework integration with Schemathesis. Automatically generates test cases from OpenAPI/GraphQL schemas using DataDriver integration.
