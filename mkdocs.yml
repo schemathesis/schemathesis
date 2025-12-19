@@ -16,6 +16,7 @@ nav:
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md
+      - guides/coverage.md
       - guides/python-apps.md
       - guides/custom-media-types.md
       - guides/custom-serializers.md
@@ -88,9 +89,6 @@ extra:
 
 markdown_extensions:
   - pymdownx.highlight:
-      anchor_linenums: true
-      line_spans: __span
-      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
