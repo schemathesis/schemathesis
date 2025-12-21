@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.6...HEAD) - TBD
 
+### :memo: Documentation
+
+- Fix code snippets config.
+
 ## [4.7.6](https://github.com/schemathesis/schemathesis/compare/v4.7.5...v4.7.6) - 2025-12-17
 
 ### :wrench: Changed
