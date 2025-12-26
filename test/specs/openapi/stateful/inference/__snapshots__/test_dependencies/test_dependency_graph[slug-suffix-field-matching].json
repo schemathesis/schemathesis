@@ -1,0 +1,49 @@
+{
+  "operations": {
+    "GET /tags": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Tag",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /tags/{tag_slug}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tag_slug",
+          "resource": "Tag",
+          "resource_field": "slug"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Tag",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Tag": {
+      "fields": [
+        "name",
+        "slug"
+      ],
+      "types": {
+        "name": [
+          "string"
+        ],
+        "slug": [
+          "string"
+        ]
+      }
+    }
+  }
+}

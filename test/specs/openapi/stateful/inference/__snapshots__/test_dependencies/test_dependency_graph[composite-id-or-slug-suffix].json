@@ -1,0 +1,85 @@
+{
+  "operations": {
+    "GET /leagues": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "League",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /leagues/{league_id_or_slug}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "League",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /leagues/{league_id_or_slug}/matches": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Match",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "League": {
+      "fields": [
+        "id",
+        "name",
+        "slug"
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ],
+        "slug": [
+          "string"
+        ]
+      }
+    },
+    "Match": {
+      "fields": [
+        "id",
+        "league_id"
+      ],
+      "types": {
+        "id": [
+          "integer"
+        ],
+        "league_id": [
+          "integer"
+        ]
+      }
+    }
+  }
+}
