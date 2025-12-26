@@ -1,0 +1,49 @@
+{
+  "operations": {
+    "GET /categories": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "pointer": "/",
+          "resource": "Category",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /categories/{category_id_or_slug}": {
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "category_id_or_slug",
+          "resource": "Category",
+          "resource_field": "slug"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "pointer": "/",
+          "resource": "Category",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Category": {
+      "fields": [
+        "name",
+        "slug"
+      ],
+      "types": {
+        "name": [
+          "string"
+        ],
+        "slug": [
+          "string"
+        ]
+      }
+    }
+  }
+}

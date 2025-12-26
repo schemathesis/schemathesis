@@ -18,6 +18,12 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("session-guid", "/sessions/{session-guid}", "Session"),
         ("messageSid", "/messages/{messageSid}", "Message"),
         ("Sid", "/messages/{messageSid}", None),
+        ("group_slug", "/groups/{group_slug}", "Group"),
+        ("household_slug", "/households/{household_slug}", "Household"),
+        ("category-slug", "/categories/{category-slug}", "Category"),
+        ("league_id_or_slug", "/leagues/{league_id_or_slug}", "League"),
+        ("match-id-or-slug", "/matches/{match-id-or-slug}", "Match"),
+        ("_slug", "/groups/{_slug}", None),
         ("id", "/users/{id}", "User"),
         ("_id", "/users/{_id}", None),
         ("uid", "/users/{uid}", None),
@@ -26,6 +32,23 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
 )
 def test_from_parameter(parameter, path, expected):
     assert naming.from_parameter(parameter, path) == expected
+
+
+@pytest.mark.parametrize(
+    ["path", "expected"],
+    [
+        ("/api/groups/self", "Group"),
+        ("/api/users/me", "User"),
+        ("/api/accounts/current", "Account"),
+        ("/api/groups", "Group"),
+        ("/api/users/{user_id}", "User"),
+        ("/self", "Self"),
+        ("/api/users/ME", "User"),
+        ("/api/groups/SELF", "Group"),
+    ],
+)
+def test_from_path(path, expected):
+    assert naming.from_path(path) == expected
 
 
 @pytest.mark.parametrize(

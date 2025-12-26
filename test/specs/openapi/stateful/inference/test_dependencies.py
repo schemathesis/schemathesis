@@ -1505,6 +1505,97 @@ def snapshot_json(snapshot):
             },
             id="nested-id-field-behind-result",
         ),
+        pytest.param(
+            {
+                **operation("get", "/leagues", "200", {"type": "array", "items": component_ref("League")}),
+                **operation(
+                    "get",
+                    "/leagues/{league_id_or_slug}",
+                    "200",
+                    component_ref("League"),
+                    [path_param("league_id_or_slug")],
+                ),
+                **operation(
+                    "get",
+                    "/leagues/{league_id_or_slug}/matches",
+                    "200",
+                    {"type": "array", "items": component_ref("Match")},
+                    [path_param("league_id_or_slug")],
+                ),
+            },
+            {
+                "schemas": {
+                    "League": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "slug": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["id", "slug"],
+                    },
+                    "Match": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "league_id": {"type": "integer"},
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="composite-id-or-slug-suffix",
+        ),
+        pytest.param(
+            {
+                **operation("get", "/categories", "200", {"type": "array", "items": component_ref("Category")}),
+                **operation(
+                    "get",
+                    "/categories/{category_id_or_slug}",
+                    "200",
+                    component_ref("Category"),
+                    [path_param("category_id_or_slug")],
+                ),
+            },
+            {
+                "schemas": {
+                    "Category": {
+                        "type": "object",
+                        "properties": {
+                            "slug": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["slug"],
+                    },
+                }
+            },
+            id="composite-id-or-slug-fallback-to-slug",
+        ),
+        pytest.param(
+            {
+                **operation("get", "/tags", "200", {"type": "array", "items": component_ref("Tag")}),
+                **operation(
+                    "get",
+                    "/tags/{tag_slug}",
+                    "200",
+                    component_ref("Tag"),
+                    [path_param("tag_slug")],
+                ),
+            },
+            {
+                "schemas": {
+                    "Tag": {
+                        "type": "object",
+                        "properties": {
+                            "slug": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["slug"],
+                    },
+                }
+            },
+            id="slug-suffix-field-matching",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

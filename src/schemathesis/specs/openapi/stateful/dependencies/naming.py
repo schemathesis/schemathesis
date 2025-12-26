@@ -17,7 +17,19 @@ def from_parameter(parameter: str, path: str) -> str | None:
                 return to_pascal_case(prefix)
 
     # Snake_case (case-insensitive is fine here)
-    snake_suffixes = ("_guid", "_uuid", "_id", "-guid", "-uuid", "-id")
+    # Composite suffixes first (longer patterns match before shorter ones)
+    snake_suffixes = (
+        "_id_or_slug",
+        "-id-or-slug",
+        "_guid",
+        "_uuid",
+        "_id",
+        "_slug",
+        "-guid",
+        "-uuid",
+        "-id",
+        "-slug",
+    )
     for suffix in snake_suffixes:
         if lower.endswith(suffix):
             prefix = parameter[: -len(suffix)]
@@ -58,7 +70,12 @@ def from_path(path: str, parameter_name: str | None = None) -> str | None:
     # Fallback to last non-parameter segment
     non_param_segments = [s for s in segments if "{" not in s]
     if non_param_segments:
-        singular = to_singular(non_param_segments[-1])
+        last_segment = non_param_segments[-1]
+        # Handle special suffixes that refer to "current instance" of parent resource
+        # e.g., /groups/self -> Group, /users/me -> User, /accounts/current -> Account
+        if last_segment.lower() in ("self", "me", "current") and len(non_param_segments) > 1:
+            last_segment = non_param_segments[-2]
+        singular = to_singular(last_segment)
         return to_pascal_case(singular)
 
     return None
@@ -422,10 +439,17 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
     parameter_prefix, parameter_suffix = _split_parameter_name(parameter)
     suffix_normalized = _normalize_for_matching(parameter_suffix)
 
-    # Common identifier field names in priority order (id, uuid, guid, uid)
+    # Common identifier field names in priority order
     ID_FIELD_NAMES = ["id", "uuid", "guid", "uid"]
+    SLUG_FIELD_NAMES = ["slug"]
 
-    if suffix_normalized in ID_FIELD_NAMES:
+    # Handle composite suffixes like `_id_or_slug` - try ID fields first, then slug
+    if suffix_normalized == "idorslug":
+        for id_name in ID_FIELD_NAMES + SLUG_FIELD_NAMES:
+            for field in fields:
+                if _normalize_for_matching(field) == id_name:
+                    return field
+    elif suffix_normalized in ID_FIELD_NAMES:
         # Try to match with any identifier field, preferring exact match first
         for id_name in ID_FIELD_NAMES:
             for field in fields:
@@ -457,16 +481,27 @@ def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
         "user_id" -> ("user", "_id")
         "id" -> ("", "id")
         "channel_id" -> ("channel", "_id")
+        "league_id_or_slug" -> ("league", "_id_or_slug")
 
     """
     if parameter_name.endswith("Id") and len(parameter_name) > 2:
         return (parameter_name[:-2], "Id")
+
+    # Composite suffixes first (longer patterns before shorter ones)
+    if parameter_name.endswith("_id_or_slug") and len(parameter_name) > 11:
+        return (parameter_name[:-11], "_id_or_slug")
+
+    if parameter_name.endswith("-id-or-slug") and len(parameter_name) > 11:
+        return (parameter_name[:-11], "-id-or-slug")
 
     if parameter_name.endswith("_id") and len(parameter_name) > 3:
         return (parameter_name[:-3], "_id")
 
     if parameter_name.endswith("_guid") and len(parameter_name) > 5:
         return (parameter_name[:-5], "_guid")
+
+    if parameter_name.endswith("_slug") and len(parameter_name) > 5:
+        return (parameter_name[:-5], "_slug")
 
     return ("", parameter_name)
 
