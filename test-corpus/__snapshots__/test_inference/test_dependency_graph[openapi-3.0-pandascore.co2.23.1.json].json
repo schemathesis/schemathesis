@@ -56,7 +56,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -73,7 +80,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}/matches": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -84,7 +98,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}/matches/past": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -95,7 +116,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}/matches/running": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -106,7 +134,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}/matches/upcoming": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -117,7 +152,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}/series": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -128,7 +170,14 @@
       ]
     },
     "GET /leagues/{league_id_or_slug}/tournaments": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "league_id_or_slug",
+          "resource": "League",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -194,7 +243,14 @@
       ]
     },
     "GET /matches/{match_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "match_id_or_slug",
+          "resource": "Match",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -241,7 +297,14 @@
       ]
     },
     "GET /matches/{match_id_or_slug}/opponents": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "match_id_or_slug",
+          "resource": "Match",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -263,7 +326,14 @@
       ]
     },
     "GET /players/{player_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "player_id_or_slug",
+          "resource": "Player",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -274,7 +344,14 @@
       ]
     },
     "GET /players/{player_id_or_slug}/matches": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "player_id_or_slug",
+          "resource": "Player",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -329,7 +406,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -352,7 +436,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}/matches": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -363,7 +454,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}/matches/past": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -374,7 +472,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}/matches/running": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -385,7 +490,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}/matches/upcoming": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -396,7 +508,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}/players": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -407,7 +526,14 @@
       ]
     },
     "GET /series/{serie_id_or_slug}/tournaments": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "serie_id_or_slug",
+          "resource": "Serie",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -429,7 +555,14 @@
       ]
     },
     "GET /teams/{team_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "team_id_or_slug",
+          "resource": "Team",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -440,7 +573,14 @@
       ]
     },
     "GET /teams/{team_id_or_slug}/leagues": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "team_id_or_slug",
+          "resource": "Team",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -451,7 +591,14 @@
       ]
     },
     "GET /teams/{team_id_or_slug}/matches": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "team_id_or_slug",
+          "resource": "Team",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -462,7 +609,14 @@
       ]
     },
     "GET /teams/{team_id_or_slug}/series": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "team_id_or_slug",
+          "resource": "Team",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -473,7 +627,14 @@
       ]
     },
     "GET /teams/{team_id_or_slug}/tournaments": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "team_id_or_slug",
+          "resource": "Team",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -528,7 +689,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -557,7 +725,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}/brackets": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -568,7 +743,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}/matches": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -579,7 +761,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}/players": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -590,7 +779,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}/rosters": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -601,7 +797,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}/standings": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -612,7 +815,14 @@
       ]
     },
     "GET /tournaments/{tournament_id_or_slug}/teams": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "tournament_id_or_slug",
+          "resource": "Tournament",
+          "resource_field": "id"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -634,7 +844,14 @@
       ]
     },
     "GET /videogames/{videogame_id_or_slug}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "videogame_id_or_slug",
+          "resource": "Videogame",
+          "resource_field": "videogame_id_or_slug"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -645,7 +862,14 @@
       ]
     },
     "GET /videogames/{videogame_id_or_slug}/leagues": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "videogame_id_or_slug",
+          "resource": "Videogame",
+          "resource_field": "videogame_id_or_slug"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -656,7 +880,14 @@
       ]
     },
     "GET /videogames/{videogame_id_or_slug}/series": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "videogame_id_or_slug",
+          "resource": "Videogame",
+          "resource_field": "videogame_id_or_slug"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -667,7 +898,14 @@
       ]
     },
     "GET /videogames/{videogame_id_or_slug}/tournaments": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "videogame_id_or_slug",
+          "resource": "Videogame",
+          "resource_field": "videogame_id_or_slug"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -678,7 +916,14 @@
       ]
     },
     "GET /videogames/{videogame_id_or_slug}/versions": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "videogame_id_or_slug",
+          "resource": "Videogame",
+          "resource_field": "videogame_id_or_slug"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -1985,7 +2230,9 @@
       }
     },
     "Videogame": {
-      "fields": [],
+      "fields": [
+        "videogame_id_or_slug"
+      ],
       "types": {}
     },
     "Videogame_LoL": {
