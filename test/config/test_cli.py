@@ -1,3 +1,4 @@
+import os
 import platform
 import textwrap
 
@@ -94,3 +95,14 @@ def test_with_null_byte(cli, snapshot_cli):
         cli.main("run", "http://127.0.0.1", config={"reports": {"junit": {"enabled": True, "path": "\x00"}}})
         == snapshot_cli
     )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="chmod doesn't work the same way on Windows")
+def test_permission_denied(cli, tmp_path, snapshot_cli):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text("color = true")
+    os.chmod(config_file, 0o000)
+    try:
+        assert cli.main(f"--config-file={config_file}", "run", "http://127.0.0.1") == snapshot_cli
+    finally:
+        os.chmod(config_file, 0o644)
