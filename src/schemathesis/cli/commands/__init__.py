@@ -84,6 +84,15 @@ def schemathesis(ctx: click.Context, config_file: str | None) -> None:
         )
         click.echo("\nThe configuration file does not exist")
         ctx.exit(1)
+    except PermissionError:
+        display_header(SCHEMATHESIS_VERSION)
+        click.secho(
+            f"❌  Failed to load configuration file from {config_file}",
+            fg="red",
+            bold=True,
+        )
+        click.echo("\nPermission denied")
+        ctx.exit(1)
     except (TOMLDecodeError, ConfigError) as exc:
         display_header(SCHEMATHESIS_VERSION)
         click.secho(
