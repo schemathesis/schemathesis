@@ -6,6 +6,10 @@
 
 - Improve dependency inference.
 
+### :bug: Fixed
+
+- Resources not captured when server returns different 2xx status code than documented.
+
 ## [4.7.7](https://github.com/schemathesis/schemathesis/compare/v4.7.6...v4.7.7) - 2025-12-22
 
 ### :memo: Documentation

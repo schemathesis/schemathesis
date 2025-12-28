@@ -60,7 +60,11 @@ class ResourceRepository:
         descriptors = self._descriptors_by_operation.get(operation, [])
 
         for descriptor in descriptors:
-            if not status_code_matches(descriptor.status_code, status_code):
+            # Match if exact status code matches OR both are 2xx
+            # This handles cases where schema says "200" but server returns "201"
+            if not status_code_matches(descriptor.status_code, status_code) and not (
+                str(descriptor.status_code).startswith("2") and str(status_code).startswith("2")
+            ):
                 continue
             for candidate in self._extract_payload(payload, descriptor):
                 self._store(
