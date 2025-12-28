@@ -55,8 +55,17 @@ def test_store_single_resource(user_data_source):
 
 
 def test_ignore_non_matching_status_code(user_data_source):
-    user_data_source.repository.record_response(operation=POST_USERS, status_code=200, payload={"id": "1"})
+    # Non-2xx responses should be ignored even though the schema expects 2xx
+    user_data_source.repository.record_response(operation=POST_USERS, status_code=404, payload={"id": "1"})
     assert list(user_data_source.repository.iter_instances(USER_RESOURCE)) == []
+
+
+def test_lenient_2xx_matching(user_data_source):
+    # Schema expects 201 but server returns 200 - should still record (both are 2xx)
+    user_data_source.repository.record_response(operation=POST_USERS, status_code=200, payload={"id": "1"})
+    resources = list(user_data_source.repository.iter_instances(USER_RESOURCE))
+    assert len(resources) == 1
+    assert resources[0].data["id"] == "1"
 
 
 def test_many_cardinality_extracts_each_item(user_schema_builder):
