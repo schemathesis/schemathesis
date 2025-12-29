@@ -99,10 +99,31 @@ class OpenAPIAnalysis:
                 self._extra_data_source = None
             else:
                 repository = ResourceRepository(descriptors)
+                self._populate_from_response_examples(repository)
                 requirements = build_parameter_requirements(self.dependency_graph)
                 self._extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
         assert not isinstance(self._extra_data_source, NotSet)
         return self._extra_data_source
+
+    def _populate_from_response_examples(self, repository: ResourceRepository) -> None:
+        """Pre-populate the resource pool with examples from response schemas."""
+        for result in self.schema.get_all_operations():
+            if not isinstance(result, Ok):
+                continue
+            operation = result.ok()
+            if not repository.descriptors_for_operation(operation.label):
+                continue
+            for response in operation.responses.iter_successful_responses():
+                # Skip wildcard patterns like "2XX" - they rarely have useful examples
+                if not response.status_code.isdigit():
+                    continue
+                status_code = int(response.status_code)
+                for _name, example_value in response.iter_examples():
+                    repository.record_response(
+                        operation=operation.label,
+                        status_code=status_code,
+                        payload=example_value,
+                    )
 
     @property
     def inferencer(self) -> LinkInferencer:
