@@ -408,3 +408,47 @@ def test_deeper_pointer(user_schema_builder):
 
     resources = list(data_source.repository.iter_instances(USER_RESOURCE))
     assert {instance.data["id"] for instance in resources} == {"nested1", "nested2"}
+
+
+def test_prepopulate_from_response_examples(ctx):
+    user_schema = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    spec = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": user_schema,
+                                    "example": {"id": "example-user-123", "name": "Example User"},
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "/users/{user_id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {"description": "Success", "content": {"application/json": {"schema": user_schema}}}
+                    },
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    # Without calling record_response(), pool should already have the example value
+    resources = list(data_source.repository.iter_instances(USER_RESOURCE))
+    assert len(resources) == 1
+    assert resources[0].data["id"] == "example-user-123"
+
+    # Verify example is used in augmentation
+    get_operation = schema["/users/{user_id}"]["GET"]
+    path_schema = get_operation.path_parameters.schema
+    augmented = data_source.augment(operation=get_operation, location=ParameterLocation.PATH, schema=path_schema)
+    assert augmented["properties"]["user_id"]["anyOf"][1]["enum"] == ["example-user-123"]

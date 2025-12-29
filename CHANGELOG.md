@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.8...HEAD) - TBD
 
+### :rocket: Added
+
+- Pre-populate resource pool with values from response examples.
+
 ### :bug: Fixed
 
 - Unhandled `PermissionError` when loading config file.
