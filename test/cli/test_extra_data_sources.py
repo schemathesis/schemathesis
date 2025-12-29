@@ -245,6 +245,124 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize("extra_data_enabled", [True, False])
+def test_extra_data_sources_with_response_examples_prepopulation(
+    cli, app_runner, snapshot_cli, ctx, extra_data_enabled
+):
+    known_user_id = "seeded-user-abc-123"
+    schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                                        "required": ["id", "name"],
+                                    },
+                                    # Response example with a known static ID that matches pre-seeded data
+                                    "example": {"id": known_user_id, "name": "Seeded User"},
+                                }
+                            },
+                            "links": {
+                                "GetUser": {
+                                    "operationId": "getUser",
+                                    "parameters": {"user_id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/users/{user_id}": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "Success",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                                        "required": ["id", "name"],
+                                    }
+                                }
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    # Simulating a pre-seeded database with a known user
+    seeded_users = {known_user_id: {"id": known_user_id, "name": "Seeded User"}}
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        # POST always fails - the only valid user is the pre-seeded one
+        abort(500)
+
+    @app.route("/users/<user_id>", methods=["GET"])
+    def get_user(user_id):
+        if user_id not in seeded_users:
+            abort(404)
+        # Bug: response violates schema - missing required 'name' field
+        return jsonify({"id": seeded_users[user_id]["id"]}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    config = {
+        "phases": {
+            "fuzzing": {
+                "operation-ordering": "none",
+                "extra-data-sources": {"responses": extra_data_enabled},
+            },
+        },
+    }
+
+    # With extra_data_enabled=True, response examples are pre-populated and
+    # the bug in GET /users/{user_id} is discovered. With False, only 404s occur.
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--max-examples=50",
+            "-c response_schema_conformance",
+            "--mode=positive",
+            config=config,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, snapshot_cli, ctx):
     schema = ctx.openapi.build_schema(
         {
