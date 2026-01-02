@@ -6,6 +6,108 @@ from flask import Flask, abort, jsonify, request
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, app_runner, snapshot_cli, ctx):
+    item_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": item_schema}},
+                            "links": {
+                                "GetItemById": {
+                                    "operationId": "getItem",
+                                    "parameters": {"id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {"description": "Success", "content": {"application/json": {"schema": item_schema}}},
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    items = {}
+    post_count = [0]
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        post_count[0] += 1
+        data = request.get_json() or {}
+        # First few requests succeed, then fail with 500
+        if post_count[0] <= 3:
+            item_id = uuid.uuid4().hex
+            item = {"id": item_id, "name": data.get("name", "Item")}
+            items[item_id] = item
+            return jsonify(item), 201
+        else:
+            abort(500)
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id not in items:
+            return "", 404
+        # Bug: missing required 'name' field - only discoverable with valid ID
+        return jsonify({"id": items[item_id]["id"]}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    config = {
+        "phases": {
+            "fuzzing": {"extra-data-sources": {"responses": True}},
+        },
+    }
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--max-examples=50",
+            "-c not_a_server_error",
+            "-c response_schema_conformance",
+            "--mode=positive",
+            config=config,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("config_enabled", [False, True])
 def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli, ctx, config_enabled):
     item_schema = {
