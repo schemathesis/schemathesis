@@ -5,6 +5,71 @@ from functools import lru_cache
 
 from schemathesis.core.errors import InternalError
 
+# Unicode property escape translations (PCRE/Java/JS → Python approximations)
+# These cover Latin-based scripts which handle the majority of real-world APIs
+_LETTER_CLASS = r"a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F"
+_LETTER_UPPER_CLASS = r"A-Z\u00C0-\u00D6\u00D8-\u00DE\u0100-\u0136\u0139-\u0147\u014A-\u0178\u0179-\u017D"
+_LETTER_LOWER_CLASS = r"a-z\u00DF-\u00F6\u00F8-\u00FF\u0101-\u0137\u013A-\u0148\u014B-\u0177\u017A-\u017E"
+_DIGIT_CLASS = r"0-9"
+_ALNUM_CLASS = rf"{_LETTER_CLASS}{_DIGIT_CLASS}"
+_SPACE_CLASS = r" \t\n\r\f\v"
+
+# Order matters - check bracketed forms first to avoid double-bracketing
+_UNICODE_PROPERTY_MAP = (
+    # Bracketed forms (must come first)
+    (r"[\p{L}]", f"[{_LETTER_CLASS}]"),
+    (r"[\p{Lu}]", f"[{_LETTER_UPPER_CLASS}]"),
+    (r"[\p{Ll}]", f"[{_LETTER_LOWER_CLASS}]"),
+    (r"[\p{N}]", f"[{_DIGIT_CLASS}]"),
+    (r"[\p{Nd}]", f"[{_DIGIT_CLASS}]"),
+    (r"[\p{Alpha}]", f"[{_LETTER_CLASS}]"),
+    (r"[\p{Digit}]", f"[{_DIGIT_CLASS}]"),
+    (r"[\p{Alnum}]", f"[{_ALNUM_CLASS}]"),
+    (r"[\p{Space}]", f"[{_SPACE_CLASS}]"),
+    (r"[\p{Z}]", f"[{_SPACE_CLASS}]"),
+    (r"[\P{L}]", f"[^{_LETTER_CLASS}]"),
+    (r"[\P{N}]", f"[^{_DIGIT_CLASS}]"),
+    (r"[\P{Nd}]", f"[^{_DIGIT_CLASS}]"),
+    # Standalone forms
+    (r"\p{L}", f"[{_LETTER_CLASS}]"),
+    (r"\p{Lu}", f"[{_LETTER_UPPER_CLASS}]"),
+    (r"\p{Ll}", f"[{_LETTER_LOWER_CLASS}]"),
+    (r"\p{N}", f"[{_DIGIT_CLASS}]"),
+    (r"\p{Nd}", f"[{_DIGIT_CLASS}]"),
+    (r"\p{Alpha}", f"[{_LETTER_CLASS}]"),
+    (r"\p{Digit}", f"[{_DIGIT_CLASS}]"),
+    (r"\p{Alnum}", f"[{_ALNUM_CLASS}]"),
+    (r"\p{Space}", f"[{_SPACE_CLASS}]"),
+    (r"\p{Z}", f"[{_SPACE_CLASS}]"),
+    (r"\P{L}", f"[^{_LETTER_CLASS}]"),
+    (r"\P{N}", f"[^{_DIGIT_CLASS}]"),
+    (r"\P{Nd}", f"[^{_DIGIT_CLASS}]"),
+)
+
+
+@lru_cache(maxsize=256)
+def translate_to_python_regex(pattern: str) -> str | None:
+    """Translate PCRE-style Unicode property escapes to Python equivalents.
+
+    Returns the translated pattern if successful, None if translation failed
+    or the result is not a valid Python regex.
+    """
+    if r"\p{" not in pattern and r"\P{" not in pattern:
+        return None  # No translation needed
+
+    translated = pattern
+    for pcre_escape, python_equiv in _UNICODE_PROPERTY_MAP:
+        translated = translated.replace(pcre_escape, python_equiv)
+
+    # Check if there are still untranslated Unicode property escapes
+    if r"\p{" in translated or r"\P{" in translated:
+        return None  # Contains unsupported escapes
+
+    # Verify the translated pattern is valid
+    if is_valid_python_regex(translated):
+        return translated
+    return None
+
 
 def is_valid_python_regex(pattern: str) -> bool:
     """Check if a pattern is valid Python regex."""

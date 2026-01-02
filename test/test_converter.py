@@ -171,3 +171,20 @@ def test_rewrite_read_only(schema, expected):
 def test_rewrite_write_only(schema, expected):
     rewrite_properties(schema, is_write_only)
     assert schema == expected
+
+
+def test_pattern_translation_success():
+    # When a schema contains a PCRE pattern that can be translated to Python regex
+    schema = {"type": "string", "pattern": r"\p{L}+"}
+    result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
+    # Then the pattern should be translated
+    assert result == {"type": "string", "pattern": r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"}
+
+
+def test_pattern_translation_invalid_result():
+    # When a PCRE pattern translates to an invalid Python regex
+    # `\p{L}` gets translated but the `[` at the end makes the result invalid
+    schema = {"type": "string", "pattern": r"\p{L}["}
+    result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
+    # Then the pattern should be removed (translation failed validation)
+    assert result == {"type": "string"}

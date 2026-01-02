@@ -977,7 +977,7 @@ def test(case):
                                     "properties": {
                                         "region": {
                                             "nullable": True,
-                                            "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                            "pattern": "^[\\w\\s\\-\\/\\p{Greek},.#;:()']+$",
                                             "type": "string",
                                         },
                                     },

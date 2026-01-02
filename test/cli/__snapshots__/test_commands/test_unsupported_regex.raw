@@ -40,10 +40,10 @@ Missing test data: 2 operations repeatedly returned 404 Not Found, preventing te
 Unsupported regex patterns: 2 operations contain regex patterns not supported by Python and were removed
 
   - POST /bar
-    Unsupported regex `\p{Alpha}` was removed
+    Unsupported regex `\p{Greek}` was removed
 
   - POST /foo
-    Unsupported regex `\p{Alpha}` was removed
+    Unsupported regex `\p{Greek}` was removed
 
 💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html
 

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.9...HEAD) - TBD
 
+### :rocket: Added
+
+- Translate PCRE Unicode property escapes (`\p{L}`, `\p{N}`) to Python regex equivalents.
+
 ### :wrench: Changed
 
 - Reduce negative test generation for parameters with captured response values.

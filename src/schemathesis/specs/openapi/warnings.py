@@ -11,7 +11,7 @@ from schemathesis.config import SchemathesisWarning
 from schemathesis.core import deserialization
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema.types import get_type
-from schemathesis.specs.openapi.patterns import is_valid_python_regex
+from schemathesis.specs.openapi.patterns import is_valid_python_regex, translate_to_python_regex
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -167,13 +167,13 @@ def detect_unsupported_regex(operation: APIOperation) -> list[UnsupportedRegexWa
         except InvalidSchema:
             continue
         for pattern in _iter_patterns(raw_schema):
-            if not is_valid_python_regex(pattern):
+            if not is_valid_python_regex(pattern) and translate_to_python_regex(pattern) is None:
                 warnings.append(UnsupportedRegexWarning(operation_label=operation.label, pattern=pattern))
 
     # Check body schemas
     for body in operation.body:
         for pattern in _iter_patterns(body.raw_schema):
-            if not is_valid_python_regex(pattern):
+            if not is_valid_python_regex(pattern) and translate_to_python_regex(pattern) is None:
                 warnings.append(UnsupportedRegexWarning(operation_label=operation.label, pattern=pattern))
 
     return warnings
