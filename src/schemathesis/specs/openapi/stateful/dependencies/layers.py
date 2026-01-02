@@ -9,6 +9,21 @@ if TYPE_CHECKING:
     from .models import DependencyGraph
 
 
+def _restful_order_key(label: str) -> tuple[int, str]:
+    """Sort by HTTP method priority, then alphabetically.
+
+    Priority: POST/PUT (0) → GET/PATCH/HEAD/OPTIONS (1) → DELETE/others (2)
+    """
+    method = label.split()[0].upper()
+    if method in ("POST", "PUT"):
+        priority = 0
+    elif method in ("GET", "PATCH", "HEAD", "OPTIONS"):
+        priority = 1
+    else:
+        priority = 2
+    return (priority, label)
+
+
 def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
     """Compute operation layers based on resource dependencies.
 
@@ -95,14 +110,14 @@ def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
                         queue.append(other_label)
 
         if current_layer:
-            current_layer.sort()
+            current_layer.sort(key=_restful_order_key)
             layers.append(current_layer)
 
     # Check if all operations were processed (no cycles)
     if len(processed) < len(graph.operations):
         # Some operations not processed due to cycles
         # Add remaining operations to final layer
-        remaining = sorted(set(graph.operations.keys()) - processed)
+        remaining = sorted(set(graph.operations.keys()) - processed, key=_restful_order_key)
         if remaining:
             layers.append(remaining)
 
@@ -178,7 +193,7 @@ def _compute_layers_with_cycles(
 
         if current_layer:
             # Sort for determinism
-            current_layer.sort()
+            current_layer.sort(key=_restful_order_key)
             layers.append(current_layer)
 
     return layers if layers else None
