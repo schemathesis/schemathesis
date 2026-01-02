@@ -745,7 +745,7 @@ def test_unsupported_regex_removed_with_warning(ctx):
                                     "properties": {
                                         "region": {
                                             "nullable": True,
-                                            "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                            "pattern": "^[\\w\\s\\-\\/\\p{Greek},.#;:()']+$",
                                             "type": "string",
                                         },
                                     },
@@ -765,7 +765,7 @@ def test_unsupported_regex_removed_with_warning(ctx):
     schema = schemathesis.openapi.from_dict(schema)
     warnings = list(schema.analysis.iter_warnings())
     assert len(warnings) > 0
-    assert any("^[\\w\\s\\-\\/\\pL,.#;:()']+$" in w.message for w in warnings)
+    assert any("^[\\w\\s\\-\\/\\p{Greek},.#;:()']+$" in w.message for w in warnings)
 
 
 def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
@@ -779,7 +779,7 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
                             "name": "id",
                             "in": "path",
                             "required": True,
-                            "schema": {"type": "string", "pattern": "\\p{Alpha}+"},
+                            "schema": {"type": "string", "pattern": "\\p{Greek}+"},
                         }
                     ],
                     "responses": {"200": {"description": "OK"}},
@@ -791,7 +791,7 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
     schema = schemathesis.openapi.from_dict(schema)
     warnings = list(schema.analysis.iter_warnings())
     assert len(warnings) > 0
-    assert any("\\p{Alpha}+" in w.message for w in warnings)
+    assert any("\\p{Greek}+" in w.message for w in warnings)
 
 
 def test_invalid_header_in_example(ctx, openapi3_base_url):
