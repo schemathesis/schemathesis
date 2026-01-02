@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.9...HEAD) - TBD
 
+### :wrench: Changed
+
+- Reduce negative test generation for parameters with captured response values.
+
 ### :bug: Fixed
 
 - Resource pool not recording IDs from successful responses when other test cases in the same scenario failed.

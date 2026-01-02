@@ -41,6 +41,10 @@ INVALID_SCHEMA_MESSAGE = (
 
 FORM_MEDIA_TYPES = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
 
+# Probability of using negative strategy when schema is augmented with captured response values.
+# We want to mostly use valid captured values to test deeper application logic.
+NEGATIVE_PROBABILITY_WITH_AUGMENTED_SCHEMA = 0.03
+
 
 @dataclass
 class OpenApiComponent(ABC):
@@ -648,6 +652,16 @@ class OpenApiParameterSet(ParameterSet):
         assert isinstance(schema, dict)
         schema_obj: JsonSchemaObject = schema
 
+        from schemathesis.specs.openapi.extra_data_source import AUGMENTED_MARKER
+
+        # When schema is augmented with captured values and we're in negative mode,
+        # mostly use positive strategy to leverage valuable captured data.
+        is_augmented = schema_obj.get(AUGMENTED_MARKER, False)
+        if is_augmented and generation_mode.is_negative:
+            return self._build_augmented_aware_strategy(
+                schema_obj, operation, generation_config, generation_mode, exclude
+            )
+
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
         if not schema_obj["properties"] and strategy_factory is make_negative_strategy:
@@ -709,6 +723,42 @@ class OpenApiParameterSet(ParameterSet):
         if use_cache:
             self._strategy_cache[cache_key] = strategy
         return strategy
+
+    def _build_augmented_aware_strategy(
+        self,
+        schema_obj: JsonSchemaObject,
+        operation: APIOperation,
+        generation_config: GenerationConfig,
+        generation_mode: GenerationMode,
+        exclude: Iterable[str],
+    ) -> st.SearchStrategy:
+        """Build a composite strategy for schemas augmented with captured response values.
+
+        Mostly uses positive strategy to leverage valuable captured data,
+        with occasional negative tests controlled by NEGATIVE_PROBABILITY_WITH_AUGMENTED_SCHEMA.
+        """
+        from hypothesis import strategies as st
+
+        from schemathesis.specs.openapi.negative import GeneratedValue
+
+        positive_strategy = self.get_strategy(
+            operation, generation_config, GenerationMode.POSITIVE, exclude, extra_data_source=None
+        )
+        negative_strategy = self.get_strategy(
+            operation, generation_config, generation_mode, exclude, extra_data_source=None
+        )
+
+        # Wrap positive strategy values in GeneratedValue for consistent return type
+        positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
+
+        @st.composite  # type: ignore[untyped-decorator]
+        def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
+            random = draw(st.randoms(use_true_random=True))
+            if random.random() < NEGATIVE_PROBABILITY_WITH_AUGMENTED_SCHEMA:
+                return draw(negative_strategy)
+            return draw(positive_strategy)
+
+        return choose_strategy()
 
 
 COMBINED_FORM_DATA_MARKER = "x-schemathesis-form-parameter"
