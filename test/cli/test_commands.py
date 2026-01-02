@@ -2245,7 +2245,7 @@ class EventCounter(cli.EventHandler):
     [
         pytest.param("none", ["GET /users/{id}", "DELETE /users/{id}", "POST /users", "GET /users"], id="none"),
         # auto mode: Layer 0 (sorted): GET /users, POST /users -> Layer 1: GET /users/{id} -> Layer 2: DELETE /users/{id}
-        pytest.param("auto", ["GET /users", "POST /users", "GET /users/{id}", "DELETE /users/{id}"], id="auto"),
+        pytest.param("auto", ["POST /users", "GET /users", "GET /users/{id}", "DELETE /users/{id}"], id="auto"),
     ],
 )
 def test_operation_ordering(ctx, cli, app_runner, ordering_mode, expected):

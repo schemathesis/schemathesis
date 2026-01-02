@@ -206,6 +206,91 @@ def test_layered_scheduler_multi_worker_coordination(ctx):
         assert max_get_idx < min_delete_idx
 
 
+def test_dependency_layers_restful_order_within_layer(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"userId": {"type": "string"}}}
+                                }
+                            },
+                        }
+                    }
+                },
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"userId": {"type": "string"}}}
+                                }
+                            },
+                        }
+                    }
+                },
+            },
+            "/items": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"itemId": {"type": "string"}}}
+                                }
+                            },
+                        }
+                    }
+                },
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"itemId": {"type": "string"}}}
+                                }
+                            },
+                        }
+                    }
+                },
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "delete": {
+                    "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"204": {"description": "Deleted"}},
+                },
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "parameters": [{"in": "path", "name": "itemId", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+
+    layers = compute_dependency_layers(loaded.analysis.dependency_graph)
+
+    # Layer 0: Collection operations (produce resources) - POST before GET
+    # Layer 1: Item operations (depend on collection outputs) - GET before DELETE
+    assert layers == [
+        ["POST /items", "POST /users", "GET /items", "GET /users"],
+        ["GET /items/{itemId}", "GET /users/{userId}", "DELETE /users/{userId}"],
+    ]
+
+
 def test_dependency_layers_with_links(ctx):
     schema = ctx.openapi.build_schema(
         {
