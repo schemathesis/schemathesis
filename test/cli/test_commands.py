@@ -1247,7 +1247,7 @@ def test_unsupported_regex(ctx, cli, snapshot_cli, openapi3_base_url):
                             "schema": {
                                 "type": "array",
                                 # Java-style regular expression
-                                "items": {"type": "string", "pattern": r"\p{Alpha}"},
+                                "items": {"type": "string", "pattern": r"\p{Greek}"},
                                 "maxItems": 3,
                                 "minItems": min_items,
                             }

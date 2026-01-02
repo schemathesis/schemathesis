@@ -1612,7 +1612,8 @@ def test_generate_empty_headers_too(ctx):
             {
                 "type": "array",
                 "items": {
-                    "pattern": "[\\p{L}]+",
+                    # Use an untranslatable PCRE pattern to test unsupported regex handling
+                    "pattern": "[\\p{Greek}]+",
                 },
                 "maxItems": 50,
             },
@@ -1865,6 +1866,7 @@ def test_path_parameters_without_constraints_negative(ctx):
 
 
 def test_path_parameters_with_unsupported_regex_pattern(ctx):
+    # Use an untranslatable PCRE pattern to test unsupported regex handling
     schema = build_schema(
         ctx,
         [
@@ -1872,7 +1874,7 @@ def test_path_parameters_with_unsupported_regex_pattern(ctx):
                 "name": "foo_id",
                 "in": "path",
                 "required": True,
-                "schema": {"pattern": "'^[-._\\p{L}\\p{N}]+$'"},
+                "schema": {"pattern": "'^[-._\\p{Greek}]+$'"},
             },
         ],
         path="/foo/{foo_id}",

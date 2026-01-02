@@ -6,7 +6,7 @@ from flask import Flask, jsonify
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from schemathesis.specs.openapi.patterns import update_quantifier
+from schemathesis.specs.openapi.patterns import translate_to_python_regex, update_quantifier
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeat is only available in Python 3.11+"
@@ -146,6 +146,37 @@ def test_update_quantifier(pattern, min_length, max_length, expected):
 
 def test_update_quantifier_invalid_pattern():
     assert update_quantifier("*", 1, 3) == "*"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        # Translatable patterns
+        (
+            r"^[\p{L}]+([ '-][\p{L}]+){0,2}$",
+            r"^[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+([ '-][a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+){0,2}$",
+        ),
+        (r"\p{L}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
+        (r"\p{N}+", r"[0-9]+"),
+        (r"\P{L}", r"[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]"),
+        # POSIX-like escapes
+        (r"\p{Alpha}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
+        (r"\p{Digit}+", r"[0-9]+"),
+        (r"\p{Alnum}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9]+"),
+        (r"\p{Space}", r"[ \t\n\r\f\v]"),
+        (r"\p{Z}", r"[ \t\n\r\f\v]"),
+        # No translation needed (already valid Python regex)
+        (r"[a-z]+", None),
+        (r"^\d+$", None),
+        # Unsupported escapes (no translation available)
+        (r"\p{Greek}", None),
+        (r"\p{Script=Latin}", None),
+    ],
+)
+def test_translate_to_python_regex(pattern, expected):
+    assert translate_to_python_regex(pattern) == expected
+    if expected:
+        re.compile(expected)
 
 
 @given(st.data())

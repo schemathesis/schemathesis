@@ -1,5 +1,5 @@
 [default]
-extend-ignore-re = ["DELET", "RESTFul", "parametrized", "worke", "secon"]
+extend-ignore-re = ["DELET", "RESTFul", "parametrized", "worke", "secon", "\\{Nd\\}"]
 
 [files]
 extend-exclude = ["test-corpus/__snapshots__/*/*.json", "test/config/__snapshots__/*/*.raw"]
