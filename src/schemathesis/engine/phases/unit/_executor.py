@@ -319,14 +319,13 @@ def run_test(
     extra_data_source = (
         ctx.extra_data_source if fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled else None
     )
-    if status == Status.SUCCESS and extra_data_source is not None:
-        if extra_data_source.should_record(operation=operation.label):
-            for case_id, interaction in recorder.interactions.items():
-                response = interaction.response
-                if response is None:
-                    continue
-                case = recorder.cases[case_id].value
-                extra_data_source.record_response(operation=operation, response=response, case=case)
+    if extra_data_source is not None and extra_data_source.should_record(operation=operation.label):
+        for case_id, interaction in recorder.interactions.items():
+            response = interaction.response
+            if response is None:
+                continue
+            case = recorder.cases[case_id].value
+            extra_data_source.record_response(operation=operation, response=response, case=case)
 
     yield scenario_finished(status)
 
