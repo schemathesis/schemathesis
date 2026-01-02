@@ -19,6 +19,9 @@ if TYPE_CHECKING:
 RequirementKey = tuple[str, ParameterLocation, str]
 DedupKey: TypeAlias = tuple[type, str | int | float | bool | None]
 
+# Marker indicating that the schema has been augmented with captured response values
+AUGMENTED_MARKER = "x-schemathesis-augmented"
+
 
 @dataclass(slots=True, frozen=True)
 class ParameterRequirement:
@@ -81,6 +84,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 augmented = dict(schema)
                 new_properties = dict(properties)
                 augmented["properties"] = new_properties
+                augmented[AUGMENTED_MARKER] = True
             assert new_properties is not None
             new_properties[name] = self._wrap_with_enum(property_schema, enum_values)
 
