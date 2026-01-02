@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.7.9...HEAD) - TBD
 
+### :bug: Fixed
+
+- Resource pool not recording IDs from successful responses when other test cases in the same scenario failed.
+
 ## [4.7.9](https://github.com/schemathesis/schemathesis/compare/v4.7.8...v4.7.9) - 2025-12-30
 
 ### :rocket: Added
