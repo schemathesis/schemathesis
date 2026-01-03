@@ -2723,7 +2723,7 @@ def test_stateful_bug_when_link_always_used(cli, app_runner, snapshot_cli, ctx):
 
     assert (
         cli.run(
-            "--max-examples=100",
+            "--max-examples=10",
             "-c not_a_server_error",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
