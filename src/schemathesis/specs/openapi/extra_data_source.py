@@ -58,8 +58,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
         schema: JsonSchema,
     ) -> JsonSchema:
         # Augment parameter schemas with enum values from captured responses.
-        # For each property with a requirement mapping, wrap its schema in anyOf
-        # with an enum containing real values from successful API calls.
+        # For properties with requirement mappings, wrap schemas with anyOf
+        # containing real values from successful API calls.
         if not isinstance(schema, dict):
             return schema
 
@@ -67,14 +67,36 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not isinstance(properties, dict):
             return schema
 
+        # Collect all requirements for properties in this schema
+        property_requirements: dict[str, ParameterRequirement] = {}
+        for name in properties:
+            requirement = self.requirements.get((operation.label, location, name))
+            if requirement is not None:
+                property_requirements[name] = requirement
+
+        if not property_requirements:
+            return schema
+
+        # Single requirement: use property-level anyOf
+        if len(property_requirements) == 1:
+            return self._augment_property_level(schema, properties, property_requirements)
+
+        # Multiple requirements: use object-level anyOf to preserve relationships
+        return self._augment_object_level(schema, property_requirements)
+
+    def _augment_property_level(
+        self,
+        schema: dict[str, Any],
+        properties: dict[str, Any],
+        requirements: dict[str, ParameterRequirement],
+    ) -> JsonSchema:
+        """Wrap individual properties with anyOf."""
         augmented: dict[str, Any] | None = None
         new_properties: dict[str, Any] | None = None
 
-        for name, property_schema in properties.items():
+        for name, requirement in requirements.items():
+            property_schema = properties.get(name)
             if not isinstance(property_schema, dict):
-                continue
-            requirement = self.requirements.get((operation.label, location, name))
-            if requirement is None:
                 continue
             enum_values = self._collect_values(requirement)
             if not enum_values:
@@ -89,6 +111,68 @@ class OpenApiExtraDataSource(ExtraDataSource):
             new_properties[name] = self._wrap_with_enum(property_schema, enum_values)
 
         return augmented or schema
+
+    def _augment_object_level(
+        self,
+        schema: dict[str, Any],
+        requirements: dict[str, ParameterRequirement],
+    ) -> JsonSchema:
+        """Use anyOf with complete schemas to preserve relationships between properties.
+
+        Creates anyOf variants where each variant is a complete schema:
+        - First variant: original schema (generates random valid values)
+        - Additional variants: schemas with const values for captured data
+        """
+        variants = self._collect_object_variants(requirements)
+        if not variants:
+            return schema
+
+        # Build anyOf with complete schemas
+        any_of_variants: list[dict[str, Any]] = [schema]  # Original schema first
+        for variant in variants:
+            any_of_variants.append(
+                {
+                    "type": "object",
+                    "properties": {name: {"const": value} for name, value in variant.items()},
+                    "required": list(variant.keys()),
+                }
+            )
+
+        return {"anyOf": any_of_variants, AUGMENTED_MARKER: True}
+
+    def _collect_object_variants(self, requirements: dict[str, ParameterRequirement]) -> list[dict[str, Any]]:
+        """Collect complete value sets that preserve relationships between properties."""
+        # Get all resource types involved
+        resource_names = {req.resource_name for req in requirements.values()}
+
+        variants: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        # For each resource instance, try to build a complete variant
+        for resource_name in resource_names:
+            for instance in self.repository.iter_instances(resource_name):
+                variant: dict[str, Any] = {}
+
+                for param_name, req in requirements.items():
+                    if req.resource_name == resource_name:
+                        # Value from the resource data (e.g., Pet.id from response)
+                        value = instance.data.get(req.resource_field)
+                    else:
+                        # Value from context (e.g., ownerId from request path)
+                        value = instance.context.get(param_name)
+
+                    if value is not None:
+                        variant[param_name] = value
+
+                # Only include if we filled ALL requirements
+                if len(variant) == len(requirements):
+                    # Deduplicate by serializing the variant
+                    key = json.dumps(variant, sort_keys=True, default=str)
+                    if key not in seen:
+                        seen.add(key)
+                        variants.append(variant)
+
+        return variants
 
     def _collect_values(self, requirement: ParameterRequirement) -> list[Any]:
         """Collect unique values from captured resource instances."""
@@ -153,4 +237,5 @@ class OpenApiExtraDataSource(ExtraDataSource):
             operation=operation.label,
             status_code=response.status_code,
             payload=payload,
+            context=case.path_parameters or {},
         )

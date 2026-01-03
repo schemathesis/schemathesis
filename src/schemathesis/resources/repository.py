@@ -20,6 +20,7 @@ class ResourceInstance:
     data: dict[str, Any]
     source_operation: str
     status_code: int
+    context: dict[str, Any]
 
 
 class ResourceRepository:
@@ -55,7 +56,9 @@ class ResourceRepository:
         # Create a new tuple as this deque could be modified concurrently
         return tuple(bucket)
 
-    def record_response(self, *, operation: str, status_code: int, payload: Any) -> None:
+    def record_response(
+        self, *, operation: str, status_code: int, payload: Any, context: dict[str, Any] | None = None
+    ) -> None:
         """Capture resources from an API response based on configured descriptors."""
         descriptors = self._descriptors_by_operation.get(operation, [])
 
@@ -72,6 +75,7 @@ class ResourceRepository:
                     data=candidate,
                     source_operation=operation,
                     status_code=status_code,
+                    context=context or {},
                 )
 
     def _extract_payload(self, payload: Any, descriptor: ResourceDescriptor) -> Iterable[dict[str, Any]]:
@@ -90,12 +94,22 @@ class ResourceRepository:
 
         return [value for value in values if isinstance(value, dict)]
 
-    def _store(self, *, resource_name: str, data: dict[str, Any], source_operation: str, status_code: int) -> None:
+    def _store(
+        self,
+        *,
+        resource_name: str,
+        data: dict[str, Any],
+        source_operation: str,
+        status_code: int,
+        context: dict[str, Any],
+    ) -> None:
         """Store a resource instance with FIFO eviction."""
         bucket = self._resource_buckets.get(resource_name)
         assert bucket is not None, "Buckets should be created for all resources"
 
-        instance = ResourceInstance(data=data, source_operation=source_operation, status_code=status_code)
+        instance = ResourceInstance(
+            data=data, source_operation=source_operation, status_code=status_code, context=context
+        )
 
         with self._lock:
             bucket.append(instance)
