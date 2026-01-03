@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import encode_pointer
+from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
@@ -111,7 +111,23 @@ class DependencyGraph:
                             request_body=request_body,
                         )
 
+                    # Propagate shared path parameters that weren't mapped via resources
+                    # For /users/{userId}/posts -> /users/{userId}/posts/{postId}, userId is shared
+                    # but only postId gets mapped from the response. We need to propagate userId.
                     if links:
+                        producer_params = get_template_fields(producer.path)
+                        consumer_params = get_template_fields(consumer.path)
+                        shared_params = producer_params & consumer_params
+
+                        for link_def in links.values():
+                            # Find which path parameters are already mapped
+                            mapped_params = {
+                                key.split(".", 1)[1] for key in link_def.parameters if key.startswith("path.")
+                            }
+                            # Add $request.path.X for shared params not already mapped
+                            for param in shared_params - mapped_params:
+                                link_def.parameters[f"path.{param}"] = f"$request.path.{param}"
+
                         yield ResponseLinks(
                             producer_operation_ref=f"#/paths/{producer_path}/{producer.method}",
                             status_code=output_slot.status_code,
