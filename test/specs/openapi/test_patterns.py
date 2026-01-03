@@ -165,6 +165,12 @@ def test_update_quantifier_invalid_pattern():
         (r"\p{Alnum}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9]+"),
         (r"\p{Space}", r"[ \t\n\r\f\v]"),
         (r"\p{Z}", r"[ \t\n\r\f\v]"),
+        # Shorthand forms (without braces)
+        (r"\pL+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
+        (r"\pN+", r"[0-9]+"),
+        (r"\PL", r"[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]"),
+        (r"\PN", r"[^0-9]"),
+        (r"^[\w\s\-\/\pL,.#;:()']+$", r"^[\w\s\-\/[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F],.#;:()']+$"),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
