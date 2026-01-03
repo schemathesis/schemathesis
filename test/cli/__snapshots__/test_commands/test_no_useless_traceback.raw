@@ -55,7 +55,7 @@ Reproduce with:
 Unsupported regex patterns: 1 operation contain regex patterns not supported by Python and were removed
 
   - POST /success
-    Unsupported regex `^[\w\s\-\/\pL,.#;:()']+$` was removed
+    Unsupported regex `^[\p{Han}]+$` was removed
 
 💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html
 

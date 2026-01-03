@@ -10,9 +10,25 @@ from schemathesis.core.errors import InternalError
 _LETTER_CLASS = r"a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F"
 _LETTER_UPPER_CLASS = r"A-Z\u00C0-\u00D6\u00D8-\u00DE\u0100-\u0136\u0139-\u0147\u014A-\u0178\u0179-\u017D"
 _LETTER_LOWER_CLASS = r"a-z\u00DF-\u00F6\u00F8-\u00FF\u0101-\u0137\u013A-\u0148\u014B-\u0177\u017A-\u017E"
+_OTHER_LETTER_CLASS = r"\u00AA\u00BA\u01BB\u01C0-\u01C3\u0294"
 _DIGIT_CLASS = r"0-9"
 _ALNUM_CLASS = rf"{_LETTER_CLASS}{_DIGIT_CLASS}"
 _SPACE_CLASS = r" \t\n\r\f\v"
+_XDIGIT_CLASS = r"0-9A-Fa-f"
+_ASCII_CLASS = r"\x00-\x7F"
+# Punctuation: ASCII + Latin-1 Supplement + General Punctuation
+_PUNCT_CLASS = r"!\"#%&'()*,\-./:;?@\[\\\]_{}\u00A1\u00A7\u00AB\u00B6\u00B7\u00BB\u00BF\u2010-\u2027\u2030-\u203E"
+# Combining marks (common diacritical marks)
+_MARK_CLASS = r"\u0300-\u036F\u0483-\u0489\u1DC0-\u1DFF\u20D0-\u20FF"
+# Symbols: currency, math, misc symbols
+_SYMBOL_CLASS = r"$+<=>^`|~\u00A2-\u00A6\u00A8\u00A9\u00AC\u00AE-\u00B1\u00B4\u00D7\u00F7\u2200-\u22FF\u2600-\u26FF"
+# Control characters
+_CONTROL_CLASS = r"\x00-\x1F\x7F-\x9F"
+# Graph (visible characters) and Print (graph + space)
+_GRAPH_CLASS = r"!-~\u00A1-\u00AC\u00AE-\u00FF"
+_PRINT_CLASS = rf" {_GRAPH_CLASS}"
+# Blank (horizontal whitespace)
+_BLANK_CLASS = r" \t"
 
 # Order matters - check bracketed forms first to avoid double-bracketing
 _UNICODE_PROPERTY_MAP = (
@@ -20,30 +36,88 @@ _UNICODE_PROPERTY_MAP = (
     (r"[\p{L}]", f"[{_LETTER_CLASS}]"),
     (r"[\p{Lu}]", f"[{_LETTER_UPPER_CLASS}]"),
     (r"[\p{Ll}]", f"[{_LETTER_LOWER_CLASS}]"),
+    (r"[\p{Lo}]", f"[{_OTHER_LETTER_CLASS}]"),
     (r"[\p{N}]", f"[{_DIGIT_CLASS}]"),
     (r"[\p{Nd}]", f"[{_DIGIT_CLASS}]"),
     (r"[\p{Alpha}]", f"[{_LETTER_CLASS}]"),
     (r"[\p{Digit}]", f"[{_DIGIT_CLASS}]"),
+    (r"[\p{XDigit}]", f"[{_XDIGIT_CLASS}]"),
     (r"[\p{Alnum}]", f"[{_ALNUM_CLASS}]"),
     (r"[\p{Space}]", f"[{_SPACE_CLASS}]"),
     (r"[\p{Z}]", f"[{_SPACE_CLASS}]"),
+    (r"[\p{Zs}]", f"[{_SPACE_CLASS}]"),
+    (r"[\p{P}]", f"[{_PUNCT_CLASS}]"),
+    (r"[\p{Punct}]", f"[{_PUNCT_CLASS}]"),
+    (r"[\p{M}]", f"[{_MARK_CLASS}]"),
+    (r"[\p{S}]", f"[{_SYMBOL_CLASS}]"),
+    (r"[\p{C}]", f"[{_CONTROL_CLASS}]"),
+    (r"[\p{Cntrl}]", f"[{_CONTROL_CLASS}]"),
+    (r"[\p{ASCII}]", f"[{_ASCII_CLASS}]"),
+    (r"[\p{Graph}]", f"[{_GRAPH_CLASS}]"),
+    (r"[\p{Print}]", f"[{_PRINT_CLASS}]"),
+    (r"[\p{Blank}]", f"[{_BLANK_CLASS}]"),
+    (r"[\p{Upper}]", f"[{_LETTER_UPPER_CLASS}]"),
+    (r"[\p{IsLetter}]", f"[{_LETTER_CLASS}]"),
     (r"[\P{L}]", f"[^{_LETTER_CLASS}]"),
     (r"[\P{N}]", f"[^{_DIGIT_CLASS}]"),
     (r"[\P{Nd}]", f"[^{_DIGIT_CLASS}]"),
-    # Standalone forms
+    (r"[\P{C}]", f"[^{_CONTROL_CLASS}]"),
+    (r"[\P{M}]", f"[^{_MARK_CLASS}]"),
+    # Shorthand forms in brackets (single-letter properties without braces)
+    (r"[\pL]", f"[{_LETTER_CLASS}]"),
+    (r"[\pN]", f"[{_DIGIT_CLASS}]"),
+    (r"[\pP]", f"[{_PUNCT_CLASS}]"),
+    (r"[\pM]", f"[{_MARK_CLASS}]"),
+    (r"[\pS]", f"[{_SYMBOL_CLASS}]"),
+    (r"[\pC]", f"[{_CONTROL_CLASS}]"),
+    (r"[\pZ]", f"[{_SPACE_CLASS}]"),
+    (r"[\PL]", f"[^{_LETTER_CLASS}]"),
+    (r"[\PN]", f"[^{_DIGIT_CLASS}]"),
+    (r"[\PC]", f"[^{_CONTROL_CLASS}]"),
+    (r"[\PM]", f"[^{_MARK_CLASS}]"),
+    # Standalone forms with braces
     (r"\p{L}", f"[{_LETTER_CLASS}]"),
     (r"\p{Lu}", f"[{_LETTER_UPPER_CLASS}]"),
     (r"\p{Ll}", f"[{_LETTER_LOWER_CLASS}]"),
+    (r"\p{Lo}", f"[{_OTHER_LETTER_CLASS}]"),
     (r"\p{N}", f"[{_DIGIT_CLASS}]"),
     (r"\p{Nd}", f"[{_DIGIT_CLASS}]"),
     (r"\p{Alpha}", f"[{_LETTER_CLASS}]"),
     (r"\p{Digit}", f"[{_DIGIT_CLASS}]"),
+    (r"\p{XDigit}", f"[{_XDIGIT_CLASS}]"),
     (r"\p{Alnum}", f"[{_ALNUM_CLASS}]"),
     (r"\p{Space}", f"[{_SPACE_CLASS}]"),
     (r"\p{Z}", f"[{_SPACE_CLASS}]"),
+    (r"\p{Zs}", f"[{_SPACE_CLASS}]"),
+    (r"\p{P}", f"[{_PUNCT_CLASS}]"),
+    (r"\p{Punct}", f"[{_PUNCT_CLASS}]"),
+    (r"\p{M}", f"[{_MARK_CLASS}]"),
+    (r"\p{S}", f"[{_SYMBOL_CLASS}]"),
+    (r"\p{C}", f"[{_CONTROL_CLASS}]"),
+    (r"\p{Cntrl}", f"[{_CONTROL_CLASS}]"),
+    (r"\p{ASCII}", f"[{_ASCII_CLASS}]"),
+    (r"\p{Graph}", f"[{_GRAPH_CLASS}]"),
+    (r"\p{Print}", f"[{_PRINT_CLASS}]"),
+    (r"\p{Blank}", f"[{_BLANK_CLASS}]"),
+    (r"\p{Upper}", f"[{_LETTER_UPPER_CLASS}]"),
+    (r"\p{IsLetter}", f"[{_LETTER_CLASS}]"),
     (r"\P{L}", f"[^{_LETTER_CLASS}]"),
     (r"\P{N}", f"[^{_DIGIT_CLASS}]"),
     (r"\P{Nd}", f"[^{_DIGIT_CLASS}]"),
+    (r"\P{C}", f"[^{_CONTROL_CLASS}]"),
+    (r"\P{M}", f"[^{_MARK_CLASS}]"),
+    # Shorthand standalone forms (single-letter properties without braces)
+    (r"\pL", f"[{_LETTER_CLASS}]"),
+    (r"\pN", f"[{_DIGIT_CLASS}]"),
+    (r"\pP", f"[{_PUNCT_CLASS}]"),
+    (r"\pM", f"[{_MARK_CLASS}]"),
+    (r"\pS", f"[{_SYMBOL_CLASS}]"),
+    (r"\pC", f"[{_CONTROL_CLASS}]"),
+    (r"\pZ", f"[{_SPACE_CLASS}]"),
+    (r"\PL", f"[^{_LETTER_CLASS}]"),
+    (r"\PN", f"[^{_DIGIT_CLASS}]"),
+    (r"\PC", f"[^{_CONTROL_CLASS}]"),
+    (r"\PM", f"[^{_MARK_CLASS}]"),
 )
 
 
@@ -54,7 +128,13 @@ def translate_to_python_regex(pattern: str) -> str | None:
     Returns the translated pattern if successful, None if translation failed
     or the result is not a valid Python regex.
     """
-    if r"\p{" not in pattern and r"\P{" not in pattern:
+    # Check for both braced (\p{L}) and shorthand (\pL) forms
+    has_braced = r"\p{" in pattern or r"\P{" in pattern
+    has_shorthand = any(
+        esc in pattern
+        for esc in (r"\pL", r"\pN", r"\pP", r"\pM", r"\pS", r"\pC", r"\pZ", r"\PL", r"\PN", r"\PC", r"\PM")
+    )
+    if not has_braced and not has_shorthand:
         return None  # No translation needed
 
     translated = pattern

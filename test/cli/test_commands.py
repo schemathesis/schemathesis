@@ -821,7 +821,7 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli, openapi3_base_url):
                                     "properties": {
                                         "region": {
                                             "nullable": True,
-                                            "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                            "pattern": "^[\\p{Han}]+$",
                                             "type": "string",
                                         },
                                     },
