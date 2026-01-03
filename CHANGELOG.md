@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Automatic success rate targeting to guide test generation toward valid API inputs.
 - Translate PCRE Unicode property escapes (`\p{L}`, `\p{N}`) to Python regex equivalents.
 
 ### :wrench: Changed
