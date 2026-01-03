@@ -41,9 +41,31 @@ INVALID_SCHEMA_MESSAGE = (
 
 FORM_MEDIA_TYPES = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
 
-# Probability of using negative strategy when schema is augmented with captured response values.
-# We want to mostly use valid captured values to test deeper application logic.
-NEGATIVE_PROBABILITY_WITH_AUGMENTED_SCHEMA = 0.03
+# Probability of using captured resource values vs generated values in hybrid strategy.
+CAPTURED_VALUES_PROBABILITY = 0.8
+
+# Probability of using negative strategy when captured values are available.
+# We want to mostly use captured values to test deeper application logic.
+NEGATIVE_STRATEGY_PROBABILITY = 0.03
+
+
+def build_hybrid_strategy(
+    original_strategy: st.SearchStrategy,
+    captured_variants: list[dict[str, Any]],
+) -> st.SearchStrategy:
+    """Combine original strategy with captured variants using weighted sampling."""
+    from hypothesis import strategies as st
+
+    captured_strategy = st.sampled_from(captured_variants)
+
+    @st.composite  # type: ignore[untyped-decorator]
+    def hybrid(draw: st.DrawFn) -> dict[str, Any]:
+        random = draw(st.randoms(use_true_random=True))
+        if random.random() < CAPTURED_VALUES_PROBABILITY:
+            return draw(captured_strategy)
+        return draw(original_strategy)
+
+    return hybrid()
 
 
 @dataclass
@@ -297,11 +319,19 @@ class OpenApiBody(OpenApiComponent):
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
+        # Check for captured variants for hybrid approach
+        captured_variants: list[dict[str, Any]] | None = None
+        if extra_data_source is not None:
+            from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
+
+            if isinstance(extra_data_source, OpenApiExtraDataSource):
+                captured_variants = extra_data_source.get_captured_variants(
+                    operation=operation, location=ParameterLocation.BODY, schema=self.optimized_schema
+                )
+
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
         schema = self.optimized_schema
-        if extra_data_source is not None:
-            schema = extra_data_source.augment(operation=operation, location=ParameterLocation.BODY, schema=schema)
         assert isinstance(operation.schema, OpenApiSchema)
         strategy = strategy_factory(
             schema,
@@ -312,6 +342,13 @@ class OpenApiBody(OpenApiComponent):
             operation.schema.adapter.jsonschema_validator_cls,
         )
 
+        # Apply hybrid approach when captured variants are available
+        if captured_variants:
+            if generation_mode.is_negative:
+                strategy = self._build_negative_aware_strategy(operation, generation_config, captured_variants)
+            else:
+                strategy = build_hybrid_strategy(strategy, captured_variants)
+
         # Cache the strategy
         if use_cache:
             if generation_mode == GenerationMode.POSITIVE:
@@ -320,6 +357,36 @@ class OpenApiBody(OpenApiComponent):
                 self._negative_strategy_cache = strategy
 
         return strategy
+
+    def _build_negative_aware_strategy(
+        self,
+        operation: APIOperation,
+        generation_config: GenerationConfig,
+        captured_variants: list[dict[str, Any]],
+    ) -> st.SearchStrategy:
+        """Build strategy for negative mode when captured values are available."""
+        from hypothesis import strategies as st
+
+        from schemathesis.specs.openapi.negative import GeneratedValue
+
+        positive_strategy = self.get_strategy(
+            operation, generation_config, GenerationMode.POSITIVE, extra_data_source=None
+        )
+        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants)
+        positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
+
+        negative_strategy = self.get_strategy(
+            operation, generation_config, GenerationMode.NEGATIVE, extra_data_source=None
+        )
+
+        @st.composite  # type: ignore[untyped-decorator]
+        def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
+            random = draw(st.randoms(use_true_random=True))
+            if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
+                return draw(negative_strategy)
+            return draw(positive_strategy)
+
+        return choose_strategy()
 
 
 OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "description"])
@@ -643,24 +710,22 @@ class OpenApiParameterSet(ParameterSet):
 
         # Get schema with exclusions
         schema: JsonSchema = self.get_schema_with_exclusions(exclude)
+
+        # Check for captured variants for hybrid approach
+        captured_variants: list[dict[str, Any]] | None = None
         if extra_data_source is not None:
-            schema = extra_data_source.augment(operation=operation, location=self.location, schema=schema)
+            from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
+
+            if isinstance(extra_data_source, OpenApiExtraDataSource):
+                captured_variants = extra_data_source.get_captured_variants(
+                    operation=operation, location=self.location, schema=schema
+                )
 
         # `JsonSchema` can be boolean (`True` / `False`), normalize to an object schema for downstream usage.
         if isinstance(schema, bool):
             schema = {} if schema else {"not": {}}
         assert isinstance(schema, dict)
         schema_obj: JsonSchemaObject = schema
-
-        from schemathesis.specs.openapi.extra_data_source import AUGMENTED_MARKER
-
-        # When schema is augmented with captured values and we're in negative mode,
-        # mostly use positive strategy to leverage valuable captured data.
-        is_augmented = schema_obj.get(AUGMENTED_MARKER, False)
-        if is_augmented and generation_mode.is_negative:
-            return self._build_augmented_aware_strategy(
-                schema_obj, operation, generation_config, generation_mode, exclude
-            )
 
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
@@ -720,41 +785,52 @@ class OpenApiParameterSet(ParameterSet):
                 else:
                     strategy = strategy.map(jsonify_python_specific_types)
 
+        # Apply hybrid approach when captured variants are available
+        if captured_variants:
+            if generation_mode.is_negative:
+                # In negative mode with captured values, mostly use positive strategy
+                # to leverage valuable captured IDs for testing deeper application logic
+                strategy = self._build_negative_aware_strategy(operation, generation_config, exclude, captured_variants)
+            else:
+                strategy = build_hybrid_strategy(strategy, captured_variants)
+
         if use_cache:
             self._strategy_cache[cache_key] = strategy
         return strategy
 
-    def _build_augmented_aware_strategy(
+    def _build_negative_aware_strategy(
         self,
-        schema_obj: JsonSchemaObject,
         operation: APIOperation,
         generation_config: GenerationConfig,
-        generation_mode: GenerationMode,
         exclude: Iterable[str],
+        captured_variants: list[dict[str, Any]],
     ) -> st.SearchStrategy:
-        """Build a composite strategy for schemas augmented with captured response values.
+        """Build strategy for negative mode when captured values are available.
 
-        Mostly uses positive strategy to leverage valuable captured data,
-        with occasional negative tests controlled by NEGATIVE_PROBABILITY_WITH_AUGMENTED_SCHEMA.
+        Mostly uses positive strategy with captured values (97%) to test deeper
+        application logic, with occasional negative tests (3%).
         """
         from hypothesis import strategies as st
 
         from schemathesis.specs.openapi.negative import GeneratedValue
 
+        # Get positive strategy with hybrid approach
         positive_strategy = self.get_strategy(
             operation, generation_config, GenerationMode.POSITIVE, exclude, extra_data_source=None
         )
-        negative_strategy = self.get_strategy(
-            operation, generation_config, generation_mode, exclude, extra_data_source=None
-        )
-
-        # Wrap positive strategy values in GeneratedValue for consistent return type
+        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants)
+        # Wrap in GeneratedValue for consistent return type with negative strategy
         positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
+
+        # Get negative strategy without extra_data_source to avoid recursion
+        negative_strategy = self.get_strategy(
+            operation, generation_config, GenerationMode.NEGATIVE, exclude, extra_data_source=None
+        )
 
         @st.composite  # type: ignore[untyped-decorator]
         def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
             random = draw(st.randoms(use_true_random=True))
-            if random.random() < NEGATIVE_PROBABILITY_WITH_AUGMENTED_SCHEMA:
+            if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
                 return draw(negative_strategy)
             return draw(positive_strategy)
 

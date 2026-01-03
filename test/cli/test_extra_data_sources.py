@@ -306,7 +306,9 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
 
     @app.route("/projects", methods=["POST"])
     def create_project():
-        data = request.get_json() or {}
+        data = request.get_json()
+        if not isinstance(data, dict):
+            abort(400)
         project_id = uuid.uuid4().hex
         project = {"id": project_id, "name": data.get("name", "Project")}
         projects[project_id] = project
@@ -314,7 +316,9 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
 
     @app.route("/tasks", methods=["POST"])
     def create_task():
-        data = request.get_json() or {}
+        data = request.get_json()
+        if not isinstance(data, dict):
+            abort(400)
         project_id = data.get("project_id")
         if not project_id or project_id not in projects:
             abort(404)

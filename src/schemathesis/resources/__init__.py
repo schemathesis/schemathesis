@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
-from schemathesis.core.jsonschema.types import JsonSchema
-from schemathesis.core.parameters import ParameterLocation
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 
@@ -14,17 +12,7 @@ if TYPE_CHECKING:
 
 
 class ExtraDataSource(Protocol):
-    """Provides extra data to augment parameter schemas for test generation."""
-
-    def augment(
-        self,
-        *,
-        operation: APIOperation,
-        location: ParameterLocation,
-        schema: JsonSchema,
-    ) -> JsonSchema:
-        """Return a schema augmented for the given operation & location."""
-        ...  # pragma: no cover
+    """Provides extra data from captured API responses for test generation."""
 
     def should_record(self, *, operation: str) -> bool:
         """Check if responses should be recorded for this operation."""
