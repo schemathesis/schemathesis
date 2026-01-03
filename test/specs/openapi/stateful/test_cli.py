@@ -624,7 +624,8 @@ def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot_cli):
+@pytest.mark.parametrize("phase", ["stateful", "fuzzing"])
+def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot_cli, phase):
     schema = ctx.openapi.build_schema(
         {
             "/users": {
@@ -761,7 +762,8 @@ def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot
     assert (
         cli.run(
             f"http://127.0.0.1:{port}/openapi.json",
-            "--phases=stateful",
+            f"--phases={phase}",
+            "--max-examples=50",
             "-c not_a_server_error",
             "--mode=positive",
         )

@@ -664,7 +664,7 @@ class OpenApiParameterSet(ParameterSet):
 
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
-        if not schema_obj["properties"] and strategy_factory is make_negative_strategy:
+        if not schema_obj.get("properties") and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
