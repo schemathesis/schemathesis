@@ -1,4 +1,5 @@
 import platform
+import uuid
 from xml.etree import ElementTree
 
 import pytest
@@ -196,7 +197,7 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--phases=stateful",
-            "--max-examples=50",
+            "--max-examples=100",
             "--generation-allow-x00=false",
             "--generation-codec=ascii",
             "--generation-with-security-parameters=false",
@@ -617,6 +618,152 @@ def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
             "--phases=stateful",
             "--max-examples=5",
             "-c not_a_server_error",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 20}},
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "User created",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                        },
+                    },
+                },
+            },
+            "/users/{userId}/posts": {
+                "parameters": [
+                    {"in": "path", "name": "userId", "required": True, "schema": {"type": "string", "format": "uuid"}}
+                ],
+                "post": {
+                    "operationId": "createPost",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["content"],
+                                    "properties": {"content": {"type": "string", "minLength": 11, "maxLength": 100}},
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Post created",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Post"}}},
+                        },
+                        "404": {"description": "User not found"},
+                    },
+                },
+            },
+            "/users/{userId}/posts/{postId}": {
+                "parameters": [
+                    {"in": "path", "name": "userId", "required": True, "schema": {"type": "string", "format": "uuid"}},
+                    {"in": "path", "name": "postId", "required": True, "schema": {"type": "string", "format": "uuid"}},
+                ],
+                "get": {
+                    "operationId": "getPost",
+                    "responses": {
+                        "200": {
+                            "description": "Post found",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Post"}}},
+                        },
+                        "404": {"description": "Post not found"},
+                        "500": {"description": "Server error"},
+                    },
+                },
+            },
+        },
+        components={
+            "schemas": {
+                "User": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string", "format": "uuid"}, "name": {"type": "string"}},
+                    "required": ["id", "name"],
+                },
+                "Post": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "format": "uuid"},
+                        "userId": {"type": "string", "format": "uuid"},
+                        "content": {"type": "string"},
+                    },
+                    "required": ["id", "userId", "content"],
+                },
+            }
+        },
+    )
+
+    app = Flask(__name__)
+    users = {}
+    posts = {}
+
+    @app.route("/openapi.json")
+    def get_spec():
+        return jsonify(schema)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        data = request.get_json(force=True, silent=True) or {}
+        if not isinstance(data.get("name"), str) or not data["name"]:
+            return jsonify({"error": "Invalid name"}), 400
+        user_id = str(uuid.uuid4())
+        users[user_id] = {"id": user_id, "name": data["name"]}
+        return jsonify(users[user_id]), 201
+
+    @app.route("/users/<user_id>/posts", methods=["POST"])
+    def create_post(user_id):
+        if user_id not in users:
+            return jsonify({"error": "User not found"}), 404
+        data = request.get_json(force=True, silent=True) or {}
+        content = data.get("content", "")
+        if not isinstance(content, str) or not content:
+            return jsonify({"error": "Invalid content"}), 400
+        post_id = str(uuid.uuid4())
+        posts[post_id] = {"id": post_id, "userId": user_id, "content": content}
+        return jsonify(posts[post_id]), 201
+
+    @app.route("/users/<user_id>/posts/<post_id>", methods=["GET"])
+    def get_post(user_id, post_id):
+        post = posts.get(post_id)
+        if post is None or post["userId"] != user_id:
+            return jsonify({"error": "Post not found"}), 404
+        # Bug only discoverable when both IDs are correct
+        if len(post["content"]) > 10:
+            return jsonify({"error": "Internal server error"}), 500
+        return jsonify(post), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "-c not_a_server_error",
+            "--mode=positive",
         )
         == snapshot_cli
     )

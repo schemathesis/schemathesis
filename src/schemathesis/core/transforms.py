@@ -1,9 +1,26 @@
 from __future__ import annotations
 
+import string
 from collections.abc import Callable, Iterator, Mapping
+from functools import lru_cache
 from typing import Any, TypeVar, overload
 
 T = TypeVar("T")
+
+
+@lru_cache
+def get_template_fields(template: str) -> frozenset[str]:
+    """Extract named placeholders from a string template.
+
+    "/users/{userId}/posts/{postId}" -> {"userId", "postId"}
+    """
+    try:
+        parameters = frozenset(name for _, name, _, _ in string.Formatter().parse(template) if name is not None)
+        # Check for malformed params to avoid injecting them
+        template.format(**dict.fromkeys(parameters, ""))
+        return parameters
+    except (ValueError, IndexError):
+        return frozenset()
 
 
 @overload

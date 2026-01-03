@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import string
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from functools import cached_property, lru_cache
+from functools import cached_property
 from json import JSONDecodeError
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, cast
@@ -29,6 +28,7 @@ from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.transforms import get_template_fields
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
@@ -58,18 +58,6 @@ if TYPE_CHECKING:
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
-
-
-@lru_cache
-def get_template_fields(template: str) -> set[str]:
-    """Extract named placeholders from a string template."""
-    try:
-        parameters = {name for _, name, _, _ in string.Formatter().parse(template) if name is not None}
-        # Check for malformed params to avoid injecting them - they will be checked later on in the workflow
-        template.format(**dict.fromkeys(parameters, ""))
-        return parameters
-    except (ValueError, IndexError):
-        return set()
 
 
 @dataclass(eq=False, repr=False)
