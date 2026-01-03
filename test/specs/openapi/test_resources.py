@@ -452,3 +452,67 @@ def test_prepopulate_from_response_examples(ctx):
     path_schema = get_operation.path_parameters.schema
     augmented = data_source.augment(operation=get_operation, location=ParameterLocation.PATH, schema=path_schema)
     assert augmented["properties"]["user_id"]["anyOf"][1]["enum"] == ["example-user-123"]
+
+
+def test_object_level_augmentation_preserves_relationships(ctx):
+    user_schema = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
+    post_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "userId": {"type": "string"}},
+        "required": ["id", "userId"],
+    }
+    spec = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "responses": {"201": {"content": {"application/json": {"schema": user_schema}}}},
+                }
+            },
+            "/users/{userId}/posts": {
+                "post": {
+                    "operationId": "createPost",
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"201": {"content": {"application/json": {"schema": post_schema}}}},
+                }
+            },
+            "/users/{userId}/posts/{postId}": {
+                "get": {
+                    "operationId": "getPost",
+                    "parameters": [
+                        {"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}},
+                        {"name": "postId", "in": "path", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"content": {"application/json": {"schema": post_schema}}}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    # Record a post creation with userId in context (from path parameter)
+    data_source.repository.record_response(
+        operation="POST /users/{userId}/posts",
+        status_code=201,
+        payload={"id": "post-123", "userId": "user-456"},
+        context={"userId": "user-456"},  # Path parameter from request
+    )
+
+    # Augment the GET /users/{userId}/posts/{postId} path parameters
+    get_operation = schema["/users/{userId}/posts/{postId}"]["GET"]
+    path_schema = get_operation.path_parameters.schema
+    augmented = data_source.augment(operation=get_operation, location=ParameterLocation.PATH, schema=path_schema)
+
+    # Should have anyOf at schema level with complete schemas
+    assert "anyOf" in augmented
+    assert len(augmented["anyOf"]) == 2
+
+    # First variant is original schema
+    assert "properties" in augmented["anyOf"][0]
+
+    # Second variant should have both userId and postId from the same context
+    variant = augmented["anyOf"][1]
+    assert variant["properties"]["userId"]["const"] == "user-456"
+    assert variant["properties"]["postId"]["const"] == "post-123"
+    assert set(variant["required"]) == {"userId", "postId"}
