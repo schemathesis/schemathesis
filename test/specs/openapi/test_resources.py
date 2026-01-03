@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import pytest
 import requests
+from hypothesis import given, settings
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
-from schemathesis.resources.repository import PER_TYPE_CAPACITY
+from schemathesis.generation.modes import GenerationMode
+from schemathesis.resources.repository import MAX_CONTEXTS_PER_TYPE, PER_CONTEXT_CAPACITY
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
+from schemathesis.specs.openapi.negative import GeneratedValue
 
 USER_RESOURCE = "User"
 POST_USERS = "POST /users"
@@ -88,7 +92,7 @@ def test_many_cardinality_extracts_each_item(user_schema_builder):
     assert {instance.data["id"] for instance in resources} == {"a", "b"}
 
 
-def test_data_source_augments_schema(user_schema_builder):
+def test_data_source_provides_captured_variants(user_schema_builder):
     user_schema = {
         "type": "object",
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
@@ -118,11 +122,14 @@ def test_data_source_augments_schema(user_schema_builder):
     get_operation = schema["/users/{user_id}"]["GET"]
     path_params_schema = get_operation.path_parameters.schema
 
-    augmented = data_source.augment(operation=get_operation, location=ParameterLocation.PATH, schema=path_params_schema)
+    variants = data_source.get_captured_variants(
+        operation=get_operation, location=ParameterLocation.PATH, schema=path_params_schema
+    )
 
-    assert augmented is not path_params_schema
-    options = augmented["properties"]["user_id"]["anyOf"]
-    assert options[1]["enum"] == ["1", "2"]
+    assert variants is not None
+    assert len(variants) == 2
+    assert {"user_id": "1"} in variants
+    assert {"user_id": "2"} in variants
 
 
 def test_wildcard_status_code_matching(user_schema_builder):
@@ -135,68 +142,6 @@ def test_wildcard_status_code_matching(user_schema_builder):
     resources = list(data_source.repository.iter_instances(USER_RESOURCE))
     assert len(resources) == 1
     assert resources[0].data["id"] == "1"
-
-
-@pytest.mark.parametrize(
-    ("parameter_schema", "expected_augmented"),
-    [
-        pytest.param(
-            {"type": "string"},
-            {"anyOf": [{"type": "string", "minLength": 1}, {"enum": ["123"]}]},
-            id="simple-type",
-        ),
-        pytest.param(
-            {"anyOf": [{"type": "string"}, {"type": "number"}]},
-            {"anyOf": [{"type": "string"}, {"type": "number"}, {"enum": ["123"]}]},
-            id="existing-anyof",
-        ),
-        pytest.param(
-            {"oneOf": [{"type": "string"}, {"type": "number"}]},
-            {"anyOf": [{"oneOf": [{"type": "string"}, {"type": "number"}]}, {"enum": ["123"]}]},
-            id="oneof",
-        ),
-        pytest.param(
-            {"allOf": [{"type": "string"}, {"minLength": 5}]},
-            {"anyOf": [{"allOf": [{"type": "string"}, {"minLength": 5}]}, {"enum": ["123"]}]},
-            id="allof",
-        ),
-        pytest.param(
-            {"not": {"type": "null"}},
-            {"anyOf": [{"not": {"type": "null"}}, {"enum": ["123"]}]},
-            id="not",
-        ),
-        pytest.param(
-            True,
-            None,
-            id="boolean-schema",
-        ),
-    ],
-)
-def test_augment_wraps_schemas_in_anyof(user_schema_builder, parameter_schema, expected_augmented):
-    get_endpoint = {
-        "/users/{user_id}": {
-            "get": {
-                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": parameter_schema}],
-                "responses": {"200": {"description": "OK"}},
-            }
-        }
-    }
-    schema = user_schema_builder(extra_endpoints=get_endpoint)
-    data_source = schema.create_extra_data_source()
-    data_source.repository.record_response(operation=POST_USERS, status_code=CREATED, payload={"id": "123"})
-
-    operation = schema["/users/{user_id}"]["GET"]
-    path_schema = operation.path_parameters.schema
-
-    augmented = data_source.augment(operation=operation, location=ParameterLocation.PATH, schema=path_schema)
-
-    if expected_augmented is None:
-        assert augmented is path_schema
-    else:
-        original_property = dict(path_schema["properties"]["user_id"])
-        assert augmented["properties"]["user_id"] == expected_augmented
-        assert augmented is not path_schema
-        assert path_schema["properties"]["user_id"] == original_property
 
 
 @pytest.mark.parametrize(
@@ -224,7 +169,7 @@ def test_augment_wraps_schemas_in_anyof(user_schema_builder, parameter_schema, e
         ),
         pytest.param(
             [{"id": str(i)} for i in range(100)],
-            PER_TYPE_CAPACITY,
+            PER_CONTEXT_CAPACITY,  # All have same (empty) context, so limited by per-context capacity
             id="respects-capacity-limit",
         ),
     ],
@@ -299,17 +244,6 @@ def test_unresolvable_pointer(user_schema_builder):
 
     resources = list(data_source.repository.iter_instances(USER_RESOURCE))
     assert resources == []
-
-
-def test_augment_body_without_properties(user_schema):
-    operation = user_schema["/users"]["POST"]
-    array_schema = {"type": "array", "items": {"type": "string"}}
-
-    augmented = user_schema.analysis.extra_data_source.augment(
-        operation=operation, location=ParameterLocation.BODY, schema=array_schema
-    )
-
-    assert augmented is array_schema
 
 
 def test_custom_deserializer(ctx):
@@ -447,11 +381,13 @@ def test_prepopulate_from_response_examples(ctx):
     assert len(resources) == 1
     assert resources[0].data["id"] == "example-user-123"
 
-    # Verify example is used in augmentation
+    # Verify example is used in captured variants
     get_operation = schema["/users/{user_id}"]["GET"]
     path_schema = get_operation.path_parameters.schema
-    augmented = data_source.augment(operation=get_operation, location=ParameterLocation.PATH, schema=path_schema)
-    assert augmented["properties"]["user_id"]["anyOf"][1]["enum"] == ["example-user-123"]
+    variants = data_source.get_captured_variants(
+        operation=get_operation, location=ParameterLocation.PATH, schema=path_schema
+    )
+    assert variants == [{"user_id": "example-user-123"}]
 
 
 def test_object_level_augmentation_preserves_relationships(ctx):
@@ -499,20 +435,182 @@ def test_object_level_augmentation_preserves_relationships(ctx):
         context={"userId": "user-456"},  # Path parameter from request
     )
 
-    # Augment the GET /users/{userId}/posts/{postId} path parameters
+    # Get the path parameters for GET /users/{userId}/posts/{postId}
     get_operation = schema["/users/{userId}/posts/{postId}"]["GET"]
     path_schema = get_operation.path_parameters.schema
-    augmented = data_source.augment(operation=get_operation, location=ParameterLocation.PATH, schema=path_schema)
 
-    # Should have anyOf at schema level with complete schemas
-    assert "anyOf" in augmented
-    assert len(augmented["anyOf"]) == 2
+    # get_captured_variants() returns the variants for hybrid strategy
+    variants = data_source.get_captured_variants(
+        operation=get_operation, location=ParameterLocation.PATH, schema=path_schema
+    )
+    assert variants is not None
+    assert len(variants) == 1
 
-    # First variant is original schema
-    assert "properties" in augmented["anyOf"][0]
+    # Variant contains both userId and postId with correct values
+    variant = variants[0]
+    assert variant["userId"] == "user-456"
+    assert variant["postId"] == "post-123"
 
-    # Second variant should have both userId and postId from the same context
-    variant = augmented["anyOf"][1]
-    assert variant["properties"]["userId"]["const"] == "user-456"
-    assert variant["properties"]["postId"]["const"] == "post-123"
-    assert set(variant["required"]) == {"userId", "postId"}
+
+def test_context_aware_eviction_maintains_diversity(ctx):
+    pet_schema = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
+    spec = ctx.openapi.build_schema(
+        {
+            "/owners/{ownerId}/pets": {
+                "post": {
+                    "operationId": "createPet",
+                    "parameters": [{"name": "ownerId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"201": {"content": {"application/json": {"schema": pet_schema}}}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    # Record pets from multiple owners - more than would fit in a single context bucket
+    for owner_id in range(1, 6):
+        for pet_id in range(1, 100):
+            data_source.repository.record_response(
+                operation="POST /owners/{ownerId}/pets",
+                status_code=201,
+                payload={"id": pet_id + owner_id * 100},
+                context={"ownerId": owner_id},
+            )
+
+    instances = data_source.repository.iter_instances("Pet")
+
+    # Should have instances from all 5 owners (context diversity preserved)
+    owner_ids = {inst.context.get("ownerId") for inst in instances}
+    assert len(owner_ids) == 5
+
+    # Each owner should have at most PER_CONTEXT_CAPACITY pets
+    for owner_id in range(1, 6):
+        owner_pets = [inst for inst in instances if inst.context.get("ownerId") == owner_id]
+        assert len(owner_pets) <= PER_CONTEXT_CAPACITY
+
+    # Total instances capped by contexts * per-context capacity
+    assert len(instances) <= MAX_CONTEXTS_PER_TYPE * PER_CONTEXT_CAPACITY
+
+
+def test_negative_aware_strategy_with_captured_values(ctx):
+    spec = ctx.openapi.build_schema(
+        {
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            },
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "GetItem": {"operationId": "getItem", "parameters": {"id": "$response.body#/id"}}
+                            },
+                        }
+                    },
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    for i in range(5):
+        data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": f"item-{i}"})
+
+    operation = schema["/items/{id}"]["GET"]
+    config = GenerationConfig()
+
+    strategy = operation.path_parameters.get_strategy(
+        operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source
+    )
+
+    results = []
+
+    @given(strategy)
+    @settings(max_examples=20, database=None)
+    def collect_samples(value):
+        results.append(value)
+
+    collect_samples()
+
+    assert all(isinstance(r, GeneratedValue) for r in results)
+
+
+def test_negative_aware_strategy_with_captured_values_body(ctx):
+    spec = ctx.openapi.build_schema(
+        {
+            "/projects": {
+                "post": {
+                    "operationId": "createProject",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "CreateTask": {
+                                    "operationId": "createTask",
+                                    "parameters": {"project_id": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/tasks": {
+                "post": {
+                    "operationId": "createTask",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"project_id": {"type": "string"}, "title": {"type": "string"}},
+                                    "required": ["project_id"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    for i in range(5):
+        data_source.repository.record_response(
+            operation="POST /projects", status_code=201, payload={"id": f"project-{i}"}
+        )
+
+    operation = schema["/tasks"]["POST"]
+    config = GenerationConfig()
+    body = operation.body[0]
+
+    strategy = body.get_strategy(operation, config, GenerationMode.NEGATIVE, extra_data_source=data_source)
+
+    results = []
+
+    @given(strategy)
+    @settings(max_examples=20, database=None)
+    def collect_samples(value):
+        results.append(value)
+
+    collect_samples()
+
+    assert all(isinstance(r, GeneratedValue) for r in results)
