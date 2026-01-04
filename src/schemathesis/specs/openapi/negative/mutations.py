@@ -284,7 +284,7 @@ def change_type(
     # Similar to stringified params, we can't generate truly invalid data with just type mutations.
     if "string" in old_types and is_binary_format(schema) and ctx.location == ParameterLocation.BODY:
         return MutationResult.FAILURE, None
-    candidates = _get_type_candidates(ctx, schema)
+    candidates = _get_type_candidates_with_weights(ctx, schema, draw)
     if not candidates:
         # Schema covers all possible types, not possible to choose something else
         return MutationResult.FAILURE, None
@@ -344,12 +344,31 @@ def _ensure_path_string_not_numeric(ctx: MutationContext, schema: Schema, old_ty
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     types = set(get_type(schema))
     if ctx.is_path_location:
-        candidates = {"string", "integer", "number", "boolean", "null"} - types
+        # Deprioritize null/boolean for path parameters to improve test budget efficiency
+        candidates = {"string", "integer", "number"} - types
     else:
         candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
     if "integer" in types and "number" in candidates:
         # Do not change "integer" to "number" as any integer is also a number
         candidates.remove("number")
+    return candidates
+
+
+# Probability of adding null/boolean type mutations for path parameters.
+PATH_NULL_BOOLEAN_PROBABILITY = 0.05
+
+
+def _get_type_candidates_with_weights(ctx: MutationContext, schema: Schema, draw: Draw) -> set[str]:
+    """Get type candidates with weighted selection for path parameters."""
+    candidates = _get_type_candidates(ctx, schema)
+    if ctx.is_path_location:
+        types = set(get_type(schema))
+        # Occasionally add null/boolean for path parameters to ensure some coverage
+        random = draw(st.randoms())
+        if "null" not in types and random.random() < PATH_NULL_BOOLEAN_PROBABILITY:
+            candidates.add("null")
+        if "boolean" not in types and random.random() < PATH_NULL_BOOLEAN_PROBABILITY:
+            candidates.add("boolean")
     return candidates
 
 
