@@ -21,6 +21,8 @@
 
 ### :bug: Fixed
 
+- Captured resource ID selection biased toward early indices.
+- Resource pool capacity too small, causing most captured resources to be evicted before use.
 - Resource pool not recording IDs from successful responses when other test cases in the same scenario failed.
 - Incorrect operation ordering within dependency layers.
 

@@ -76,6 +76,7 @@ def build_hybrid_strategy(
 
     # Pre-compute keys for all variants
     variant_keys = [_variant_key(v) for v in captured_variants]
+    n_variants = len(captured_variants)
 
     @st.composite  # type: ignore[untyped-decorator]
     def hybrid(draw: st.DrawFn) -> dict[str, Any]:
@@ -86,27 +87,13 @@ def build_hybrid_strategy(
             return draw(original_strategy)
 
         # Single variant: no selection needed
-        if len(captured_variants) == 1:
+        if n_variants == 1:
             usage_tracker.record_draw(variant_keys[0])
             return captured_variants[0]
 
-        # Weighted selection based on recency
-        weights = [usage_tracker.get_weight(k) for k in variant_keys]
-        total = sum(weights)
-
-        if total == 0:
-            # All weights zero (shouldn't happen), fall back to uniform
-            idx = random.randint(0, len(captured_variants) - 1)
-        else:
-            # Weighted random selection
-            r = random.random() * total
-            cumulative = 0.0
-            idx = len(captured_variants) - 1
-            for i, w in enumerate(weights):
-                cumulative += w
-                if r < cumulative:
-                    idx = i
-                    break
+        # Shuffle indices before weighted selection to avoid Hypothesis's bias
+        # toward early indices when using cumulative probability selection.
+        idx = usage_tracker.weighted_select(variant_keys, random)
 
         # Record this draw for future weighting
         usage_tracker.record_draw(variant_keys[idx])
