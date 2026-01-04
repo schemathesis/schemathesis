@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import chain
+from random import Random
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.config import GenerationConfig
@@ -48,6 +49,11 @@ CAPTURED_VALUES_PROBABILITY = 0.8
 # We want to mostly use captured values to test deeper application logic.
 NEGATIVE_STRATEGY_PROBABILITY = 0.03
 
+# Probability of biasing path parameter integers toward positive values.
+# Most REST APIs use positive integers for resource IDs, so this improves
+# the chance of hitting existing resources while still allowing edge cases.
+PATH_INTEGER_POSITIVE_BIAS = 0.8
+
 
 def build_hybrid_strategy(
     original_strategy: st.SearchStrategy,
@@ -66,6 +72,50 @@ def build_hybrid_strategy(
         return draw(original_strategy)
 
     return hybrid()
+
+
+def _schema_has_integer_properties(schema: JsonSchemaObject) -> bool:
+    """Check if the schema has any integer-type properties."""
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return False
+    for prop_schema in properties.values():
+        if isinstance(prop_schema, dict) and prop_schema.get("type") == "integer":
+            return True
+    return False
+
+
+def _bias_path_integers_to_positive(params: dict[str, Any], random: Random) -> dict[str, Any]:
+    """Bias integer path parameters toward positive values.
+
+    Most REST APIs use positive integers for resource IDs (1, 2, 3, ...),
+    so biasing toward positive values increases the chance of hitting
+    existing resources while still occasionally testing edge cases like 0
+    and negative numbers.
+    """
+    result = {}
+    for key, value in params.items():
+        if isinstance(value, int) and value <= 0 and random.random() < PATH_INTEGER_POSITIVE_BIAS:
+            # Convert to positive: 0 -> 1, negative -> abs(value) or 1
+            result[key] = max(1, abs(value))
+        else:
+            result[key] = value
+    return result
+
+
+def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
+    """Wrap a path parameter strategy to bias integers toward positive values."""
+    from hypothesis import strategies as st
+
+    @st.composite  # type: ignore[untyped-decorator]
+    def biased(draw: st.DrawFn) -> dict[str, Any] | None:
+        params = draw(strategy)
+        if params is None:
+            return params
+        random = draw(st.randoms())
+        return _bias_path_integers_to_positive(params, random)
+
+    return biased()
 
 
 @dataclass
@@ -745,6 +795,14 @@ class OpenApiParameterSet(ParameterSet):
 
             # For negative strategies, we need to handle GeneratedValue wrappers
             is_negative = strategy_factory is make_negative_strategy
+
+            # Bias path parameter integers toward positive values in positive mode
+            if (
+                self.location == ParameterLocation.PATH
+                and not is_negative
+                and _schema_has_integer_properties(schema_obj)
+            ):
+                strategy = build_positive_biased_path_strategy(strategy)
 
             serialize = operation.get_parameter_serializer(self.location)
             if serialize is not None:
