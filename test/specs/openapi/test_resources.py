@@ -168,7 +168,7 @@ def test_wildcard_status_code_matching(user_schema_builder):
             id="deduplicates",
         ),
         pytest.param(
-            [{"id": str(i)} for i in range(100)],
+            [{"id": str(i)} for i in range(PER_CONTEXT_CAPACITY + 100)],
             PER_CONTEXT_CAPACITY,  # All have same (empty) context, so limited by per-context capacity
             id="respects-capacity-limit",
         ),
