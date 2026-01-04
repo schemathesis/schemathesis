@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
 
@@ -18,6 +19,49 @@ if TYPE_CHECKING:
 
 RequirementKey = tuple[str, ParameterLocation, str]
 DedupKey: TypeAlias = tuple[type, str | int | float | bool | None]
+
+# Decay factor for recency weighting. Higher = faster recovery of weight.
+RECENCY_DECAY_FACTOR = 3.0
+# Maximum number of variants to track. Oldest entries are evicted when exceeded.
+MAX_TRACKED_VARIANTS = 10000
+
+
+class VariantUsageTracker:
+    """Tracks variant usage for weighted sampling.
+
+    Maintains a global step counter and records when each variant was last drawn.
+    Recently drawn variants get lower weights to encourage diversity.
+    Uses LRU eviction to bound memory usage.
+    """
+
+    __slots__ = ("_step", "_last_drawn", "_maxlen", "_lock")
+
+    def __init__(self, maxlen: int = MAX_TRACKED_VARIANTS) -> None:
+        self._step = 0
+        self._last_drawn: dict[str, int] = {}
+        self._maxlen = maxlen
+        self._lock = threading.Lock()
+
+    def get_weight(self, variant_key: str) -> float:
+        """Calculate weight for a variant based on recency."""
+        with self._lock:
+            last_step = self._last_drawn.get(variant_key)
+            if last_step is None:
+                return 1.0
+            age = self._step - last_step
+            return age / (age + RECENCY_DECAY_FACTOR)
+
+    def record_draw(self, variant_key: str) -> None:
+        """Record that a variant was drawn, advancing the global step."""
+        with self._lock:
+            self._step += 1
+            # Delete first to move to end (maintains LRU order)
+            if variant_key in self._last_drawn:
+                del self._last_drawn[variant_key]
+            self._last_drawn[variant_key] = self._step
+            # Evict oldest if over limit
+            while len(self._last_drawn) > self._maxlen:
+                del self._last_drawn[next(iter(self._last_drawn))]
 
 
 @dataclass(slots=True, frozen=True)
@@ -46,6 +90,17 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
     repository: ResourceRepository
     requirements: dict[RequirementKey, ParameterRequirement]
+    usage_tracker: VariantUsageTracker
+
+    def __init__(
+        self,
+        repository: ResourceRepository,
+        requirements: dict[RequirementKey, ParameterRequirement],
+        usage_tracker: VariantUsageTracker | None = None,
+    ) -> None:
+        self.repository = repository
+        self.requirements = requirements
+        self.usage_tracker = usage_tracker if usage_tracker is not None else VariantUsageTracker()
 
     def get_captured_variants(
         self,
