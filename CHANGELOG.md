@@ -11,6 +11,7 @@
 
 ### :wrench: Changed
 
+- Deprioritize `null` and `boolean` type mutations for path parameters to improve test budget efficiency.
 - Recency-weighted sampling of captured resource IDs to reduce repeated operations on the same resources.
 - Bias path parameter integers toward positive values to reduce test budget spent on likely invalid IDs.
 - Use `st.sampled_from` for captured variants instead of schema augmentation.
