@@ -11,6 +11,7 @@
 
 ### :wrench: Changed
 
+- Recency-weighted sampling of captured resource IDs to reduce repeated operations on the same resources.
 - Bias path parameter integers toward positive values to reduce test budget spent on likely invalid IDs.
 - Use `st.sampled_from` for captured variants instead of schema augmentation.
 - Context-aware resource pool to preserve diversity across parent resources.

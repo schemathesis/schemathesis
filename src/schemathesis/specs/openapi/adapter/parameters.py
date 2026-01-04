@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
@@ -29,6 +30,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.core.compat import RefResolver
+    from schemathesis.specs.openapi.extra_data_source import VariantUsageTracker
 
 
 MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
@@ -55,21 +57,60 @@ NEGATIVE_STRATEGY_PROBABILITY = 0.03
 PATH_INTEGER_POSITIVE_BIAS = 0.8
 
 
+def _variant_key(variant: dict[str, Any]) -> str:
+    """Create a stable string key for a variant dict."""
+    return json.dumps(variant, sort_keys=True, default=str)
+
+
 def build_hybrid_strategy(
     original_strategy: st.SearchStrategy,
     captured_variants: list[dict[str, Any]],
+    usage_tracker: "VariantUsageTracker",
 ) -> st.SearchStrategy:
-    """Combine original strategy with captured variants using weighted sampling."""
+    """Combine original strategy with captured variants using weighted sampling.
+
+    Weights selection to prefer variants that haven't been drawn recently,
+    reducing wasted test budget from repeated operations on the same resources.
+    """
     from hypothesis import strategies as st
 
-    captured_strategy = st.sampled_from(captured_variants)
+    # Pre-compute keys for all variants
+    variant_keys = [_variant_key(v) for v in captured_variants]
 
     @st.composite  # type: ignore[untyped-decorator]
     def hybrid(draw: st.DrawFn) -> dict[str, Any]:
-        random = draw(st.randoms(use_true_random=True))
-        if random.random() < CAPTURED_VALUES_PROBABILITY:
-            return draw(captured_strategy)
-        return draw(original_strategy)
+        random = draw(st.randoms())
+
+        # Decide: use captured variant or generate fresh?
+        if random.random() >= CAPTURED_VALUES_PROBABILITY:
+            return draw(original_strategy)
+
+        # Single variant: no selection needed
+        if len(captured_variants) == 1:
+            usage_tracker.record_draw(variant_keys[0])
+            return captured_variants[0]
+
+        # Weighted selection based on recency
+        weights = [usage_tracker.get_weight(k) for k in variant_keys]
+        total = sum(weights)
+
+        if total == 0:
+            # All weights zero (shouldn't happen), fall back to uniform
+            idx = random.randint(0, len(captured_variants) - 1)
+        else:
+            # Weighted random selection
+            r = random.random() * total
+            cumulative = 0.0
+            idx = len(captured_variants) - 1
+            for i, w in enumerate(weights):
+                cumulative += w
+                if r < cumulative:
+                    idx = i
+                    break
+
+        # Record this draw for future weighting
+        usage_tracker.record_draw(variant_keys[idx])
+        return captured_variants[idx]
 
     return hybrid()
 
@@ -371,6 +412,7 @@ class OpenApiBody(OpenApiComponent):
 
         # Check for captured variants for hybrid approach
         captured_variants: list[dict[str, Any]] | None = None
+        usage_tracker = None
         if extra_data_source is not None:
             from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 
@@ -378,6 +420,7 @@ class OpenApiBody(OpenApiComponent):
                 captured_variants = extra_data_source.get_captured_variants(
                     operation=operation, location=ParameterLocation.BODY, schema=self.optimized_schema
                 )
+                usage_tracker = extra_data_source.usage_tracker
 
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
@@ -393,11 +436,13 @@ class OpenApiBody(OpenApiComponent):
         )
 
         # Apply hybrid approach when captured variants are available
-        if captured_variants:
+        if captured_variants and usage_tracker is not None:
             if generation_mode.is_negative:
-                strategy = self._build_negative_aware_strategy(operation, generation_config, captured_variants)
+                strategy = self._build_negative_aware_strategy(
+                    operation, generation_config, captured_variants, usage_tracker
+                )
             else:
-                strategy = build_hybrid_strategy(strategy, captured_variants)
+                strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
 
         # Cache the strategy
         if use_cache:
@@ -413,6 +458,7 @@ class OpenApiBody(OpenApiComponent):
         operation: APIOperation,
         generation_config: GenerationConfig,
         captured_variants: list[dict[str, Any]],
+        usage_tracker: "VariantUsageTracker",
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available."""
         from hypothesis import strategies as st
@@ -422,7 +468,7 @@ class OpenApiBody(OpenApiComponent):
         positive_strategy = self.get_strategy(
             operation, generation_config, GenerationMode.POSITIVE, extra_data_source=None
         )
-        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants)
+        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
 
         negative_strategy = self.get_strategy(
@@ -431,7 +477,7 @@ class OpenApiBody(OpenApiComponent):
 
         @st.composite  # type: ignore[untyped-decorator]
         def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
-            random = draw(st.randoms(use_true_random=True))
+            random = draw(st.randoms())
             if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
                 return draw(negative_strategy)
             return draw(positive_strategy)
@@ -763,6 +809,7 @@ class OpenApiParameterSet(ParameterSet):
 
         # Check for captured variants for hybrid approach
         captured_variants: list[dict[str, Any]] | None = None
+        usage_tracker = None
         if extra_data_source is not None:
             from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
 
@@ -770,6 +817,7 @@ class OpenApiParameterSet(ParameterSet):
                 captured_variants = extra_data_source.get_captured_variants(
                     operation=operation, location=self.location, schema=schema
                 )
+                usage_tracker = extra_data_source.usage_tracker
 
         # `JsonSchema` can be boolean (`True` / `False`), normalize to an object schema for downstream usage.
         if isinstance(schema, bool):
@@ -844,13 +892,15 @@ class OpenApiParameterSet(ParameterSet):
                     strategy = strategy.map(jsonify_python_specific_types)
 
         # Apply hybrid approach when captured variants are available
-        if captured_variants:
+        if captured_variants and usage_tracker is not None:
             if generation_mode.is_negative:
                 # In negative mode with captured values, mostly use positive strategy
                 # to leverage valuable captured IDs for testing deeper application logic
-                strategy = self._build_negative_aware_strategy(operation, generation_config, exclude, captured_variants)
+                strategy = self._build_negative_aware_strategy(
+                    operation, generation_config, exclude, captured_variants, usage_tracker
+                )
             else:
-                strategy = build_hybrid_strategy(strategy, captured_variants)
+                strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
 
         if use_cache:
             self._strategy_cache[cache_key] = strategy
@@ -862,6 +912,7 @@ class OpenApiParameterSet(ParameterSet):
         generation_config: GenerationConfig,
         exclude: Iterable[str],
         captured_variants: list[dict[str, Any]],
+        usage_tracker: "VariantUsageTracker",
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available.
 
@@ -876,7 +927,7 @@ class OpenApiParameterSet(ParameterSet):
         positive_strategy = self.get_strategy(
             operation, generation_config, GenerationMode.POSITIVE, exclude, extra_data_source=None
         )
-        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants)
+        positive_strategy = build_hybrid_strategy(positive_strategy, captured_variants, usage_tracker)
         # Wrap in GeneratedValue for consistent return type with negative strategy
         positive_strategy = positive_strategy.map(lambda x: GeneratedValue(x, None))
 
@@ -887,7 +938,7 @@ class OpenApiParameterSet(ParameterSet):
 
         @st.composite  # type: ignore[untyped-decorator]
         def choose_strategy(draw: st.DrawFn) -> GeneratedValue:
-            random = draw(st.randoms(use_true_random=True))
+            random = draw(st.randoms())
             if random.random() < NEGATIVE_STRATEGY_PROBABILITY:
                 return draw(negative_strategy)
             return draw(positive_strategy)
