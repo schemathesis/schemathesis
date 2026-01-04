@@ -12,7 +12,8 @@ from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 
 # Maximum number of resource instances cached per unique context within a resource type.
 # This ensures diversity across parent resources (e.g., pets from different owners).
-PER_CONTEXT_CAPACITY = 50
+# Set high enough to retain most resources created during typical test runs.
+PER_CONTEXT_CAPACITY = 500
 
 # Maximum number of unique contexts to track per resource type.
 MAX_CONTEXTS_PER_TYPE = 20
