@@ -1,7 +1,7 @@
 Error in [reports] section:
   Unknown properties:
 
-  - 'json'
+  - 'json' -> Did you mean 'ndjson'?
   - 'junitxml' -> Did you mean 'junit'?
 
-Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr'.
+Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr', 'ndjson'.

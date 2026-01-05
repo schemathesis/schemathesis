@@ -18,6 +18,7 @@ class ReportFormat(str, Enum):
     JUNIT = "junit"
     VCR = "vcr"
     HAR = "har"
+    NDJSON = "ndjson"
 
     @property
     def extension(self) -> str:
@@ -26,6 +27,7 @@ class ReportFormat(str, Enum):
             self.JUNIT: "xml",
             self.VCR: "yaml",
             self.HAR: "json",
+            self.NDJSON: "ndjson",
         }[self]
 
 
@@ -56,9 +58,10 @@ class ReportsConfig(DiffBase):
     junit: ReportConfig
     vcr: ReportConfig
     har: ReportConfig
+    ndjson: ReportConfig
     _timestamp: str
 
-    __slots__ = ("directory", "preserve_bytes", "junit", "vcr", "har", "_timestamp")
+    __slots__ = ("directory", "preserve_bytes", "junit", "vcr", "har", "ndjson", "_timestamp")
 
     def __init__(
         self,
@@ -68,12 +71,14 @@ class ReportsConfig(DiffBase):
         junit: ReportConfig | None = None,
         vcr: ReportConfig | None = None,
         har: ReportConfig | None = None,
+        ndjson: ReportConfig | None = None,
     ) -> None:
         self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
         self.preserve_bytes = preserve_bytes
         self.junit = junit or ReportConfig()
         self.vcr = vcr or ReportConfig()
         self.har = har or ReportConfig()
+        self.ndjson = ndjson or ReportConfig()
         self._timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
     @classmethod
@@ -84,6 +89,7 @@ class ReportsConfig(DiffBase):
             junit=ReportConfig.from_dict(data.get("junit", {})),
             vcr=ReportConfig.from_dict(data.get("vcr", {})),
             har=ReportConfig.from_dict(data.get("har", {})),
+            ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
         )
 
     def update(
@@ -93,6 +99,7 @@ class ReportsConfig(DiffBase):
         junit_path: str | None = None,
         vcr_path: str | None = None,
         har_path: str | None = None,
+        ndjson_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
         preserve_bytes: bool | None = None,
     ) -> None:
@@ -106,6 +113,9 @@ class ReportsConfig(DiffBase):
         if har_path is not None or ReportFormat.HAR in formats:
             self.har.enabled = True
             self.har.path = Path(har_path) if har_path is not None else har_path
+        if ndjson_path is not None or ReportFormat.NDJSON in formats:
+            self.ndjson.enabled = True
+            self.ndjson.path = Path(ndjson_path) if ndjson_path is not None else ndjson_path
         if directory != DEFAULT_REPORT_DIRECTORY:
             self.directory = directory
         if preserve_bytes is True:

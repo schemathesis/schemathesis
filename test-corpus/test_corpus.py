@@ -13,6 +13,7 @@ from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
+from schemathesis.cli.commands.run.handlers.ndjson import NdjsonWriter
 from schemathesis.config import HealthCheck
 from schemathesis.config._report import ReportFormat
 from schemathesis.core.compat import RefResolutionError
@@ -374,6 +375,7 @@ def test_default(corpus, filename):
         JunitXMLHandler(output=StringIO()),
         CassetteWriter(format=ReportFormat.VCR, output=StringIO(), config=schema.config),
         CassetteWriter(format=ReportFormat.HAR, output=StringIO(), config=schema.config),
+        NdjsonWriter(output=StringIO(), config=schema.config),
     ]
     ctx = ExecutionContext(schema.config)
 
