@@ -4,4 +4,4 @@ Error in [reports] section:
   - 'output_format'
   - 'preserve_byte' -> Did you mean 'preserve-bytes'?
 
-Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr'.
+Valid properties for [reports] are: 'directory', 'preserve-bytes', 'junit', 'har', 'vcr', 'ndjson'.

@@ -1639,12 +1639,13 @@ class OutputHandler(EventHandler):
 
     def display_reports(self) -> None:
         reports = self.config.reports
-        if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled:
+        if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled or reports.ndjson.enabled:
             click.echo(_style("Reports:", bold=True))
             for format, report in (
                 (ReportFormat.JUNIT, reports.junit),
                 (ReportFormat.VCR, reports.vcr),
                 (ReportFormat.HAR, reports.har),
+                (ReportFormat.NDJSON, reports.ndjson),
             ):
                 if report.enabled:
                     path = reports.get_path(format)
