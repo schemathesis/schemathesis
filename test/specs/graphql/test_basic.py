@@ -321,7 +321,12 @@ def test_type_as_strategy(graphql_schema, type_name):
     strategy = operations.as_strategy()
     for operation in operations.values():
         # All fields should be possible to generate
-        find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
+        # Note: Phase.explain excluded due to Hypothesis 6.149.0 bug with variable-length strategies
+        find(
+            strategy,
+            lambda x, op=operation: op.definition.field_name in x.body,
+            settings=settings(phases=[Phase.generate, Phase.shrink]),
+        )
 
 
 def test_schema_as_strategy(graphql_schema):
@@ -329,7 +334,12 @@ def test_schema_as_strategy(graphql_schema):
     for operations in graphql_schema.values():
         for operation in operations.values():
             # All fields should be possible to generate
-            find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
+            # Note: Phase.explain excluded due to Hypothesis 6.149.0 bug with variable-length strategies
+            find(
+                strategy,
+                lambda x, op=operation: op.definition.field_name in x.body,
+                settings=settings(phases=[Phase.generate, Phase.shrink]),
+            )
 
 
 @pytest.mark.parametrize(

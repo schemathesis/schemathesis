@@ -96,7 +96,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
                 assert interaction["phase"]["data"]["parameter_location"] is not None
 
 
-@pytest.mark.parametrize("format", ["vcr", "har"])
+@pytest.mark.parametrize("format", ["vcr", "har", "ndjson"])
 @pytest.mark.operations("slow")
 @pytest.mark.openapi_version("3.0")
 def test_store_timeout(cli, schema_url, cassette_path, format):
@@ -114,11 +114,19 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
         assert cassette["http_interactions"][0]["status"] == "ERROR"
         assert cassette["seed"] == 1
         assert cassette["http_interactions"][0]["response"] is None
-    else:
+    elif format == "har":
         with cassette_path.open(encoding="utf-8") as fd:
             data = json.load(fd)
             assert len(data["log"]["entries"]) == 3
             assert data["log"]["entries"][1]["response"]["bodySize"] == -1
+    else:
+        # ndjson format (externally tagged)
+        events = []
+        with cassette_path.open(encoding="utf-8") as fd:
+            for line in fd:
+                events.append(json.loads(line))
+        assert "Initialize" in events[0]
+        assert events[0]["Initialize"]["seed"] == 1
 
 
 @pytest.mark.operations("flaky")
@@ -345,14 +353,20 @@ def test_report_dir(cli, schema_url, tmp_path, in_config):
     kwargs = {}
     if in_config:
         kwargs["config"] = {
-            "reports": {"vcr": {"enabled": True}, "har": {"enabled": True}, "directory": str(report_dir)}
+            "reports": {
+                "vcr": {"enabled": True},
+                "har": {"enabled": True},
+                "ndjson": {"enabled": True},
+                "directory": str(report_dir),
+            }
         }
     else:
-        args = [f"--report-dir={report_dir}", "--report=vcr,har", *args]
+        args = [f"--report-dir={report_dir}", "--report=vcr,har,ndjson", *args]
     cli.run(schema_url, *args, **kwargs)
     # Then all reports should be created in the specified directory
     assert list(report_dir.glob("*.yaml"))
     assert list(report_dir.glob("*.json"))
+    assert list(report_dir.glob("*.ndjson"))
 
 
 @given(text=st.text())

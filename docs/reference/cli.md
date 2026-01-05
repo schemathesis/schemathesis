@@ -380,7 +380,7 @@ These options control the reporting and output format of test results:
 !!! note ""
 
     **Type**: `Comma-separated list`  
-    **Possible values**: `junit`, `vcr`, `har`  
+    **Possible values**: `junit`, `vcr`, `har`, `ndjson`  
 
     Generate test reports in specified formats as a comma-separated list.
 
@@ -435,6 +435,18 @@ These options control the reporting and output format of test results:
 
     ```console
     $ st run openapi.yaml --report har --report-har-path ./custom-har.json
+    ```
+
+#### `--report-ndjson-path FILENAME`
+
+!!! note ""
+
+    **Type**: `String`  
+
+    Custom path for NDJSON events file. This format exports all engine events as newline-delimited JSON, useful for analysis and tooling integration.
+
+    ```console
+    $ st run openapi.yaml --report ndjson --report-ndjson-path ./events.ndjson
     ```
 
 #### `--report-preserve-bytes`

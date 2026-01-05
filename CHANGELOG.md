@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.8.0...HEAD) - TBD
 
+### :rocket: Added
+
+- NDJSON report format (`--report=ndjson`) for exporting all engine events as newline-delimited JSON.
+
 ## [4.8.0](https://github.com/schemathesis/schemathesis/compare/v4.7.9...v4.8.0) - 2026-01-05
 
 ### :rocket: Added

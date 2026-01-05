@@ -93,19 +93,21 @@ Network requests options:
                                  the client certificate
 
 Output options:
-  --report FORMAT               Generate test reports in formats specified as a
-                                comma-separated list [possible values: junit,
-                                vcr, har]
-  --report-dir DIRECTORY        Directory to store all report files  [default:
-                                schemathesis-report]
-  --report-junit-path FILENAME  Custom path for JUnit XML report
-  --report-vcr-path FILENAME    Custom path for VCR cassette
-  --report-har-path FILENAME    Custom path for HAR file
-  --report-preserve-bytes       Retain exact byte sequence of payloads in
-                                cassettes, encoded as base64
-  --output-sanitize BOOLEAN     Enable or disable automatic output sanitization
-                                to obscure sensitive data
-  --output-truncate BOOLEAN     Truncate schemas and responses in error messages
+  --report FORMAT                Generate test reports in formats specified as a
+                                 comma-separated list [possible values: junit,
+                                 vcr, har, ndjson]
+  --report-dir DIRECTORY         Directory to store all report files  [default:
+                                 schemathesis-report]
+  --report-junit-path FILENAME   Custom path for JUnit XML report
+  --report-vcr-path FILENAME     Custom path for VCR cassette
+  --report-har-path FILENAME     Custom path for HAR file
+  --report-ndjson-path FILENAME  Custom path for NDJSON events file
+  --report-preserve-bytes        Retain exact byte sequence of payloads in
+                                 cassettes, encoded as base64
+  --output-sanitize BOOLEAN      Enable or disable automatic output sanitization
+                                 to obscure sensitive data
+  --output-truncate BOOLEAN      Truncate schemas and responses in error
+                                 messages
 
 Data generation options:
   -m, --mode                      Test data generation mode  [default: all]

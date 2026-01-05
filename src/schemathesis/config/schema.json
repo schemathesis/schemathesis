@@ -45,6 +45,9 @@
         },
         "vcr": {
           "$ref": "#/$defs/ReportConfig"
+        },
+        "ndjson": {
+          "$ref": "#/$defs/ReportConfig"
         }
       }
     },

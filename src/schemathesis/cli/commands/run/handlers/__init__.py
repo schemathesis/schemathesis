@@ -3,6 +3,7 @@ import click
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
+from schemathesis.cli.commands.run.handlers.ndjson import NdjsonWriter
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
 from schemathesis.core.errors import format_exception
@@ -11,6 +12,7 @@ __all__ = [
     "EventHandler",
     "CassetteWriter",
     "JunitXMLHandler",
+    "NdjsonWriter",
     "OutputHandler",
     "display_handler_error",
 ]
@@ -18,7 +20,7 @@ __all__ = [
 
 def is_built_in_handler(handler: EventHandler) -> bool:
     # Look for exact instances, not subclasses
-    return any(type(handler) is class_ for class_ in (CassetteWriter, JunitXMLHandler, OutputHandler))
+    return any(type(handler) is class_ for class_ in (CassetteWriter, JunitXMLHandler, NdjsonWriter, OutputHandler))
 
 
 def display_handler_error(handler: EventHandler, exc: Exception) -> None:

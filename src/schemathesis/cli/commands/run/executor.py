@@ -12,6 +12,7 @@ from schemathesis.cli.commands.run.handlers import display_handler_error
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
+from schemathesis.cli.commands.run.handlers.ndjson import NdjsonWriter
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.loaders import load_schema
 from schemathesis.cli.ext.fs import open_file
@@ -107,6 +108,11 @@ def initialize_handlers(
             path = config.reports.get_path(format)
             open_file(path)
             handlers.append(CassetteWriter(format=format, output=path, config=config))
+
+    if config.reports.ndjson.enabled:
+        path = config.reports.get_path(ReportFormat.NDJSON)
+        open_file(path)
+        handlers.append(NdjsonWriter(output=path, config=config))
 
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))
