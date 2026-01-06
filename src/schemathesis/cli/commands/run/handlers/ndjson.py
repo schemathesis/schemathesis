@@ -15,6 +15,7 @@ from schemathesis.cli.commands.run.handlers.cassettes import get_command_represe
 from schemathesis.core import NOT_SET
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.result import Err, Ok
+from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import events
@@ -38,6 +39,8 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
 
     if obj is NOT_SET:
         return None
+    if isinstance(obj, Unresolvable):
+        return {"$unresolvable": True}
     if obj is None or isinstance(obj, (bool, int, float, str)):
         return obj
     if isinstance(obj, bytes):

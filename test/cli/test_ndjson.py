@@ -402,3 +402,88 @@ def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
     # Stateful phase should run
     phase_started = [e for e in events if get_event_type(e) == "PhaseStarted"]
     assert any(get_event_data(e)["phase"]["name"] == "Stateful" for e in phase_started)
+
+
+def test_unresolvable_extraction_serialized(cli, ctx, app_runner, ndjson_path):
+    # Link references an array index that will be empty, triggering $unresolvable
+    schema = ctx.openapi.build_schema(
+        {
+            "/tags": {
+                "get": {
+                    "operationId": "listTags",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"data": {"type": "array", "items": {"type": "object"}}},
+                                    }
+                                }
+                            },
+                            "links": {
+                                "GetTag": {
+                                    "operationId": "getTag",
+                                    "parameters": {"tagId": "$response.body#/data/0/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/tags/{tagId}": {
+                "get": {
+                    "operationId": "getTag",
+                    "parameters": [{"name": "tagId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi():
+        return jsonify(schema)
+
+    @app.route("/tags")
+    def list_tags():
+        # Return empty array - extraction of /data/0/id will be unresolvable
+        return jsonify({"data": []})
+
+    @app.route("/tags/<int:tag_id>")
+    def get_tag(tag_id):
+        return jsonify({"id": tag_id, "name": "Test"})
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=10",
+        "--seed=1",
+        "--phases=stateful",
+    )
+    events = load_ndjson(ndjson_path)
+
+    # Find ScenarioFinished events with transitions
+    scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
+    found_unresolvable = False
+
+    for event in scenario_finished:
+        data = get_event_data(event)
+        cases = data["recorder"].get("cases", {})
+        for case_node in cases.values():
+            transition = case_node.get("transition")
+            if transition and transition.get("parameters"):
+                for location_params in transition["parameters"].values():
+                    for param in location_params.values():
+                        if param.get("value") == {"$unresolvable": True}:
+                            found_unresolvable = True
+                            # Verify the structure
+                            assert "definition" in param
+                            assert "is_required" in param
+
+    assert found_unresolvable, "Expected to find $unresolvable marker in extraction results"
