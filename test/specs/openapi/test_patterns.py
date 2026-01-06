@@ -236,6 +236,93 @@ def is_valid_regex(pattern: str) -> bool:
         return False
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, app_runner, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/owners": {
+                "get": {
+                    "operationId": "listOwners",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/Owner"},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/owners/{ownerId}": {
+                "get": {
+                    "operationId": "getOwner",
+                    "parameters": [{"name": "ownerId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        # allOf triggers canonicalize() call in dependency analysis
+                                        "allOf": [
+                                            {"$ref": "#/components/schemas/Owner"},
+                                            {"description": "An owner"},
+                                        ]
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Owner": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        # PCRE Unicode property escape - this caused the crash
+                        "firstName": {"type": "string", "pattern": r"^[\p{L}]+([ '-][\p{L}]+){0,2}\.?$"},
+                        "lastName": {"type": "string", "pattern": r"^[\p{L}]+([ '-][\p{L}]+){0,2}\.?$"},
+                    },
+                }
+            }
+        },
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi():
+        return jsonify(schema)
+
+    @app.route("/owners")
+    def list_owners():
+        return jsonify([{"id": 1, "firstName": "John", "lastName": "Doe"}])
+
+    @app.route("/owners/<int:owner_id>")
+    def get_owner(owner_id):
+        return jsonify({"id": owner_id, "firstName": "John", "lastName": "Doe"})
+
+    port = app_runner.run_flask_app(app)
+
+    # This should not crash with SchemaError about invalid regex
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--max-examples=1",
+            "--phases=examples",
+        )
+        == snapshot_cli
+    )
+
+
 def test_response_schema_is_not_mutated(cli, app_runner, snapshot_cli):
     # See GH-2749
     raw_schema = {

@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - CLI headers (`-H`) not being passed to schema loading requests. [#3440](https://github.com/schemathesis/schemathesis/issues/3440)
+- PCRE Unicode property escapes (`\p{L}`, `\p{N}`) in response schemas causing crashes during dependency analysis.
 
 ## [4.8.0](https://github.com/schemathesis/schemathesis/compare/v4.7.9...v4.8.0) - 2026-01-05
 
