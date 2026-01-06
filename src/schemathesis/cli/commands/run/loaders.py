@@ -95,6 +95,9 @@ def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchem
         auth = config.auth_for()
         if auth is not None:
             kwargs["auth"] = auth
+        headers = config.headers_for()
+        if headers:
+            kwargs["headers"] = headers
 
     return loader(location, config=config._parent, **kwargs)
 

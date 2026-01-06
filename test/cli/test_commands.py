@@ -1141,6 +1141,38 @@ def test_colon_in_headers(cli, schema_url, app):
     assert app["incoming_requests"][0].headers[header] == value
 
 
+def test_headers_passed_to_schema_loading(cli, ctx, app_runner):
+    # GH-3440: Headers should be passed to schema loading request
+    schema = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    app = Flask(__name__)
+    schema_requests = []
+
+    @app.route("/openapi.json")
+    def openapi():
+        schema_requests.append(dict(request.headers))
+        auth = request.headers.get("Authorization")
+        if auth != "Bearer secret-token":
+            return jsonify({"error": "Unauthorized"}), 401
+        return jsonify(schema)
+
+    @app.route("/users")
+    def users():
+        return jsonify([])
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "-H",
+        "Authorization: Bearer secret-token",
+        "--max-examples=1",
+    )
+
+    assert len(schema_requests) >= 1
+    assert schema_requests[0].get("Authorization") == "Bearer secret-token"
+
+
 @pytest.mark.openapi_version("3.0")
 def test_yaml_parsing_of_floats(cli, testdir, base_url):
     schema = """info:
