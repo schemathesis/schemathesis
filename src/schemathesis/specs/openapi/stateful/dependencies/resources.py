@@ -117,7 +117,9 @@ def iter_resources_from_response(
                 canonicalized = canonicalization_cache[parent_ref]
             else:
                 try:
-                    canonicalized = canonicalize(cast(dict, resolved), resolver)
+                    canonicalized = canonicalize(
+                        cast(dict, resolved), resolver, nullable_keyword=response.adapter.nullable_keyword
+                    )
                 except (InfiniteRecursiveReference, BundleError):
                     canonicalized = resolved
                 if parent_ref is not None:
