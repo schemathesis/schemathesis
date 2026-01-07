@@ -73,7 +73,12 @@ def resolve_all_refs_inner(schema: JsonSchema, *, resolve: Callable[[str], dict[
         del schema["$ref"]
         schema.pop(BUNDLE_STORAGE_KEY, None)
         schema.pop("example", None)
-        return merged([resolve_all_refs_inner(schema, resolve=resolve), resolved])
+        result = merged([resolve_all_refs_inner(schema, resolve=resolve), resolved])
+        # hypothesis_jsonschema's merged() can return None for irreconcilable schemas.
+        # For dependency analysis, fall back to the resolved ref which has the resource structure.
+        if result is None:
+            return resolved
+        return result
 
     for key, value in schema.items():
         if key in SCHEMA_KEYS:
