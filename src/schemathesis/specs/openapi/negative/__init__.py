@@ -118,6 +118,7 @@ def negative_schema(
     *,
     custom_formats: dict[str, st.SearchStrategy[str]],
     validator_cls: type[jsonschema.Validator],
+    name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
     """A strategy for instances that DO NOT match the input schema.
 
@@ -160,6 +161,7 @@ def negative_schema(
         location=location,
         media_type=media_type,
         allow_extra_parameters=generation_config.allow_extra_parameters,
+        name_to_uri=name_to_uri,
     ).flatmap(generate_value_with_metadata)
 
 
@@ -189,6 +191,7 @@ def mutated(
     location: ParameterLocation,
     media_type: str | None,
     allow_extra_parameters: bool,
+    name_to_uri: dict[str, str] | None = None,
 ) -> Any:
     return MutationContext(
         keywords=keywords,
@@ -196,4 +199,5 @@ def mutated(
         location=location,
         media_type=media_type,
         allow_extra_parameters=allow_extra_parameters,
+        name_to_uri=name_to_uri,
     ).mutate(draw)

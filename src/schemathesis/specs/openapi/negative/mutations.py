@@ -13,7 +13,7 @@ from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 from hypothesis_jsonschema._canonicalise import canonicalish
 
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, unbundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -90,8 +90,10 @@ class MutationContext:
     media_type: str | None
     # Whether generating unexpected parameters is permitted
     allow_extra_parameters: bool
+    # Mapping from bundled schema names to original URIs (for unbundling)
+    name_to_uri: dict[str, str]
 
-    __slots__ = ("keywords", "non_keywords", "location", "media_type", "allow_extra_parameters")
+    __slots__ = ("keywords", "non_keywords", "location", "media_type", "allow_extra_parameters", "name_to_uri")
 
     def __init__(
         self,
@@ -101,12 +103,14 @@ class MutationContext:
         location: ParameterLocation,
         media_type: str | None,
         allow_extra_parameters: bool,
+        name_to_uri: dict[str, str] | None = None,
     ) -> None:
         self.keywords = keywords
         self.non_keywords = non_keywords
         self.location = location
         self.media_type = media_type
         self.allow_extra_parameters = allow_extra_parameters
+        self.name_to_uri = name_to_uri or {}
 
     @property
     def is_path_location(self) -> bool:
@@ -564,7 +568,7 @@ def negate_constraints(
         # Should we negate this key?
         if k == "required":
             return v != []
-        if k in ("example", "examples"):
+        if k in ("example", "examples", BUNDLE_STORAGE_KEY):
             return False
         if ctx.is_path_location and k == "minLength" and v == 1:
             # Empty path parameter will be filtered out
@@ -621,8 +625,9 @@ def negate_constraints(
                 props = ", ".join(f"`{prop}`" for prop in value)
                 descriptions.append(f"`{key}` ({props})")
             else:
-                # Default: show `key` (value) for all constraints
-                descriptions.append(f"`{key}` ({value})")
+                # Unbundle values to show original $ref paths instead of internal bundled ones
+                display_value = unbundle(value, ctx.name_to_uri) if ctx.name_to_uri else value
+                descriptions.append(f"`{key}` ({display_value})")
 
         constraint_desc = ", ".join(descriptions)
         metadata = MutationMetadata(
