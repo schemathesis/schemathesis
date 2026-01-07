@@ -420,6 +420,7 @@ class OpenApiBody(OpenApiComponent):
             self.media_type,
             generation_config,
             operation.schema.adapter.jsonschema_validator_cls,
+            self.name_to_uri,
         )
 
         # Apply hybrid approach when captured variants are available
@@ -730,6 +731,18 @@ class OpenApiParameterSet(ParameterSet):
         assert not isinstance(self._schema, NotSet)
         return self._schema
 
+    @property
+    def name_to_uri(self) -> dict[str, str]:
+        """Combine name_to_uri from all parameters in this set.
+
+        Merging is safe because a single Bundler instance is used for all parameters,
+        so bundled schema names are globally unique with no overlap between parameters.
+        """
+        result: dict[str, str] = {}
+        for item in self.items:
+            result.update(item.name_to_uri)
+        return result
+
     def get_schema_with_exclusions(self, exclude: Iterable[str]) -> dict[str, Any]:
         """Get cached schema with specified parameters excluded."""
         exclude_key = frozenset(exclude)
@@ -826,6 +839,7 @@ class OpenApiParameterSet(ParameterSet):
                 None,
                 generation_config,
                 operation.schema.adapter.jsonschema_validator_cls,
+                self.name_to_uri,
             )
 
             # For negative strategies, we need to handle GeneratedValue wrappers

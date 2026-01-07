@@ -1,4 +1,4 @@
-from .bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX, BundleCache, BundleError, Bundler, bundle
+from .bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX, BundleCache, BundleError, Bundler, bundle, unbundle
 from .keywords import ALL_KEYWORDS
 from .types import get_type
 
@@ -11,4 +11,5 @@ __all__ = [
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",
     "get_type",
+    "unbundle",
 ]

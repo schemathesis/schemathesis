@@ -107,3 +107,76 @@ def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_bundled_ref_in_negative_testing_description(ctx, app_runner, cli, snapshot_cli):
+    # When a request body schema has $ref with multiple definitions, the negative testing (fuzzing)
+    # phase may negate the $ref constraint. The error description should show the original reference
+    # path (e.g., `#/components/schemas/Item`) instead of the internal bundled path (e.g., `#/x-bundled/schema1`).
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {"$ref": "#/components/schemas/Item"},
+                                        {"$ref": "#/components/schemas/Category"},
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            }
+        },
+        version="3.0.2",
+        components={
+            "schemas": {
+                "Item": {
+                    "type": "object",
+                    "required": ["id"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                    },
+                },
+                "Category": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {
+                        "name": {"type": "string"},
+                    },
+                },
+            }
+        },
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        # Accept all requests to trigger negative_data_rejection failures
+        return jsonify({"id": 1}), 201
+
+    port = app_runner.run_flask_app(app)
+
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=negative_data_rejection",
+        "--phases=fuzzing",
+        "--mode=negative",
+        "--max-examples=10",
+    )
+
+    assert "#/x-bundled/" not in result.stdout
+
+    assert result == snapshot_cli
