@@ -71,6 +71,10 @@ def build_hybrid_strategy(
 
     Weights selection to prefer variants that haven't been drawn recently,
     reducing wasted test budget from repeated operations on the same resources.
+
+    Captured variants may be partial (only containing parameters with resource
+    requirements). We merge them with generated values to ensure all required
+    parameters are present.
     """
     from hypothesis import strategies as st
 
@@ -86,10 +90,16 @@ def build_hybrid_strategy(
         if random.random() >= CAPTURED_VALUES_PROBABILITY:
             return draw(original_strategy)
 
+        # Always generate base values first, then overlay captured values.
+        # This ensures parameters without resource requirements (like `file_name`)
+        # still get generated values while resource-linked params use captured data.
+        base = draw(original_strategy)
+
         # Single variant: no selection needed
         if n_variants == 1:
             usage_tracker.record_draw(variant_keys[0])
-            return captured_variants[0]
+            base.update(captured_variants[0])
+            return base
 
         # Shuffle indices before weighted selection to avoid Hypothesis's bias
         # toward early indices when using cumulative probability selection.
@@ -97,7 +107,8 @@ def build_hybrid_strategy(
 
         # Record this draw for future weighting
         usage_tracker.record_draw(variant_keys[idx])
-        return captured_variants[idx]
+        base.update(captured_variants[idx])
+        return base
 
     return hybrid()
 

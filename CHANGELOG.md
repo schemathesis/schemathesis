@@ -13,6 +13,7 @@
 - OpenAPI 3.1 response schemas with conflicting `anyOf` arrays (e.g., different `const` values) causing crashes during dependency analysis.
 - Negative testing error descriptions displaying internal bundled refs like `#/x-bundled/schema1` instead of original refs like `#/components/schemas/Item`.
 - Resource pool lookups failing due to naming mismatch between producer ($ref-based) and consumer (path-based) sides.
+- "Path parameter 'X' is not defined" errors when using captured resource values for endpoints with parameters that have no resource requirements.
 
 ## [4.8.0](https://github.com/schemathesis/schemathesis/compare/v4.7.9...v4.8.0) - 2026-01-05
 
