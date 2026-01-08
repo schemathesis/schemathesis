@@ -59,6 +59,9 @@ if TYPE_CHECKING:
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
+_V3_1 = version.parse("3.1")
+_V3_2 = version.parse("3.2")
+
 
 @dataclass(eq=False, repr=False)
 class OpenApiSchema(BaseSchema):
@@ -83,7 +86,10 @@ class OpenApiSchema(BaseSchema):
         openapi_version = self.raw_schema.get("openapi")
         if openapi_version is not None:
             self._spec_version = openapi_version
-            if openapi_version.startswith("3.1"):
+            parsed_version = version.parse(openapi_version)
+            if parsed_version >= _V3_2:
+                self.adapter = adapter.v3_2
+            elif parsed_version >= _V3_1:
                 self.adapter = adapter.v3_1
             else:
                 self.adapter = adapter.v3_0
@@ -301,7 +307,7 @@ class OpenApiSchema(BaseSchema):
         __tracebackhide__ = True
         paths = self._get_paths()
         if paths is None:
-            if version.parse(self.specification.version) >= version.parse("3.1"):
+            if version.parse(self.specification.version) >= _V3_1:
                 return
             self._raise_invalid_schema(KeyError("paths"))
 
