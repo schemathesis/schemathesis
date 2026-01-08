@@ -200,7 +200,7 @@ class EngineErrorInfo:
             message.extend(f"{indent}{extra}" for extra in extras)
 
         if self._code_sample is not None:
-            message.append(f"\nReproduce with: \n\n    {self._code_sample}")
+            message.append(f"\nReproduce with:\n\n    {self._code_sample}")
 
         # Suggestion
         suggestion = get_runtime_error_suggestion(self._kind, bold=bold)

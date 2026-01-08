@@ -79,7 +79,7 @@ def test_explicit_headers(curl):
 def test_cli_output(cli, base_url, schema_url, curl):
     result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
     lines = result.stdout.splitlines()
-    assert "Reproduce with: " in lines
+    assert "Reproduce with:" in lines
     line = f"    curl -X GET {base_url}/failure"
     assert line in lines
     command = line.strip()
