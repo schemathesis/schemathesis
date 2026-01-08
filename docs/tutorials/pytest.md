@@ -19,7 +19,7 @@ This tutorial shows how to integrate Schemathesis into your `pytest` test suite 
 ```console
 uv venv -p 3.13
 source .venv/bin/activate.fish 
-uv pip install "pytest>=9.0.2" "schemathesis>=4.8.0"
+uv pip install -U pytest schemathesis
 ```
 
 !!! note "Shell differences"
