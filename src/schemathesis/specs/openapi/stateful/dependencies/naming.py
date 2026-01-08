@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+# Generic parameter prefixes that don't identify a specific resource type.
+# When a parameter like "item_id" or "resource_uuid" is detected, the prefix
+# is not meaningful for resource identification, so we fall back to path-based naming.
+GENERIC_PREFIXES = frozenset({"item", "resource", "object", "entity"})
+
 
 def from_parameter(parameter: str, path: str) -> str | None:
     parameter = parameter.strip()
@@ -14,6 +19,10 @@ def from_parameter(parameter: str, path: str) -> str | None:
         if parameter.endswith(suffix):
             prefix = parameter[: -len(suffix)]
             if len(prefix) >= 2:
+                # Generic prefixes like "itemId" should use path context,
+                # but only if this is a path parameter (placeholder exists in path)
+                if prefix.lower() in GENERIC_PREFIXES and f"{{{parameter}}}" in path:
+                    return from_path(path, parameter_name=parameter)
                 return to_pascal_case(prefix)
 
     # Snake_case (case-insensitive is fine here)
@@ -34,6 +43,10 @@ def from_parameter(parameter: str, path: str) -> str | None:
         if lower.endswith(suffix):
             prefix = parameter[: -len(suffix)]
             if len(prefix) >= 2:
+                # Generic prefixes like "item_id" should use path context,
+                # but only if this is a path parameter (placeholder exists in path)
+                if prefix.lower() in GENERIC_PREFIXES and f"{{{parameter}}}" in path:
+                    return from_path(path, parameter_name=parameter)
                 return to_pascal_case(prefix)
 
     # Special cases that need exact match
@@ -42,6 +55,10 @@ def from_parameter(parameter: str, path: str) -> str | None:
         prefix = parameter[:-3]
         if len(prefix) >= 2:
             return to_pascal_case(prefix)
+
+    # Bare "slug" parameter - use path context if it's a path parameter
+    if lower == "slug" and f"{{{parameter}}}" in path:
+        return from_path(path, parameter_name=parameter)
 
     return None
 
