@@ -105,7 +105,7 @@ __________________________ test_api[POST /bookings] ___________________________
   |         ^^^^^^^^^^^^^^^^^^^^^^^^
   |     )
   |     ^
-  |   File ".../schemathesis/generation/case.py", line 459, in validate_response
+  |   File "/schemathesis/generation/case.py", line 459, in validate_response
   |     raise FailureGroup(_failures, message) from None
   | schemathesis.core.failures.FailureGroup: Schemathesis found 2 distinct failures
   |
