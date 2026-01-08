@@ -19,7 +19,7 @@ This tutorial shows how to integrate Schemathesis into your `pytest` test suite 
 ```console
 uv venv -p 3.13
 source .venv/bin/activate.fish 
-uv pip install pytest==8.3.5 schemathesis==4.0.0
+uv pip install -U pytest schemathesis
 ```
 
 !!! note "Shell differences"
@@ -44,8 +44,9 @@ The API lives in the [Schemathesis repository](https://github.com/schemathesis/s
 ```console
 git clone https://github.com/schemathesis/schemathesis.git
 cd schemathesis/examples/booking
-docker compose up -d
+docker compose up -d --build
 ```
+
 !!! success "Verify the API is running"
 
     Open [http://localhost:8080/docs](http://localhost:8080/docs){target=_blank} - you should see the interactive API documentation.
@@ -91,29 +92,29 @@ test_api.py::test_api[GET /health] PASSED
 ================================== FAILURES ===================================
 __________________________ test_api[POST /bookings] ___________________________
 + Exception Group Traceback (most recent call last):
-  |   File "/schemathesis-tutorial/test_api.py", line 10, in test_api
+  |   File "/schemathesis-tutorial/test_api.py", line 11, in test_api
   |     case.call_and_validate(headers={"Authorization": "Bearer secret-token"})
   |     ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |   File "/../schemathesis/generation/case.py", line 185, in call_and_validate
+  |   File "/../schemathesis/generation/case.py", line 493, in call_and_validate
   |     self.validate_response(
   |     ~~~~~~~~~~~~~~~~~~~~~~^
   |         response,
   |         ^^^^^^^^^
   |     ...<4 lines>...
-  |         transport_kwargs=kwargs,
+  |         transport_kwargs=transport_kwargs,
   |         ^^^^^^^^^^^^^^^^^^^^^^^^
   |     )
   |     ^
-  |   File "/schemathesis/generation/case.py", line 171, in validate_response
+  |   File "/schemathesis/generation/case.py", line 459, in validate_response
   |     raise FailureGroup(_failures, message) from None
-  | schemathesis.FailureGroup: Schemathesis found 2 distinct failures
+  | schemathesis.core.failures.FailureGroup: Schemathesis found 2 distinct failures
   |
   | - Server error
   |
   | - Undocumented HTTP status code
   |
   |     Received: 500
-  |     Documented: 200, 422
+  |     Documented: 200, 400, 422
   |
   | [500] Internal Server Error:
   |

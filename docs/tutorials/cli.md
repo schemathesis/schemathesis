@@ -33,9 +33,10 @@ The API lives in the [Schemathesis repository](https://github.com/schemathesis/s
 
 ```console
 git clone https://github.com/schemathesis/schemathesis.git
-cd schemathesis/examples/basic
-docker compose up -d
+cd schemathesis/examples/booking
+docker compose up -d --build
 ```
+
 !!! success "Verify the API is running"
 
     Open [http://localhost:8080/docs](http://localhost:8080/docs){target=_blank} - you should see the interactive API documentation.

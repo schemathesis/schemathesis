@@ -70,7 +70,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     assert failure[0].attrib["type"] == "failure"
     assert (
         extract_message(failure[0], server_host)
-        == "1. Test Case ID: <PLACEHOLDER>  - Server error  - Undocumented Content-Type      Received: text/plain; charset=utf-8     Documented: application/json  [500] Internal Server Error:      `500: Internal Server Error`  Reproduce with:       curl -X GET http://localhost/api/failure"
+        == "1. Test Case ID: <PLACEHOLDER>  - Server error  - Undocumented Content-Type      Received: text/plain; charset=utf-8     Documented: application/json  [500] Internal Server Error:      `500: Internal Server Error`  Reproduce with:      curl -X GET http://localhost/api/failure"
     )
 
     # Inspect passed testcase
@@ -165,7 +165,7 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
     assert testcases[0][0].attrib["type"] == "failure"
     assert (
         extract_message(testcases[0][0], server_host)
-        == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:       curl -X GET http://localhost/api/binary"
+        == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:      curl -X GET http://localhost/api/binary"
     )
 
 

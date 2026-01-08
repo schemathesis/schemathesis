@@ -311,6 +311,6 @@ def format_failures(
 
     # cURL
     _curl = "\n".join(f"    {line}" for line in curl.splitlines())
-    output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with: \n\n{_curl}")
+    output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with:\n\n{_curl}")
 
     return output
