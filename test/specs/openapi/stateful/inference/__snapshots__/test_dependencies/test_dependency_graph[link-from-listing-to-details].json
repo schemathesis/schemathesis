@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Book",
           "status_code": "200"
@@ -23,6 +24,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Note",
           "status_code": "200"

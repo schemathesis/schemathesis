@@ -541,3 +541,31 @@ def strip_affixes(name: str, prefixes: list[str], suffixes: list[str]) -> str:
             break
 
     return result.strip()
+
+
+_HYPHENATED_SCHEMA_SUFFIXES = ("-Output", "-Input", "-Response", "-Request")
+# NOTE: "Response"/"Request" excluded - often wrappers, not variants
+# NOTE: "Summary" excluded - ambiguous (may have different identifier)
+_PASCALCASE_SCHEMA_SUFFIXES = ("Output", "Input", "Out", "In", "DTO", "Dto")
+_MIN_BASE_LENGTH = 2
+
+
+def normalize_schema_name(name: str) -> str:
+    """Normalize schema name by removing common suffixes (-Output, Out, DTO, etc.)."""
+    if not name or len(name) < _MIN_BASE_LENGTH + 2:
+        return name
+
+    for suffix in _HYPHENATED_SCHEMA_SUFFIXES:
+        if name.endswith(suffix):
+            base = name[: -len(suffix)]
+            if len(base) >= _MIN_BASE_LENGTH:
+                return base
+            return name
+
+    for suffix in _PASCALCASE_SCHEMA_SUFFIXES:
+        if name.endswith(suffix) and len(name) > len(suffix):
+            base = name[: -len(suffix)]
+            if len(base) >= _MIN_BASE_LENGTH and base[-1].islower():
+                return base
+
+    return name

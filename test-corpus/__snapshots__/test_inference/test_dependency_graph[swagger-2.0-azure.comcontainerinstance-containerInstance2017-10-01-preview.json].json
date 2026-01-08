@@ -12,6 +12,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ContainerGroup",
           "status_code": "200"
@@ -23,6 +24,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/value",
           "resource": "Operation",
           "status_code": "200"
@@ -41,6 +43,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/value",
           "resource": "ContainerGroup",
           "status_code": "200"
@@ -59,6 +62,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/value",
           "resource": "ContainerGroup",
           "status_code": "200"
@@ -77,6 +81,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ContainerGroup",
           "status_code": "200"
@@ -95,6 +100,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Logs",
           "status_code": "200"
@@ -113,12 +119,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ContainerGroup",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ContainerGroup",
           "status_code": "201"

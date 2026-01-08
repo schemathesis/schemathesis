@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1recipes/post",
+    {
+      "GetRecipe": {
+        "operationRef": "#/paths/~1recipes~1{slug}/get",
+        "parameters": {
+          "path.slug": "$response.body#/"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

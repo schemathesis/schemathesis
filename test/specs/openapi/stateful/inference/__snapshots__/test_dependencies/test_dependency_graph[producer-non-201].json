@@ -16,6 +16,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "User",
           "status_code": "200"

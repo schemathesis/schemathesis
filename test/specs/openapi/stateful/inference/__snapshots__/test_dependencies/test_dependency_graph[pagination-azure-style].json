@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/value",
           "resource": "Group",
           "status_code": "200"
@@ -23,6 +24,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/value",
           "resource": "User",
           "status_code": "200"

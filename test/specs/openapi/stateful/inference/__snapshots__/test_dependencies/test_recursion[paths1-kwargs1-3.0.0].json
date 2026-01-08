@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "EmployeesResponse",
           "status_code": "200"

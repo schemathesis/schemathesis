@@ -225,3 +225,54 @@ def test_to_pascal_case(text, expected):
 )
 def test_strip_affixes(name, prefixes, suffixes, expected):
     assert naming.strip_affixes(name, prefixes, suffixes) == expected
+
+
+@pytest.mark.parametrize(
+    ["name", "expected"],
+    [
+        # Hyphenated suffixes (safest - always normalize)
+        pytest.param("Recipe-Output", "Recipe", id="hyphen-output"),
+        pytest.param("Recipe-Input", "Recipe", id="hyphen-input"),
+        pytest.param("User-Response", "User", id="hyphen-response"),
+        pytest.param("Pet-Request", "Pet", id="hyphen-request"),
+        pytest.param("IngredientFood-Output", "IngredientFood", id="hyphen-compound-name"),
+        # PascalCase short suffixes (Out/In at word boundary)
+        pytest.param("UserOut", "User", id="pascal-out"),
+        pytest.param("UserIn", "User", id="pascal-in"),
+        pytest.param("RecipeOut", "Recipe", id="pascal-out-recipe"),
+        pytest.param("OrderIn", "Order", id="pascal-in-order"),
+        # PascalCase Output/Input suffixes (at word boundary)
+        pytest.param("RecipeOutput", "Recipe", id="pascal-output"),
+        pytest.param("RecipeInput", "Recipe", id="pascal-input"),
+        # PascalCase Response/Request are NOT normalized (often response wrappers)
+        pytest.param("UserResponse", "UserResponse", id="pascal-response-not-normalized"),
+        pytest.param("UserRequest", "UserRequest", id="pascal-request-not-normalized"),
+        pytest.param("CountryResponse", "CountryResponse", id="country-response-wrapper"),
+        # DTO patterns
+        pytest.param("OrderDTO", "Order", id="dto-uppercase"),
+        pytest.param("OrderDto", "Order", id="dto-titlecase"),
+        pytest.param("UserDTO", "User", id="dto-user"),
+        # Should NOT normalize - name is too short
+        pytest.param("Output", "Output", id="just-output"),
+        pytest.param("Input", "Input", id="just-input"),
+        pytest.param("In", "In", id="just-in"),
+        pytest.param("Out", "Out", id="just-out"),
+        pytest.param("A-Output", "A-Output", id="single-char-base"),
+        # Should NOT normalize - suffix is part of word (lowercase before suffix)
+        pytest.param("Timeout", "Timeout", id="timeout-word"),
+        pytest.param("Within", "Within", id="within-word"),
+        pytest.param("Scout", "Scout", id="scout-word"),
+        pytest.param("Spin", "Spin", id="spin-word"),
+        pytest.param("Login", "Login", id="login-word"),
+        pytest.param("Logout", "Logout", id="logout-word"),
+        # Edge cases - PascalCase word boundary detection
+        pytest.param("AudioOutput", "Audio", id="audio-output"),
+        pytest.param("DataInput", "Data", id="data-input"),
+        # Empty and short strings
+        pytest.param("", "", id="empty"),
+        pytest.param("X", "X", id="single-char"),
+        pytest.param("AB", "AB", id="two-chars"),
+    ],
+)
+def test_normalize_schema_name(name, expected):
+    assert naming.normalize_schema_name(name) == expected

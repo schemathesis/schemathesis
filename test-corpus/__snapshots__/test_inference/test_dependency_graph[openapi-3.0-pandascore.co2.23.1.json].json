@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "NonDeletionIncident",
           "status_code": "200"
@@ -16,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Incident",
           "status_code": "200"
@@ -27,6 +29,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeletionIncident",
           "status_code": "200"
@@ -38,6 +41,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Incident",
           "status_code": "200"
@@ -49,6 +53,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
@@ -67,12 +72,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "LeagueVideogame",
           "status_code": "200"
@@ -91,6 +98,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -109,6 +117,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -127,6 +136,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -145,6 +155,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -163,6 +174,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -181,6 +193,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -192,6 +205,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Live",
           "status_code": "200"
@@ -203,6 +217,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -214,6 +229,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -225,6 +241,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -236,6 +253,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -254,42 +272,49 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/league",
           "resource": "BaseLeague",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/live",
           "resource": "MatchLive",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/serie",
           "resource": "BaseSerie",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/streams",
           "resource": "MatchLocalizedStreams",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/tournament",
           "resource": "BaseTournament",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "CurrentVideogame",
           "status_code": "200"
@@ -308,6 +333,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "MatchTeamOpponentsObject",
           "status_code": "200"
@@ -319,6 +345,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
           "status_code": "200"
@@ -337,6 +364,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
           "status_code": "200"
@@ -355,6 +383,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -366,6 +395,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -377,6 +407,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -388,6 +419,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -399,6 +431,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -417,18 +450,21 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/league",
           "resource": "BaseLeague",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "CurrentVideogame",
           "status_code": "200"
@@ -447,6 +483,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -465,6 +502,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -483,6 +521,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -501,6 +540,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -519,6 +559,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
           "status_code": "200"
@@ -537,6 +578,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -548,6 +590,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
           "status_code": "200"
@@ -566,6 +609,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
           "status_code": "200"
@@ -584,6 +628,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
@@ -602,6 +647,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -620,6 +666,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -638,6 +685,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -649,6 +697,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -660,6 +709,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -671,6 +721,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -682,6 +733,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -700,24 +752,28 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Tournament",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/league",
           "resource": "BaseLeague",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/serie",
           "resource": "BaseSerie",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "CurrentVideogame",
           "status_code": "200"
@@ -736,6 +792,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Bracket",
           "status_code": "200"
@@ -754,6 +811,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
@@ -772,6 +830,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
           "status_code": "200"
@@ -790,6 +849,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TournamentTeamRosters",
           "status_code": "200"
@@ -808,6 +868,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Standing",
           "status_code": "200"
@@ -826,6 +887,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
           "status_code": "200"
@@ -837,6 +899,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Videogame",
           "status_code": "200"
@@ -855,6 +918,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Videogame_LoL",
           "status_code": "200"
@@ -873,6 +937,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
@@ -891,6 +956,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
@@ -909,6 +975,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
@@ -927,6 +994,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortVideogameVersion",
           "status_code": "200"

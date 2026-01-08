@@ -1596,6 +1596,32 @@ def snapshot_json(snapshot):
             },
             id="slug-suffix-field-matching",
         ),
+        # POST returns bare string identifier - like Mealie POST /api/recipes returning slug
+        pytest.param(
+            {
+                **operation("post", "/recipes", "201", {"type": "string"}),
+                **operation(
+                    "get",
+                    "/recipes/{slug}",
+                    "200",
+                    component_ref("Recipe"),
+                    [path_param("slug")],
+                ),
+            },
+            {
+                "schemas": {
+                    "Recipe": {
+                        "type": "object",
+                        "properties": {
+                            "slug": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["slug"],
+                    },
+                }
+            },
+            id="post-returns-string-identifier",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):
