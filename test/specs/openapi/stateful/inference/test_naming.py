@@ -28,6 +28,19 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("_id", "/users/{_id}", None),
         ("uid", "/users/{uid}", None),
         ("someRandom", "/users/{someRandom}", None),
+        # Generic prefixes - should use path context when it's a path parameter
+        ("item_id", "/api/groups/{item_id}", "Group"),
+        ("resource_id", "/api/users/{resource_id}", "User"),
+        ("object_uuid", "/api/pets/{object_uuid}", "Pet"),
+        ("entity-guid", "/api/orders/{entity-guid}", "Order"),
+        # Bare slug - should use path context when it's a path parameter
+        ("slug", "/api/recipes/{slug}", "Recipe"),
+        # Non-generic prefixes - should still extract from parameter name
+        ("user_id", "/api/members/{user_id}", "User"),
+        ("recipe_slug", "/api/items/{recipe_slug}", "Recipe"),
+        # Generic prefixes for query params - should NOT use path context (no placeholder in path)
+        ("item_id", "/api/groups", "Item"),
+        ("itemId", "/items/search", "Item"),
     ],
 )
 def test_from_parameter(parameter, path, expected):
