@@ -315,4 +315,4 @@ def _load_yaml(content: str) -> dict[str, Any]:
 
 SCHEMA_INVALID_ERROR = "The provided API schema does not appear to be a valid OpenAPI schema"
 SCHEMA_SYNTAX_ERROR = "API schema does not appear syntactically valid"
-OPENAPI_VERSION_RE = re.compile(r"^3\.[01]\.[0-9](-.+)?$")
+OPENAPI_VERSION_RE = re.compile(r"^3\.[0-2]\.[0-9]+(-.+)?$")

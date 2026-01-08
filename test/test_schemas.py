@@ -1,5 +1,6 @@
 import platform
 
+import jsonschema
 import pytest
 import requests
 
@@ -9,7 +10,9 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
+from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi._operation_lookup import OperationLookup
+from schemathesis.specs.openapi.adapter import validators
 
 
 @pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
@@ -184,6 +187,75 @@ def test_operation_lookup_without_paths_on_openapi_3_1():
     schema = schemathesis.openapi.from_dict(raw_schema)
     with pytest.raises(OperationNotFound, match="/users"):
         schema["/users"]
+
+
+def test_openapi_3_2():
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+        "paths": {},
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    assert schema.adapter is adapter.v3_2
+    assert schema.specification.name == "Open API 3.2.0"
+    assert schema.specification.version == "3.2.0"
+
+
+def test_no_paths_on_openapi_3_2():
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    assert list(schema.get_all_operations()) == []
+
+
+def test_openapi_3_2_smoke():
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 1
+    assert operations[0].ok().path == "/users"
+    assert operations[0].ok().method == "get"
+
+
+@pytest.mark.parametrize(
+    ("version", "invalid_schema", "expected_error"),
+    [
+        ("3.0.0", {"openapi": "3.0.0"}, "'info' is a required property"),
+        ("3.1.0", {"openapi": "3.1.0"}, "'info' is a required property"),
+        ("3.2.0", {"openapi": "3.2.0"}, "'info' is a required property"),
+    ],
+    ids=["openapi-3.0", "openapi-3.1", "openapi-3.2"],
+)
+def test_validate_v3_rejects_invalid_schema(version, invalid_schema, expected_error):
+    with pytest.raises(jsonschema.ValidationError, match=expected_error):
+        validators.validate_v3(invalid_schema)
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["3.0.0", "3.1.0", "3.2.0"],
+    ids=["openapi-3.0", "openapi-3.1", "openapi-3.2"],
+)
+def test_validate_v3_accepts_valid_schema(version):
+    raw_schema = {
+        "openapi": version,
+        "info": {"title": "Test", "version": "0.1.0"},
+        "paths": {},
+    }
+    # Should not raise
+    validators.validate_v3(raw_schema)
 
 
 def test_schema_error_on_path(simple_schema):
