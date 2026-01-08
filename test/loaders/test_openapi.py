@@ -32,7 +32,7 @@ def test_openapi_wsgi_loader(flask_app, run_test):
 @pytest.mark.parametrize(
     ("version", "expected"),
     [
-        ("3.2.0", "The provided schema uses Open API 3.2.0, which is currently not supported."),
+        ("4.0.0", "The provided schema uses Open API 4.0.0, which is currently not supported."),
     ],
 )
 def test_unsupported_openapi_version(version, expected):

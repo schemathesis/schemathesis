@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- OpenAPI 3.2 support.
 - NDJSON report format (`--report=ndjson`) for exporting all engine events as newline-delimited JSON.
 
 ### :bug: Fixed
