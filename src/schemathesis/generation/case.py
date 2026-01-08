@@ -375,7 +375,7 @@ class Case:
             verify = kwargs.get("verify", True)
             try:
                 curl = self.as_curl_command(headers=headers, verify=verify)
-                exc.__notes__.append(f"\nReproduce with: \n\n    {curl}")  # type: ignore[attr-defined]
+                exc.__notes__.append(f"\nReproduce with:\n\n    {curl}")  # type: ignore[attr-defined]
             except Exception:
                 # Curl generation can fail for the same reason as the original error
                 # (e.g., malformed path template). Skip adding curl command to avoid

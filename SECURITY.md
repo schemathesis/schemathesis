@@ -5,7 +5,7 @@
 Schemathesis provides security updates only for the latest minor version within the 4.x series.
 
 | Version | Supported          |
-| ------- | ------------------ |
+|---------|--------------------|
 | 4.x     | :white_check_mark: |
 | < 4.0   | :x:                |
 
