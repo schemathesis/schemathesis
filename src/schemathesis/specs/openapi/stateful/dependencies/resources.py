@@ -33,7 +33,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.responses import OpenApiResponse
 
 
-@dataclass
+@dataclass(slots=True)
 class ExtractedResource:
     """How a resource was extracted from a response."""
 
@@ -42,8 +42,8 @@ class ExtractedResource:
     pointer: str
     # Is this a single resource or an array?
     cardinality: Cardinality
-
-    __slots__ = ("resource", "pointer", "cardinality")
+    # True when response is a primitive value (string/number) that IS the identifier
+    is_primitive_identifier: bool = False
 
 
 def extract_resources_from_responses(
@@ -62,6 +62,7 @@ def extract_resources_from_responses(
     """
     for response in operation.responses.iter_successful_responses():
         for extracted in iter_resources_from_response(
+            method=operation.method,
             path=operation.path,
             response=response,
             resources=resources,
@@ -74,6 +75,7 @@ def extract_resources_from_responses(
 
 def iter_resources_from_response(
     *,
+    method: str,
     path: str,
     response: OpenApiResponse,
     resources: ResourceMap,
@@ -91,6 +93,16 @@ def iter_resources_from_response(
     elif not isinstance(schema, dict):
         # Ignore invalid schemas
         return None
+
+    # Handle primitive responses from POST/PUT operations as resource identifiers.
+    # Example: POST /api/recipes returns just a slug string - treat this as Recipe.slug
+    # Example: POST /api/users returns just an integer ID - treat this as User.id
+    schema_type = schema.get("type")
+    if schema_type in ("string", "integer") and method in ("post", "put"):
+        primitive_resource = _resource_from_primitive_response(path=path, resources=resources)
+        if primitive_resource is not None:
+            yield primitive_resource
+            return None
 
     # Push the response's scope so all nested $refs are resolved relative to the response's location
     resolver.push_scope(response.scope)
@@ -219,6 +231,27 @@ def _resource_from_boolean_schema(*, path: str, resources: ResourceMap) -> Extra
         resources[name] = resource
     # Do not update existing resource as if it is inferred, it will have at least one field
     return ExtractedResource(resource=resource, cardinality=Cardinality.ONE, pointer=ROOT_POINTER)
+
+
+def _resource_from_primitive_response(*, path: str, resources: ResourceMap) -> ExtractedResource | None:
+    """Handle POST/PUT returning a bare primitive identifier (e.g., slug string or integer ID)."""
+    name = from_path(path)
+    if name is None:
+        return None
+
+    resource = resources.get(name)
+    if resource is None:
+        resource = ResourceDefinition.inferred_from_parameter(name=name, parameter_name="id")
+        resources[name] = resource
+    elif not resource.fields:
+        resource.fields = ["id"]
+
+    return ExtractedResource(
+        resource=resource,
+        cardinality=Cardinality.ONE,
+        pointer=ROOT_POINTER,
+        is_primitive_identifier=True,
+    )
 
 
 def _extract_resource_and_cardinality(

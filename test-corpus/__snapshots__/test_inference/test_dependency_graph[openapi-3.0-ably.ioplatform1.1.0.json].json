@@ -50,6 +50,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ChannelDetails",
           "status_code": "2XX"
@@ -68,12 +69,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ChannelDetails",
           "status_code": "200"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/status",
           "resource": "ChannelStatus",
           "status_code": "200"
@@ -92,6 +95,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Message",
           "status_code": "2XX"
@@ -122,6 +126,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PresenceMessage",
           "status_code": "200"
@@ -140,6 +145,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PresenceMessage",
           "status_code": "2XX"
@@ -164,12 +170,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
@@ -198,12 +206,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
@@ -222,12 +232,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
@@ -246,12 +258,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
@@ -263,6 +277,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Stat",
           "status_code": "2XX"
@@ -297,12 +312,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
@@ -339,6 +356,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Message",
           "status_code": "2XX"
@@ -350,6 +368,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TokenDetails",
           "status_code": "2XX"
@@ -378,12 +397,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
@@ -418,12 +439,14 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
           "status_code": "2XX"
         },
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"

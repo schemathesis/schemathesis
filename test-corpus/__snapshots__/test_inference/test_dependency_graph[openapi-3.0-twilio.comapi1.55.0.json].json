@@ -465,6 +465,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Accounts.json",
           "status_code": "200"
@@ -483,6 +484,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Addresses.json",
           "status_code": "200"
@@ -507,6 +509,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DependentPhoneNumbers.json",
           "status_code": "200"
@@ -525,6 +528,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.address",
           "status_code": "200"
@@ -543,6 +547,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Applications.json",
           "status_code": "200"
@@ -561,6 +566,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.application",
           "status_code": "200"
@@ -579,6 +585,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AuthorizedConnectApps.json",
           "status_code": "200"
@@ -603,6 +610,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.authorized_connect_app",
           "status_code": "200"
@@ -621,6 +629,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AvailablePhoneNumbers.json",
           "status_code": "200"
@@ -639,6 +648,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.available_phone_number_country",
           "status_code": "200"
@@ -657,6 +667,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Local.json",
           "status_code": "200"
@@ -675,6 +686,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "MachineToMachine.json",
           "status_code": "200"
@@ -693,6 +705,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Mobile.json",
           "status_code": "200"
@@ -711,6 +724,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "National.json",
           "status_code": "200"
@@ -729,6 +743,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "SharedCost.json",
           "status_code": "200"
@@ -747,6 +762,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TollFree.json",
           "status_code": "200"
@@ -765,6 +781,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Voip.json",
           "status_code": "200"
@@ -783,6 +800,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.balance",
           "status_code": "200"
@@ -807,6 +825,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Calls.json",
           "status_code": "200"
@@ -831,6 +850,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Events.json",
           "status_code": "200"
@@ -855,6 +875,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Notifications.json",
           "status_code": "200"
@@ -879,6 +900,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_notification-instance",
           "status_code": "200"
@@ -903,6 +925,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
           "status_code": "200"
@@ -927,6 +950,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_recording",
           "status_code": "200"
@@ -945,6 +969,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call",
           "status_code": "200"
@@ -963,6 +988,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Conferences.json",
           "status_code": "200"
@@ -987,6 +1013,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Participants.json",
           "status_code": "200"
@@ -1017,6 +1044,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.participant",
           "status_code": "200"
@@ -1041,6 +1069,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
           "status_code": "200"
@@ -1065,6 +1094,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.conference_recording",
           "status_code": "200"
@@ -1083,6 +1113,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference",
           "status_code": "200"
@@ -1101,6 +1132,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ConnectApps.json",
           "status_code": "200"
@@ -1119,6 +1151,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.connect_app",
           "status_code": "200"
@@ -1137,6 +1170,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IncomingPhoneNumbers.json",
           "status_code": "200"
@@ -1155,6 +1189,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Local.json",
           "status_code": "200"
@@ -1173,6 +1208,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Mobile.json",
           "status_code": "200"
@@ -1191,6 +1227,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TollFree.json",
           "status_code": "200"
@@ -1215,6 +1252,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AssignedAddOns.json",
           "status_code": "200"
@@ -1245,6 +1283,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Extensions.json",
           "status_code": "200"
@@ -1275,6 +1314,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension",
           "status_code": "200"
@@ -1299,6 +1339,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
           "status_code": "200"
@@ -1317,6 +1358,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number",
           "status_code": "200"
@@ -1335,6 +1377,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Keys.json",
           "status_code": "200"
@@ -1353,6 +1396,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.key",
           "status_code": "200"
@@ -1371,6 +1415,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Messages.json",
           "status_code": "200"
@@ -1395,6 +1440,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Media.json",
           "status_code": "200"
@@ -1419,6 +1465,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message.media",
           "status_code": "200"
@@ -1437,6 +1484,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message",
           "status_code": "200"
@@ -1455,6 +1503,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Notifications.json",
           "status_code": "200"
@@ -1473,6 +1522,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.notification-instance",
           "status_code": "200"
@@ -1491,6 +1541,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "OutgoingCallerIds.json",
           "status_code": "200"
@@ -1509,6 +1560,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.outgoing_caller_id",
           "status_code": "200"
@@ -1527,6 +1579,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Queues.json",
           "status_code": "200"
@@ -1551,6 +1604,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Members.json",
           "status_code": "200"
@@ -1581,6 +1635,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue.member",
           "status_code": "200"
@@ -1599,6 +1654,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue",
           "status_code": "200"
@@ -1629,6 +1685,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
           "status_code": "200"
@@ -1653,6 +1710,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Transcriptions.json",
           "status_code": "200"
@@ -1677,6 +1735,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording.recording_transcription",
           "status_code": "200"
@@ -1701,6 +1760,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AddOnResults.json",
           "status_code": "200"
@@ -1731,6 +1791,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Payloads.json",
           "status_code": "200"
@@ -1761,6 +1822,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload",
           "status_code": "200"
@@ -1785,6 +1847,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording.recording_add_on_result",
           "status_code": "200"
@@ -1803,6 +1866,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording",
           "status_code": "200"
@@ -1821,6 +1885,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialLists.json",
           "status_code": "200"
@@ -1845,6 +1910,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Credentials.json",
           "status_code": "200"
@@ -1869,6 +1935,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
           "status_code": "200"
@@ -1887,6 +1954,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list",
           "status_code": "200"
@@ -1905,6 +1973,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Domains.json",
           "status_code": "200"
@@ -1929,6 +1998,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
           "status_code": "200"
@@ -1953,6 +2023,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
           "status_code": "200"
@@ -1977,6 +2048,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlListMappings.json",
           "status_code": "200"
@@ -2001,6 +2073,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
           "status_code": "200"
@@ -2025,6 +2098,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
           "status_code": "200"
@@ -2049,6 +2123,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
           "status_code": "200"
@@ -2073,6 +2148,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
           "status_code": "200"
@@ -2097,6 +2173,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
           "status_code": "200"
@@ -2121,6 +2198,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlListMappings.json",
           "status_code": "200"
@@ -2145,6 +2223,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
           "status_code": "200"
@@ -2163,6 +2242,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
           "status_code": "200"
@@ -2181,6 +2261,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlLists.json",
           "status_code": "200"
@@ -2205,6 +2286,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAddresses.json",
           "status_code": "200"
@@ -2229,6 +2311,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
           "status_code": "200"
@@ -2247,6 +2330,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
           "status_code": "200"
@@ -2265,6 +2349,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortCodes.json",
           "status_code": "200"
@@ -2283,6 +2368,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.short_code",
           "status_code": "200"
@@ -2301,6 +2387,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "SigningKeys.json",
           "status_code": "200"
@@ -2319,6 +2406,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.signing_key",
           "status_code": "200"
@@ -2337,6 +2425,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Transcriptions.json",
           "status_code": "200"
@@ -2355,6 +2444,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.transcription",
           "status_code": "200"
@@ -2373,6 +2463,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Records.json",
           "status_code": "200"
@@ -2391,6 +2482,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AllTime.json",
           "status_code": "200"
@@ -2409,6 +2501,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Daily.json",
           "status_code": "200"
@@ -2427,6 +2520,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "LastMonth.json",
           "status_code": "200"
@@ -2445,6 +2539,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Monthly.json",
           "status_code": "200"
@@ -2463,6 +2558,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ThisMonth.json",
           "status_code": "200"
@@ -2481,6 +2577,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Today.json",
           "status_code": "200"
@@ -2499,6 +2596,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Yearly.json",
           "status_code": "200"
@@ -2517,6 +2615,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Yesterday.json",
           "status_code": "200"
@@ -2535,6 +2634,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Triggers.json",
           "status_code": "200"
@@ -2553,6 +2653,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.usage.usage_trigger",
           "status_code": "200"
@@ -2564,6 +2665,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account",
           "status_code": "200"
@@ -2575,6 +2677,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Healthcheck",
           "status_code": "200"
@@ -2586,6 +2689,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account",
           "status_code": "201"
@@ -2604,6 +2708,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.address",
           "status_code": "201"
@@ -2622,6 +2727,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.address",
           "status_code": "200"
@@ -2640,6 +2746,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.application",
           "status_code": "201"
@@ -2658,6 +2765,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.application",
           "status_code": "200"
@@ -2676,6 +2784,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call",
           "status_code": "201"
@@ -2700,6 +2809,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.payments",
           "status_code": "201"
@@ -2724,6 +2834,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.payments",
           "status_code": "202"
@@ -2748,6 +2859,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_recording",
           "status_code": "201"
@@ -2772,6 +2884,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_recording",
           "status_code": "200"
@@ -2796,6 +2909,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.siprec",
           "status_code": "201"
@@ -2820,6 +2934,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.siprec",
           "status_code": "200"
@@ -2844,6 +2959,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.stream",
           "status_code": "201"
@@ -2868,6 +2984,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.stream",
           "status_code": "200"
@@ -2892,6 +3009,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.user_defined_message_subscription",
           "status_code": "201"
@@ -2916,6 +3034,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.user_defined_message",
           "status_code": "201"
@@ -2934,6 +3053,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call",
           "status_code": "200"
@@ -2958,6 +3078,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.participant",
           "status_code": "201"
@@ -2988,6 +3109,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.participant",
           "status_code": "200"
@@ -3012,6 +3134,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.conference_recording",
           "status_code": "200"
@@ -3030,6 +3153,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference",
           "status_code": "200"
@@ -3048,6 +3172,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.connect_app",
           "status_code": "200"
@@ -3066,6 +3191,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number",
           "status_code": "201"
@@ -3084,6 +3210,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_local",
           "status_code": "201"
@@ -3102,6 +3229,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile",
           "status_code": "201"
@@ -3120,6 +3248,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free",
           "status_code": "201"
@@ -3144,6 +3273,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
           "status_code": "201"
@@ -3162,6 +3292,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number",
           "status_code": "200"
@@ -3180,6 +3311,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.new_key",
           "status_code": "201"
@@ -3198,6 +3330,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.key",
           "status_code": "200"
@@ -3216,6 +3349,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message",
           "status_code": "201"
@@ -3240,6 +3374,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message.message_feedback",
           "status_code": "201"
@@ -3258,6 +3393,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message",
           "status_code": "200"
@@ -3276,6 +3412,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.validation_request",
           "status_code": "201"
@@ -3294,6 +3431,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.outgoing_caller_id",
           "status_code": "200"
@@ -3312,6 +3450,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue",
           "status_code": "201"
@@ -3342,6 +3481,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue.member",
           "status_code": "200"
@@ -3360,6 +3500,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue",
           "status_code": "200"
@@ -3378,6 +3519,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list",
           "status_code": "201"
@@ -3402,6 +3544,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
           "status_code": "201"
@@ -3426,6 +3569,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
           "status_code": "200"
@@ -3444,6 +3588,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list",
           "status_code": "200"
@@ -3462,6 +3607,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
           "status_code": "201"
@@ -3486,6 +3632,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
           "status_code": "201"
@@ -3510,6 +3657,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
           "status_code": "201"
@@ -3534,6 +3682,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
           "status_code": "201"
@@ -3558,6 +3707,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
           "status_code": "201"
@@ -3582,6 +3732,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
           "status_code": "201"
@@ -3600,6 +3751,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
           "status_code": "200"
@@ -3618,6 +3770,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
           "status_code": "201"
@@ -3642,6 +3795,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
           "status_code": "201"
@@ -3666,6 +3820,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
           "status_code": "200"
@@ -3684,6 +3839,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
           "status_code": "200"
@@ -3702,6 +3858,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.short_code",
           "status_code": "200"
@@ -3720,6 +3877,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.new_signing_key",
           "status_code": "201"
@@ -3738,6 +3896,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.signing_key",
           "status_code": "200"
@@ -3756,6 +3915,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.token",
           "status_code": "201"
@@ -3774,6 +3934,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.usage.usage_trigger",
           "status_code": "201"
@@ -3792,6 +3953,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.usage.usage_trigger",
           "status_code": "200"
@@ -3803,6 +3965,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account",
           "status_code": "200"

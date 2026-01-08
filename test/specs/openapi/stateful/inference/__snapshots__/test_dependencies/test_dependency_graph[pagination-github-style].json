@@ -16,6 +16,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/runner_groups",
           "resource": "RunnerGroup",
           "status_code": "200"

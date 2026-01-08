@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/Merchants",
           "resource": "Merchant",
           "status_code": "200"

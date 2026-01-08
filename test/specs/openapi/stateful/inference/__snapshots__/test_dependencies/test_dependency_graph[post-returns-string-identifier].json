@@ -1,12 +1,12 @@
 {
   "operations": {
-    "GET /users/{userId}/posts": {
+    "GET /recipes/{slug}": {
       "inputs": [
         {
           "parameter_location": "path",
-          "parameter_name": "userId",
-          "resource": "User",
-          "resource_field": "id"
+          "parameter_name": "slug",
+          "resource": "Recipe",
+          "resource_field": "slug"
         }
       ],
       "outputs": [
@@ -14,41 +14,35 @@
           "cardinality": "ONE",
           "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "Post",
+          "resource": "Recipe",
           "status_code": "200"
         }
       ]
     },
-    "POST /users": {
+    "POST /recipes": {
       "inputs": [],
       "outputs": [
         {
           "cardinality": "ONE",
-          "is_primitive_identifier": false,
+          "is_primitive_identifier": true,
           "pointer": "/",
-          "resource": "User",
+          "resource": "Recipe",
           "status_code": "201"
         }
       ]
     }
   },
   "resources": {
-    "Post": {
+    "Recipe": {
       "fields": [
-        "id"
+        "name",
+        "slug"
       ],
       "types": {
-        "id": [
+        "name": [
           "string"
-        ]
-      }
-    },
-    "User": {
-      "fields": [
-        "id"
-      ],
-      "types": {
-        "id": [
+        ],
+        "slug": [
           "string"
         ]
       }

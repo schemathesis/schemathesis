@@ -614,3 +614,173 @@ def test_negative_aware_strategy_with_captured_values_body(ctx):
     collect_samples()
 
     assert all(isinstance(r, GeneratedValue) for r in results)
+
+
+def test_primitive_identifier_extraction(ctx):
+    recipe_schema = {
+        "type": "object",
+        "properties": {"slug": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["slug"],
+    }
+    spec = ctx.openapi.build_schema(
+        {
+            "/recipes": {
+                "post": {
+                    "operationId": "createRecipe",
+                    "responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}},
+                }
+            },
+            "/recipes/{slug}": {
+                "get": {
+                    "operationId": "getRecipe",
+                    "parameters": [{"name": "slug", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": recipe_schema}}}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /recipes", status_code=201, payload="my-recipe-slug")
+
+    resources = list(data_source.repository.iter_instances("Recipe"))
+    assert len(resources) == 1
+    assert resources[0].data == {"slug": "my-recipe-slug"}
+
+    get_operation = schema["/recipes/{slug}"]["GET"]
+    path_schema = get_operation.path_parameters.schema
+    variants = data_source.get_captured_variants(
+        operation=get_operation, location=ParameterLocation.PATH, schema=path_schema
+    )
+    assert variants == [{"slug": "my-recipe-slug"}]
+
+
+def test_primitive_identifier_adds_field_to_empty_resource(ctx):
+    # GET with empty object schema creates Item with no fields, POST adds "id"
+    spec = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {"responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}}},
+                "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}},
+            },
+            "/items/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+
+    # Verify resource has "id" field added by POST
+    graph = schema.analysis.dependency_graph
+    assert "id" in graph.resources["Item"].fields
+
+    # Verify primitive capture works
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload="item-123")
+
+    resources = list(data_source.repository.iter_instances("Item"))
+    assert len(resources) == 1
+    assert resources[0].data == {"id": "item-123"}
+
+
+def test_primitive_response_ignored_for_root_path(ctx):
+    # POST at "/" can't derive resource name, should produce no outputs
+    spec = ctx.openapi.build_schema(
+        {"/": {"post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}}}
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+
+    # Verify no outputs for POST / in dependency graph
+    graph = schema.analysis.dependency_graph
+    operation = graph.operations.get("POST /")
+    assert operation is None or operation.outputs == []
+
+
+def test_identifier_field_fallback_when_paths_differ(ctx):
+    # Producer at /recipes, consumer at /admin/recipes/{slug} - different base paths
+    spec = ctx.openapi.build_schema(
+        {
+            "/recipes": {
+                "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}
+            },
+            "/admin/recipes/{slug}": {
+                "get": {
+                    "parameters": [{"name": "slug", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"slug": {"type": "string"}}}
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /recipes", status_code=201, payload="my-recipe")
+
+    # Should use "slug" from fallback (first consumer's field)
+    resources = list(data_source.repository.iter_instances("Recipe"))
+    assert len(resources) == 1
+    assert resources[0].data == {"slug": "my-recipe"}
+
+
+def test_identifier_field_defaults_to_id_when_no_consumer(ctx):
+    # POST /recipes with no consumer - falls back to "id"
+    spec = ctx.openapi.build_schema(
+        {
+            "/recipes": {
+                "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /recipes", status_code=201, payload="my-recipe")
+
+    resources = list(data_source.repository.iter_instances("Recipe"))
+    assert len(resources) == 1
+    assert resources[0].data == {"id": "my-recipe"}
+
+
+def test_primitive_integer_identifier(ctx):
+    # POST returning integer ID
+    spec = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "integer"}}}}}}
+            },
+            "/users/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "integer"}}}
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /users", status_code=201, payload=12345)
+
+    resources = list(data_source.repository.iter_instances("User"))
+    assert len(resources) == 1
+    assert resources[0].data == {"id": 12345}

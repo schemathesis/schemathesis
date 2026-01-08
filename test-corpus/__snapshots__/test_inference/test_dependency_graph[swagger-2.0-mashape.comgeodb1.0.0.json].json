@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -23,6 +24,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PopulatedPlaceResponse",
           "status_code": "200"
@@ -41,6 +43,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -59,6 +62,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -70,6 +74,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -88,6 +93,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PopulatedPlaceResponse",
           "status_code": "200"
@@ -106,6 +112,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DateTimeResponse",
           "status_code": "200"
@@ -130,6 +137,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DistanceResponse",
           "status_code": "200"
@@ -148,6 +156,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PopulatedPlaceResponse",
           "status_code": "200"
@@ -166,6 +175,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -184,6 +194,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TimeResponse",
           "status_code": "200"
@@ -195,6 +206,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "CountrySummary",
           "status_code": "200"
@@ -213,6 +225,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CountryResponse",
           "status_code": "200"
@@ -231,6 +244,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "RegionSummary",
           "status_code": "200"
@@ -249,6 +263,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "RegionResponse",
           "status_code": "200"
@@ -267,6 +282,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -285,6 +301,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -303,6 +320,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -321,6 +339,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"
@@ -339,6 +358,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "Currency",
           "status_code": "200"
@@ -350,6 +370,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "LanguageDescriptor",
           "status_code": "200"
@@ -361,6 +382,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "Locale",
           "status_code": "200"
@@ -372,6 +394,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "TimeZoneDescriptor",
           "status_code": "200"
@@ -390,6 +413,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TimeZoneResponse",
           "status_code": "200"
@@ -408,6 +432,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DateTimeResponse",
           "status_code": "200"
@@ -426,6 +451,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TimeResponse",
           "status_code": "200"

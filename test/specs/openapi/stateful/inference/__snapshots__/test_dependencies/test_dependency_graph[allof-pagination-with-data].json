@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "PopulatedPlaceSummary",
           "status_code": "200"

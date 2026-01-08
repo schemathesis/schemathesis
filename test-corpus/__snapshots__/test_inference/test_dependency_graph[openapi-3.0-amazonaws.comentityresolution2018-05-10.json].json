@@ -5,8 +5,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "DeleteMatchingWorkflowOutput",
+          "resource": "DeleteMatchingWorkflow",
           "status_code": "200"
         }
       ]
@@ -16,8 +17,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "DeleteSchemaMappingOutput",
+          "resource": "DeleteSchemaMapping",
           "status_code": "200"
         }
       ]
@@ -27,8 +29,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "UntagResourceOutput",
+          "resource": "UntagResource",
           "status_code": "200"
         }
       ]
@@ -38,8 +41,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "ListMatchingWorkflowsOutput",
+          "resource": "ListMatchingWorkflows",
           "status_code": "200"
         }
       ]
@@ -49,8 +53,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "GetMatchingWorkflowOutput",
+          "resource": "GetMatchingWorkflow",
           "status_code": "200"
         }
       ]
@@ -60,6 +65,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/jobs",
           "resource": "JobSummary",
           "status_code": "200"
@@ -71,15 +77,16 @@
         {
           "parameter_location": "path",
           "parameter_name": "jobId",
-          "resource": "StartMatchingJobOutput",
+          "resource": "StartMatchingJob",
           "resource_field": "jobId"
         }
       ],
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "GetMatchingJobOutput",
+          "resource": "GetMatchingJob",
           "status_code": "200"
         }
       ]
@@ -89,8 +96,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "ListSchemaMappingsOutput",
+          "resource": "ListSchemaMappings",
           "status_code": "200"
         }
       ]
@@ -100,8 +108,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "GetSchemaMappingOutput",
+          "resource": "GetSchemaMapping",
           "status_code": "200"
         }
       ]
@@ -111,6 +120,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/tags",
           "resource": "TagMap",
           "status_code": "200"
@@ -122,8 +132,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "CreateMatchingWorkflowOutput",
+          "resource": "CreateMatchingWorkflow",
           "status_code": "200"
         }
       ]
@@ -133,8 +144,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "StartMatchingJobOutput",
+          "resource": "StartMatchingJob",
           "status_code": "200"
         }
       ]
@@ -144,8 +156,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "GetMatchIdOutput",
+          "resource": "GetMatchId",
           "status_code": "200"
         }
       ]
@@ -155,8 +168,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "CreateSchemaMappingOutput",
+          "resource": "CreateSchemaMapping",
           "status_code": "200"
         }
       ]
@@ -166,8 +180,9 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "TagResourceOutput",
+          "resource": "TagResource",
           "status_code": "200"
         }
       ]
@@ -177,15 +192,16 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
-          "resource": "UpdateMatchingWorkflowOutput",
+          "resource": "UpdateMatchingWorkflow",
           "status_code": "200"
         }
       ]
     }
   },
   "resources": {
-    "CreateMatchingWorkflowOutput": {
+    "CreateMatchingWorkflow": {
       "fields": [
         "description",
         "incrementalRunConfig",
@@ -263,7 +279,7 @@
         ]
       }
     },
-    "CreateSchemaMappingOutput": {
+    "CreateSchemaMapping": {
       "fields": [
         "description",
         "mappedInputFields",
@@ -305,7 +321,7 @@
         ]
       }
     },
-    "DeleteMatchingWorkflowOutput": {
+    "DeleteMatchingWorkflow": {
       "fields": [
         "message"
       ],
@@ -320,7 +336,7 @@
         ]
       }
     },
-    "DeleteSchemaMappingOutput": {
+    "DeleteSchemaMapping": {
       "fields": [
         "message"
       ],
@@ -335,7 +351,7 @@
         ]
       }
     },
-    "GetMatchIdOutput": {
+    "GetMatchId": {
       "fields": [
         "matchId"
       ],
@@ -350,7 +366,7 @@
         ]
       }
     },
-    "GetMatchingJobOutput": {
+    "GetMatchingJob": {
       "fields": [
         "endTime",
         "errorDetails",
@@ -410,7 +426,7 @@
         ]
       }
     },
-    "GetMatchingWorkflowOutput": {
+    "GetMatchingWorkflow": {
       "fields": [
         "createdAt",
         "description",
@@ -515,7 +531,7 @@
         ]
       }
     },
-    "GetSchemaMappingOutput": {
+    "GetSchemaMapping": {
       "fields": [
         "createdAt",
         "description",
@@ -626,7 +642,7 @@
         ]
       }
     },
-    "ListMatchingWorkflowsOutput": {
+    "ListMatchingWorkflows": {
       "fields": [
         "nextToken",
         "workflowSummaries"
@@ -650,7 +666,7 @@
         ]
       }
     },
-    "ListSchemaMappingsOutput": {
+    "ListSchemaMappings": {
       "fields": [
         "nextToken",
         "schemaList"
@@ -674,7 +690,7 @@
         ]
       }
     },
-    "StartMatchingJobOutput": {
+    "StartMatchingJob": {
       "fields": [
         "jobId"
       ],
@@ -693,15 +709,15 @@
       "fields": [],
       "types": {}
     },
-    "TagResourceOutput": {
+    "TagResource": {
       "fields": [],
       "types": {}
     },
-    "UntagResourceOutput": {
+    "UntagResource": {
       "fields": [],
       "types": {}
     },
-    "UpdateMatchingWorkflowOutput": {
+    "UpdateMatchingWorkflow": {
       "fields": [
         "description",
         "incrementalRunConfig",

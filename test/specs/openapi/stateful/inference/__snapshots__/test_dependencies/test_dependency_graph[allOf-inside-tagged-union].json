@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/tags",
           "resource": "TagMap",
           "status_code": "200"

@@ -12,6 +12,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "Message",
           "status_code": "200"
@@ -23,6 +24,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Channel",
           "status_code": "201"

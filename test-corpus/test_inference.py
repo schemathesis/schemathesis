@@ -82,10 +82,10 @@ KNOWN_FIELDLESS_RESOURCES = {
     ),
     "amazonaws.com/entityresolution/2018-05-10.json": frozenset(
         [
-            # Empty objects
+            # Empty objects (names normalized from TagResourceOutput, UntagResourceOutput)
             "TagMap",
-            "TagResourceOutput",
-            "UntagResourceOutput",
+            "TagResource",
+            "UntagResource",
         ]
     ),
     "digitallocker.gov.in/authpartner/1.0.0.json": frozenset(

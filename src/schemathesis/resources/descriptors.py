@@ -21,6 +21,8 @@ class ResourceDescriptor:
         status_code: HTTP status code to match
         pointer: JSON pointer to resource location in response (empty for root)
         cardinality: Whether response contains ONE resource or MANY
+        is_primitive_identifier: True when response is a primitive value that IS the identifier
+        identifier_field: Field name to use when wrapping primitive identifiers (e.g., "slug")
 
     """
 
@@ -29,3 +31,5 @@ class ResourceDescriptor:
     status_code: str
     pointer: str
     cardinality: Cardinality
+    is_primitive_identifier: bool = False
+    identifier_field: str | None = None

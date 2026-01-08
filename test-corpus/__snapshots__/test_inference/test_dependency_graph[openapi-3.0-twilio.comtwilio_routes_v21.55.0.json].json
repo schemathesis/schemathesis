@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.phone_number",
           "status_code": "200"
@@ -16,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.sip_domain",
           "status_code": "200"
@@ -27,6 +29,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.trunks",
           "status_code": "200"
@@ -38,6 +41,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.phone_number",
           "status_code": "200"
@@ -49,6 +53,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.sip_domain",
           "status_code": "200"
@@ -60,6 +65,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "routes.v2.trunks",
           "status_code": "200"

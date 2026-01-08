@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/Atms",
           "resource": "Atms",
           "status_code": "200"
@@ -16,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/Countries",
           "resource": "Countries",
           "status_code": "200"
@@ -27,6 +29,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/CountrySubdivisions",
           "resource": "CountrySubdivisions",
           "status_code": "200"
@@ -38,6 +41,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/Categories",
           "resource": "Categories",
           "status_code": "200"
@@ -49,6 +53,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/Countries",
           "resource": "Countries",
           "status_code": "200"
@@ -60,6 +65,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/CountrySubdivisions",
           "resource": "CountrySubdivisions",
           "status_code": "200"
@@ -71,6 +77,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/Merchants",
           "resource": "Merchants",
           "status_code": "200"

@@ -32,4 +32,5 @@ def extract_outputs(
             pointer=extracted.pointer,
             cardinality=extracted.cardinality,
             status_code=response.status_code,
+            is_primitive_identifier=extracted.is_primitive_identifier,
         )

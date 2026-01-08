@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Week",
           "status_code": "200"
@@ -16,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Coach",
           "status_code": "200"
@@ -27,6 +29,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Conference",
           "status_code": "200"
@@ -38,6 +41,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DraftPick",
           "status_code": "200"
@@ -49,6 +53,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DraftPosition",
           "status_code": "200"
@@ -60,6 +65,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DraftTeam",
           "status_code": "200"
@@ -71,6 +77,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Drive",
           "status_code": "200"
@@ -89,6 +96,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "BoxScore",
           "status_code": "200"
@@ -107,6 +115,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Game",
           "status_code": "200"
@@ -118,6 +127,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GameMedia",
           "status_code": "200"
@@ -136,6 +146,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayerGame",
           "status_code": "200"
@@ -154,6 +165,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamGame",
           "status_code": "200"
@@ -172,6 +184,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GameWeather",
           "status_code": "200"
@@ -190,6 +203,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GameLines",
           "status_code": "200"
@@ -208,6 +222,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "LivePlayByPlay",
           "status_code": "200"
@@ -226,6 +241,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayWP",
           "status_code": "200"
@@ -237,6 +253,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PregameWP",
           "status_code": "200"
@@ -248,6 +265,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayStatType",
           "status_code": "200"
@@ -278,6 +296,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayStat",
           "status_code": "200"
@@ -289,6 +308,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayType",
           "status_code": "200"
@@ -300,6 +320,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PortalPlayer",
           "status_code": "200"
@@ -311,6 +332,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ReturningProduction",
           "status_code": "200"
@@ -322,6 +344,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayerSearchResult",
           "status_code": "200"
@@ -340,6 +363,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayerUsage",
           "status_code": "200"
@@ -351,6 +375,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Play",
           "status_code": "200"
@@ -362,6 +387,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GamePPA",
           "status_code": "200"
@@ -380,6 +406,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayerGamePPA",
           "status_code": "200"
@@ -398,6 +425,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayerSeasonPPA",
           "status_code": "200"
@@ -409,6 +437,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PredictedPoints",
           "status_code": "200"
@@ -420,6 +449,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamPPA",
           "status_code": "200"
@@ -431,6 +461,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "RankingWeek",
           "status_code": "200"
@@ -442,6 +473,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamEloRating",
           "status_code": "200"
@@ -453,6 +485,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamSPRating",
           "status_code": "200"
@@ -464,6 +497,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ConferenceSPRating",
           "status_code": "200"
@@ -475,6 +509,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamSRSRating",
           "status_code": "200"
@@ -486,6 +521,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamRecord",
           "status_code": "200"
@@ -497,6 +533,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PositionGroupRecruitingRating",
           "status_code": "200"
@@ -508,6 +545,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recruit",
           "status_code": "200"
@@ -519,6 +557,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamRecruitingRank",
           "status_code": "200"
@@ -530,6 +569,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
           "status_code": "200"
@@ -541,6 +581,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ScoreboardGame",
           "status_code": "200"
@@ -556,6 +597,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AdvancedGameStat",
           "status_code": "200"
@@ -567,6 +609,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PlayerSeasonStat",
           "status_code": "200"
@@ -578,6 +621,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamSeasonStat",
           "status_code": "200"
@@ -589,6 +633,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AdvancedSeasonStat",
           "status_code": "200"
@@ -600,6 +645,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamTalent",
           "status_code": "200"
@@ -611,6 +657,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
           "status_code": "200"
@@ -622,6 +669,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
           "status_code": "200"
@@ -633,6 +681,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TeamMatchup",
           "status_code": "200"
@@ -644,6 +693,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Venue",
           "status_code": "200"
