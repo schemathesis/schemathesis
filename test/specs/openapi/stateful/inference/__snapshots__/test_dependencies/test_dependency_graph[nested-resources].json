@@ -22,6 +22,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "User",
           "status_code": "201"
@@ -40,6 +41,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Post",
           "status_code": "201"

@@ -16,6 +16,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.AdvisoryItem",
           "status_code": "200"
@@ -34,6 +35,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.AdvisoryDetailItem",
           "status_code": "200"
@@ -52,6 +54,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
           "status_code": "200"
@@ -63,6 +66,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.AdvisoryInlineItem",
           "status_code": "200"
@@ -81,6 +85,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemInlineItem",
           "status_code": "200"
@@ -92,6 +97,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.PackageItem",
           "status_code": "200"
@@ -103,6 +109,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.PackageSystemItem",
           "status_code": "200"
@@ -114,6 +121,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemInlineItem",
           "status_code": "200"
@@ -132,6 +140,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemAdvisoriesDBLookup",
           "status_code": "200"
@@ -150,6 +159,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemPackageInline",
           "status_code": "200"
@@ -161,6 +171,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageItem",
           "status_code": "200"
@@ -172,6 +183,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageDetailItem",
           "status_code": "200"
@@ -183,6 +195,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageSystemItem",
           "status_code": "200"
@@ -194,6 +207,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageVersionItem",
           "status_code": "200"
@@ -205,6 +219,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
           "status_code": "200"
@@ -223,6 +238,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
           "status_code": "200"
@@ -241,6 +257,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemAdvisoryItem",
           "status_code": "200"
@@ -259,6 +276,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemPackageData",
           "status_code": "200"
@@ -270,6 +288,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.AdvisoriesSystemsResponse",
           "status_code": "200"
@@ -281,6 +300,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemsAdvisoriesResponse",
           "status_code": "200"

@@ -678,7 +678,11 @@ def iter_parameters_v3(
 
 
 def resource_name_from_ref(reference: str) -> str:
-    return reference.rsplit("/", maxsplit=1)[1]
+    """Extract and normalize resource name from a $ref."""
+    from schemathesis.specs.openapi.stateful.dependencies.naming import normalize_schema_name
+
+    raw_name = reference.rsplit("/", maxsplit=1)[1]
+    return normalize_schema_name(raw_name)
 
 
 def build_path_parameter_v2(kwargs: Mapping[str, Any]) -> OpenApiParameter:

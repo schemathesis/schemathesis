@@ -22,6 +22,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/_embedded/conversations",
           "resource": "Conversation",
           "status_code": "200"

@@ -111,7 +111,15 @@ class ResourceRepository:
         else:
             values = [target]
 
-        return [value for value in values if isinstance(value, dict)]
+        results: list[dict[str, Any]] = []
+        for value in values:
+            if isinstance(value, dict):
+                results.append(value)
+            elif descriptor.is_primitive_identifier and descriptor.identifier_field is not None:
+                # Wrap primitive identifier (string, int, etc.) in a dict
+                # Example: POST /recipes returns "my-slug" -> {"slug": "my-slug"}
+                results.append({descriptor.identifier_field: value})
+        return results
 
     def _store(
         self,

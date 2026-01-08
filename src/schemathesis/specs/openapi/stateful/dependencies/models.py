@@ -75,7 +75,11 @@ class DependencyGraph:
                     links: dict[str, LinkDefinition] = {}
 
                     for input_slot in input_slots:
-                        if input_slot.resource_field is not None:
+                        if output_slot.is_primitive_identifier:
+                            # Primitive identifier (e.g., string response from POST)
+                            # The whole response IS the identifier value
+                            body_pointer = output_slot.pointer
+                        elif input_slot.resource_field is not None:
                             body_pointer = extend_pointer(
                                 output_slot.pointer, input_slot.resource_field, output_slot.cardinality
                             )
@@ -290,7 +294,7 @@ class InputSlot:
     __slots__ = ("resource", "resource_field", "parameter_name", "parameter_location")
 
 
-@dataclass
+@dataclass(slots=True)
 class OutputSlot:
     """Describes how to extract a resource from an operation's response."""
 
@@ -302,8 +306,8 @@ class OutputSlot:
     cardinality: Cardinality
     # HTTP status code
     status_code: str
-
-    __slots__ = ("resource", "pointer", "cardinality", "status_code")
+    # True when response is a bare primitive (string/int) rather than an object
+    is_primitive_identifier: bool = False
 
 
 @dataclass

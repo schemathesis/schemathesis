@@ -12,6 +12,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Authorize",
           "status_code": "200"
@@ -27,6 +28,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/items",
           "resource": "File",
           "status_code": "200"
@@ -38,6 +40,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Issued",
           "status_code": "200"
@@ -56,6 +59,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "File",
           "status_code": "200"
@@ -67,6 +71,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "User",
           "status_code": "200"
@@ -78,6 +83,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "XMLFormatSchema",
           "status_code": "200"
@@ -89,6 +95,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/items",
           "resource": "Issued",
           "status_code": "200"
@@ -100,6 +107,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "EaadharXamlSchema",
           "status_code": "200"
@@ -111,6 +119,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Pushuri",
           "status_code": "200"
@@ -122,6 +131,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "VerifyAccountResponse",
           "status_code": "200"
@@ -140,6 +150,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceAuthorizationCodeResponse",
           "status_code": "200"
@@ -151,6 +162,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "FileUploadResponse",
           "status_code": "200"
@@ -162,6 +174,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DocTypeResponse",
           "status_code": "200"
@@ -173,6 +186,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/issuers",
           "resource": "IssuerResponse",
           "status_code": "200"
@@ -184,6 +198,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "SearchParametersResponse",
           "status_code": "200"
@@ -195,6 +210,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Pulldocument",
           "status_code": "200"
@@ -210,6 +226,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AccessResponse",
           "status_code": "200"
@@ -221,6 +238,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DemoAuthVerifyResponse",
           "status_code": "200"
@@ -232,6 +250,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DemoAuthResponse",
           "status_code": "200"
@@ -243,6 +262,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GetStatisticsResponse",
           "status_code": "200"
