@@ -324,7 +324,7 @@ class OperationConfig(DiffBase):
             if "headers" in data
             else None,
             proxy=resolve(data.get("proxy")),
-            continue_on_failure=data.get("continue-on-failure"),
+            continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),
