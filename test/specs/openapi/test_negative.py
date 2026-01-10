@@ -531,7 +531,7 @@ def test_non_default_styles(ctx, location, schema, style, explode):
     test()
 
 
-@pytest.mark.snapshot()
+@pytest.mark.snapshot
 def test_bundled_references(ctx, app_runner, cli, snapshot_cli):
     raw_schema = ctx.openapi.build_schema(
         {

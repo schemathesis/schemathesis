@@ -131,8 +131,8 @@ def test_not_recoverable_schema_error(simple_schema):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]
     # Then it is an explicit exception during processing API operations
+    schema = schemathesis.openapi.from_dict(simple_schema)
     with pytest.raises(InvalidSchema):
-        schema = schemathesis.openapi.from_dict(simple_schema)
         list(schema.get_all_operations())
 
 

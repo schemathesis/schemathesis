@@ -10,7 +10,7 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import probes
 
 
-@pytest.fixture()
+@pytest.fixture
 def ctx(openapi_30):
     return EngineContext(schema=openapi_30, stop_event=threading.Event())
 
