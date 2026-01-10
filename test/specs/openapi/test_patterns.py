@@ -199,8 +199,7 @@ def test_update_quantifier_random(data):
     assume(
         max_length is None
         or min_length is None
-        or min_length <= max_length
-        and not (min_length is None and max_length is None)
+        or (min_length <= max_length and not (min_length is None and max_length is None))
     )
 
     # Apply length constraints

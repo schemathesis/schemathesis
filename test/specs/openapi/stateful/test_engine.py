@@ -124,8 +124,8 @@ def test_stop_outside_of_state_machine_execution(engine_factory, mocker, stop_ev
 
 
 @pytest.mark.parametrize(
-    ["kwargs"],
-    [({},), ({"unique_inputs": True},)],
+    "kwargs",
+    [{}, {"unique_inputs": True}],
 )
 @pytest.mark.usefixtures("restore_checks")
 def test_internal_error_in_check(engine_factory, kwargs):

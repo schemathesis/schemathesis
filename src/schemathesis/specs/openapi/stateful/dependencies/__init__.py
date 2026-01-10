@@ -153,7 +153,7 @@ def _normalize_parameter_keys(parameters: dict, operation: APIOperation) -> set[
     """Normalize parameter keys to location.name format."""
     normalized = set()
 
-    for parameter_name in parameters.keys():
+    for parameter_name in parameters:
         # If already has location prefix, use as-is
         if "." in parameter_name:
             normalized.add(parameter_name)
