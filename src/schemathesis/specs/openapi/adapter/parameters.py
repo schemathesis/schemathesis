@@ -93,7 +93,7 @@ def build_hybrid_strategy(
         # Always generate base values first, then overlay captured values.
         # This ensures parameters without resource requirements (like `file_name`)
         # still get generated values while resource-linked params use captured data.
-        base = draw(original_strategy)
+        base = draw(original_strategy) or {}
 
         # Single variant: no selection needed
         if n_variants == 1:
