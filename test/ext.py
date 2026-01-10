@@ -33,9 +33,10 @@ class ResponseStatistic(EventHandler):
     responses: dict[str, dict[int, int]]
     links: dict[str, int]
 
-    __slots__ = ("responses", "links")
+    __slots__ = ("links", "responses")
 
     def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
         self.responses = RESPONSES
         self.links = LINKS
 
@@ -76,7 +77,7 @@ class ResponseStatistic(EventHandler):
             ctx.add_summary_line("")
             ctx.add_summary_line(f"Links usage ({len(used_links)}):\n")
 
-            max_link_len = max((len(link) for link in used_links.keys()), default=1)
+            max_link_len = max((len(link) for link in used_links), default=1)
             max_count_len = max((len(str(c)) for c in used_links.values()), default=1)
 
             for link in sorted(used_links):

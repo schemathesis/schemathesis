@@ -98,11 +98,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             yield from probes.execute(ctx, phase)
         elif phase.name == PhaseName.SCHEMA_ANALYSIS:
             yield from analysis.execute(ctx, phase)
-        elif phase.name == PhaseName.EXAMPLES:
-            yield from unit.execute(ctx, phase)
-        elif phase.name == PhaseName.COVERAGE:
-            yield from unit.execute(ctx, phase)
-        elif phase.name == PhaseName.FUZZING:
+        elif phase.name == PhaseName.EXAMPLES or phase.name == PhaseName.COVERAGE or phase.name == PhaseName.FUZZING:
             yield from unit.execute(ctx, phase)
         elif phase.name == PhaseName.STATEFUL_TESTING:
             yield from stateful.execute(ctx, phase)
