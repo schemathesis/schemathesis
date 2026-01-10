@@ -120,31 +120,31 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = [
-  "E",     # pycodestyle errors
-  "W",     # pycodestyle warnings
-  "F",     # pyflakes
-  "C",     # flake8-comprehensions
-  "B",     # flake8-bugbear
-  "D",     # pydocstyle
-  "T201",  # flake8-print
-  "I",     # isort
-  "FURB",  # refurb
+  "E",      # pycodestyle errors
+  "W",      # pycodestyle warnings
+  "F",      # pyflakes
+  "C",      # flake8-comprehensions
+  "B",      # flake8-bugbear
+  "D",      # pydocstyle
+  "T201",   # flake8-print
+  "I",      # isort
+  "FURB",   # refurb
   "PGH003", # blanket-type-ignore
 ]
 ignore = [
-  "E501", # Line too long
-  "B008", # Do not perform function calls in argument defaults
-  "C901", # Too complex
-  "D100", # Missing docstring in public module
-  "D101", # Missing docstring in public class
-  "D102", # Missing docstring in public method
-  "D103", # Missing docstring in public function
-  "D104", # Missing docstring in public package
-  "D105", # Missing docstring in magic method
-  "D107", # Missing docstring in `__init__`
-  "D203", # One blank line before class
-  "D213", # Multiline summary second line
-  "D401", # Imperative mood
+  "E501",   # Line too long
+  "B008",   # Do not perform function calls in argument defaults
+  "C901",   # Too complex
+  "D100",   # Missing docstring in public module
+  "D101",   # Missing docstring in public class
+  "D102",   # Missing docstring in public method
+  "D103",   # Missing docstring in public function
+  "D104",   # Missing docstring in public package
+  "D105",   # Missing docstring in magic method
+  "D107",   # Missing docstring in `__init__`
+  "D203",   # One blank line before class
+  "D213",   # Multiline summary second line
+  "D401",   # Imperative mood
 ]
 
 [tool.ruff.lint.isort]
