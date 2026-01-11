@@ -842,7 +842,7 @@ def cover_schema_iter(
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
                     resolver = ctx.resolver
-                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems → items)
+                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems -> items)
                     validators = [jsonschema.Draft7Validator(sub_schema, resolver=resolver) for sub_schema in value]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
@@ -854,7 +854,7 @@ def cover_schema_iter(
                 elif key == "oneOf":
                     nctx = ctx.with_negative()
                     resolver = ctx.resolver
-                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems → items)
+                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems -> items)
                     validators = [jsonschema.Draft7Validator(sub_schema, resolver=resolver) for sub_schema in value]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):

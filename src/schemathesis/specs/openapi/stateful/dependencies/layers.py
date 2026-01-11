@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 def _restful_order_key(label: str) -> tuple[int, str]:
     """Sort by HTTP method priority, then alphabetically.
 
-    Priority: POST/PUT (0) → GET/PATCH/HEAD/OPTIONS (1) → DELETE/others (2)
+    Priority: POST/PUT (0) -> GET/PATCH/HEAD/OPTIONS (1) -> DELETE/others (2)
     """
     method = label.split()[0].upper()
     if method in ("POST", "PUT"):

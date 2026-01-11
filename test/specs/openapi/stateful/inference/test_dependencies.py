@@ -1668,6 +1668,46 @@ def snapshot_json(snapshot):
             },
             id="subresource-in-array-items",
         ),
+        # Prefix matching: parameter "group_slug" → inferred "Group" not found →
+        # but "GroupSummary" starts with "Group" and has "slug" field
+        # Like Mealie's /api/explore/groups/{group_slug}/... endpoints
+        pytest.param(
+            {
+                **operation(
+                    "get",
+                    "/groups/self",
+                    "200",
+                    component_ref("GroupSummary"),
+                ),
+                **operation(
+                    "get",
+                    "/explore/groups/{group_slug}/recipes",
+                    "200",
+                    component_ref("RecipeList"),
+                    [path_param("group_slug")],
+                ),
+            },
+            {
+                "schemas": {
+                    "GroupSummary": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "name": {"type": "string"},
+                            "slug": {"type": "string"},
+                        },
+                        "required": ["id", "slug"],
+                    },
+                    "RecipeList": {
+                        "type": "object",
+                        "properties": {
+                            "items": {"type": "array", "items": {"type": "object"}},
+                        },
+                    },
+                }
+            },
+            id="prefix-matching-group-slug",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

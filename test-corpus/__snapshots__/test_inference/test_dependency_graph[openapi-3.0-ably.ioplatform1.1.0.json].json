@@ -3,12 +3,14 @@
     "DELETE /push/channelSubscriptions": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "deviceId",
           "resource": "Device",
-          "resource_field": "device_id"
+          "resource_field": "deviceId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "clientId",
           "resource": "Client",
@@ -20,12 +22,14 @@
     "DELETE /push/deviceRegistrations": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "deviceId",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "clientId",
           "resource": "Client",
@@ -37,6 +41,7 @@
     "DELETE /push/deviceRegistrations/{device_id}": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "device_id",
           "resource": "DeviceDetails",
@@ -60,10 +65,11 @@
     "GET /channels/{channel_id}": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "channel_id",
-          "resource": "Channel",
-          "resource_field": "channel_id"
+          "resource": "ChannelDetails",
+          "resource_field": "channelId"
         }
       ],
       "outputs": [
@@ -86,10 +92,11 @@
     "GET /channels/{channel_id}/messages": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "channel_id",
-          "resource": "Channel",
-          "resource_field": "channel_id"
+          "resource": "ChannelDetails",
+          "resource_field": "channelId"
         }
       ],
       "outputs": [
@@ -105,18 +112,21 @@
     "GET /channels/{channel_id}/presence": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "channel_id",
-          "resource": "Channel",
-          "resource_field": "channel_id"
+          "resource": "ChannelDetails",
+          "resource_field": "channelId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "clientId",
           "resource": "Client",
           "resource_field": "clientId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "connectionId",
           "resource": "Connection",
@@ -136,10 +146,11 @@
     "GET /channels/{channel_id}/presence/history": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "channel_id",
-          "resource": "Channel",
-          "resource_field": "channel_id"
+          "resource": "ChannelDetails",
+          "resource_field": "channelId"
         }
       ],
       "outputs": [
@@ -155,12 +166,14 @@
     "GET /push/channelSubscriptions": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "deviceId",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "clientId",
           "resource": "Client",
@@ -191,12 +204,14 @@
     "GET /push/deviceRegistrations": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "deviceId",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "clientId",
           "resource": "Client",
@@ -223,6 +238,7 @@
     "GET /push/deviceRegistrations/{device_id}": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "device_id",
           "resource": "DeviceDetails",
@@ -249,10 +265,11 @@
     "GET /push/deviceRegistrations/{device_id}/resetUpdateToken": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "device_id",
-          "resource": "Device",
-          "resource_field": "device_id"
+          "resource": "DeviceDetails",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -291,18 +308,21 @@
     "PATCH /push/deviceRegistrations/{device_id}": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "device_id",
           "resource": "DeviceDetails",
           "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "clientId",
           "resource": "DeviceDetails",
           "resource_field": "clientId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "id",
           "resource": "DeviceDetails",
@@ -329,24 +349,28 @@
     "POST /channels/{channel_id}/messages": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "channel_id",
-          "resource": "Channel",
-          "resource_field": "channel_id"
+          "resource": "ChannelDetails",
+          "resource_field": "channelId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "clientId",
           "resource": "Client",
           "resource_field": "clientId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "connectionId",
           "resource": "Connection",
           "resource_field": "connectionId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "id",
           "resource": "Message",
@@ -382,12 +406,14 @@
     "POST /push/deviceRegistrations": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "clientId",
           "resource": "Client",
           "resource_field": "clientId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "id",
           "resource": "DeviceRegistration",
@@ -418,18 +444,21 @@
     "PUT /push/deviceRegistrations/{device_id}": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "device_id",
           "resource": "DeviceDetails",
           "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "clientId",
           "resource": "DeviceDetails",
           "resource_field": "clientId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "id",
           "resource": "DeviceDetails",
@@ -455,12 +484,6 @@
     }
   },
   "resources": {
-    "Channel": {
-      "fields": [
-        "channel_id"
-      ],
-      "types": {}
-    },
     "ChannelDetails": {
       "fields": [
         "channelId",
@@ -511,7 +534,7 @@
     },
     "Device": {
       "fields": [
-        "device_id"
+        "deviceId"
       ],
       "types": {}
     },

@@ -3,6 +3,7 @@
     "DELETE /api/patch/v1/systems/{inventory_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "inventory_id",
           "resource": "Inventory",
@@ -26,6 +27,7 @@
     "GET /api/patch/v1/advisories/{advisory_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "advisory_id",
           "resource": "Advisory",
@@ -45,6 +47,7 @@
     "GET /api/patch/v1/advisories/{advisory_id}/systems": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "advisory_id",
           "resource": "Advisory",
@@ -76,6 +79,7 @@
     "GET /api/patch/v1/export/advisories/{advisory_id}/systems": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "advisory_id",
           "resource": "Advisory",
@@ -107,6 +111,7 @@
     "GET /api/patch/v1/export/packages/{package_name}/systems": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "package_name",
           "resource": "Package",
@@ -138,6 +143,7 @@
     "GET /api/patch/v1/export/systems/{inventory_id}/advisories": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "inventory_id",
           "resource": "Inventory",
@@ -157,6 +163,7 @@
     "GET /api/patch/v1/export/systems/{inventory_id}/packages": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "inventory_id",
           "resource": "Inventory",
@@ -188,6 +195,7 @@
     "GET /api/patch/v1/packages/{package_name}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "package_name",
           "resource": "Package",
@@ -207,6 +215,7 @@
     "GET /api/patch/v1/packages/{package_name}/systems": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "package_name",
           "resource": "Package",
@@ -226,6 +235,7 @@
     "GET /api/patch/v1/packages/{package_name}/versions": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "package_name",
           "resource": "Package",
@@ -257,6 +267,7 @@
     "GET /api/patch/v1/systems/{inventory_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "inventory_id",
           "resource": "Inventory",
@@ -276,6 +287,7 @@
     "GET /api/patch/v1/systems/{inventory_id}/advisories": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "inventory_id",
           "resource": "Inventory",
@@ -295,6 +307,7 @@
     "GET /api/patch/v1/systems/{inventory_id}/packages": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "inventory_id",
           "resource": "Inventory",
