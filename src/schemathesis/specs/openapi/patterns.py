@@ -5,7 +5,7 @@ from functools import lru_cache
 
 from schemathesis.core.errors import InternalError
 
-# Unicode property escape translations (PCRE/Java/JS → Python approximations)
+# Unicode property escape translations (PCRE/Java/JS -> Python approximations)
 # These cover Latin-based scripts which handle the majority of real-world APIs
 _LETTER_CLASS = r"a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F"
 _LETTER_UPPER_CLASS = r"A-Z\u00C0-\u00D6\u00D8-\u00DE\u0100-\u0136\u0139-\u0147\u014A-\u0178\u0179-\u017D"

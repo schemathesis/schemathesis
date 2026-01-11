@@ -3,6 +3,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -14,6 +15,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -25,12 +27,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -42,12 +46,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessageSubscriptions/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -59,6 +65,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -70,18 +77,21 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
           "resource_field": "ConferenceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -93,12 +103,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -110,6 +122,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -121,12 +134,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ResourceSid",
           "resource": "Resource",
@@ -138,6 +153,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -149,6 +165,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -160,12 +177,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "MessageSid",
           "resource": "Message",
@@ -177,6 +196,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -188,6 +208,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -199,6 +220,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -210,12 +232,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "RecordingSid",
           "resource": "Recording",
@@ -227,18 +251,21 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ReferenceSid",
           "resource": "Reference",
           "resource_field": "ReferenceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AddOnResultSid",
           "resource": "AddOnResult",
@@ -250,12 +277,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ReferenceSid",
           "resource": "Reference",
@@ -267,6 +296,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -278,12 +308,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CredentialListSid",
           "resource": "CredentialList",
@@ -295,6 +327,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -306,12 +339,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -323,12 +358,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -340,12 +377,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -357,12 +396,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -374,12 +415,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -391,6 +434,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -402,12 +446,14 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
@@ -419,6 +465,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -430,6 +477,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -441,6 +489,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Transcriptions/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -452,6 +501,7 @@
     "DELETE /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -482,6 +532,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Addresses.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -508,12 +559,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Addresses/{AddressSid}/DependentPhoneNumbers.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AddressSid",
           "resource": "Address",
@@ -540,6 +593,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -559,6 +613,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Applications.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -585,6 +640,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -604,6 +660,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AuthorizedConnectApps.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -630,12 +687,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AuthorizedConnectApps/{ConnectAppSid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConnectAppSid",
           "resource": "ConnectApp",
@@ -655,6 +714,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -681,6 +741,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -700,6 +761,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Local.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -726,6 +788,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/MachineToMachine.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -752,6 +815,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Mobile.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -778,6 +842,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/National.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -804,6 +869,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/SharedCost.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -830,6 +896,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/TollFree.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -856,6 +923,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/AvailablePhoneNumbers/{CountryCode}/Voip.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -882,6 +950,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Balance.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -901,12 +970,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "ParentCallSid",
           "resource": "ParentCall",
@@ -933,12 +1004,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Events.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -965,12 +1038,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Notifications.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -997,12 +1072,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Notifications/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -1022,12 +1099,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -1054,12 +1133,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -1079,6 +1160,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1098,6 +1180,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1124,12 +1207,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -1156,18 +1241,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
           "resource_field": "ConferenceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -1187,12 +1275,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -1219,12 +1309,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -1244,6 +1336,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Conferences/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1263,6 +1356,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/ConnectApps.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1289,6 +1383,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1308,6 +1403,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1334,6 +1430,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Local.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1360,6 +1457,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Mobile.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1386,6 +1484,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/TollFree.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1412,12 +1511,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ResourceSid",
           "resource": "Resource",
@@ -1444,18 +1545,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{AssignedAddOnSid}/Extensions.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ResourceSid",
           "resource": "Resource",
           "resource_field": "ResourceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AssignedAddOnSid",
           "resource": "AssignedAddOn",
@@ -1482,18 +1586,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{AssignedAddOnSid}/Extensions/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ResourceSid",
           "resource": "Resource",
           "resource_field": "ResourceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AssignedAddOnSid",
           "resource": "AssignedAddOn",
@@ -1513,12 +1620,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ResourceSid",
           "resource": "Resource",
@@ -1538,6 +1647,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1557,6 +1667,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Keys.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1583,6 +1694,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1602,6 +1714,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Messages.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1628,12 +1741,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "MessageSid",
           "resource": "Message",
@@ -1660,12 +1775,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Media/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "MessageSid",
           "resource": "Message",
@@ -1685,6 +1802,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1704,6 +1822,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Notifications.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1730,6 +1849,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Notifications/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1749,6 +1869,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1775,6 +1896,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1794,6 +1916,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Queues.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1820,12 +1943,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "QueueSid",
           "resource": "Queue",
@@ -1852,18 +1977,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members/{CallSid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "QueueSid",
           "resource": "Queue",
           "resource_field": "QueueSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -1883,6 +2011,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -1902,18 +2031,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "CallSid",
           "resource": "Call",
           "resource_field": "CallSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -1940,12 +2072,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "RecordingSid",
           "resource": "Recording",
@@ -1972,12 +2106,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{RecordingSid}/Transcriptions/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "RecordingSid",
           "resource": "Recording",
@@ -1997,12 +2133,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ReferenceSid",
           "resource": "Reference",
@@ -2029,18 +2167,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ReferenceSid",
           "resource": "Reference",
           "resource_field": "ReferenceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AddOnResultSid",
           "resource": "AddOnResult",
@@ -2067,18 +2208,21 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{AddOnResultSid}/Payloads/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ReferenceSid",
           "resource": "Reference",
           "resource_field": "ReferenceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AddOnResultSid",
           "resource": "AddOnResult",
@@ -2098,12 +2242,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{ReferenceSid}/AddOnResults/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ReferenceSid",
           "resource": "Reference",
@@ -2123,6 +2269,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2142,6 +2289,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2168,12 +2316,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CredentialListSid",
           "resource": "CredentialList",
@@ -2200,12 +2350,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CredentialListSid",
           "resource": "CredentialList",
@@ -2225,6 +2377,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2244,6 +2397,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2270,12 +2424,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2302,12 +2458,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2327,12 +2485,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2359,12 +2519,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2384,12 +2546,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2416,12 +2580,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2441,12 +2607,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2473,12 +2641,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2498,12 +2668,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2530,12 +2702,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -2555,6 +2729,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2574,6 +2749,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2600,12 +2776,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
@@ -2632,12 +2810,14 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
@@ -2657,6 +2837,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2676,6 +2857,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2702,6 +2884,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2721,6 +2904,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SigningKeys.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2747,6 +2931,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2766,6 +2951,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Transcriptions.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2792,6 +2978,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Transcriptions/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2811,6 +2998,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2837,6 +3025,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/AllTime.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2863,6 +3052,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Daily.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2889,6 +3079,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/LastMonth.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2915,6 +3106,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Monthly.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2941,6 +3133,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/ThisMonth.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2967,6 +3160,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Today.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -2993,6 +3187,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Yearly.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3019,6 +3214,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Records/Yesterday.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3045,6 +3241,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Triggers.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3071,6 +3268,7 @@
     "GET /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3126,6 +3324,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Addresses.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3145,6 +3344,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Addresses/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3164,6 +3364,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Applications.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3183,6 +3384,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Applications/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3202,6 +3404,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3221,12 +3424,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Payments.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3246,12 +3451,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Payments/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3271,12 +3478,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3296,12 +3505,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3321,12 +3532,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Siprec.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3346,12 +3559,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Siprec/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3371,12 +3586,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Streams.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3396,12 +3613,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/Streams/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3421,12 +3640,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessageSubscriptions.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3446,12 +3667,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{CallSid}/UserDefinedMessages.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3471,6 +3694,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Calls/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3490,12 +3714,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -3515,18 +3741,21 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Participants/{CallSid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
           "resource_field": "ConferenceSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3546,12 +3775,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{ConferenceSid}/Recordings/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ConferenceSid",
           "resource": "Conference",
@@ -3571,6 +3802,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Conferences/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3590,6 +3822,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/ConnectApps/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3609,6 +3842,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3628,6 +3862,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Local.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3647,6 +3882,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/Mobile.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3666,6 +3902,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/TollFree.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3685,12 +3922,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{ResourceSid}/AssignedAddOns.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "ResourceSid",
           "resource": "Resource",
@@ -3710,6 +3949,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3729,6 +3969,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Keys.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3748,6 +3989,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Keys/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3767,6 +4009,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Messages.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3786,12 +4029,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Messages/{MessageSid}/Feedback.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "MessageSid",
           "resource": "Message",
@@ -3811,6 +4056,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Messages/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3830,6 +4076,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3849,6 +4096,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/OutgoingCallerIds/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3868,6 +4116,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Queues.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3887,18 +4136,21 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Queues/{QueueSid}/Members/{CallSid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "QueueSid",
           "resource": "Queue",
           "resource_field": "QueueSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CallSid",
           "resource": "Call",
@@ -3918,6 +4170,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Queues/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3937,6 +4190,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -3956,12 +4210,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CredentialListSid",
           "resource": "CredentialList",
@@ -3981,12 +4237,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{CredentialListSid}/Credentials/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "CredentialListSid",
           "resource": "CredentialList",
@@ -4006,6 +4264,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/CredentialLists/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4025,6 +4284,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4044,12 +4304,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/CredentialListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -4069,12 +4331,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Calls/IpAccessControlListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -4094,12 +4358,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/Auth/Registrations/CredentialListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -4119,12 +4385,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/CredentialListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -4144,12 +4412,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{DomainSid}/IpAccessControlListMappings.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "DomainSid",
           "resource": "Domain",
@@ -4169,6 +4439,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/Domains/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4188,6 +4459,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4207,12 +4479,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
@@ -4232,12 +4506,14 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{IpAccessControlListSid}/IpAddresses/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
           "resource_field": "AccountSid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "IpAccessControlListSid",
           "resource": "IpAccessControlList",
@@ -4257,6 +4533,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SIP/IpAccessControlLists/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4276,6 +4553,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SMS/ShortCodes/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4295,6 +4573,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SigningKeys.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4314,6 +4593,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/SigningKeys/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4333,6 +4613,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Tokens.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4352,6 +4633,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Usage/Triggers.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",
@@ -4371,6 +4653,7 @@
     "POST /2010-04-01/Accounts/{AccountSid}/Usage/Triggers/{Sid}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "AccountSid",
           "resource": "Account",

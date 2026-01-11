@@ -15,6 +15,7 @@
     "GET /geo/adminDivisions/{divisionId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "divisionId",
           "resource": "Division",
@@ -34,6 +35,7 @@
     "GET /geo/adminDivisions/{divisionId}/nearbyCities": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "divisionId",
           "resource": "Division",
@@ -53,6 +55,7 @@
     "GET /geo/adminDivisions/{divisionId}/nearbyDivisions": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "divisionId",
           "resource": "Division",
@@ -84,6 +87,7 @@
     "GET /geo/cities/{cityId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "cityId",
           "resource": "City",
@@ -103,6 +107,7 @@
     "GET /geo/cities/{cityId}/dateTime": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "cityId",
           "resource": "City",
@@ -122,12 +127,14 @@
     "GET /geo/cities/{cityId}/distance": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "cityId",
           "resource": "City",
           "resource_field": "cityId"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "toCityId",
           "resource": "ToCity",
@@ -147,6 +154,7 @@
     "GET /geo/cities/{cityId}/locatedIn": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "cityId",
           "resource": "City",
@@ -166,6 +174,7 @@
     "GET /geo/cities/{cityId}/nearbyCities": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "cityId",
           "resource": "City",
@@ -185,6 +194,7 @@
     "GET /geo/cities/{cityId}/time": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "cityId",
           "resource": "City",
@@ -216,6 +226,7 @@
     "GET /geo/countries/{countryId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "countryId",
           "resource": "Country",
@@ -235,6 +246,7 @@
     "GET /geo/countries/{countryId}/regions": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "countryId",
           "resource": "Country",
@@ -254,6 +266,7 @@
     "GET /geo/countries/{countryId}/regions/{regionCode}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "countryId",
           "resource": "Country",
@@ -273,6 +286,7 @@
     "GET /geo/countries/{countryId}/regions/{regionCode}/adminDivisions": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "countryId",
           "resource": "Country",
@@ -292,6 +306,7 @@
     "GET /geo/countries/{countryId}/regions/{regionCode}/cities": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "countryId",
           "resource": "Country",
@@ -311,6 +326,7 @@
     "GET /geo/locations/{locationId}/nearbyCities": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "locationId",
           "resource": "Location",
@@ -330,6 +346,7 @@
     "GET /geo/locations/{locationId}/nearbyDivisions": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "locationId",
           "resource": "Location",
@@ -349,6 +366,7 @@
     "GET /locale/currencies": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "countryId",
           "resource": "Country",
@@ -404,6 +422,7 @@
     "GET /locale/timezones/{zoneId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "zoneId",
           "resource": "Zone",
@@ -423,6 +442,7 @@
     "GET /locale/timezones/{zoneId}/dateTime": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "zoneId",
           "resource": "Zone",
@@ -442,6 +462,7 @@
     "GET /locale/timezones/{zoneId}/time": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "zoneId",
           "resource": "Zone",

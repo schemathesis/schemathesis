@@ -181,7 +181,7 @@ def extend_pointer(base: str, field: str, cardinality: Cardinality) -> str:
     if not base.endswith("/"):
         base += "/"
     if cardinality == Cardinality.MANY:
-        # For arrays, reference first element: /data → /data/0
+        # For arrays, reference first element: /data -> /data/0
         base += "0/"
     base += encode_pointer(field)
     return base
@@ -290,7 +290,7 @@ class InputSlot:
     # Integer means index in an array (only single items are supported)
     parameter_name: str | int
     parameter_location: ParameterLocation
-    # Whether this input was matched via suffix matching (e.g., "file_name" → "BackupFile")
+    # Whether this input was matched via suffix matching (e.g., "file_name" -> "BackupFile")
     # Suffix-matched inputs can be upgraded by merge_related_resources if a producer exists
     is_suffix_matched: bool = False
 

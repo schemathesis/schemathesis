@@ -13,8 +13,8 @@
 
 - Deprioritize successfully deleted resources in variant selection to reduce wasted requests on non-existent resources.
 - Discover sub-resources inside array `items` (e.g., `BackupFile` from `AllBackups.imports[]`).
-- Recognize `_name` and `-name` parameter suffixes for resource inference (e.g., `file_name` → `File`).
-- Match parameters to resources with matching suffixes when exact match not found (e.g., `file_name` links to `BackupFile.name`).
+- Recognize `_name` and `-name` parameter suffixes for resource inference (e.g., `file_name` -> `File`).
+- Match parameters to resources with matching suffixes or prefixes when exact match not found (e.g., `file_name` -> `BackupFile.name`, `group_slug` -> `GroupSummary.slug`).
 
 ### :bug: Fixed
 

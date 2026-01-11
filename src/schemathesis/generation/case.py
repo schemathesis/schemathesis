@@ -287,7 +287,7 @@ class Case:
 
     @property
     def formatted_path(self) -> str:
-        """Path template with variables substituted (e.g., /users/{user_id} → /users/123)."""
+        """Path template with variables substituted (e.g., /users/{user_id} -> /users/123)."""
         return prepare_path(self.path, self.path_parameters)
 
     def as_curl_command(self, headers: Mapping[str, Any] | None = None, verify: bool = True) -> str:

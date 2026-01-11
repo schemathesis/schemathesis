@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1groups~1self/get",
+    {
+      "GetGroupSummary": {
+        "operationRef": "#/paths/~1explore~1groups~1{group_slug}~1recipes/get",
+        "parameters": {
+          "path.group_slug": "$response.body#/slug"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

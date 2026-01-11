@@ -250,8 +250,14 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         pytest.param("user_email", "User", ["id", "email", "name"], "email", id="resource-hint-user-email"),
         pytest.param("backup_file_name", "BackupFile", ["name"], "name", id="resource-hint-compound"),
         pytest.param("category_name", "RecipeCategory", ["id", "name", "slug"], "name", id="resource-hint-category"),
-        # Resource-hint: resource must END with prefix
-        pytest.param("file_name", "FileManager", ["name"], None, id="resource-hint-no-match-prefix-at-start"),
+        # Resource-hint: resource starts with prefix (prefix matching)
+        pytest.param("file_name", "FileManager", ["name"], "name", id="resource-hint-prefix-at-start"),
+        pytest.param(
+            "group_slug", "GroupSummary", ["id", "name", "slug"], "slug", id="resource-hint-prefix-group-slug"
+        ),
+        pytest.param(
+            "household_slug", "HouseholdInDB", ["id", "name", "slug"], "slug", id="resource-hint-prefix-household"
+        ),
         # Resource-hint: prefix too short (< 3 chars)
         pytest.param("xy_name", "Oxy", ["name"], None, id="resource-hint-prefix-too-short"),
         # No match cases

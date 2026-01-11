@@ -476,7 +476,8 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
                     return field
 
     # Resource-hint matching for underscore-separated parameters
-    # Example: file_name → BackupFile.name
+    # Example: file_name -> BackupFile.name (resource ends with prefix)
+    # Example: group_slug -> GroupSummary.slug (resource starts with prefix)
     # The parameter prefix hints at the resource type, suffix is the field name
     if "_" in parameter:
         last_underscore = parameter.rfind("_")
@@ -489,9 +490,10 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
                 prefix_normalized = _normalize_for_matching(param_prefix)
                 suffix_normalized = _normalize_for_matching(param_suffix)
 
-                # Check if resource name ends with the prefix
-                # e.g., "BackupFile" ends with "file" for parameter "file_name"
-                if resource_normalized.endswith(prefix_normalized):
+                # Check if resource name ends with OR starts with the prefix
+                # Suffix: "BackupFile" ends with "file" for parameter "file_name"
+                # Prefix: "GroupSummary" starts with "group" for parameter "group_slug"
+                if resource_normalized.endswith(prefix_normalized) or resource_normalized.startswith(prefix_normalized):
                     for field in fields:
                         if _normalize_for_matching(field) == suffix_normalized:
                             return field

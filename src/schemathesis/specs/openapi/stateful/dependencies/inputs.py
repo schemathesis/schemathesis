@@ -109,7 +109,7 @@ def _resolve_parameter_dependency(
     is_suffix_matched = False
     if resource is None:
         # Try to find an existing resource with matching suffix
-        # Example: parameter "file_name" → inferred "File" not found → check if "BackupFile" exists
+        # Example: parameter "file_name" -> inferred "File" not found -> check if "BackupFile" exists
         matched_resource, matched_field = _find_matching_resource_by_suffix(
             resource_name=resource_name,
             parameter_name=parameter_name,
@@ -140,7 +140,7 @@ def _resolve_parameter_dependency(
                 resources[resource_name] = resource
             field = parameter_name
     else:
-        # Match parameter to resource field (`userId` → `id`, `Id` → `ChannelId`, etc.)
+        # Match parameter to resource field (`userId` -> `id`, `Id` -> `ChannelId`, etc.)
         field = (
             naming.find_matching_field(
                 parameter=parameter_name,
@@ -192,11 +192,15 @@ def _find_matching_resource_by_suffix(
     parameter_name: str,
     resources: ResourceMap,
 ) -> tuple[ResourceDefinition, str] | tuple[None, None]:
-    """Find a resource with matching suffix when exact match not found.
+    """Find a resource with matching suffix or prefix when exact match not found.
 
     When a parameter like "file_name" infers resource "File" but no "File" exists,
-    check if a resource ending with "File" exists (e.g., "BackupFile") and if the
-    parameter can be matched to one of its fields.
+    check if a resource ending with "File" exists (e.g., "BackupFile") or starting
+    with "File" (e.g., "FileSummary") and if the parameter can be matched to one
+    of its fields.
+
+    Suffix matching example: "file_name" -> "File" -> "BackupFile"
+    Prefix matching example: "group_slug" -> "Group" -> "GroupSummary"
 
     Only considers high-quality resources (schema-defined with properties) and
     requires the parameter to match a field via find_matching_field.
@@ -209,9 +213,12 @@ def _find_matching_resource_by_suffix(
         if candidate_resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
             continue
 
-        # Check if candidate ends with the inferred resource name
-        # e.g., "BackupFile".lower().endswith("file") for resource_name="File"
-        if not candidate_name.lower().endswith(resource_lower):
+        candidate_lower = candidate_name.lower()
+
+        # Check if candidate ends with OR starts with the inferred resource name
+        # Suffix: "BackupFile".endswith("file") for resource_name="File"
+        # Prefix: "GroupSummary".startswith("group") for resource_name="Group"
+        if not (candidate_lower.endswith(resource_lower) or candidate_lower.startswith(resource_lower)):
             continue
 
         # Check if parameter can be matched to a field
@@ -437,7 +444,7 @@ def find_producer_consumer_candidates(operations: OperationMap) -> list[tuple[st
         base = _extract_base_path(node.path)
         paths.setdefault(base, []).append(name)
 
-    # Within each path group, find POST/PUT → GET/DELETE/PATCH patterns
+    # Within each path group, find POST/PUT -> GET/DELETE/PATCH patterns
     for names in paths.values():
         for producer_name in names:
             producer = operations[producer_name]
