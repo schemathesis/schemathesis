@@ -820,7 +820,8 @@ def test_checks_are_loaded(case):
         [sys.executable, "-m", "pytest", str(test_file), "-v", "-p", "no:cacheprovider"],
         capture_output=True,
         text=True,
-        cwd=str(tmp_path), check=False,
+        cwd=str(tmp_path),
+        check=False,
     )
 
     assert result.returncode == 0, f"Test failed:\n{result.stdout}\n{result.stderr}"

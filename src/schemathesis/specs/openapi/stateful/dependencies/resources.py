@@ -368,7 +368,7 @@ def _extract_resource_from_schema(
 def remove_unused_resources(operations: OperationMap, resources: ResourceMap) -> None:
     """Remove resources that aren't referenced by any operation."""
     # Collect all resource names currently in use
-    used_resources = set()
+    used_resources: set[str] = set()
     for operation in operations.values():
         used_resources.update(input_slot.resource.name for input_slot in operation.inputs)
         used_resources.update(output_slot.resource.name for output_slot in operation.outputs)

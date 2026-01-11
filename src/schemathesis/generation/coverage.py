@@ -1192,7 +1192,7 @@ def _positive_array(
         smaller = max_items - 1
         if (
             INTERNAL_BUFFER_SIZE > smaller > 0
-                and (min_items is None or smaller >= min_items)
+            and (min_items is None or smaller >= min_items)
             and smaller not in seen_constraints
         ):
             value = ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})

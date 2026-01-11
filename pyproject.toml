@@ -147,7 +147,7 @@ ignore = [
   "D213",   # Multiline summary second line
   "D401",   # Imperative mood
   "COM812", # twice "," in dict/tuple/list
-  "SIM910"  # delete default arguments in .get() in some cases
+  "SIM910", # delete default arguments in .get() in some cases
 ]
 
 [tool.ruff.lint.isort]
