@@ -3,6 +3,7 @@
     "POST /devices": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "recipient_id",
           "resource": "Recipient",

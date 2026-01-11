@@ -3,6 +3,7 @@
     "DELETE /items/{runner_group_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "runner_group_id",
           "resource": "RunnerGroup",

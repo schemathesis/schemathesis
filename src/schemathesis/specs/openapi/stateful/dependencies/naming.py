@@ -34,10 +34,12 @@ def from_parameter(parameter: str, path: str) -> str | None:
         "_uuid",
         "_id",
         "_slug",
+        "_name",
         "-guid",
         "-uuid",
         "-id",
         "-slug",
+        "-name",
     )
     for suffix in snake_suffixes:
         if lower.endswith(suffix):
@@ -472,6 +474,27 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
             for field in fields:
                 if _normalize_for_matching(field) == id_name:
                     return field
+
+    # Resource-hint matching for underscore-separated parameters
+    # Example: file_name → BackupFile.name
+    # The parameter prefix hints at the resource type, suffix is the field name
+    if "_" in parameter:
+        last_underscore = parameter.rfind("_")
+        if last_underscore > 0:  # Ensure there's actually a prefix
+            param_prefix = parameter[:last_underscore]
+            param_suffix = parameter[last_underscore + 1 :]
+
+            # Conservative: require minimum prefix length (3 chars) to avoid spurious matches
+            if len(param_prefix) >= 3 and param_suffix:
+                prefix_normalized = _normalize_for_matching(param_prefix)
+                suffix_normalized = _normalize_for_matching(param_suffix)
+
+                # Check if resource name ends with the prefix
+                # e.g., "BackupFile" ends with "file" for parameter "file_name"
+                if resource_normalized.endswith(prefix_normalized):
+                    for field in fields:
+                        if _normalize_for_matching(field) == suffix_normalized:
+                            return field
 
     return None
 

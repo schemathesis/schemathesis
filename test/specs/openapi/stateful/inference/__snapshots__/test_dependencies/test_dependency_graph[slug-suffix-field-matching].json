@@ -15,6 +15,7 @@
     "GET /tags/{tag_slug}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "tag_slug",
           "resource": "Tag",

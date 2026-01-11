@@ -15,6 +15,7 @@
     "GET /categories/{category_id_or_slug}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "category_id_or_slug",
           "resource": "Category",

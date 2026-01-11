@@ -3,6 +3,7 @@
     "GET /users/{userId}/posts": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "userId",
           "resource": "User",

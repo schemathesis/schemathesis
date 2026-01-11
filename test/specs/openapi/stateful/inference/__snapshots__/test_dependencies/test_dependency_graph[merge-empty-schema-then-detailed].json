@@ -3,6 +3,7 @@
     "GET /directories/{id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "Directory",
@@ -22,6 +23,7 @@
     "GET /files/{id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "File",
@@ -41,6 +43,7 @@
     "GET /oauth2/1/files/{id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "File",

@@ -3,6 +3,7 @@
     "GET /recipes/{slug}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "slug",
           "resource": "Recipe",

@@ -215,7 +215,7 @@
         {
           "parameter_location": "query",
           "parameter_name": "id",
-          "resource": "Play",
+          "resource": "LivePlayByPlay",
           "resource_field": "id"
         }
       ],
@@ -289,8 +289,8 @@
         {
           "parameter_location": "query",
           "parameter_name": "statTypeId",
-          "resource": "StatType",
-          "resource_field": "statTypeId"
+          "resource": "PlayStatType",
+          "resource_field": "id"
         }
       ],
       "outputs": [
@@ -2455,12 +2455,6 @@
           "object"
         ]
       }
-    },
-    "StatType": {
-      "fields": [
-        "statTypeId"
-      ],
-      "types": {}
     },
     "Team": {
       "fields": [

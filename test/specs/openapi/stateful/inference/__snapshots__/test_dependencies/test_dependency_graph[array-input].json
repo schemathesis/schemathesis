@@ -3,6 +3,7 @@
     "GET /tags/{tagId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "tagId",
           "resource": "Tag",
@@ -22,6 +23,7 @@
     "POST /tags/bulk": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": 0,
           "resource": "Tag",

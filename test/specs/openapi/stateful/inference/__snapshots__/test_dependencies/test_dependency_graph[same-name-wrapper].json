@@ -3,6 +3,7 @@
     "GET /data_requests/{data_request_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "data_request_id",
           "resource": "DataRequest",
@@ -14,6 +15,7 @@
     "PUT /data_requests/{data_request_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "data_request_id",
           "resource": "DataRequest",

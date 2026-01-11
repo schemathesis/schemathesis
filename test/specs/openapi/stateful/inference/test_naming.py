@@ -41,6 +41,10 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         # Generic prefixes for query params - should NOT use path context (no placeholder in path)
         ("item_id", "/api/groups", "Item"),
         ("itemId", "/items/search", "Item"),
+        # Name suffix - common for file/resource name parameters
+        ("file_name", "/backups/{file_name}", "File"),
+        ("recipe-name", "/recipes/{recipe-name}", "Recipe"),
+        ("user_name", "/users/{user_name}", "User"),
     ],
 )
 def test_from_parameter(parameter, path, expected):
@@ -225,6 +229,38 @@ def test_to_pascal_case(text, expected):
 )
 def test_strip_affixes(name, prefixes, suffixes, expected):
     assert naming.strip_affixes(name, prefixes, suffixes) == expected
+
+
+@pytest.mark.parametrize(
+    ["parameter", "resource", "fields", "expected"],
+    [
+        # Exact match
+        pytest.param("id", "User", ["id", "name"], "id", id="exact-match"),
+        pytest.param("name", "User", ["id", "name"], "name", id="exact-match-name"),
+        # Normalized match
+        pytest.param("userId", "User", ["user_id", "name"], "user_id", id="normalized-match"),
+        # Parameter has resource prefix, field is suffix
+        pytest.param("channelId", "Channel", ["id", "name"], "id", id="resource-prefix-in-param"),
+        pytest.param("userId", "User", ["id", "email"], "id", id="user-id-to-id"),
+        # ID synonym matching
+        pytest.param("user_id", "User", ["uuid", "name"], "uuid", id="id-synonym-uuid"),
+        pytest.param("item_id", "Item", ["guid", "name"], "guid", id="id-synonym-guid"),
+        # Resource-hint matching (parameter prefix hints at resource, suffix is field)
+        pytest.param("file_name", "BackupFile", ["name", "date", "size"], "name", id="resource-hint-file-name"),
+        pytest.param("user_email", "User", ["id", "email", "name"], "email", id="resource-hint-user-email"),
+        pytest.param("backup_file_name", "BackupFile", ["name"], "name", id="resource-hint-compound"),
+        pytest.param("category_name", "RecipeCategory", ["id", "name", "slug"], "name", id="resource-hint-category"),
+        # Resource-hint: resource must END with prefix
+        pytest.param("file_name", "FileManager", ["name"], None, id="resource-hint-no-match-prefix-at-start"),
+        # Resource-hint: prefix too short (< 3 chars)
+        pytest.param("xy_name", "Oxy", ["name"], None, id="resource-hint-prefix-too-short"),
+        # No match cases
+        pytest.param("random", "User", ["id", "name"], None, id="no-match"),
+        pytest.param("the_name", "User", ["name"], None, id="no-match-resource-mismatch"),
+    ],
+)
+def test_find_matching_field(parameter, resource, fields, expected):
+    assert naming.find_matching_field(parameter=parameter, resource=resource, fields=fields) == expected
 
 
 @pytest.mark.parametrize(

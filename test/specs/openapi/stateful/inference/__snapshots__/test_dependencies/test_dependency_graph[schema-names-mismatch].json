@@ -3,6 +3,7 @@
     "GET /blog/posts/{postId}": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "path",
           "parameter_name": "postId",
           "resource": "Blog post public",

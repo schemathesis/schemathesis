@@ -3,6 +3,7 @@
     "PATCH /comments/{id}/read": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "Comment",

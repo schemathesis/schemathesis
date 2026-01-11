@@ -3,6 +3,7 @@
     "GET /brands/{brandId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "brandId",
           "resource": "Brand",

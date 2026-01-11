@@ -469,6 +469,13 @@
           "pointer": "/",
           "resource": "Accounts.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/accounts",
+          "resource": "api.v2010.account",
+          "status_code": "200"
         }
       ]
     },
@@ -487,6 +494,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Addresses.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/addresses",
+          "resource": "api.v2010.account.address",
           "status_code": "200"
         }
       ]
@@ -512,6 +526,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DependentPhoneNumbers.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/dependent_phone_numbers",
+          "resource": "api.v2010.account.address.dependent_phone_number",
           "status_code": "200"
         }
       ]
@@ -551,6 +572,13 @@
           "pointer": "/",
           "resource": "Applications.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/applications",
+          "resource": "api.v2010.account.application",
+          "status_code": "200"
         }
       ]
     },
@@ -588,6 +616,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AuthorizedConnectApps.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/authorized_connect_apps",
+          "resource": "api.v2010.account.authorized_connect_app",
           "status_code": "200"
         }
       ]
@@ -633,6 +668,13 @@
           "pointer": "/",
           "resource": "AvailablePhoneNumbers.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/countries",
+          "resource": "api.v2010.account.available_phone_number_country",
+          "status_code": "200"
         }
       ]
     },
@@ -671,6 +713,13 @@
           "pointer": "/",
           "resource": "Local.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_local",
+          "status_code": "200"
         }
       ]
     },
@@ -689,6 +738,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "MachineToMachine.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_machine_to_machine",
           "status_code": "200"
         }
       ]
@@ -709,6 +765,13 @@
           "pointer": "/",
           "resource": "Mobile.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_mobile",
+          "status_code": "200"
         }
       ]
     },
@@ -727,6 +790,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "National.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_national",
           "status_code": "200"
         }
       ]
@@ -747,6 +817,13 @@
           "pointer": "/",
           "resource": "SharedCost.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_shared_cost",
+          "status_code": "200"
         }
       ]
     },
@@ -766,6 +843,13 @@
           "pointer": "/",
           "resource": "TollFree.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_toll_free",
+          "status_code": "200"
         }
       ]
     },
@@ -784,6 +868,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Voip.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/available_phone_numbers",
+          "resource": "api.v2010.account.available_phone_number_country.available_phone_number_voip",
           "status_code": "200"
         }
       ]
@@ -829,6 +920,13 @@
           "pointer": "/",
           "resource": "Calls.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/calls",
+          "resource": "api.v2010.account.call",
+          "status_code": "200"
         }
       ]
     },
@@ -854,6 +952,13 @@
           "pointer": "/",
           "resource": "Events.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/events",
+          "resource": "api.v2010.account.call.call_event",
+          "status_code": "200"
         }
       ]
     },
@@ -878,6 +983,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Notifications.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/notifications",
+          "resource": "api.v2010.account.call.call_notification",
           "status_code": "200"
         }
       ]
@@ -928,6 +1040,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/recordings",
+          "resource": "api.v2010.account.call.call_recording",
           "status_code": "200"
         }
       ]
@@ -992,6 +1111,13 @@
           "pointer": "/",
           "resource": "Conferences.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/conferences",
+          "resource": "api.v2010.account.conference",
+          "status_code": "200"
         }
       ]
     },
@@ -1016,6 +1142,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Participants.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/participants",
+          "resource": "api.v2010.account.conference.participant",
           "status_code": "200"
         }
       ]
@@ -1072,6 +1205,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/recordings",
+          "resource": "api.v2010.account.conference.conference_recording",
           "status_code": "200"
         }
       ]
@@ -1136,6 +1276,13 @@
           "pointer": "/",
           "resource": "ConnectApps.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/connect_apps",
+          "resource": "api.v2010.account.connect_app",
+          "status_code": "200"
         }
       ]
     },
@@ -1174,6 +1321,13 @@
           "pointer": "/",
           "resource": "IncomingPhoneNumbers.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/incoming_phone_numbers",
+          "resource": "api.v2010.account.incoming_phone_number",
+          "status_code": "200"
         }
       ]
     },
@@ -1192,6 +1346,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Local.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/incoming_phone_numbers",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_local",
           "status_code": "200"
         }
       ]
@@ -1212,6 +1373,13 @@
           "pointer": "/",
           "resource": "Mobile.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/incoming_phone_numbers",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile",
+          "status_code": "200"
         }
       ]
     },
@@ -1230,6 +1398,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TollFree.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/incoming_phone_numbers",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free",
           "status_code": "200"
         }
       ]
@@ -1255,6 +1430,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AssignedAddOns.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/assigned_add_ons",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
           "status_code": "200"
         }
       ]
@@ -1286,6 +1468,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Extensions.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/extensions",
+          "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension",
           "status_code": "200"
         }
       ]
@@ -1381,6 +1570,13 @@
           "pointer": "/",
           "resource": "Keys.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/keys",
+          "resource": "api.v2010.account.key",
+          "status_code": "200"
         }
       ]
     },
@@ -1419,6 +1615,13 @@
           "pointer": "/",
           "resource": "Messages.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/messages",
+          "resource": "api.v2010.account.message",
+          "status_code": "200"
         }
       ]
     },
@@ -1443,6 +1646,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Media.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/media_list",
+          "resource": "api.v2010.account.message.media",
           "status_code": "200"
         }
       ]
@@ -1507,6 +1717,13 @@
           "pointer": "/",
           "resource": "Notifications.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/notifications",
+          "resource": "api.v2010.account.notification",
+          "status_code": "200"
         }
       ]
     },
@@ -1544,6 +1761,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "OutgoingCallerIds.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/outgoing_caller_ids",
+          "resource": "api.v2010.account.outgoing_caller_id",
           "status_code": "200"
         }
       ]
@@ -1583,6 +1807,13 @@
           "pointer": "/",
           "resource": "Queues.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/queues",
+          "resource": "api.v2010.account.queue",
+          "status_code": "200"
         }
       ]
     },
@@ -1607,6 +1838,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Members.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/queue_members",
+          "resource": "api.v2010.account.queue.member",
           "status_code": "200"
         }
       ]
@@ -1689,6 +1927,13 @@
           "pointer": "/",
           "resource": "Recordings.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/recordings",
+          "resource": "api.v2010.account.recording",
+          "status_code": "200"
         }
       ]
     },
@@ -1713,6 +1958,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Transcriptions.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/transcriptions",
+          "resource": "api.v2010.account.recording.recording_transcription",
           "status_code": "200"
         }
       ]
@@ -1764,6 +2016,13 @@
           "pointer": "/",
           "resource": "AddOnResults.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/add_on_results",
+          "resource": "api.v2010.account.recording.recording_add_on_result",
+          "status_code": "200"
         }
       ]
     },
@@ -1794,6 +2053,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Payloads.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/payloads",
+          "resource": "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload",
           "status_code": "200"
         }
       ]
@@ -1889,6 +2155,13 @@
           "pointer": "/",
           "resource": "CredentialLists.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/credential_lists",
+          "resource": "api.v2010.account.sip.sip_credential_list",
+          "status_code": "200"
         }
       ]
     },
@@ -1913,6 +2186,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Credentials.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/credentials",
+          "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
           "status_code": "200"
         }
       ]
@@ -1977,6 +2257,13 @@
           "pointer": "/",
           "resource": "Domains.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/domains",
+          "resource": "api.v2010.account.sip.sip_domain",
+          "status_code": "200"
         }
       ]
     },
@@ -2001,6 +2288,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/contents",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
           "status_code": "200"
         }
       ]
@@ -2052,6 +2346,13 @@
           "pointer": "/",
           "resource": "IpAccessControlListMappings.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/contents",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
+          "status_code": "200"
         }
       ]
     },
@@ -2101,6 +2402,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/contents",
+          "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
           "status_code": "200"
         }
       ]
@@ -2152,6 +2460,13 @@
           "pointer": "/",
           "resource": "CredentialListMappings.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/credential_list_mappings",
+          "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
+          "status_code": "200"
         }
       ]
     },
@@ -2201,6 +2516,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlListMappings.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/ip_access_control_list_mappings",
+          "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
           "status_code": "200"
         }
       ]
@@ -2265,6 +2587,13 @@
           "pointer": "/",
           "resource": "IpAccessControlLists.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/ip_access_control_lists",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list",
+          "status_code": "200"
         }
       ]
     },
@@ -2289,6 +2618,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAddresses.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/ip_addresses",
+          "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
           "status_code": "200"
         }
       ]
@@ -2353,6 +2689,13 @@
           "pointer": "/",
           "resource": "ShortCodes.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/short_codes",
+          "resource": "api.v2010.account.short_code",
+          "status_code": "200"
         }
       ]
     },
@@ -2390,6 +2733,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "SigningKeys.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/signing_keys",
+          "resource": "api.v2010.account.signing_key",
           "status_code": "200"
         }
       ]
@@ -2429,6 +2779,13 @@
           "pointer": "/",
           "resource": "Transcriptions.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/transcriptions",
+          "resource": "api.v2010.account.transcription",
+          "status_code": "200"
         }
       ]
     },
@@ -2467,6 +2824,13 @@
           "pointer": "/",
           "resource": "Records.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record",
+          "status_code": "200"
         }
       ]
     },
@@ -2485,6 +2849,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AllTime.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_all_time",
           "status_code": "200"
         }
       ]
@@ -2505,6 +2876,13 @@
           "pointer": "/",
           "resource": "Daily.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_daily",
+          "status_code": "200"
         }
       ]
     },
@@ -2523,6 +2901,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "LastMonth.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_last_month",
           "status_code": "200"
         }
       ]
@@ -2543,6 +2928,13 @@
           "pointer": "/",
           "resource": "Monthly.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_monthly",
+          "status_code": "200"
         }
       ]
     },
@@ -2561,6 +2953,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ThisMonth.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_this_month",
           "status_code": "200"
         }
       ]
@@ -2581,6 +2980,13 @@
           "pointer": "/",
           "resource": "Today.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_today",
+          "status_code": "200"
         }
       ]
     },
@@ -2599,6 +3005,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Yearly.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_yearly",
           "status_code": "200"
         }
       ]
@@ -2619,6 +3032,13 @@
           "pointer": "/",
           "resource": "Yesterday.json",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_records",
+          "resource": "api.v2010.account.usage.usage_record.usage_record_yesterday",
+          "status_code": "200"
         }
       ]
     },
@@ -2637,6 +3057,13 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Triggers.json",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/usage_triggers",
+          "resource": "api.v2010.account.usage.usage_trigger",
           "status_code": "200"
         }
       ]
@@ -6338,6 +6765,121 @@
         ]
       }
     },
+    "api.v2010.account.address.dependent_phone_number": {
+      "fields": [
+        "account_sid",
+        "address_requirements",
+        "api_version",
+        "capabilities",
+        "date_created",
+        "date_updated",
+        "emergency_address_sid",
+        "emergency_status",
+        "friendly_name",
+        "phone_number",
+        "sid",
+        "sms_application_sid",
+        "sms_fallback_method",
+        "sms_fallback_url",
+        "sms_method",
+        "sms_url",
+        "status_callback",
+        "status_callback_method",
+        "trunk_sid",
+        "uri",
+        "voice_application_sid",
+        "voice_caller_id_lookup",
+        "voice_fallback_method",
+        "voice_fallback_url",
+        "voice_method",
+        "voice_url"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "address_requirements": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "capabilities": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "emergency_address_sid": [
+          "string"
+        ],
+        "emergency_status": [
+          "string"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "sms_application_sid": [
+          "string"
+        ],
+        "sms_fallback_method": [
+          "string"
+        ],
+        "sms_fallback_url": [
+          "string"
+        ],
+        "sms_method": [
+          "string"
+        ],
+        "sms_url": [
+          "string"
+        ],
+        "status_callback": [
+          "string"
+        ],
+        "status_callback_method": [
+          "string"
+        ],
+        "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ],
+        "voice_application_sid": [
+          "string"
+        ],
+        "voice_caller_id_lookup": [
+          "boolean"
+        ],
+        "voice_fallback_method": [
+          "string"
+        ],
+        "voice_fallback_url": [
+          "string"
+        ],
+        "voice_method": [
+          "string"
+        ],
+        "voice_url": [
+          "string"
+        ]
+      }
+    },
     "api.v2010.account.application": {
       "fields": [
         "account_sid",
@@ -6492,6 +7034,412 @@
         ]
       }
     },
+    "api.v2010.account.available_phone_number_country.available_phone_number_local": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.available_phone_number_country.available_phone_number_machine_to_machine": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.available_phone_number_country.available_phone_number_mobile": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.available_phone_number_country.available_phone_number_national": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.available_phone_number_country.available_phone_number_shared_cost": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.available_phone_number_country.available_phone_number_toll_free": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.available_phone_number_country.available_phone_number_voip": {
+      "fields": [
+        "address_requirements",
+        "beta",
+        "capabilities",
+        "friendly_name",
+        "iso_country",
+        "lata",
+        "latitude",
+        "locality",
+        "longitude",
+        "phone_number",
+        "postal_code",
+        "rate_center",
+        "region"
+      ],
+      "types": {
+        "address_requirements": [
+          "string"
+        ],
+        "beta": [
+          "boolean"
+        ],
+        "capabilities": [
+          "object"
+        ],
+        "friendly_name": [
+          "string"
+        ],
+        "iso_country": [
+          "string"
+        ],
+        "lata": [
+          "string"
+        ],
+        "latitude": [
+          "number"
+        ],
+        "locality": [
+          "string"
+        ],
+        "longitude": [
+          "number"
+        ],
+        "phone_number": [
+          "string"
+        ],
+        "postal_code": [
+          "string"
+        ],
+        "rate_center": [
+          "string"
+        ],
+        "region": [
+          "string"
+        ]
+      }
+    },
     "api.v2010.account.balance": {
       "fields": [
         "account_sid",
@@ -6613,6 +7561,92 @@
           "string"
         ],
         "trunk_sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.call.call_event": {
+      "fields": [
+        "request",
+        "response"
+      ],
+      "types": {
+        "request": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "response": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.call.call_notification": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "date_created",
+        "date_updated",
+        "error_code",
+        "log",
+        "message_date",
+        "message_text",
+        "more_info",
+        "request_method",
+        "request_url",
+        "sid",
+        "uri"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "error_code": [
+          "string"
+        ],
+        "log": [
+          "string"
+        ],
+        "message_date": [
+          "string"
+        ],
+        "message_text": [
+          "string"
+        ],
+        "more_info": [
+          "string"
+        ],
+        "request_method": [
+          "string"
+        ],
+        "request_url": [
+          "string"
+        ],
+        "sid": [
           "string"
         ],
         "uri": [
@@ -8057,6 +9091,68 @@
         ]
       }
     },
+    "api.v2010.account.notification": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "call_sid",
+        "date_created",
+        "date_updated",
+        "error_code",
+        "log",
+        "message_date",
+        "message_text",
+        "more_info",
+        "request_method",
+        "request_url",
+        "sid",
+        "uri"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "call_sid": [
+          "string"
+        ],
+        "date_created": [
+          "string"
+        ],
+        "date_updated": [
+          "string"
+        ],
+        "error_code": [
+          "string"
+        ],
+        "log": [
+          "string"
+        ],
+        "message_date": [
+          "string"
+        ],
+        "message_text": [
+          "string"
+        ],
+        "more_info": [
+          "string"
+        ],
+        "request_method": [
+          "string"
+        ],
+        "request_url": [
+          "string"
+        ],
+        "sid": [
+          "string"
+        ],
+        "uri": [
+          "string"
+        ]
+      }
+    },
     "api.v2010.account.notification-instance": {
       "fields": [
         "account_sid",
@@ -9022,6 +10118,600 @@
           "string"
         ],
         "uri": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_all_time": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_daily": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_last_month": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_monthly": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_this_month": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_today": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_yearly": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
+          "string"
+        ]
+      }
+    },
+    "api.v2010.account.usage.usage_record.usage_record_yesterday": {
+      "fields": [
+        "account_sid",
+        "api_version",
+        "as_of",
+        "category",
+        "count",
+        "count_unit",
+        "description",
+        "end_date",
+        "price",
+        "price_unit",
+        "start_date",
+        "subresource_uris",
+        "uri",
+        "usage",
+        "usage_unit"
+      ],
+      "types": {
+        "account_sid": [
+          "string"
+        ],
+        "api_version": [
+          "string"
+        ],
+        "as_of": [
+          "string"
+        ],
+        "category": [
+          "string"
+        ],
+        "count": [
+          "string"
+        ],
+        "count_unit": [
+          "string"
+        ],
+        "description": [
+          "string"
+        ],
+        "end_date": [
+          "string"
+        ],
+        "price": [
+          "number"
+        ],
+        "price_unit": [
+          "string"
+        ],
+        "start_date": [
+          "string"
+        ],
+        "subresource_uris": [
+          "object"
+        ],
+        "uri": [
+          "string"
+        ],
+        "usage": [
+          "string"
+        ],
+        "usage_unit": [
           "string"
         ]
       }
