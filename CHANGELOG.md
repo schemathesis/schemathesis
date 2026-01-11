@@ -9,6 +9,10 @@
 - Capture primitive identifiers from POST/PUT responses returning bare strings or integers.
 - Normalize schema names by stripping common suffixes (`-Output`, `-Input`, `Out`, `In`, `DTO`).
 
+### :wrench: Changed
+
+- Deprioritize successfully deleted resources in variant selection to reduce wasted requests on non-existent resources.
+
 ### :bug: Fixed
 
 - CLI headers (`-H`) not being passed to schema loading requests. [#3440](https://github.com/schemathesis/schemathesis/issues/3440)
