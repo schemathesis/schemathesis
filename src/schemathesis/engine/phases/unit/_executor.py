@@ -319,13 +319,15 @@ def run_test(
     extra_data_source = (
         ctx.extra_data_source if fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled else None
     )
-    if extra_data_source is not None and extra_data_source.should_record(operation=operation.label):
+    if extra_data_source is not None:
         for case_id, interaction in recorder.interactions.items():
             response = interaction.response
             if response is None:
                 continue
             case = recorder.cases[case_id].value
-            extra_data_source.record_response(operation=operation, response=response, case=case)
+            # Record response data for operations that produce resources
+            if extra_data_source.should_record(operation=operation.label):
+                extra_data_source.record_response(operation=operation, response=response, case=case)
 
     yield scenario_finished(status)
 
@@ -370,6 +372,7 @@ def cached_test_func(f: Callable) -> Callable:
                     return None
                 try:
                     f(
+                        ctx=ctx,
                         case=case,
                         check_ctx=check_ctx,
                         recorder=recorder,
@@ -384,6 +387,7 @@ def cached_test_func(f: Callable) -> Callable:
                     ctx.cache_outcome(case, None)
             else:
                 f(
+                    ctx=ctx,
                     case=case,
                     check_ctx=check_ctx,
                     recorder=recorder,
@@ -423,6 +427,7 @@ def cached_test_func(f: Callable) -> Callable:
 @cached_test_func
 def test_func(
     *,
+    ctx: EngineContext,
     case: Case,
     check_ctx: CheckContext,
     recorder: ScenarioRecorder,
@@ -440,6 +445,13 @@ def test_func(
             recorder.record_request(case_id=case.id, request=error.request)
         raise
     recorder.record_response(case_id=case.id, response=response)
+    # Record DELETE attempts immediately to influence subsequent strategy draws.
+    # Include both successful (2xx) and 404 responses - each attempt increases decay
+    # to avoid hammering the same resource repeatedly.
+    if ctx.extra_data_source is not None:
+        status = response.status_code
+        if 200 <= status < 300 or status == 404:
+            ctx.extra_data_source.record_successful_delete(operation=case.operation, case=case)
     metrics.maximize(generation.maximize, case=case, response=response)
     validate_response(
         case=case,
