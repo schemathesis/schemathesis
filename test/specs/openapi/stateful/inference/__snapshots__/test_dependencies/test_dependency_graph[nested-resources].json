@@ -3,12 +3,14 @@
     "GET /users/{userId}/posts/{postId}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "userId",
           "resource": "User",
           "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "postId",
           "resource": "Post",
@@ -32,6 +34,7 @@
     "POST /users/{userId}/posts": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "userId",
           "resource": "User",

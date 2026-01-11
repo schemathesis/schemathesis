@@ -1622,6 +1622,52 @@ def snapshot_json(snapshot):
             },
             id="post-returns-string-identifier",
         ),
+        # Sub-resource inside array items should be discovered
+        # Like Mealie's AllBackups.imports which is an array of BackupFile refs
+        pytest.param(
+            {
+                **operation(
+                    "get",
+                    "/backups",
+                    "200",
+                    component_ref("AllBackups"),
+                ),
+                **operation(
+                    "delete",
+                    "/backups/{file_name}",
+                    "200",
+                    None,
+                    [path_param("file_name")],
+                ),
+            },
+            {
+                "schemas": {
+                    "AllBackups": {
+                        "type": "object",
+                        "properties": {
+                            "imports": {
+                                "type": "array",
+                                "items": component_ref("BackupFile"),
+                            },
+                            "templates": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        },
+                    },
+                    "BackupFile": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "date": {"type": "string"},
+                            "size": {"type": "string"},
+                        },
+                        "required": ["name"],
+                    },
+                }
+            },
+            id="subresource-in-array-items",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

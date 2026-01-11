@@ -3,12 +3,14 @@
     "DELETE /conversations/{conversation_id}/members/{member_id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "conversation_id",
           "resource": "Conversation",
           "resource_field": "uuid"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "member_id",
           "resource": "Member",

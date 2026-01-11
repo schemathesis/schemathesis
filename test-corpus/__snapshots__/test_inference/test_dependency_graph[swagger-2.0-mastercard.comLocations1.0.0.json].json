@@ -9,6 +9,13 @@
           "pointer": "/Atms",
           "resource": "Atms",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/Atms/0/Atm",
+          "resource": "Atm",
+          "status_code": "200"
         }
       ]
     },
@@ -21,6 +28,13 @@
           "pointer": "/Countries",
           "resource": "Countries",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/Countries/0/Country",
+          "resource": "Country",
+          "status_code": "200"
         }
       ]
     },
@@ -32,6 +46,13 @@
           "is_primitive_identifier": false,
           "pointer": "/CountrySubdivisions",
           "resource": "CountrySubdivisions",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/CountrySubdivisions/0/CountrySubdivision",
+          "resource": "CountrySubdivision",
           "status_code": "200"
         }
       ]
@@ -57,6 +78,13 @@
           "pointer": "/Countries",
           "resource": "Countries",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/Countries/0/Country",
+          "resource": "Country",
+          "status_code": "200"
         }
       ]
     },
@@ -68,6 +96,13 @@
           "is_primitive_identifier": false,
           "pointer": "/CountrySubdivisions",
           "resource": "CountrySubdivisions",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/CountrySubdivisions/0/CountrySubdivision",
+          "resource": "CountrySubdivision",
           "status_code": "200"
         }
       ]
@@ -81,11 +116,77 @@
           "pointer": "/Merchants",
           "resource": "Merchants",
           "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/Merchants/0/Merchant",
+          "resource": "Merchant",
+          "status_code": "200"
         }
       ]
     }
   },
   "resources": {
+    "Atm": {
+      "fields": [
+        "AccessFees",
+        "Availability",
+        "Camera",
+        "HandicapAccessible",
+        "InternationalMaestroAccepted",
+        "Location",
+        "Owner",
+        "SharedDeposit",
+        "Sponsor",
+        "SupportEMV",
+        "SurchargeFreeAlliance",
+        "SurchargeFreeAllianceNetwork"
+      ],
+      "types": {
+        "AccessFees": [
+          "string"
+        ],
+        "Availability": [
+          "string"
+        ],
+        "Camera": [
+          "string"
+        ],
+        "HandicapAccessible": [
+          "string"
+        ],
+        "InternationalMaestroAccepted": [
+          "integer"
+        ],
+        "Location": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "Owner": [
+          "string"
+        ],
+        "SharedDeposit": [
+          "string"
+        ],
+        "Sponsor": [
+          "string"
+        ],
+        "SupportEMV": [
+          "integer"
+        ],
+        "SurchargeFreeAlliance": [
+          "string"
+        ],
+        "SurchargeFreeAllianceNetwork": [
+          "string"
+        ]
+      }
+    },
     "Atms": {
       "fields": [
         "Atm",
@@ -124,6 +225,38 @@
         ]
       }
     },
+    "Country": {
+      "fields": [
+        "Code",
+        "Geocoding",
+        "Name"
+      ],
+      "types": {
+        "Code": [
+          "string"
+        ],
+        "Geocoding": [
+          "boolean"
+        ],
+        "Name": [
+          "string"
+        ]
+      }
+    },
+    "CountrySubdivision": {
+      "fields": [
+        "Code",
+        "Name"
+      ],
+      "types": {
+        "Code": [
+          "string"
+        ],
+        "Name": [
+          "string"
+        ]
+      }
+    },
     "CountrySubdivisions": {
       "fields": [
         "CountrySubdivision"
@@ -131,6 +264,81 @@
       "types": {
         "CountrySubdivision": [
           "array"
+        ]
+      }
+    },
+    "Merchant": {
+      "fields": [
+        "Acceptance",
+        "Category",
+        "Features",
+        "Id",
+        "Location",
+        "MerchantOfferId",
+        "Name",
+        "PhoneNumber",
+        "Products",
+        "Topup",
+        "WebsiteUrl"
+      ],
+      "types": {
+        "Acceptance": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "Category": [
+          "string"
+        ],
+        "Features": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "Id": [
+          "string"
+        ],
+        "Location": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "MerchantOfferId": [
+          "string"
+        ],
+        "Name": [
+          "string"
+        ],
+        "PhoneNumber": [
+          "string"
+        ],
+        "Products": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "Topup": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "WebsiteUrl": [
+          "string"
         ]
       }
     },

@@ -3,6 +3,7 @@
     "GET /channels/{channel_id}/messages": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "channel_id",
           "resource": "Channel",

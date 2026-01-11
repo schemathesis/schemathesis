@@ -15,6 +15,7 @@
     "GET /{source}/datasets/{dataset_id}/exports/json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "dataset_id",
           "resource": "Dataset",
