@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Sequence
+from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.resources import ResourceDescriptor

@@ -118,7 +118,7 @@ class ReportsConfig(DiffBase):
             self.ndjson.path = Path(ndjson_path) if ndjson_path is not None else ndjson_path
         if directory != DEFAULT_REPORT_DIRECTORY:
             self.directory = directory
-        if preserve_bytes is True:
+        if preserve_bytes:
             self.preserve_bytes = preserve_bytes
 
     def get_path(self, format: ReportFormat) -> Path:

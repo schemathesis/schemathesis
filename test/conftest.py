@@ -447,7 +447,7 @@ class CliSnapshotConfig:
             lines = data.splitlines()
             for idx, line in enumerate(lines):
                 if re.match(r".*\d+\. Test Case ID", line):
-                    sequential_id = lines[idx].split(".")[0]
+                    sequential_id = line.split(".")[0]
                     lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"
         if self.replace_uuid:
@@ -766,9 +766,7 @@ def openapi_3_schema_with_xml(ctx):
 
     # No `xml` attributes are used. The default behavior
     no_xml_object = make_object()
-    #
     renamed_property_xml_object = make_object(id_extra={"xml": {"name": "renamed-id"}})
-    #
     property_as_attribute = make_object(id_extra={"xml": {"attribute": True}})
 
     simple_array = make_array(items=id_schema)

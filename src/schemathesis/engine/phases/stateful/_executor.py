@@ -134,7 +134,7 @@ def execute_state_machine_loop(
                 raise
             except Exception as exc:
                 if isinstance(
-                    exc, (requests.ConnectionError, ChunkedEncodingError, requests.Timeout)
+                    exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
                 ) and is_unrecoverable_network_error(exc):
                     transport_kwargs = engine.get_transport_kwargs(operation=input.case.operation)
                     if exc.request is not None:

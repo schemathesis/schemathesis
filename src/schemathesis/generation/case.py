@@ -269,7 +269,7 @@ class Case:
         """
         if isinstance(value, Mapping):
             return hash((type(value), tuple(sorted((k, self._hash_container(v)) for k, v in value.items()))))
-        elif isinstance(value, (list, tuple)):
+        elif isinstance(value, list | tuple):
             return hash((type(value), tuple(self._hash_container(item) for item in value)))
         elif isinstance(value, NotSet):
             return _NOTSET_HASH

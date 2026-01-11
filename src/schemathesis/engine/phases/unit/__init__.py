@@ -56,7 +56,7 @@ def _create_scheduler(engine: EngineContext, phase: Phase) -> DefaultScheduler |
 
     # Get operation ordering config for this phase
     phase_config = engine.config.phases.get_by_name(name=phase.name.name)
-    assert isinstance(phase_config, (FuzzingPhaseConfig, CoveragePhaseConfig, ExamplesPhaseConfig))
+    assert isinstance(phase_config, FuzzingPhaseConfig | CoveragePhaseConfig | ExamplesPhaseConfig)
     ordering = phase_config.operation_ordering
 
     # If ordering is disabled, use regular scheduler with collected operations

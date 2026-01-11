@@ -85,7 +85,7 @@ class Bundler:
                         return {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
                     resolved_uri, resolved_schema = resolve(reference)
 
-                    if not isinstance(resolved_schema, (dict, bool)):
+                    if not isinstance(resolved_schema, dict | bool):
                         raise BundleError(reference, resolved_schema)
                     def_name = get_def_name(resolved_uri)
 
@@ -143,7 +143,7 @@ class Bundler:
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
                             else _bundle_recursive(value)
-                            if isinstance(value, (dict, list))
+                            if isinstance(value, dict | list)
                             else value
                             for key, value in current.items()
                         }
@@ -153,16 +153,16 @@ class Bundler:
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
                             else _bundle_recursive(value)
-                            if isinstance(value, (dict, list))
+                            if isinstance(value, dict | list)
                             else value
                             for key, value in current.items()
                         }
                 return {
-                    key: _bundle_recursive(value) if isinstance(value, (dict, list)) else value
+                    key: _bundle_recursive(value) if isinstance(value, dict | list) else value
                     for key, value in current.items()
                 }
             elif isinstance(current, list):
-                return [_bundle_recursive(item) if isinstance(item, (dict, list)) else item for item in current]  # type: ignore[misc]
+                return [_bundle_recursive(item) if isinstance(item, dict | list) else item for item in current]  # type: ignore[misc]
             # `isinstance` guards won't let it happen
             # Otherwise is present to make type checker happy
             return current  # pragma: no cover
@@ -220,7 +220,7 @@ def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str])
                     else:
                         components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)
                 result["components"] = components
-            elif isinstance(value, (dict, list)):
+            elif isinstance(value, dict | list):
                 result[key] = unbundle(value, name_to_uri)
             else:
                 result[key] = value

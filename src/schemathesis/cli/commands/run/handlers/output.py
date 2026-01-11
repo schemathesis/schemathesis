@@ -1803,7 +1803,7 @@ class StatusCodeStatistic:
 
     def _is_only_4xx_responses(self) -> bool:
         """Check if all responses are 4xx (excluding 5xx)."""
-        return all(400 <= code < 500 for code in self.counts.keys() if code not in {500})
+        return all(400 <= code < 500 for code in self.counts.keys() if code != 500)
 
     def _can_warn_about_4xx(self) -> bool:
         """Check basic conditions for 4xx warnings."""

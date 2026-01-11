@@ -630,19 +630,18 @@ def _find_matching_in_responses(
         if key.lower() == normalized:
             yield example[key]
             return
-    else:
-        # If no match found and it's an ID parameter, try additional checks
-        if is_id_param:
-            # Check for 'id' if parameter is '{something}Id'
-            if "id" in example:
-                yield example["id"]
-                return
-            # Check for '{schemaName}Id' or '{schemaName}_id'
-            if normalized == "id" or normalized.startswith(schema_name.lower()):
-                for key in (schema_name, schema_name.lower()):
-                    for suffix in ("_id", "Id"):
-                        with_suffix = f"{key}{suffix}"
-                        if with_suffix in example:
-                            yield example[with_suffix]
-                            return
+    # If no match found and it's an ID parameter, try additional checks
+    if is_id_param:
+        # Check for 'id' if parameter is '{something}Id'
+        if "id" in example:
+            yield example["id"]
+            return
+        # Check for '{schemaName}Id' or '{schemaName}_id'
+        if normalized == "id" or normalized.startswith(schema_name.lower()):
+            for key in (schema_name, schema_name.lower()):
+                for suffix in ("_id", "Id"):
+                    with_suffix = f"{key}{suffix}"
+                    if with_suffix in example:
+                        yield example[with_suffix]
+                        return
     yield NOT_FOUND

@@ -228,7 +228,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 continue
 
             dedup_key: DedupKey
-            if isinstance(value, (str, int, float, bool)) or value is None:
+            if isinstance(value, str | int | float | bool) or value is None:
                 dedup_key = (type(value), value)
             else:
                 try:

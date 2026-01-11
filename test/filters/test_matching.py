@@ -1,4 +1,5 @@
 import re
+from itertools import starmap
 
 import pytest
 
@@ -84,7 +85,7 @@ def case_id(case):
         return key
 
     def fmt_kwargs(kwargs):
-        return ",".join(fmt_item(key, value) for key, value in kwargs.items())
+        return ",".join(starmap(fmt_item, kwargs.items()))
 
     return "-".join(f"{kind}-{fmt_kwargs(kwargs)}" for kind, kwargs in case)
 

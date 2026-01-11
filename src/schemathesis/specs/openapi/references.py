@@ -59,7 +59,7 @@ def load_remote_uri(uri: str) -> Any:
 
     document = deserialize_yaml(response.content)
 
-    if not isinstance(document, (dict, list)):
+    if not isinstance(document, dict | list):
         raise RemoteDocumentError(
             f"Remote document is parsed as {type(document).__name__}, but an object/array is expected {_suffix()}"
         )

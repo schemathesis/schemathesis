@@ -416,10 +416,10 @@ def _encode(o: Any) -> str:
 
 
 def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
-    if isinstance(value, (dict, list)):
+    if isinstance(value, dict | list):
         serialized = _encode(value)
-        return (type(value), serialized)
-    return (type(value), value)
+        return type(value), serialized
+    return type(value), value
 
 
 class HashSet:
@@ -492,7 +492,7 @@ def _cover_positive_for_type(
                 yield from _positive_object(ctx, schema, cast(dict, template))
         elif "properties" in schema or "required" in schema:
             yield from _positive_object(ctx, schema, cast(dict, template))
-        elif "not" in schema and isinstance(schema["not"], (dict, bool)):
+        elif "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode
             nctx = ctx.with_negative()
@@ -861,7 +861,7 @@ def cover_schema_iter(
                             for value in cover_schema_iter(nctx, sub_schema, seen):
                                 if is_invalid_for_oneOf(value.value, idx, validators):
                                     yield value
-                elif key == "not" and isinstance(value, (dict, bool)):
+                elif key == "not" and isinstance(value, dict | bool):
                     # For 'not' schemas: generate positive cases of inner schema (valid values)
                     # These valid values are negative for the outer schema, so flip the mode
                     pctx = ctx.with_positive()
@@ -1191,9 +1191,8 @@ def _positive_array(
         # One item smaller than maximum if possible
         smaller = max_items - 1
         if (
-            smaller < INTERNAL_BUFFER_SIZE
-            and smaller > 0
-            and (min_items is None or smaller >= min_items)
+            INTERNAL_BUFFER_SIZE > smaller > 0
+                and (min_items is None or smaller >= min_items)
             and smaller not in seen_constraints
         ):
             value = ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})
@@ -1580,7 +1579,7 @@ def _negative_type(
         and schema.get("format") in ("binary", "byte")
         and ctx.path == ["type"]
         and ctx.media_type is not None
-        and ctx.media_type[1] not in ("json",)
+        and ctx.media_type[1] != "json"
     ):
         return
     # Form-urlencoded body-level type mutations serialize to empty body

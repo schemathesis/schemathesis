@@ -35,7 +35,7 @@ class ConfigError(SchemathesisError):
 
 
 def _format_minimum_error(error: ValidationError) -> str:
-    assert isinstance(error.validator_value, (int, float))
+    assert isinstance(error.validator_value, int | float)
     section = path_to_section_name(list(error.path)[:-1] if error.path else [])
     assert error.path
 
@@ -92,7 +92,7 @@ def _format_enum_error(error: ValidationError) -> str:
 
 def _format_type_error(error: ValidationError) -> str:
     expected = error.validator_value
-    assert isinstance(expected, (str, list))
+    assert isinstance(expected, str | list)
     section = path_to_section_name(list(error.path)[:-1] if error.path else [])
     assert error.path
 

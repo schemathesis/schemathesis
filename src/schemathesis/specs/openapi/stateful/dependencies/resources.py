@@ -370,10 +370,8 @@ def remove_unused_resources(operations: OperationMap, resources: ResourceMap) ->
     # Collect all resource names currently in use
     used_resources = set()
     for operation in operations.values():
-        for input_slot in operation.inputs:
-            used_resources.add(input_slot.resource.name)
-        for output_slot in operation.outputs:
-            used_resources.add(output_slot.resource.name)
+        used_resources.update(input_slot.resource.name for input_slot in operation.inputs)
+        used_resources.update(output_slot.resource.name for output_slot in operation.outputs)
 
     unused = set(resources.keys()) - used_resources
     for resource_name in unused:

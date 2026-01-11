@@ -526,7 +526,7 @@ def _handle_repeat_quantifier(
         parsed = sre_parse.parse(inner)
         if all(item[0] == LITERAL for item in parsed):
             inner_length = len(parsed)
-            if max_length and max_length > 0 and inner_length > max_length:
+            if max_length and 0 < max_length < inner_length:
                 return pattern
     except re.error:
         pass

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
+from itertools import starmap
 from typing import TypeVar
 
 T = TypeVar("T", bound="DiffBase")
@@ -36,7 +37,7 @@ class DiffBase:
         if isinstance(value, list) and isinstance(default, list):
             if len(value) != len(default):
                 return True
-            return any(self._has_diff(v, d) for v, d in zip(value, default, strict=False))
+            return any(starmap(self._has_diff, zip(value, default, strict=False)))
         if isinstance(value, dict) and isinstance(default, dict):
             if set(value.keys()) != set(default.keys()):
                 return True

@@ -56,7 +56,7 @@ def get_exclude_headers(case: Case) -> list[str]:
         return [phase_data.parameter]
 
     if (
-        isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData))
+        isinstance(phase_data, (FuzzingPhaseData | StatefulPhaseData))
         and case.meta.generation.mode.is_negative
         and phase_data.parameter_location == ParameterLocation.HEADER
         and phase_data.parameter is not None
@@ -90,7 +90,7 @@ def prepare_body(case: Case) -> list | dict[str, Any] | str | int | float | bool
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
     if isinstance(case.operation.schema, GraphQLSchema):
-        return case.body if isinstance(case.body, (NotSet, bytes)) else {"query": case.body}
+        return case.body if isinstance(case.body, NotSet | bytes) else {"query": case.body}
     return case.body
 
 

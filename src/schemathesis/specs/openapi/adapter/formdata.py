@@ -73,19 +73,17 @@ def prepare_multipart_v3(
                     files.append((name, (None, value, content_type)))
                 else:
                     files.append((name, value))
+            elif content_type:
+                files.append((name, (None, value, content_type)))
             else:
-                if content_type:
-                    files.append((name, (None, value, content_type)))
-                else:
-                    files.append((name, (None, value)))
+                files.append((name, (None, value)))
         elif isinstance(value, list):
             if content_type:
                 files.extend((name, (None, item, content_type)) for item in value)
             else:
                 files.extend((name, item) for item in value)
+        elif content_type:
+            files.append((name, (None, value, content_type)))
         else:
-            if content_type:
-                files.append((name, (None, value, content_type)))
-            else:
-                files.append((name, (None, value)))
+            files.append((name, (None, value)))
     return files or None, None
