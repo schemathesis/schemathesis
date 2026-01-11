@@ -87,6 +87,7 @@
     "GET /game/box/advanced": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
@@ -106,6 +107,7 @@
     "GET /games": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "id",
           "resource": "Game",
@@ -137,6 +139,7 @@
     "GET /games/players": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
@@ -156,6 +159,7 @@
     "GET /games/teams": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
@@ -175,6 +179,7 @@
     "GET /games/weather": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
@@ -194,6 +199,7 @@
     "GET /lines": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
@@ -213,9 +219,10 @@
     "GET /live/plays": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "id",
-          "resource": "LivePlayByPlay",
+          "resource": "PlayerGame",
           "resource_field": "id"
         }
       ],
@@ -232,6 +239,7 @@
     "GET /metrics/wp": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
@@ -275,18 +283,21 @@
     "GET /play/stats": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "gameId",
           "resource": "Game",
           "resource_field": "id"
         },
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "athleteId",
           "resource": "Athlete",
           "resource_field": "athleteId"
         },
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "statTypeId",
           "resource": "PlayStatType",
@@ -354,9 +365,10 @@
     "GET /player/usage": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "playerId",
-          "resource": "Player",
+          "resource": "PlayerGame",
           "resource_field": "id"
         }
       ],
@@ -397,9 +409,10 @@
     "GET /ppa/players/games": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "playerId",
-          "resource": "Player",
+          "resource": "PlayerGame",
           "resource_field": "id"
         }
       ],
@@ -416,9 +429,10 @@
     "GET /ppa/players/season": {
       "inputs": [
         {
+          "is_suffix_matched": true,
           "parameter_location": "query",
           "parameter_name": "playerId",
-          "resource": "Player",
+          "resource": "PlayerGame",
           "resource_field": "id"
         }
       ],

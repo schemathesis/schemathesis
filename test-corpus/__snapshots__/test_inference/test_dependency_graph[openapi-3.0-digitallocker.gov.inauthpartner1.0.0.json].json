@@ -3,6 +3,7 @@
     "GET /oauth2/1/authorize": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "query",
           "parameter_name": "client_id",
           "resource": "Client",
@@ -50,6 +51,7 @@
     "GET /oauth2/1/files/{id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "File",
@@ -141,6 +143,7 @@
     "POST /oauth2/1/code": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "client_id",
           "resource": "Client",
