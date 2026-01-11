@@ -216,3 +216,12 @@ def test_auth_cache_with_scopes(openapi3_base_url):
     list(from_schema(schema).execute())
     assert counts["list"] == 1
     assert counts["create"] == 1
+
+
+def test_noop_key_function_raises_not_implemented(mocker):
+    from schemathesis.auths import _noop_key_function
+
+    case = mocker.create_autospec(Case)
+    context = mocker.create_autospec(AuthContext)
+    with pytest.raises(NotImplementedError):
+        _noop_key_function(case, context)

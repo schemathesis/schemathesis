@@ -157,3 +157,28 @@ def test_hypothesis_max_examples_and_no_shrink_override(operation):
     assert hypothesis.Phase.reuse in op_settings.phases
 
     assert op_settings.derandomize is False
+
+
+def test_phases_for_with_none_operation():
+    config = SchemathesisConfig.from_dict({})
+    project = config.projects.get_default()
+    phases = project.phases_for(operation=None)
+    assert phases is project.phases
+
+
+def test_phases_for_with_matching_operation(operation):
+    config = SchemathesisConfig.from_dict(
+        {
+            "operations": [
+                {
+                    "include-name": "PUT /users/{user_id}",
+                    "phases": {
+                        "fuzzing": {"enabled": False},
+                    },
+                }
+            ],
+        }
+    )
+    project = config.projects.get_default()
+    phases = project.phases_for(operation=operation)
+    assert not phases.fuzzing.enabled

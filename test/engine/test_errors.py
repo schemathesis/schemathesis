@@ -1,6 +1,7 @@
 import requests
 
-from schemathesis.engine.errors import deduplicate_errors
+from schemathesis.core.errors import SerializationNotPossible
+from schemathesis.engine.errors import deduplicate_errors, is_unrecoverable_network_error
 
 
 def test_deduplicate_errors():
@@ -13,3 +14,27 @@ def test_deduplicate_errors():
         ),
     ]
     assert len(list(deduplicate_errors(errors))) == 1
+
+
+def test_deduplicate_errors_with_serialization_not_possible():
+    errors = [
+        SerializationNotPossible.from_media_types("text/csv", "application/xml"),
+        SerializationNotPossible.from_media_types("text/tsv"),
+        SerializationNotPossible.from_media_types("application/json"),
+    ]
+    deduplicated = list(deduplicate_errors(errors))
+    assert len(deduplicated) == 1
+    assert isinstance(deduplicated[0], SerializationNotPossible)
+    assert set(deduplicated[0].media_types) == {"text/csv", "application/xml", "text/tsv", "application/json"}
+
+
+def test_is_unrecoverable_network_error_chunked_encoding():
+    import requests.exceptions
+
+    error = requests.exceptions.ChunkedEncodingError("Connection broken")
+    assert is_unrecoverable_network_error(error) is True
+
+
+def test_is_unrecoverable_network_error_timeout():
+    error = requests.Timeout("Read timed out")
+    assert is_unrecoverable_network_error(error) is True

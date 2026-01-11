@@ -1752,6 +1752,57 @@ def test_resource_name_from_path_with_param(path, param_name, expected):
     assert naming.from_path(path, param_name) == expected
 
 
+def test_remove_unused_resources():
+    from schemathesis.core.parameters import ParameterLocation
+    from schemathesis.specs.openapi.stateful.dependencies.models import (
+        InputSlot,
+        OperationNode,
+        OutputSlot,
+        ResourceDefinition,
+    )
+    from schemathesis.specs.openapi.stateful.dependencies.resources import remove_unused_resources
+
+    # Create resources
+    user_resource = ResourceDefinition(name="User", fields=["id"], types={"id": {"string"}}, source=2)
+    post_resource = ResourceDefinition(name="Post", fields=["id"], types={"id": {"string"}}, source=2)
+    unused_resource = ResourceDefinition(name="Unused", fields=[], types={}, source=0)
+
+    # Create operations that use User and Post
+    operations = {
+        "POST /users": OperationNode(
+            method="POST",
+            path="/users",
+            inputs=[],
+            outputs=[OutputSlot(resource=user_resource, pointer="/", cardinality=1, status_code="201")],
+        ),
+        "GET /posts/{id}": OperationNode(
+            method="GET",
+            path="/posts/{id}",
+            inputs=[
+                InputSlot(
+                    resource=post_resource,
+                    resource_field="id",
+                    parameter_name="id",
+                    parameter_location=ParameterLocation.PATH,
+                )
+            ],
+            outputs=[],
+        ),
+    }
+
+    resources = {
+        "User": user_resource,
+        "Post": post_resource,
+        "Unused": unused_resource,
+    }
+
+    remove_unused_resources(operations, resources)
+
+    assert "User" in resources
+    assert "Post" in resources
+    assert "Unused" not in resources
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_cli, ctx):
     product_schema = {
