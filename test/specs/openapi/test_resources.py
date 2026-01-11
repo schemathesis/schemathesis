@@ -132,6 +132,60 @@ def test_data_source_provides_captured_variants(user_schema_builder):
     assert {"user_id": "2"} in variants
 
 
+def test_record_successful_delete_uses_only_resource_linked_params(ctx):
+    spec = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object", "properties": {"id": {"type": "string"}}}
+                                }
+                            },
+                            "links": {
+                                "DeleteItem": {
+                                    "operationId": "deleteItem",
+                                    "parameters": {"itemId": "$response.body#/id"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            # DELETE has two path params: itemId (resource-linked) and version (not resource-linked)
+            "/items/{itemId}/versions/{version}": {
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [
+                        {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}},
+                        {"name": "version", "in": "path", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"204": {"description": "Deleted"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "item-123"})
+
+    delete_operation = schema["/items/{itemId}/versions/{version}"]["DELETE"]
+    case = delete_operation.Case(path_parameters={"itemId": "item-123", "version": "v1"})
+
+    data_source.record_successful_delete(operation=delete_operation, case=case)
+
+    # The key should only contain the resource-linked parameter (itemId), not version
+    assert len(data_source.usage_tracker._delete_attempts) == 1
+    for key in data_source.usage_tracker._delete_attempts.keys():
+        assert "itemId" in key
+        assert "version" not in key
+        assert "v1" not in key
+
+
 def test_wildcard_status_code_matching(user_schema_builder):
     schema = user_schema_builder(status_code="2XX")
     data_source = schema.create_extra_data_source()

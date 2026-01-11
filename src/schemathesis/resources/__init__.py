@@ -25,16 +25,16 @@ class ExtraDataSource(Protocol):
         response: Response,
         case: Case,
     ) -> None:
-        """Record a response for later use in test generation.
+        """Record a response for later use in test generation."""
+        ...  # pragma: no cover
 
-        Handles deserialization and extraction of response data internally.
-
-        Args:
-            operation: The API operation that was tested.
-            response: The response object to record.
-            case: The test case that generated this response.
-
-        """
+    def record_successful_delete(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+    ) -> None:
+        """Record that a resource was successfully deleted."""
         ...  # pragma: no cover
 
 

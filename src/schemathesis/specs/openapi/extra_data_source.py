@@ -26,6 +26,9 @@ DedupKey: TypeAlias = tuple[type, str | int | float | bool | None]
 RECENCY_DECAY_FACTOR = 3.0
 # Maximum number of variants to track. Oldest entries are evicted when exceeded.
 MAX_TRACKED_VARIANTS = 10000
+# Decay factor for delete attempts. Weight = decay ^ attempts.
+# 0.3 gives: 0 attempts = 1.0, 1 = 0.3, 2 = 0.09, 3 = 0.027
+DELETE_ATTEMPT_DECAY = 0.3
 
 
 class VariantUsageTracker:
@@ -33,14 +36,16 @@ class VariantUsageTracker:
 
     Maintains a global step counter and records when each variant was last drawn.
     Recently drawn variants get lower weights to encourage diversity.
+    Also tracks DELETE attempts per variant to spread deletions across resources.
     Uses LRU eviction to bound memory usage.
     """
 
-    __slots__ = ("_step", "_last_drawn", "_maxlen", "_lock")
+    __slots__ = ("_step", "_last_drawn", "_delete_attempts", "_maxlen", "_lock")
 
     def __init__(self, maxlen: int = MAX_TRACKED_VARIANTS) -> None:
         self._step = 0
         self._last_drawn: dict[str, int] = {}
+        self._delete_attempts: dict[str, int] = {}
         self._maxlen = maxlen
         self._lock = threading.Lock()
 
@@ -51,6 +56,10 @@ class VariantUsageTracker:
         The shuffle uses the random source but decouples the selection from
         index ordering, so Hypothesis's bias toward small values doesn't
         cause preference for early indices.
+
+        Weights combine:
+        - Recency: recently drawn variants get lower weight (recovers over time)
+        - Delete attempts: variants targeted for deletion get permanently lower weight
         """
         n = len(variant_keys)
         with self._lock:
@@ -83,12 +92,25 @@ class VariantUsageTracker:
         return indices[-1]
 
     def _get_weight_unlocked(self, variant_key: str) -> float:
-        """Get weight without acquiring lock (caller must hold lock)."""
+        """Get weight without acquiring lock (caller must hold lock).
+
+        Combines recency weighting with delete attempt decay:
+        - Recency: recently drawn variants get lower weight (recovers over time)
+        - Delete attempts: variants targeted for deletion get exponentially lower weight (permanent)
+        """
+        # Recency-based weight (recovers over time)
         last_step = self._last_drawn.get(variant_key)
         if last_step is None:
-            return 1.0
-        age = self._step - last_step
-        return age / (age + RECENCY_DECAY_FACTOR)
+            recency_weight = 1.0
+        else:
+            age = self._step - last_step
+            recency_weight = age / (age + RECENCY_DECAY_FACTOR)
+
+        # Delete attempt decay (permanent, doesn't recover)
+        delete_attempts = self._delete_attempts.get(variant_key, 0)
+        delete_weight = DELETE_ATTEMPT_DECAY**delete_attempts
+
+        return recency_weight * delete_weight
 
     def record_draw(self, variant_key: str) -> None:
         """Record that a variant was drawn, advancing the global step."""
@@ -101,6 +123,15 @@ class VariantUsageTracker:
             # Evict oldest if over limit
             while len(self._last_drawn) > self._maxlen:
                 del self._last_drawn[next(iter(self._last_drawn))]
+
+    def record_successful_delete(self, variant_key: str) -> None:
+        """Record that a resource was successfully deleted.
+
+        Increments a permanent counter that reduces the variant's selection weight.
+        Unlike recency, this doesn't recover over time - deleted resources stay deprioritized.
+        """
+        with self._lock:
+            self._delete_attempts[variant_key] = self._delete_attempts.get(variant_key, 0) + 1
 
 
 @dataclass(slots=True, frozen=True)
@@ -274,3 +305,37 @@ class OpenApiExtraDataSource(ExtraDataSource):
             payload=payload,
             context=case.path_parameters or {},
         )
+
+    def record_successful_delete(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+    ) -> None:
+        """Record that a resource was successfully deleted.
+
+        This helps spread DELETE operations across different resources
+        by reducing the selection weight of deleted resources.
+        """
+        if operation.method.lower() != "delete":
+            return
+
+        if not case.path_parameters:
+            return
+
+        # Build variant key from resource-linked path parameters.
+        # This matches how variant keys are built in build_hybrid_strategy,
+        # where captured variants contain only resource-linked parameters.
+        resource_params = {}
+        for param_name, param_value in case.path_parameters.items():
+            if (operation.label, ParameterLocation.PATH, param_name) in self.requirements:
+                resource_params[param_name] = param_value
+
+        # Fall back to all path parameters for DELETE when no resource-linked params found.
+        # This ensures we track successful deletes even when the dependency graph
+        # doesn't link the DELETE operation's parameters to resources.
+        if not resource_params:
+            resource_params = dict(case.path_parameters)
+
+        variant_key = json.dumps(resource_params, sort_keys=True, default=str)
+        self.usage_tracker.record_successful_delete(variant_key)
