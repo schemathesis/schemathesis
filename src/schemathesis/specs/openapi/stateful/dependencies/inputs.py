@@ -106,25 +106,39 @@ def _resolve_parameter_dependency(
             resources[resource_name] = resource
 
     # Determine resource and its field
+    is_suffix_matched = False
     if resource is None:
-        # No schema found - create placeholder resource with inferred field
-        #
-        # Example: `DELETE /users/{userId}` with no response body -> `User` resource with "userId" field
-        #
-        # Later operations with schemas will upgrade this placeholder
-        if resource_name in resources:
-            # Resource exists but was empty - update with parameter field
-            resources[resource_name].fields = [parameter_name]
-            resources[resource_name].source = DefinitionSource.PARAMETER_INFERENCE
-            updated_resources.add(resource_name)
-            resource = resources[resource_name]
+        # Try to find an existing resource with matching suffix
+        # Example: parameter "file_name" → inferred "File" not found → check if "BackupFile" exists
+        matched_resource, matched_field = _find_matching_resource_by_suffix(
+            resource_name=resource_name,
+            parameter_name=parameter_name,
+            resources=resources,
+        )
+        if matched_resource is not None and matched_field is not None:
+            resource = matched_resource
+            resource_name = matched_resource.name
+            field = matched_field
+            is_suffix_matched = True
         else:
-            resource = ResourceDefinition.inferred_from_parameter(
-                name=resource_name,
-                parameter_name=parameter_name,
-            )
-            resources[resource_name] = resource
-        field = parameter_name
+            # No schema found - create placeholder resource with inferred field
+            #
+            # Example: `DELETE /users/{userId}` with no response body -> `User` resource with "userId" field
+            #
+            # Later operations with schemas will upgrade this placeholder
+            if resource_name in resources:
+                # Resource exists but was empty - update with parameter field
+                resources[resource_name].fields = [parameter_name]
+                resources[resource_name].source = DefinitionSource.PARAMETER_INFERENCE
+                updated_resources.add(resource_name)
+                resource = resources[resource_name]
+            else:
+                resource = ResourceDefinition.inferred_from_parameter(
+                    name=resource_name,
+                    parameter_name=parameter_name,
+                )
+                resources[resource_name] = resource
+            field = parameter_name
     else:
         # Match parameter to resource field (`userId` → `id`, `Id` → `ChannelId`, etc.)
         field = (
@@ -141,6 +155,7 @@ def _resolve_parameter_dependency(
         resource_field=field,
         parameter_name=parameter_name,
         parameter_location=parameter_location,
+        is_suffix_matched=is_suffix_matched,
     )
 
 
@@ -169,6 +184,46 @@ def _find_resource_in_responses(
             return extracted.resource
 
     return None
+
+
+def _find_matching_resource_by_suffix(
+    *,
+    resource_name: str,
+    parameter_name: str,
+    resources: ResourceMap,
+) -> tuple[ResourceDefinition, str] | tuple[None, None]:
+    """Find a resource with matching suffix when exact match not found.
+
+    When a parameter like "file_name" infers resource "File" but no "File" exists,
+    check if a resource ending with "File" exists (e.g., "BackupFile") and if the
+    parameter can be matched to one of its fields.
+
+    Only considers high-quality resources (schema-defined with properties) and
+    requires the parameter to match a field via find_matching_field.
+    """
+    # Normalize for case-insensitive matching
+    resource_lower = resource_name.lower()
+
+    for candidate_name, candidate_resource in resources.items():
+        # Only consider schema-defined resources
+        if candidate_resource.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
+            continue
+
+        # Check if candidate ends with the inferred resource name
+        # e.g., "BackupFile".lower().endswith("file") for resource_name="File"
+        if not candidate_name.lower().endswith(resource_lower):
+            continue
+
+        # Check if parameter can be matched to a field
+        matched_field = naming.find_matching_field(
+            parameter=parameter_name,
+            resource=candidate_name,
+            fields=candidate_resource.fields,
+        )
+        if matched_field is not None:
+            return candidate_resource, matched_field
+
+    return None, None
 
 
 GENERIC_FIELD_NAMES = frozenset(
@@ -341,8 +396,9 @@ def try_merge_input_resource(
     """Try to upgrade an input's resource to a producer's resource."""
     consumer_resource = input_slot.resource
 
-    # Only upgrade parameter-inferred resources (low confidence)
-    if consumer_resource.source != DefinitionSource.PARAMETER_INFERENCE:
+    # Only upgrade parameter-inferred resources (low confidence) or suffix-matched inputs
+    # Suffix-matched inputs may have matched a less specific resource (e.g., "Blog post" instead of "Blog post public")
+    if consumer_resource.source != DefinitionSource.PARAMETER_INFERENCE and not input_slot.is_suffix_matched:
         return None
 
     # Try each producer output

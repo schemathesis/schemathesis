@@ -1,0 +1,69 @@
+{
+  "operations": {
+    "DELETE /backups/{file_name}": {
+      "inputs": [
+        {
+          "is_suffix_matched": true,
+          "parameter_location": "path",
+          "parameter_name": "file_name",
+          "resource": "BackupFile",
+          "resource_field": "name"
+        }
+      ],
+      "outputs": []
+    },
+    "GET /backups": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "AllBackups",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/0/imports",
+          "resource": "BackupFile",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "AllBackups": {
+      "fields": [
+        "imports",
+        "templates"
+      ],
+      "types": {
+        "imports": [
+          "array"
+        ],
+        "templates": [
+          "array"
+        ]
+      }
+    },
+    "BackupFile": {
+      "fields": [
+        "date",
+        "name",
+        "size"
+      ],
+      "types": {
+        "date": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "size": [
+          "string"
+        ]
+      }
+    }
+  }
+}

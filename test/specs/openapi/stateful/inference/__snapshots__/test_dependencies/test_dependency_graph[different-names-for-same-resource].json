@@ -3,6 +3,7 @@
     "DELETE /spaces/{id}": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "Space",
@@ -14,6 +15,7 @@
     "POST /spaces/{spaceId}/topic": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "spaceId",
           "resource": "Space",

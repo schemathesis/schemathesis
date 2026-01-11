@@ -15,6 +15,7 @@
     "POST /orders": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "customer_id",
           "resource": "Customer",

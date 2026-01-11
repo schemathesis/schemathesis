@@ -105,7 +105,14 @@
       ]
     },
     "GET /api/patch/v1/export/packages/{package_name}/systems": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "package_name",
+          "resource": "Package",
+          "resource_field": "package_name"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -179,7 +186,14 @@
       ]
     },
     "GET /api/patch/v1/packages/{package_name}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "package_name",
+          "resource": "Package",
+          "resource_field": "package_name"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -191,7 +205,14 @@
       ]
     },
     "GET /api/patch/v1/packages/{package_name}/systems": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "package_name",
+          "resource": "Package",
+          "resource_field": "package_name"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -203,7 +224,14 @@
       ]
     },
     "GET /api/patch/v1/packages/{package_name}/versions": {
-      "inputs": [],
+      "inputs": [
+        {
+          "parameter_location": "path",
+          "parameter_name": "package_name",
+          "resource": "Package",
+          "resource_field": "package_name"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "MANY",
@@ -318,6 +346,12 @@
     "Inventory": {
       "fields": [
         "inventory_id"
+      ],
+      "types": {}
+    },
+    "Package": {
+      "fields": [
+        "package_name"
       ],
       "types": {}
     },

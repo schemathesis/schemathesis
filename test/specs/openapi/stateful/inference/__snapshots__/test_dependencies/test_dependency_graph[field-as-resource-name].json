@@ -3,6 +3,7 @@
     "DELETE /categories/{id}.json": {
       "inputs": [
         {
+          "is_suffix_matched": false,
           "parameter_location": "path",
           "parameter_name": "id",
           "resource": "Category",

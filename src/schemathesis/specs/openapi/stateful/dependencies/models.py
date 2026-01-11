@@ -277,7 +277,7 @@ class OperationNode:
     __slots__ = ("method", "path", "inputs", "outputs")
 
 
-@dataclass
+@dataclass(slots=True)
 class InputSlot:
     """A required input for an operation."""
 
@@ -290,8 +290,9 @@ class InputSlot:
     # Integer means index in an array (only single items are supported)
     parameter_name: str | int
     parameter_location: ParameterLocation
-
-    __slots__ = ("resource", "resource_field", "parameter_name", "parameter_location")
+    # Whether this input was matched via suffix matching (e.g., "file_name" → "BackupFile")
+    # Suffix-matched inputs can be upgraded by merge_related_resources if a producer exists
+    is_suffix_matched: bool = False
 
 
 @dataclass(slots=True)

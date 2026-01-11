@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1backups/get",
+    {
+      "DeleteBackupFile": {
+        "operationRef": "#/paths/~1backups~1{file_name}/delete",
+        "parameters": {
+          "path.file_name": "$response.body#/0/imports/0/name"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]
