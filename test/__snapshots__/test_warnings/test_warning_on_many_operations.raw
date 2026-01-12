@@ -27,7 +27,7 @@ Missing test data: 4 operations repeatedly returned 404 Not Found, preventing te
   - GET /custom_format
   - GET /failure
   - GET /multiple_failures
-  + 1 more
+  - GET /success
 
 💡 Provide realistic parameter values in your config file so tests can access existing resources
 
