@@ -1315,13 +1315,10 @@ class OutputHandler(EventHandler):
         if tips:
             click.echo()
 
-    def _print_items_truncated(self, items: set[str], max_items: int = 3) -> None:
-        """Print up to max_items, then show +N more."""
-        for item in sorted(items)[:max_items]:
+    def _print_items(self, items: set[str]) -> None:
+        """Print all items."""
+        for item in sorted(items):
             click.echo(_style(f"  - {item}", fg="yellow"))
-        extra = len(items) - max_items
-        if extra > 0:
-            click.echo(_style(f"  + {extra} more", fg="yellow"))
 
     def _display_warning_block(
         self,
@@ -1342,11 +1339,11 @@ class OutputHandler(EventHandler):
                 count = len(ops)
                 plural = "" if count == 1 else "s"
                 click.echo(_style(f"{status_code} {status_text} ({count} {entity_name}{plural}):", fg="yellow"))
-                self._print_items_truncated(ops)
+                self._print_items(ops)
         else:
             # Simple set of operations
             self._print_warning_header(title, len(operations), entity_name, suffix_text)
-            self._print_items_truncated(operations)
+            self._print_items(operations)
 
         self._print_warning_tips(tips)
 
@@ -1362,8 +1359,7 @@ class OutputHandler(EventHandler):
         """Display warnings with detailed messages per entity."""
         self._print_warning_header(title, len(warnings), entity_name, suffix_text)
 
-        # Show up to 3 entities with their messages
-        for idx, (entity_label, messages) in enumerate(sorted(warnings.items())[:3]):
+        for idx, (entity_label, messages) in enumerate(sorted(warnings.items())):
             if show_entity_label:
                 click.echo(_style(f"  - {entity_label}", fg="yellow"))
                 for message in sorted(messages):
@@ -1373,12 +1369,8 @@ class OutputHandler(EventHandler):
                     click.echo(_style(f"  {message}", fg="yellow"))
 
             # Add spacing between entities (but not after the last one)
-            if idx < min(len(warnings), 3) - 1:
+            if idx < len(warnings) - 1:
                 click.echo()
-
-        extra = len(warnings) - 3
-        if extra > 0:
-            click.echo(_style(f"  + {extra} more", fg="yellow"))
 
         self._print_warning_tips(tips)
 
