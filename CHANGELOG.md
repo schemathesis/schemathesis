@@ -8,13 +8,14 @@
 - NDJSON report format (`--report=ndjson`) for exporting all engine events as newline-delimited JSON.
 - Capture primitive identifiers from POST/PUT responses returning bare strings or integers.
 - Normalize schema names by stripping common suffixes (`-Output`, `-Input`, `Out`, `In`, `DTO`).
-
-### :wrench: Changed
-
-- Deprioritize successfully deleted resources in variant selection to reduce wasted requests on non-existent resources.
 - Discover sub-resources inside array `items` (e.g., `BackupFile` from `AllBackups.imports[]`).
 - Recognize `_name` and `-name` parameter suffixes for resource inference (e.g., `file_name` -> `File`).
 - Match parameters to resources with matching suffixes or prefixes when exact match not found (e.g., `file_name` -> `BackupFile.name`, `group_slug` -> `GroupSummary.slug`).
+
+### :wrench: Changed
+
+- Show all affected operations in CLI warnings instead of truncating to 3.
+- Deprioritize successfully deleted resources in variant selection to reduce wasted requests on non-existent resources.
 
 ### :bug: Fixed
 
