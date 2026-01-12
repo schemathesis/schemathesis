@@ -16,6 +16,7 @@
 
 - Show all affected operations in CLI warnings instead of truncating to 3.
 - Deprioritize successfully deleted resources in variant selection to reduce wasted requests on non-existent resources.
+- Generate clean HTTP headers (ASCII without control characters) 95% of the time to reduce invalid request errors.
 
 ### :bug: Fixed
 

@@ -51,6 +51,10 @@ from .negative import GeneratedValue, negative_schema
 from .negative.utils import can_negate
 
 SLASH = "/"
+# Probability threshold for generating "clean" headers (ASCII without control characters)
+CLEAN_HEADER_THRESHOLD = 0.95
+# ASCII control characters (0x00-0x1F and 0x7F) that are invalid in HTTP headers
+ASCII_CONTROL_CHARS = "".join(chr(i) for i in range(32)) + "\x7f"
 StrategyFactory = Callable[
     [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema.protocols.Validator]],
     st.SearchStrategy,
@@ -735,17 +739,34 @@ def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
 
 def _build_custom_formats(generation_config: GenerationConfig) -> dict[str, st.SearchStrategy]:
     custom_formats = {**get_default_format_strategies(), **STRING_FORMATS}
-    header_values_kwargs = {}
+    header_values_kwargs: dict[str, Any] = {}
     if generation_config.exclude_header_characters is not None:
         header_values_kwargs["exclude_characters"] = generation_config.exclude_header_characters
         if not generation_config.allow_x00:
             header_values_kwargs["exclude_characters"] += "\x00"
     elif not generation_config.allow_x00:
         header_values_kwargs["exclude_characters"] = DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00"
-    if generation_config.codec is not None:
+    if generation_config.codec not in (None, "utf-8"):
+        # User explicitly set a non-default codec - use it directly
         header_values_kwargs["codec"] = generation_config.codec
-    if header_values_kwargs:
         custom_formats[HEADER_FORMAT] = header_values(**header_values_kwargs)
+    else:
+        # Default codec - use probabilistic clean/fuzzing headers
+        base_exclude = header_values_kwargs.get("exclude_characters", "")
+        clean_exclude = base_exclude + ASCII_CONTROL_CHARS
+        # Deduplicate
+        clean_exclude = "".join(sorted(set(clean_exclude)))
+
+        @st.composite  # type: ignore[untyped-decorator]
+        def header_strategy(draw: st.DrawFn) -> str:
+            random = draw(st.randoms())
+            if random.random() < CLEAN_HEADER_THRESHOLD:
+                # Clean headers: ASCII without control characters
+                return draw(header_values(codec="ascii", exclude_characters=clean_exclude))
+            # Fuzzing headers: allow unicode and control characters
+            return draw(header_values(**header_values_kwargs))
+
+        custom_formats[HEADER_FORMAT] = header_strategy()
     return custom_formats
 
 
