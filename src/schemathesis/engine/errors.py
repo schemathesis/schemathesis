@@ -366,8 +366,7 @@ def deduplicate_errors(errors: Sequence[Exception]) -> Iterator[Exception]:
     for error in errors:
         # Collect media types
         if isinstance(error, SerializationNotPossible):
-            for media_type in error.media_types:
-                serialization_media_types.add(media_type)
+            serialization_media_types.update(error.media_types)
             continue
 
         message = canonicalize_error_message(error)
@@ -433,7 +432,7 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
 
         return False
 
-    if isinstance(exc, (requests.Timeout, requests.exceptions.ChunkedEncodingError)):
+    if isinstance(exc, requests.Timeout | requests.exceptions.ChunkedEncodingError):
         return True
     if isinstance(exc.__context__, ProtocolError):
         if len(exc.__context__.args) == 2 and isinstance(exc.__context__.args[1], RemoteDisconnected):

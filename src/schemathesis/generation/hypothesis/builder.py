@@ -535,7 +535,7 @@ def _stringify_value(val: Any, container_name: str) -> Any:
         return "true"
     if val is False:
         return "false"
-    if isinstance(val, (int, float)):
+    if isinstance(val, int | float):
         return str(val)
     if isinstance(val, list):
         if container_name == "query":
@@ -646,7 +646,7 @@ def _iter_coverage_cases(
                 schema = dict(schema)
                 # User-registered media types should only handle text / binary data
                 if body.media_type in MEDIA_TYPES:
-                    schema["examples"] = [example for example in examples if isinstance(example, (str, bytes))]
+                    schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]
                 else:
                     schema["examples"] = examples
             try:
@@ -668,7 +668,7 @@ def _iter_coverage_cases(
             )
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet) or (
-                body.media_type in MEDIA_TYPES and not isinstance(value.value, (str, bytes))
+                body.media_type in MEDIA_TYPES and not isinstance(value.value, str | bytes)
             ):
                 continue
             if body.is_required:
@@ -700,7 +700,7 @@ def _iter_coverage_cases(
                 instant = Instant()
                 try:
                     next_value = next(iterator)
-                    if body.media_type in MEDIA_TYPES and not isinstance(next_value.value, (str, bytes)):
+                    if body.media_type in MEDIA_TYPES and not isinstance(next_value.value, str | bytes):
                         continue
 
                     data = template.with_body(value=next_value, media_type=body.media_type)

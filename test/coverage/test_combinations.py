@@ -30,7 +30,7 @@ def assert_unique(values: list):
     for value in values:
         if isinstance(value, GeneratedValue):
             value = value.value
-        if isinstance(value, (dict, list)):
+        if isinstance(value, (dict | list)):
             serialized = json.dumps(value, sort_keys=True)
             key = (type(value), serialized)
         else:
@@ -135,7 +135,7 @@ class AnyString:
 
 class AnyNumber:
     def __eq__(self, value: object, /) -> bool:
-        return not isinstance(value, bool) and isinstance(value, (int, float))
+        return not isinstance(value, bool) and isinstance(value, (int | float))
 
 
 @pytest.mark.parametrize(
@@ -1967,7 +1967,7 @@ def test_negative_binary_string_type_violation(ctx_factory):
     assert_unique(covered)
     # Check that we generate non-string values for the binary property
     non_string_values = [
-        v for v in covered if isinstance(v, dict) and "value" in v and not isinstance(v["value"], (str, bytes))
+        v for v in covered if isinstance(v, dict) and "value" in v and not isinstance(v["value"], (str | bytes))
     ]
     assert len(non_string_values) > 0, "Should generate non-string type violations for binary format"
     assert_not_conform(covered, schema)

@@ -283,7 +283,7 @@ def test_path_parameters_are_string(data, schema):
     validate_schema(new_schema)
     # And parameters remain primitive types
     new_instance = data.draw(from_schema(new_schema))
-    assert not isinstance(new_instance["foo"], (list, dict))
+    assert not isinstance(new_instance["foo"], (list | dict))
     # And there should be no additional parameters
     assert len(new_instance) == 1
     # And instances valid for this schema are not valid for the original one

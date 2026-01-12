@@ -99,7 +99,7 @@ class OpenApiSecurity:
         meta = case.meta
         if meta and meta.generation.mode.is_negative:
             phase_data = meta.phase.data
-            if isinstance(phase_data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
+            if isinstance(phase_data, FuzzingPhaseData | CoveragePhaseData | StatefulPhaseData):
                 mutated_param = phase_data.parameter
                 mutated_location = phase_data.parameter_location
                 if mutated_param and mutated_location:

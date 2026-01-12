@@ -429,7 +429,7 @@ def try_merge_input_resource(
             )
 
             if matched_field is not None:
-                return (producer_resource.name, matched_field)
+                return producer_resource.name, matched_field
 
     return None
 

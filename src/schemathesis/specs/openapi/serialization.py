@@ -80,7 +80,7 @@ def _serialize_path_openapi3(
         if type_ == "object":
             if explode is False:
                 yield comma_delimited_object(name)
-            if explode is True:
+            if explode:
                 yield delimited_object(name)
         if type_ == "array":
             yield delimited(name, delimiter=",")
@@ -109,7 +109,7 @@ def _serialize_query_openapi3(
         if style is None or style == "form":
             if explode is False:
                 yield comma_delimited_object(name)
-            if explode is True:
+            if explode:
                 yield extracted_object(name)
     elif type_ == "array" and explode is False:
         if style == "pipeDelimited":
@@ -131,7 +131,7 @@ def _serialize_header_openapi3(
     if type_ == "object":
         if explode is False:
             yield comma_delimited_object(name)
-        if explode is True:
+        if explode:
             yield delimited_object(name)
 
 
@@ -199,7 +199,7 @@ def force_iterable(value: Any) -> list | tuple:
 
     Only relevant for negative test scenarios where the original types might be changed.
     """
-    if isinstance(value, (tuple, list)):
+    if isinstance(value, tuple | list):
         return value
     return [value]
 

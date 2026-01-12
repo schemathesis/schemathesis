@@ -1,3 +1,5 @@
+import string
+
 import pytest
 
 from schemathesis.config import OutputConfig, TruncationConfig
@@ -68,10 +70,10 @@ def test_prepare_response_payload(payload, expected):
 
 
 def test_prepare_response_payload_truncated():
-    value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" * 30
+    value = string.ascii_uppercase * 30
     assert prepare_response_payload(value, config=OutputConfig()).endswith(" // Output truncated...")
 
 
 def test_prepare_response_payload_no_truncation():
-    value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    value = string.ascii_uppercase
     assert prepare_response_payload(value, config=OutputConfig(truncation=TruncationConfig(enabled=False))) == value

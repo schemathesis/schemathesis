@@ -169,7 +169,7 @@ class Response:
 
         reason = http.client.responses.get(response.status_code, "Unknown")
         data = response.get_data()
-        if response.response == []:
+        if not response.response:
             # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
             encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
         else:
@@ -198,7 +198,7 @@ class Response:
     @property
     def text(self) -> str:
         """Decode response content as text using the detected or default encoding."""
-        return self.content.decode(self.encoding if self.encoding else "utf-8")
+        return self.content.decode(self.encoding or "utf-8")
 
     def json(self) -> Any:
         """Parse response content as JSON.

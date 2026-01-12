@@ -21,7 +21,7 @@ def _restful_order_key(label: str) -> tuple[int, str]:
         priority = 1
     else:
         priority = 2
-    return (priority, label)
+    return priority, label
 
 
 def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
@@ -121,7 +121,7 @@ def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:
         if remaining:
             layers.append(remaining)
 
-    return layers if layers else None
+    return layers or None
 
 
 def _compute_layers_with_cycles(
@@ -196,7 +196,7 @@ def _compute_layers_with_cycles(
             current_layer.sort(key=_restful_order_key)
             layers.append(current_layer)
 
-    return layers if layers else None
+    return layers or None
 
 
 def _find_sccs(

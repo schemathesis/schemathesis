@@ -369,7 +369,7 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
             return {"error": "Invalid name"}, 400
 
         price = data.get("price", 9.99)
-        if not isinstance(price, (int, float)):
+        if not isinstance(price, (int | float)):
             return {"error": "Invalid price"}, 400
 
         product_id = str(next_id)

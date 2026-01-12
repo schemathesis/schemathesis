@@ -527,25 +527,25 @@ def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
 
     """
     if parameter_name.endswith("Id") and len(parameter_name) > 2:
-        return (parameter_name[:-2], "Id")
+        return parameter_name[:-2], "Id"
 
     # Composite suffixes first (longer patterns before shorter ones)
     if parameter_name.endswith("_id_or_slug") and len(parameter_name) > 11:
-        return (parameter_name[:-11], "_id_or_slug")
+        return parameter_name[:-11], "_id_or_slug"
 
     if parameter_name.endswith("-id-or-slug") and len(parameter_name) > 11:
-        return (parameter_name[:-11], "-id-or-slug")
+        return parameter_name[:-11], "-id-or-slug"
 
     if parameter_name.endswith("_id") and len(parameter_name) > 3:
-        return (parameter_name[:-3], "_id")
+        return parameter_name[:-3], "_id"
 
     if parameter_name.endswith("_guid") and len(parameter_name) > 5:
-        return (parameter_name[:-5], "_guid")
+        return parameter_name[:-5], "_guid"
 
     if parameter_name.endswith("_slug") and len(parameter_name) > 5:
-        return (parameter_name[:-5], "_slug")
+        return parameter_name[:-5], "_slug"
 
-    return ("", parameter_name)
+    return "", parameter_name
 
 
 def strip_affixes(name: str, prefixes: list[str], suffixes: list[str]) -> str:

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Collection, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Collection, Iterator, Mapping
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import OperationNotFound

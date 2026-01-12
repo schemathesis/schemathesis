@@ -85,7 +85,7 @@ def test_multipart_without_custom_encoding_uses_default():
 
     @given(case=operation.as_strategy())
     def test(case):
-        assert isinstance(case.body["file"], (bytes, Binary))
+        assert isinstance(case.body["file"], (bytes | Binary))
         assert isinstance(case.body["name"], str)
 
     test()
@@ -126,7 +126,7 @@ def test_multipart_encoding_without_registered_strategy_falls_back():
     @given(case=operation.as_strategy())
     def test(case):
         # Should fall back to default strategy
-        assert isinstance(case.body["file"], (bytes, Binary))
+        assert isinstance(case.body["file"], (bytes | Binary))
 
     test()
 
@@ -484,7 +484,7 @@ def test_multipart_defensive_non_string_content_type():
     @given(case=operation.as_strategy())
     def test(case):
         # Should fall back to default strategy
-        assert isinstance(case.body["data"], (bytes, Binary))
+        assert isinstance(case.body["data"], (bytes | Binary))
 
     test()
 

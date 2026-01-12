@@ -967,7 +967,7 @@ def test_header_conformance(ctx, response_factory, version, header, schema, valu
     schema = schemathesis.openapi.from_dict(base_schema)
     case = make_case(schema, base_schema["paths"]["/data"]["get"])
     response = Response.from_requests(response_factory.requests(headers={header: value}), True)
-    if expected is True:
+    if expected:
         assert response_headers_conformance(CTX, response, case) is None
     else:
         with pytest.raises(AssertionError, match="Response header does not conform to the schema"):

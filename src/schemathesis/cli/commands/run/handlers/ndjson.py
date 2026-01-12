@@ -41,7 +41,7 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
         return None
     if isinstance(obj, Unresolvable):
         return {"$unresolvable": True}
-    if obj is None or isinstance(obj, (bool, int, float, str)):
+    if obj is None or isinstance(obj, bool | int | float | str):
         return obj
     if isinstance(obj, bytes):
         return {"$base64": base64.b64encode(obj).decode("ascii")}
@@ -51,7 +51,7 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
         return {k: serialize(v, sanitization=sanitization) for k, v in obj.items()}
     if isinstance(obj, Mapping):
         return {k: serialize(v, sanitization=sanitization) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [serialize(v, sanitization=sanitization) for v in obj]
     if isinstance(obj, Ok):
         return serialize(obj.ok(), sanitization=sanitization)

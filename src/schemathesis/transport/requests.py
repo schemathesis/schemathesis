@@ -208,7 +208,7 @@ def yaml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
 def _should_coerce_to_bytes(item: Any) -> bool:
     """Whether the item should be converted to bytes."""
     # These types are OK in forms, others should be coerced to bytes
-    return isinstance(item, Binary) or not isinstance(item, (bytes, str, int))
+    return isinstance(item, Binary) or not isinstance(item, (bytes | str | int))
 
 
 def _prepare_form_data(data: dict[str, Any]) -> dict[str, Any]:

@@ -1932,7 +1932,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
         data = request.get_json() or {}
         if not isinstance(data, dict):
             return {"error": "Invalid input"}, 400
-        if not isinstance(data.get("price", 0), (int, float)):
+        if not isinstance(data.get("price", 0), (int | float)):
             return {"error": "Invalid price"}, 400
 
         product_id = str(next_id)

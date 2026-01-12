@@ -74,7 +74,7 @@ def serialize_yaml(value: Any) -> dict[str, Any]:
         return {"data": value}
     if isinstance(value, Binary):
         return {"data": value.data}
-    if isinstance(value, (list, dict)):
+    if isinstance(value, (list | dict)):
         value = transform(value, _replace_binary)
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
@@ -109,7 +109,7 @@ def _serialize_xml(value: Any, schema: dict[str, Any], resource_name: str | None
     """
     from schemathesis.core.compat import RefResolver
 
-    if isinstance(value, (bytes, str)):
+    if isinstance(value, (bytes | str)):
         return {"data": value}
     resolver = RefResolver.from_schema(schema)
     if "$ref" in schema:
@@ -291,7 +291,7 @@ def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
 
 def _escape_xml(value: JSON) -> str:
     """Escape special characters in XML content."""
-    if isinstance(value, (int, float, bool)):
+    if isinstance(value, (int | float | bool)):
         return str(value)
     if value is None:
         return ""

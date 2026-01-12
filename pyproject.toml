@@ -130,6 +130,7 @@ select = [
   "I",      # isort
   "FURB",   # refurb
   "PGH003", # blanket-type-ignore
+  "UP",     # pyupgrade
 ]
 ignore = [
   "E501",   # Line too long
@@ -145,6 +146,8 @@ ignore = [
   "D203",   # One blank line before class
   "D213",   # Multiline summary second line
   "D401",   # Imperative mood
+  "COM812", # twice "," in dict/tuple/list
+  "SIM910", # delete default arguments in .get() in some cases
 ]
 
 [tool.ruff.lint.isort]

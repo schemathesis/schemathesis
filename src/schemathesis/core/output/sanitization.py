@@ -23,11 +23,11 @@ def sanitize_value(item: Any, *, config: SanitizationConfig) -> None:
                 else:
                     item[key] = config.replacement
         for value in item.values():
-            if isinstance(value, (MutableMapping, MutableSequence)):
+            if isinstance(value, MutableMapping | MutableSequence):
                 sanitize_value(value, config=config)
     elif isinstance(item, MutableSequence):
         for value in item:
-            if isinstance(value, (MutableMapping, MutableSequence)):
+            if isinstance(value, MutableMapping | MutableSequence):
                 sanitize_value(value, config=config)
 
 

@@ -22,12 +22,14 @@ def run_memray(schema_path: str, args: list[str]) -> dict[str, Any]:
             stdout=subprocess.PIPE,
             text=True,
             env={**os.environ, "SCHEMATHESIS_HOOKS": "benches.memory.hooks"},
+            check=False,
         )
 
         subprocess.run(
             ["memray", "stats", "--force", "-o", stats_output, "--json", memray_output],
             stdout=subprocess.PIPE,
             text=True,
+            check=False,
         )
 
         with open(stats_output) as f:
