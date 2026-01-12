@@ -1716,13 +1716,12 @@ def test_output_sanitization_via_config(cli, openapi2_schema_url, hypothesis_max
         else:
             # Config disables sanitization, CLI enables it
             expected = "curl -X GET -H 'Authorization: [Filtered]'"
+    elif enabled:
+        # Config enables sanitization
+        expected = "curl -X GET -H 'Authorization: [Filtered]'"
     else:
-        if enabled:
-            # Config enables sanitization
-            expected = "curl -X GET -H 'Authorization: [Filtered]'"
-        else:
-            # Config disables sanitization
-            expected = f"curl -X GET -H 'Authorization: {auth}'"
+        # Config disables sanitization
+        expected = f"curl -X GET -H 'Authorization: {auth}'"
     assert expected in result.stdout, result.stdout
 
 

@@ -18,7 +18,7 @@ __all__ = ["lexer", "nodes", "parser"]
 
 def evaluate(expr: Any, output: StepOutput, evaluate_nested: bool = False) -> Any:
     """Evaluate runtime expression in context."""
-    if isinstance(expr, (dict, list)) and evaluate_nested:
+    if isinstance(expr, dict | list) and evaluate_nested:
         return _evaluate_nested(expr, output)
     if not isinstance(expr, str):
         # Can be a non-string constant
@@ -60,7 +60,7 @@ def _evaluate_object_key(key: str, output: StepOutput) -> Any:
         return evaluated
     if isinstance(evaluated, bool):
         return "true" if evaluated else "false"
-    if isinstance(evaluated, (int, float)):
+    if isinstance(evaluated, int | float):
         return str(evaluated)
     if evaluated is None:
         return "null"

@@ -821,6 +821,7 @@ def test_checks_are_loaded(case):
         capture_output=True,
         text=True,
         cwd=str(tmp_path),
+        check=False,
     )
 
     assert result.returncode == 0, f"Test failed:\n{result.stdout}\n{result.stderr}"

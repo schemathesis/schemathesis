@@ -65,7 +65,7 @@ def _variant_key(variant: dict[str, Any]) -> str:
 def build_hybrid_strategy(
     original_strategy: st.SearchStrategy,
     captured_variants: list[dict[str, Any]],
-    usage_tracker: "VariantUsageTracker",
+    usage_tracker: VariantUsageTracker,
 ) -> st.SearchStrategy:
     """Combine original strategy with captured variants using weighted sampling.
 
@@ -457,7 +457,7 @@ class OpenApiBody(OpenApiComponent):
         operation: APIOperation,
         generation_config: GenerationConfig,
         captured_variants: list[dict[str, Any]],
-        usage_tracker: "VariantUsageTracker",
+        usage_tracker: VariantUsageTracker,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available."""
         from hypothesis import strategies as st
@@ -494,7 +494,7 @@ def extract_parameter_schema_v2(parameter: Mapping[str, Any]) -> JsonSchemaObjec
 
 def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
     if "schema" in parameter:
-        if not isinstance(parameter["schema"], (dict, bool)):
+        if not isinstance(parameter["schema"], dict | bool):
             raise InvalidSchema(
                 INVALID_SCHEMA_MESSAGE.format(
                     location=parameter.get("in", ""),
@@ -928,7 +928,7 @@ class OpenApiParameterSet(ParameterSet):
         generation_config: GenerationConfig,
         exclude: Iterable[str],
         captured_variants: list[dict[str, Any]],
-        usage_tracker: "VariantUsageTracker",
+        usage_tracker: VariantUsageTracker,
     ) -> st.SearchStrategy:
         """Build strategy for negative mode when captured values are available.
 

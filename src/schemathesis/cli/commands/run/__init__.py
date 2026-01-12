@@ -540,7 +540,7 @@ def run(
     # Other CLI options work as an override for all defined projects
     config.projects.override.update(
         base_url=base_url,
-        headers=headers if headers else None,
+        headers=headers or None,
         basic_auth=auth,
         workers=workers,
         continue_on_failure=continue_on_failure,

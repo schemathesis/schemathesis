@@ -53,7 +53,7 @@ class HttpBasicAuthProvider:
     __slots__ = ("username", "password")
 
     def get(self, _: Case, __: AuthContext) -> tuple[str, str]:
-        return (self.username, self.password)
+        return self.username, self.password
 
     def set(self, case: Case, data: tuple[str, str], __: AuthContext) -> None:
         import requests.auth

@@ -307,11 +307,11 @@ class ProjectConfig(DiffBase):
             config = self.operations.get_for_operation(operation=operation)
             if config.request_cert is not None:
                 if config.request_cert_key:
-                    return (config.request_cert, config.request_cert_key)
+                    return config.request_cert, config.request_cert_key
                 return config.request_cert
         if self.request_cert is not None:
             if self.request_cert_key:
-                return (self.request_cert, self.request_cert_key)
+                return self.request_cert, self.request_cert_key
             return self.request_cert
         return None
 

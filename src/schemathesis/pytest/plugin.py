@@ -276,7 +276,7 @@ def pytest_runtest_logreport(report: pytest.TestReport) -> None:
 
 
 @hookimpl(tryfirst=True, hookwrapper=True)  # type: ignore[untyped-decorator]
-def pytest_terminal_summary(terminalreporter: "TerminalReporter") -> Generator[None, None, None]:
+def pytest_terminal_summary(terminalreporter: TerminalReporter) -> Generator[None, None, None]:
     passed = terminalreporter.stats.get("passed", [])
     if passed:
         terminalreporter.stats["passed"] = [

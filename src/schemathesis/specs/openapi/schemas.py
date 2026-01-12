@@ -284,7 +284,7 @@ class OpenApiSchema(BaseSchema):
                 for method, definition in path_item.items():
                     if should_skip(path, method, definition):
                         continue
-                    yield (method, path, definition)
+                    yield method, path, definition
             except SCHEMA_PARSING_ERRORS:
                 continue
 

@@ -191,7 +191,7 @@ def test_binary_body_base64(cli, schema_url, ndjson_path):
             if interaction.get("response") and interaction["response"].get("body"):
                 body = interaction["response"]["body"]
                 # Body should be a string or a base64 encoded dict
-                assert isinstance(body, (str, dict))
+                assert isinstance(body, (str | dict))
                 if isinstance(body, dict):
                     assert "$base64" in body
 

@@ -58,7 +58,7 @@ def _to_json_schema(
     if isinstance(schema, bool):
         return schema
 
-    if schema.get(nullable_keyword) is True:
+    if schema.get(nullable_keyword):
         del schema[nullable_keyword]
         bundled = schema.pop(BUNDLE_STORAGE_KEY, None)
         schema = {"anyOf": [schema, {"type": "null"}]}
@@ -85,7 +85,7 @@ def _to_json_schema(
             if not isinstance(subschema, dict):
                 continue
             is_required = subschema.get("required")
-            if is_required is True:
+            if is_required:
                 schema.setdefault("required", []).append(name)
                 del subschema["required"]
             elif is_required is False:

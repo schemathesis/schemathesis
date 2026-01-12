@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import threading
 from collections import defaultdict, deque
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Deque, Iterable, Sequence
+from typing import Any
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import status_code_matches
@@ -47,9 +48,9 @@ class ResourceRepository:
     def __init__(self, descriptors: Sequence[ResourceDescriptor]) -> None:
         self._descriptors_by_operation: dict[str, list[ResourceDescriptor]] = defaultdict(list)
         # Nested structure: resource_name -> context_key -> deque of instances
-        self._resource_buckets: dict[str, dict[str, Deque[ResourceInstance]]] = {}
+        self._resource_buckets: dict[str, dict[str, deque[ResourceInstance]]] = {}
         # Track context insertion order for FIFO eviction of contexts
-        self._context_order: dict[str, Deque[str]] = {}
+        self._context_order: dict[str, deque[str]] = {}
         self._lock = threading.Lock()
 
         for descriptor in descriptors:

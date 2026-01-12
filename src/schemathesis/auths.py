@@ -287,7 +287,7 @@ class SelectiveAuthProvider(Generic[Auth]):
                 # Need to unwrap to get the actual provider class name
                 provider = self.provider
                 # Unwrap caching providers
-                while isinstance(provider, (CachingAuthProvider, KeyedCachingAuthProvider)):
+                while isinstance(provider, CachingAuthProvider | KeyedCachingAuthProvider):
                     provider = provider.provider
                 provider_name = provider.__class__.__name__
                 raise AuthenticationError(provider_name, "get", str(exc)) from exc
@@ -471,7 +471,7 @@ def _should_skip_auth_for_negative_testing(case: Case, param_name: str, param_lo
         return False
 
     phase_data = meta.phase.data
-    if not isinstance(phase_data, (FuzzingPhaseData, CoveragePhaseData, StatefulPhaseData)):
+    if not isinstance(phase_data, FuzzingPhaseData | CoveragePhaseData | StatefulPhaseData):
         return False
 
     return phase_data.parameter == param_name and phase_data.parameter_location == param_location
