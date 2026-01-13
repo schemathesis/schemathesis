@@ -96,6 +96,9 @@ def openapi_cases(
 
     ctx = HookContext(operation=operation)
 
+    # Don't mix in schema examples during EXAMPLES phase - they're handled separately there
+    mix_examples = phase != TestPhase.EXAMPLES
+
     path_parameters_ = generate_parameter(
         ParameterLocation.PATH,
         path_parameters,
@@ -106,6 +109,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        mix_examples=mix_examples,
     )
     headers_ = generate_parameter(
         ParameterLocation.HEADER,
@@ -117,6 +121,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        mix_examples=mix_examples,
     )
     cookies_ = generate_parameter(
         ParameterLocation.COOKIE,
@@ -128,6 +133,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        mix_examples=mix_examples,
     )
     query_ = generate_parameter(
         ParameterLocation.QUERY,
@@ -139,6 +145,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        mix_examples=mix_examples,
     )
 
     if body is NOT_SET:
@@ -155,7 +162,13 @@ def openapi_cases(
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
             strategy = _get_body_strategy(
-                parameter, operation, generation_config, draw, body_generator, extra_data_source=extra_data_source
+                parameter,
+                operation,
+                generation_config,
+                draw,
+                body_generator,
+                extra_data_source=extra_data_source,
+                mix_examples=mix_examples,
             )
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
@@ -540,6 +553,7 @@ def _get_body_strategy(
     draw: st.DrawFn,
     generation_mode: GenerationMode,
     extra_data_source: ExtraDataSource | None = None,
+    mix_examples: bool = True,
 ) -> st.SearchStrategy:
     # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
     if parameter.media_type in FORM_MEDIA_TYPES:
@@ -557,7 +571,7 @@ def _get_body_strategy(
 
     # Use the cached strategy from the parameter
     strategy = parameter.get_strategy(
-        operation, generation_config, generation_mode, extra_data_source=extra_data_source
+        operation, generation_config, generation_mode, extra_data_source=extra_data_source, mix_examples=mix_examples
     )
     return _maybe_set_optional_body(strategy, parameter, draw)
 
@@ -572,6 +586,7 @@ def get_parameters_value(
     generation_mode: GenerationMode,
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None = None,
+    mix_examples: bool = True,
 ) -> tuple[dict[str, Any] | None, Any]:
     """Get the final value for the specified location.
 
@@ -580,7 +595,12 @@ def get_parameters_value(
     """
     if value is None:
         strategy = get_parameters_strategy(
-            operation, generation_mode, location, generation_config, extra_data_source=extra_data_source
+            operation,
+            generation_mode,
+            location,
+            generation_config,
+            extra_data_source=extra_data_source,
+            mix_examples=mix_examples,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = draw(strategy)
@@ -595,6 +615,7 @@ def get_parameters_value(
         generation_config,
         exclude=value.keys(),
         extra_data_source=extra_data_source,
+        mix_examples=mix_examples,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
     new = draw(strategy)
@@ -641,6 +662,7 @@ def generate_parameter(
     generator: GenerationMode,
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None = None,
+    mix_examples: bool = True,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -663,6 +685,7 @@ def generate_parameter(
         generator,
         generation_config,
         extra_data_source=extra_data_source,
+        mix_examples=mix_examples,
     )
     used_generator: GenerationMode | None = generator
     if value == explicit:
@@ -702,6 +725,7 @@ def get_parameters_strategy(
     generation_config: GenerationConfig,
     exclude: Iterable[str] = (),
     extra_data_source: ExtraDataSource | None = None,
+    mix_examples: bool = True,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = getattr(operation, location.container_name)
@@ -712,6 +736,7 @@ def get_parameters_strategy(
             generation_mode,
             exclude,
             extra_data_source=extra_data_source,
+            mix_examples=mix_examples,
         )
     # No parameters defined for this location
     return st.none()
