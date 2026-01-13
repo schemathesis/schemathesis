@@ -65,7 +65,10 @@ async def long(request: web.Request) -> web.Response:
 async def payload(request: web.Request) -> web.Response:
     body = await request.read()
     if body:
-        data = await request.json()
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise web.HTTPBadRequest(text="Invalid JSON")  # noqa: B904
         try:
             PAYLOAD_VALIDATOR.validate(data)
         except jsonschema.ValidationError as exc:
@@ -143,7 +146,10 @@ async def slow(request: web.Request) -> web.Response:
 async def performance(request: web.Request) -> web.Response:
     # Emulate bad performance on certain input type
     # This API operation is for Schemathesis targeted testing, the failure should be discovered
-    decoded = await request.json()
+    try:
+        decoded = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise web.HTTPBadRequest(text='{"detail": "Invalid JSON"}')  # noqa: B904
     number = str(decoded).count("0")
     if number > 0:
         await asyncio.sleep(0.01 * number)
@@ -201,7 +207,10 @@ async def read_only(request: web.Request) -> web.Response:
 
 
 async def write_only(request: web.Request) -> web.Response:
-    data = await request.json()
+    try:
+        data = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise web.HTTPBadRequest(text='{"detail": "Invalid JSON"}')  # noqa: B904
     if len(data) == 1 and isinstance(data["write"], int):
         return web.json_response(SUCCESS_RESPONSE)
     raise web.HTTPInternalServerError
@@ -253,7 +262,10 @@ async def form(request: web.Request) -> web.Response:
 
 
 async def create_user(request: web.Request) -> web.Response:
-    data = await request.json()
+    try:
+        data = await request.json()
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise web.HTTPBadRequest(text='{"detail": "Invalid JSON"}')  # noqa: B904
     if not isinstance(data, dict):
         raise web.HTTPBadRequest(text='{"detail": "Invalid payload"}')
     for field in ("first_name", "last_name"):
@@ -288,7 +300,10 @@ async def update_user(request: web.Request) -> web.Response:
     user_id = get_user_id(request)
     try:
         user = request.app["users"][user_id]
-        data = await request.json()
+        try:
+            data = await request.json()
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise web.HTTPBadRequest(text='{"detail": "Invalid JSON"}')  # noqa: B904
         if not isinstance(data, dict):
             raise web.HTTPBadRequest(text='{"detail": "Invalid input type, expected an object"}')
         for field in ("first_name", "last_name"):

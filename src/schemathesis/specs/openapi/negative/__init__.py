@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
@@ -12,12 +13,32 @@ from hypothesis_jsonschema import from_schema
 from schemathesis.config import GenerationConfig
 from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
 
 from .mutations import MutationContext, MutationMetadata
 
+SYNTAX_FUZZING_PROBABILITY = 0.05
+
 if TYPE_CHECKING:
     from .types import Draw, Schema
+
+
+def _is_not_valid_json(data: bytes) -> bool:
+    """Check if bytes are NOT valid JSON."""
+    try:
+        json.loads(data)
+        return False  # Valid JSON, reject
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return True  # Invalid, keep
+
+
+def _random_non_json_bytes() -> st.SearchStrategy[bytes]:
+    """Generate random bytes that are NOT valid JSON.
+
+    Used for syntax-level fuzzing of JSON endpoints.
+    """
+    return st.binary(min_size=1, max_size=1024).filter(_is_not_valid_json)
 
 
 @dataclass
@@ -155,7 +176,7 @@ def negative_schema(
             .map(lambda value: GeneratedValue(value, metadata))
         )
 
-    return mutated(
+    mutated_strategy = mutated(
         keywords=keywords,
         non_keywords=non_keywords,
         location=location,
@@ -163,6 +184,23 @@ def negative_schema(
         allow_extra_parameters=generation_config.allow_extra_parameters,
         name_to_uri=name_to_uri,
     ).flatmap(generate_value_with_metadata)
+
+    # For JSON bodies, add syntax-level fuzzing with random bytes (~5% of cases)
+    if location == ParameterLocation.BODY and media_type is not None and is_json(media_type):
+        syntax_fuzzing_strategy = _random_non_json_bytes().map(
+            lambda b: GeneratedValue(b, MutationMetadata(None, "Invalid syntax: random bytes", None))
+        )
+
+        @st.composite  # type: ignore[untyped-decorator]
+        def with_syntax_fuzzing(draw: Any) -> GeneratedValue:
+            random = draw(st.randoms(use_true_random=True))
+            if random.random() < SYNTAX_FUZZING_PROBABILITY:
+                return draw(syntax_fuzzing_strategy)
+            return draw(mutated_strategy)
+
+        return with_syntax_fuzzing()
+
+    return mutated_strategy
 
 
 def is_non_empty_query(query: dict[str, Any]) -> bool:
