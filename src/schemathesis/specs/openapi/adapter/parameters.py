@@ -56,6 +56,11 @@ NEGATIVE_STRATEGY_PROBABILITY = 0.03
 # the chance of hitting existing resources while still allowing edge cases.
 PATH_INTEGER_POSITIVE_BIAS = 0.8
 
+# Probability of using schema examples instead of generated values.
+# 20% example usage provides good coverage of domain-specific values
+# while still allowing hypothesis-generated exploration.
+EXAMPLE_USAGE_PROBABILITY = 0.20
+
 
 def _variant_key(variant: dict[str, Any]) -> str:
     """Create a stable string key for a variant dict."""
@@ -157,6 +162,70 @@ def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.Searc
     return biased()
 
 
+def build_example_aware_strategy(
+    original_strategy: st.SearchStrategy,
+    examples: list[Any],
+) -> st.SearchStrategy:
+    """Combine original strategy with schema examples.
+
+    Uses examples approximately 20% of the time to provide coverage of domain-specific
+    values while still allowing hypothesis-generated exploration (~80%).
+
+    Uses true randomness (not Hypothesis's reproducible random) to ensure the
+    probability distribution is uniform and not affected by shrinking behavior.
+    """
+    from hypothesis import strategies as st
+
+    @st.composite  # type: ignore[untyped-decorator]
+    def with_examples(draw: st.DrawFn) -> Any:
+        # Use true random for uniform distribution (like stateful phase)
+        random = draw(st.randoms(use_true_random=True))
+
+        # 20% use example, 80% generate fresh
+        if random.random() >= EXAMPLE_USAGE_PROBABILITY:
+            return draw(original_strategy)
+
+        return random.choice(examples)
+
+    return with_examples()
+
+
+def build_parameter_example_aware_strategy(
+    original_strategy: st.SearchStrategy,
+    parameter_examples: dict[str, list[Any]],
+) -> st.SearchStrategy:
+    """Combine original parameter strategy with per-parameter schema examples.
+
+    For each parameter with examples, approximately 20% chance to replace its
+    generated value with one of the examples. Parameters without examples keep
+    their generated values.
+
+    Uses true randomness for uniform probability distribution.
+    """
+    from hypothesis import strategies as st
+
+    @st.composite  # type: ignore[untyped-decorator]
+    def with_parameter_examples(draw: st.DrawFn) -> dict[str, Any] | None:
+        result = draw(original_strategy)
+        if result is None:
+            return result
+
+        # Use true random for uniform distribution
+        random = draw(st.randoms(use_true_random=True))
+
+        # For each parameter with examples, potentially replace with example
+        for param_name, examples in parameter_examples.items():
+            if not examples:
+                continue
+            # 20% chance to use example for this parameter
+            if random.random() < EXAMPLE_USAGE_PROBABILITY:
+                result[param_name] = random.choice(examples)
+
+        return result
+
+    return with_parameter_examples()
+
+
 @dataclass
 class OpenApiComponent(ABC):
     definition: Mapping[str, Any]
@@ -246,9 +315,15 @@ class OpenApiComponent(ABC):
         return self._examples
 
     def _extract_examples(self) -> list[object]:
-        """Extract examples from both single example and examples container."""
+        """Extract examples from definition and schema.
+
+        Looks for examples in:
+        - Top-level 'example' and 'examples' keywords in the definition
+        - 'example' and 'examples' keywords in the nested schema (for parameters with schema)
+        """
         examples: list[object] = []
 
+        # Extract from top-level definition
         container = self.definition.get(self.adapter.examples_container_keyword)
         if isinstance(container, dict):
             examples.extend(ex["value"] for ex in container.values() if isinstance(ex, dict) and "value" in ex)
@@ -258,6 +333,18 @@ class OpenApiComponent(ABC):
         example = self.definition.get(self.adapter.example_keyword, NOT_SET)
         if example is not NOT_SET:
             examples.append(example)
+
+        # Also extract from the schema if present (e.g., parameter.schema.example)
+        raw_schema = self.raw_schema
+        if isinstance(raw_schema, dict):
+            schema_example = raw_schema.get(self.adapter.example_keyword, NOT_SET)
+            if schema_example is not NOT_SET:
+                examples.append(schema_example)
+
+            # JSON Schema supports 'examples' as an array
+            schema_examples = raw_schema.get("examples")
+            if isinstance(schema_examples, list):
+                examples.extend(schema_examples)
 
         return examples
 
@@ -390,9 +477,12 @@ class OpenApiBody(OpenApiComponent):
         generation_config: GenerationConfig,
         generation_mode: GenerationMode,
         extra_data_source: ExtraDataSource | None = None,
+        mix_examples: bool = True,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
-        use_cache = extra_data_source is None
+        # Don't cache when mix_examples is False since we need different strategies
+        # for EXAMPLES phase vs fuzzing/stateful phases
+        use_cache = extra_data_source is None and mix_examples
 
         # Check cache based on generation mode (only when extra data sources are not used)
         if use_cache:
@@ -433,6 +523,11 @@ class OpenApiBody(OpenApiComponent):
             operation.schema.adapter.jsonschema_validator_cls,
             self.name_to_uri,
         )
+
+        # Mix in schema examples for positive mode (20% example, 80% generated)
+        # Skip during EXAMPLES phase since examples are handled separately there
+        if mix_examples and generation_mode == GenerationMode.POSITIVE and self.examples:
+            strategy = build_example_aware_strategy(strategy, self.examples)
 
         # Apply hybrid approach when captured variants are available
         if captured_variants and usage_tracker is not None:
@@ -795,12 +890,13 @@ class OpenApiParameterSet(ParameterSet):
         generation_mode: GenerationMode,
         exclude: Iterable[str] = (),
         extra_data_source: ExtraDataSource | None = None,
+        mix_examples: bool = True,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = frozenset(exclude)
         cache_key = (exclude_key, generation_mode)
 
-        use_cache = extra_data_source is None
+        use_cache = extra_data_source is None and mix_examples
 
         if use_cache and cache_key in self._strategy_cache:
             return self._strategy_cache[cache_key]
@@ -859,6 +955,17 @@ class OpenApiParameterSet(ParameterSet):
 
             # For negative strategies, we need to handle GeneratedValue wrappers
             is_negative = strategy_factory is make_negative_strategy
+
+            # Mix in schema examples for positive mode (20% example, 80% generated per parameter)
+            # Must be applied BEFORE serialization so examples go through the same transformations
+            # Skip during EXAMPLES phase since examples are handled separately there
+            if mix_examples and not is_negative:
+                parameter_examples: dict[str, list[Any]] = {}
+                for param in self.items:
+                    if param.name not in exclude_key and param.examples:
+                        parameter_examples[param.name] = param.examples
+                if parameter_examples:
+                    strategy = build_parameter_example_aware_strategy(strategy, parameter_examples)
 
             # Bias path parameter integers toward positive values in positive mode
             if (
