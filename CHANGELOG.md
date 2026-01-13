@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - OpenAPI 3.2 support.
+- Mix schema examples into fuzzing and stateful data generation.
 - NDJSON report format (`--report=ndjson`) for exporting all engine events as newline-delimited JSON.
 - Capture primitive identifiers from POST/PUT responses returning bare strings or integers.
 - Normalize schema names by stripping common suffixes (`-Output`, `-Input`, `Out`, `In`, `DTO`).
