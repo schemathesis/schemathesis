@@ -167,6 +167,17 @@ This explicitly tells Schemathesis that the `userId` parameter in the `getUser` 
 !!! note "All Three Work Together"
     Schema analysis runs first, manual links override when present, and `Location` learning adds runtime discoveries.
 
+## Learning from Feedback
+
+Not all connections are correct. Sometimes schema analysis infers wrong parameter mappings, or extracted data might fail validation.
+
+Schemathesis learns which extracted parameters lead to successful requests and adapts its strategy. Parameters that consistently work get used more often (~90%). Parameters that consistently fail get used less (~20%).
+
+**Impact:** This learning helps focus test attempts on reaching business logic rather than hitting validation failures. For example, in a test with several incorrect inferred links, validation failure rates dropped from ~65% to ~15%, though results vary depending on your API and schema.
+
+!!! info "Multi-Armed Bandit"
+    Schemathesis uses a multi-armed bandit approach - technique from reinforcement learning where each parameter choice is treated as an "arm" to pull. The system balances exploration (trying different options) with exploitation (using what works), adapting based on response feedback (2xx/3xx = success, 4xx/5xx = failure).
+
 ## How Schemathesis Extends OpenAPI Links
 
 ### Regex Extraction from Headers and Query Parameters

@@ -5,22 +5,25 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
+import jsonschema
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
-from schemathesis.core import NOT_SET
+from schemathesis.core import NOT_SET, NotSet, media_types
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
-from schemathesis.generation.meta import TestPhase
+from schemathesis.generation.meta import ComponentInfo, TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.stateful.control import TransitionController
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
+from schemathesis.specs.openapi.stateful.state import BASE_EXPLORATION_RATE, TransitionState
 from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
@@ -48,8 +51,6 @@ class OpenAPIStateMachine(APIStateMachine):
 
 # The proportion of negative tests generated for "root" transitions
 NEGATIVE_TEST_CASES_THRESHOLD = 10
-# How often some transition is skipped
-BASE_EXPLORATION_RATE = 0.15
 
 
 @dataclass
@@ -67,16 +68,37 @@ class OperationTransitions:
 class ApiTransitions:
     """Stores all transitions grouped by operation."""
 
-    __slots__ = ("operations",)
+    __slots__ = ("operations", "state")
 
     def __init__(self) -> None:
         # operation label -> its transitions
         self.operations: dict[str, OperationTransitions] = {}
+        self.state: dict[str, TransitionState] = {}
 
     def add_outgoing(self, source: str, link: OpenApiLink) -> None:
         """Record an outgoing transition from source operation."""
         self.operations.setdefault(source, OperationTransitions()).outgoing.append(link)
         self.operations.setdefault(link.target.label, OperationTransitions()).incoming.append(link)
+
+    def add_state(self, name: str, link: OpenApiLink, target: APIOperation) -> None:
+        parameters = []
+        for parameter in link.parameters:
+            for stored in target.iter_parameters():
+                if parameter.location is not None and stored.location != parameter.location:
+                    continue
+                if parameter.name == stored.name:
+                    parameters.append((f"{parameter.container_name}.{parameter.name}", stored.is_required))
+        if not isinstance(link.body, NotSet):
+            body = None
+            for body in target.body:
+                # Don't catch parsing errors here. If there is an invalid media type, it will be caught much earlier
+                if media_types.is_json(body.media_type):
+                    break
+            assert body is not None, "Link was created from a valid body"
+            required = body.raw_schema.get("required", [])
+            for field in link.body:
+                parameters.append((f"body.{field}", field in required))
+        self.state[name] = TransitionState(parameters=parameters)
 
 
 @dataclass
@@ -105,6 +127,8 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
                     link = OpenApiLink(name, status_code, link, operation)
                     if link.target.label in selected_labels:
                         transitions.add_outgoing(operation.label, link)
+                    full_name = f"{link.source.label} -> [{link.status_code}] {link.name} -> {link.target.label}"
+                    transitions.add_state(full_name, link, link.target)
                 except InvalidTransition as exc:
                     errors.append(exc)
 
@@ -175,7 +199,7 @@ def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
                             name=name,
                             target=catch_all,
                             input=bundles[bundle_name].flatmap(
-                                into_step_input(target=target, link=link, modes=config.modes)
+                                into_step_input(target=target, link=link, modes=config.modes, transitions=transitions)
                             ),
                         )
                     )
@@ -248,7 +272,7 @@ def is_likely_root_transition(operation: APIOperation) -> bool:
 
 
 def into_step_input(
-    *, target: APIOperation, link: OpenApiLink, modes: list[GenerationMode]
+    *, target: APIOperation, link: OpenApiLink, modes: list[GenerationMode], transitions: ApiTransitions
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
     """A single transition between API operations."""
 
@@ -263,6 +287,8 @@ def into_step_input(
             # Extract transition data from previous operation's output
             transition = link.extract(output)
 
+            # Build request parameters based on learned success rate
+            transition_state = transitions.state[transition.id]
             overrides: dict[str, Any] = {}
             applied_parameters = []
             for container, data in transition.parameters.items():
@@ -273,24 +299,11 @@ def into_step_input(
                     if not isinstance(extracted.value, Ok) or extracted.value.ok() in (None, UNRESOLVABLE):
                         continue
 
+                    # Decide whether to use this parameter based on learned success rate
                     param_key = f"{container}.{name}"
+                    use_probability = transition_state.parameters[param_key].use_probability
 
-                    # Calculate exploration rate based on parameter characteristics
-                    exploration_rate = BASE_EXPLORATION_RATE
-
-                    # Path parameters are critical for routing - use link values more often
-                    if container == "path_parameters":
-                        exploration_rate *= 0.5
-
-                    # Required parameters should follow links more often, optional ones explored more
-                    # Path params are always required, so they get both multipliers
-                    if extracted.is_required:
-                        exploration_rate *= 0.5
-                    else:
-                        # Explore optional parameters more to avoid only testing link-provided values
-                        exploration_rate *= 3.0
-
-                    if biased_coin(1 - exploration_rate):
+                    if biased_coin(use_probability):
                         overrides[container][name] = extracted.value.ok()
                         applied_parameters.append(param_key)
 
@@ -312,6 +325,7 @@ def into_step_input(
                 else:
                     applied_parameters.append("body")
 
+            # Generate a test case with possible overrides derived from stateful data
             cases = st.one_of(
                 [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **overrides) for mode in modes]
             )
@@ -323,10 +337,12 @@ def into_step_input(
                     for field_name, field_value in request_body.items():
                         if field_value is UNRESOLVABLE:
                             continue
+                        field_key = f"body.{field_name}"
 
-                        if biased_coin(1 - BASE_EXPLORATION_RATE):
+                        use_probability = transition_state.parameters[field_key].use_probability
+                        if biased_coin(use_probability):
                             selected_fields[field_name] = field_value
-                            applied_parameters.append(f"body.{field_name}")
+                            applied_parameters.append(field_key)
 
                     if selected_fields:
                         if isinstance(case.body, dict):
@@ -334,9 +350,28 @@ def into_step_input(
                         else:
                             # Can't merge into non-dict, replace entirely
                             case.body = selected_fields
-                elif biased_coin(1 - BASE_EXPLORATION_RATE):
-                    case.body = request_body
-                    applied_parameters.append("body")
+                else:
+                    if "body" in transition_state.parameters:
+                        use_probability = transition_state.parameters["body"].use_probability
+                    else:
+                        use_probability = 1 - BASE_EXPLORATION_RATE
+
+                    if biased_coin(use_probability):
+                        case.body = request_body
+                        applied_parameters.append("body")
+
+                # Re-validate generation mode after merging body
+                if case.meta and case.meta.generation.mode == GenerationMode.NEGATIVE:
+                    # It is possible that the new body is now valid and the whole test case could be valid too
+                    for alternative in case.operation.body:
+                        if alternative.media_type == case.media_type:
+                            schema = alternative.optimized_schema
+                            if jsonschema.validators.validator_for(schema)(schema).is_valid(case.body):
+                                case.meta.components[ParameterLocation.BODY] = ComponentInfo(
+                                    mode=GenerationMode.POSITIVE
+                                )
+                                if all(info.mode == GenerationMode.POSITIVE for info in case.meta.components.values()):
+                                    case.meta.generation.mode = GenerationMode.POSITIVE
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)

@@ -240,6 +240,7 @@ class APIStateMachine(RuleBasedStateMachine):
         kwargs = self.get_call_kwargs(input.case)
         response = self.call(input.case, **kwargs)
         self.after_call(response, input.case)
+        self.control.update_state(response, input)
         self.validate_response(response, input.case, **kwargs)
         return StepOutput(response, input.case)
 
