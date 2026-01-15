@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.9.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Duplicate entries in `required` array causing "non-unique elements" schema validation errors. [#3460](https://github.com/schemathesis/schemathesis/issues/3460)
+
 ## [4.9.0](https://github.com/schemathesis/schemathesis/compare/v4.8.0...v4.9.0) - 2026-01-13
 
 ### :rocket: Added
