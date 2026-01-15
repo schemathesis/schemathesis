@@ -188,3 +188,21 @@ def test_pattern_translation_invalid_result():
     result = transform(schema, converter.to_json_schema, nullable_keyword="x-nullable")
     # Then the pattern should be removed (translation failed validation)
     assert result == {"type": "string"}
+
+
+def test_nested_object_required_array_not_duplicated():
+    # GH-3460: Nested `required` arrays should not cause duplicates in parent's `required`
+    schema = {
+        "type": "object",
+        "properties": {
+            "propOne": {
+                "type": "object",
+                "properties": {"innerPropOne": {"type": "integer"}},
+                "required": ["innerPropOne"],
+            },
+        },
+        "required": ["propOne"],
+    }
+    result = transform(schema, converter.to_json_schema, nullable_keyword="nullable")
+    assert result["required"] == ["propOne"]
+    assert result["properties"]["propOne"]["required"] == ["innerPropOne"]
