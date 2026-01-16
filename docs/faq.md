@@ -112,6 +112,38 @@ This helps catch authentication bypass vulnerabilities where APIs accept request
 !!! important ""
     The majority of test cases still use your provided authentication normally. Only specific security-focused tests intentionally modify it.
 
+## Why do I see unexpected 400 errors with empty bodies?
+
+During fuzzing, you may see failures like:
+
+```
+[400] Bad Request: <EMPTY>
+```
+
+...even when you expect your API to return `401 Unauthorized` or other responses.
+
+**Why this happens:**
+
+Schemathesis generates header values using the full byte range allowed by [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110), including bytes 0x80-0xFF. While these are **valid per the HTTP specification**, many servers and proxies are stricter and reject them.
+
+This rejection happens at the infrastructure layer—before your application code runs. Common examples include AWS API Gateway, Node.js, Rust frameworks (Actix, Axum), and Nginx.
+
+The empty body occurs because the request is rejected at the HTTP parsing layer, before reaching your application.
+
+**This is infrastructure behavior, not your application.** Your API code may be correct, but the framework or proxy in front of it is stricter than the HTTP spec allows.
+
+**What to do:**
+
+Restrict generated strings to ASCII characters (`--generation-codec=ascii`):
+
+```toml
+[generation]
+codec = "ascii"
+```
+
+!!! tip "Fine-grained control"
+    Use `exclude-header-characters` to restrict only header values while keeping full Unicode in request bodies. See [generation options](reference/configuration.md#generationexclude-header-characters) for details.
+
 ## Can I use Schemathesis with Allure?
 
 Yes, through JUnit XML export. Allure can generate rich visual reports from Schemathesis test results.
