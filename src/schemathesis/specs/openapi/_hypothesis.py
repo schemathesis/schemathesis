@@ -51,10 +51,11 @@ from .negative import GeneratedValue, negative_schema
 from .negative.utils import can_negate
 
 SLASH = "/"
-# Probability threshold for generating "clean" headers (ASCII without control characters)
-CLEAN_HEADER_THRESHOLD = 0.95
-# ASCII control characters (0x00-0x1F and 0x7F) that are invalid in HTTP headers
-ASCII_CONTROL_CHARS = "".join(chr(i) for i in range(32)) + "\x7f"
+# Probability of generating valid headers in negative mode
+VALID_HEADER_PROBABILITY = 0.95
+# RFC 9110 Section 5.5: Invalid header chars are 0x00-0x08, 0x0A-0x1F, 0x7F
+# Note: 0x09 (HTAB) is valid per RFC, so excluded from this set
+INVALID_HEADER_CHARS = "".join(chr(i) for i in range(9)) + "".join(chr(i) for i in range(10, 32)) + "\x7f"
 StrategyFactory = Callable[
     [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema.protocols.Validator]],
     st.SearchStrategy,
@@ -762,7 +763,7 @@ def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _build_custom_formats(generation_config: GenerationConfig) -> dict[str, st.SearchStrategy]:
+def _build_custom_formats(generation_config: GenerationConfig, mode: GenerationMode) -> dict[str, st.SearchStrategy]:
     custom_formats = {**get_default_format_strategies(), **STRING_FORMATS}
     header_values_kwargs: dict[str, Any] = {}
     if generation_config.exclude_header_characters is not None:
@@ -776,22 +777,22 @@ def _build_custom_formats(generation_config: GenerationConfig) -> dict[str, st.S
         header_values_kwargs["codec"] = generation_config.codec
         custom_formats[HEADER_FORMAT] = header_values(**header_values_kwargs)
     else:
-        # Default codec - use probabilistic clean/fuzzing headers
         base_exclude = header_values_kwargs.get("exclude_characters", "")
-        clean_exclude = base_exclude + ASCII_CONTROL_CHARS
-        # Deduplicate
-        clean_exclude = "".join(sorted(set(clean_exclude)))
+        valid_exclude = "".join(sorted(set(base_exclude + INVALID_HEADER_CHARS)))
 
-        @st.composite  # type: ignore[untyped-decorator]
-        def header_strategy(draw: st.DrawFn) -> str:
-            random = draw(st.randoms())
-            if random.random() < CLEAN_HEADER_THRESHOLD:
-                # Clean headers: ASCII without control characters
-                return draw(header_values(codec="ascii", exclude_characters=clean_exclude))
-            # Fuzzing headers: allow unicode and control characters
-            return draw(header_values(**header_values_kwargs))
+        if mode.is_positive:
+            # Positive mode: Always generate RFC-valid headers
+            custom_formats[HEADER_FORMAT] = header_values(codec="ascii", exclude_characters=valid_exclude)
+        else:
+            # Negative mode: Occasionally allow invalid characters
+            @st.composite  # type: ignore[untyped-decorator]
+            def header_strategy(draw: st.DrawFn) -> str:
+                random = draw(st.randoms())
+                if random.random() < VALID_HEADER_PROBABILITY:
+                    return draw(header_values(codec="ascii", exclude_characters=valid_exclude))
+                return draw(header_values(**header_values_kwargs))
 
-        custom_formats[HEADER_FORMAT] = header_strategy()
+            custom_formats[HEADER_FORMAT] = header_strategy()
     return custom_formats
 
 
@@ -805,7 +806,7 @@ def make_positive_strategy(
     name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
-    custom_formats = _build_custom_formats(generation_config)
+    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
     return from_schema(
         schema,
         custom_formats=custom_formats,
@@ -828,7 +829,7 @@ def make_negative_strategy(
     validator_cls: type[jsonschema.protocols.Validator],
     name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
-    custom_formats = _build_custom_formats(generation_config)
+    custom_formats = _build_custom_formats(generation_config, GenerationMode.NEGATIVE)
     return negative_schema(
         schema,
         operation_name=operation_name,
