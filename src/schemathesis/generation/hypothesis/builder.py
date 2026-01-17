@@ -568,7 +568,7 @@ def _iter_coverage_cases(
 
     instant = Instant()
     responses = list(operation.responses.iter_examples())
-    custom_formats = _build_custom_formats(generation_config)
+    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
 
     seen_negative = coverage.HashSet()
     seen_positive = coverage.HashSet()
