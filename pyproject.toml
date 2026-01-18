@@ -95,6 +95,10 @@ addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
 testpaths = "tests"
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
+filterwarnings = [
+    # anyio streams not closed during aiohttp test server teardown (flaky on Python 3.13+)
+    "ignore:Unclosed <MemoryObject.*:ResourceWarning",
+]
 
 [tool.coverage.run]
 parallel = true
