@@ -9,7 +9,10 @@ from enum import Enum
 from functools import wraps
 from itertools import combinations
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 
 import hypothesis
 from hypothesis import Phase, Verbosity
@@ -548,6 +551,63 @@ def _stringify_value(val: Any, container_name: str) -> Any:
     return val
 
 
+def _generate_coverage_values_from_custom_strategy(
+    media_type: str,
+) -> Generator[coverage.GeneratedValue, None, None]:
+    """Generate coverage values from a custom media type strategy."""
+    from schemathesis.specs.openapi._hypothesis import _find_media_type_strategy
+
+    strategy = _find_media_type_strategy(media_type)
+    if strategy is None:
+        return
+
+    value: str | bytes = examples.generate_one(strategy)
+    yield coverage.GeneratedValue.with_positive(
+        value=value,
+        scenario=CoverageScenario.EXAMPLE_VALUE,
+        description=f"Custom media type: {media_type}",
+    )
+
+
+def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[str, Any] | None:
+    """Generate a body dict for multipart forms using custom encoding strategies.
+
+    Returns None if the body doesn't have custom encoding strategies or isn't a form type.
+    """
+    from schemathesis.specs.openapi._hypothesis import _find_media_type_strategy
+    from schemathesis.specs.openapi.adapter.parameters import FORM_MEDIA_TYPES
+
+    if body.media_type not in FORM_MEDIA_TYPES:
+        return None
+
+    schema = body.definition.get("schema", {})
+    properties = schema.get("properties", {})
+    required = schema.get("required", [])
+
+    result: dict[str, Any] = {}
+    has_custom_strategy = False
+
+    for prop_name in properties:
+        content_type = body.get_property_content_type(prop_name)
+        if not content_type:
+            continue
+
+        content_types = content_type if isinstance(content_type, list) else content_type.split(",")
+        for ct in content_types:
+            strategy = _find_media_type_strategy(ct.strip())
+            if strategy is not None:
+                result[prop_name] = examples.generate_one(strategy)
+                has_custom_strategy = True
+                break
+
+    for prop_name in required:
+        if prop_name not in result:
+            prop_schema = properties.get(prop_name, {})
+            result[prop_name] = b"" if prop_schema.get("format") == "binary" else ""
+
+    return result if has_custom_strategy else None
+
+
 def _iter_coverage_cases(
     *,
     operation: APIOperation,
@@ -640,6 +700,49 @@ def _iter_coverage_cases(
     if operation.body:
         for body in operation.body:
             instant = Instant()
+
+            multipart_body = _generate_multipart_body_from_custom_strategies(body)
+            if multipart_body is not None:
+                if body.is_required:
+                    has_generated_required_body = True
+                if "body" not in template:
+                    template.set_body(
+                        coverage.GeneratedValue.with_positive(
+                            value=multipart_body,
+                            scenario=CoverageScenario.EXAMPLE_VALUE,
+                            description="Multipart body with custom encoding",
+                        ),
+                        body.media_type,
+                    )
+                continue
+
+            custom_gen = _generate_coverage_values_from_custom_strategy(body.media_type)
+            first_custom_value = next(custom_gen, None)
+
+            if first_custom_value is not None:
+                if body.is_required:
+                    has_generated_required_body = True
+                elapsed = instant.elapsed
+                if "body" not in template:
+                    template_time += elapsed
+                    template.set_body(first_custom_value, body.media_type)
+                data = template.with_body(value=first_custom_value, media_type=body.media_type)
+                yield operation.Case(
+                    **data.kwargs,
+                    _meta=CaseMetadata(
+                        generation=GenerationInfo(time=elapsed, mode=first_custom_value.generation_mode),
+                        components=data.components,
+                        phase=PhaseInfo.coverage(
+                            scenario=first_custom_value.scenario,
+                            description=first_custom_value.description,
+                            location=first_custom_value.location,
+                            parameter=body.media_type,
+                            parameter_location=ParameterLocation.BODY,
+                        ),
+                    ),
+                )
+                continue
+
             schema = body.unoptimized_schema
             examples = body.examples
             if examples:
