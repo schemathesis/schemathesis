@@ -276,3 +276,167 @@ def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
         assert case.multipart_content_types["attachment"] == "application/pdf"
 
     test()
+
+
+def test_custom_media_type_strategy_in_coverage_phase(testdir, openapi3_base_url):
+    # Regression test for GH-3345
+    testdir.make_test(
+        f"""
+schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.phases.examples.enabled = False
+schema.config.phases.fuzzing.enabled = False
+
+@schema.include(path_regex="upload").parametrize()
+def test(case):
+    assert case.body == b"%PDF-1.4", f"Expected PDF bytes, got: {{case.body!r}}"
+""",
+        paths={
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/pdf": {"schema": {"type": "string", "format": "binary"}},
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
+
+
+def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
+    schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+
+    spec = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                    "required": ["file"],
+                                },
+                                "encoding": {"file": {"contentType": "application/pdf"}},
+                            },
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(spec)
+    operation = schema["/upload"]["POST"]
+    strategy = operation.as_strategy()
+
+    @given(strategy)
+    def test(case):
+        if case.body is not None and isinstance(case.body, dict):
+            if "file" in case.body:
+                assert case.body["file"] == b"%PDF-1.4"
+
+    test()
+
+
+def test_multipart_encoding_with_custom_strategy_parametrize(testdir, openapi3_base_url):
+    # Regression test for GH-3345 - positive mode cases should have consistent PDF bytes
+    testdir.make_test(
+        f"""
+schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+schema.config.update(base_url="{openapi3_base_url}")
+
+@schema.include(path_regex="upload").parametrize()
+def test(case):
+    # Negative mode generates intentionally invalid data
+    if case.meta.generation.mode == GenerationMode.POSITIVE:
+        if case.body is not None and isinstance(case.body, dict) and "file" in case.body:
+            assert case.body["file"] == b"%PDF-1.4", f"Expected PDF bytes, got: {{case.body['file']!r}}"
+""",
+        paths={
+            "/upload": {
+                "post": {
+                    "parameters": [{"name": "tag", "in": "query", "required": False, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                    "required": ["file"],
+                                },
+                                "encoding": {"file": {"contentType": "application/pdf"}},
+                            },
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=1)
+
+
+def test_multipart_encoding_required_body_parameter_coverage(testdir, openapi3_base_url):
+    # Regression test for GH-3345 - parameter coverage should still be generated
+    testdir.make_test(
+        f"""
+schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.phases.fuzzing.enabled = False
+
+param_values_seen = set()
+
+@schema.include(path_regex="upload").parametrize()
+def test(case):
+    if case.query:
+        param_values_seen.add(str(case.query.get("count")))
+
+def test_parameter_coverage_generated():
+    assert len(param_values_seen) > 0, f"No parameter coverage generated. Values seen: {{param_values_seen}}"
+""",
+        paths={
+            "/upload": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "count",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 10},
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                    "required": ["file"],
+                                },
+                                "encoding": {"file": {"contentType": "application/pdf"}},
+                            },
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=2)

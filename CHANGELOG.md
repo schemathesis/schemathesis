@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Custom media type strategies registered via `schemathesis.openapi.media_type()` not being applied in the coverage phase when using `@schema.parametrize()`. [#3345](https://github.com/schemathesis/schemathesis/issues/3345)
 - `positive_data_acceptance` failures caused by RFC-invalid control characters in generated headers. Positive mode now generates only valid ASCII headers. [#3462](https://github.com/schemathesis/schemathesis/issues/3462)
 
 ## [4.9.1](https://github.com/schemathesis/schemathesis/compare/v4.9.0...v4.9.1) - 2026-01-15
