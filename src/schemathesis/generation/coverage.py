@@ -415,9 +415,22 @@ def _encode(o: Any) -> str:
     return "".join(_iterencode(o, False))
 
 
+def _convert_bytes_for_hashing(value: Any) -> Any:
+    """Convert bytes to a hashable string representation for JSON encoding."""
+    if isinstance(value, bytes):
+        return f"__bytes__:{value.hex()}"
+    if isinstance(value, dict):
+        return {k: _convert_bytes_for_hashing(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_convert_bytes_for_hashing(v) for v in value]
+    return value
+
+
 def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
     if isinstance(value, dict | list):
-        serialized = _encode(value)
+        # Convert bytes to a hashable representation before JSON encoding
+        converted = _convert_bytes_for_hashing(value)
+        serialized = _encode(converted)
         return type(value), serialized
     return type(value), value
 
