@@ -1116,6 +1116,7 @@ def _iter_coverage_cases(
                             GenerationMode.POSITIVE,
                             Instant(),
                         )
+                        break
 
 
 def _case_to_kwargs(case: Case) -> dict:
