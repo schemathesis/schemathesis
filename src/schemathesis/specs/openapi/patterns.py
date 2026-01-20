@@ -122,12 +122,14 @@ _UNICODE_PROPERTY_MAP = (
 
 
 @lru_cache(maxsize=256)
-def translate_to_python_regex(pattern: str) -> str | None:
+def translate_to_python_regex(pattern: object) -> str | None:
     """Translate PCRE-style Unicode property escapes to Python equivalents.
 
     Returns the translated pattern if successful, None if translation failed
     or the result is not a valid Python regex.
     """
+    if not isinstance(pattern, str):
+        return None
     # Check for both braced (\p{L}) and shorthand (\pL) forms
     has_braced = r"\p{" in pattern or r"\P{" in pattern
     has_shorthand = any(
@@ -151,8 +153,10 @@ def translate_to_python_regex(pattern: str) -> str | None:
     return None
 
 
-def is_valid_python_regex(pattern: str) -> bool:
+def is_valid_python_regex(pattern: object) -> bool:
     """Check if a pattern is valid Python regex."""
+    if not isinstance(pattern, str):
+        return False
     try:
         re.compile(pattern)
         return True

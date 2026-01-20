@@ -66,3 +66,46 @@ def test_malformed_regex_removed_allows_body_generation(ctx):
 
     # Cases are generated because the malformed pattern is removed
     assert len(cases) > 0
+
+
+def test_numeric_pattern_value(ctx):
+    # When a body schema contains a pattern with a numeric value instead of a string,
+    # it should be handled gracefully without raising a TypeError
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "patch": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "key": {
+                                            "pattern": 0.0  # Invalid: pattern should be a string
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.0.0",
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/test"]["PATCH"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    # Cases should be generated despite the invalid pattern value
+    assert len(cases) > 0
