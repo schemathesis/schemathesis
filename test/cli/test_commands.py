@@ -1175,6 +1175,9 @@ def test_headers_passed_to_schema_loading(cli, ctx, app_runner):
 
 @pytest.mark.openapi_version("3.0")
 def test_yaml_parsing_of_floats(cli, testdir, base_url):
+    # When a YAML schema contains a pattern that looks like a time (e.g., 00:00:00.00),
+    # YAML parses it as a float (0.0). The pattern should be gracefully ignored,
+    # allowing tests to proceed without errors.
     schema = """info:
   description: Test
   title: Test
@@ -1193,15 +1196,14 @@ paths:
         '200':
           description: OK"""
     schema_file = testdir.makefile(".yaml", schema=schema)
-    result = cli.run_and_assert(
+    # Non-string pattern is gracefully handled (ignored), so tests should pass
+    cli.run_and_assert(
         str(schema_file),
         f"--url={base_url}",
         "--phases=fuzzing",
         "--checks=not_a_server_error",
         "--mode=positive",
-        exit_code=ExitCode.TESTS_FAILED,
     )
-    assert "Invalid `pattern` value: expected a string" in result.stdout
 
 
 @pytest.mark.operations("slow")

@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Coverage phase hanging on endpoints with many optional parameters due to combinatorial explosion. [#3046](https://github.com/schemathesis/schemathesis/issues/3046)
+- Coverage phase crashing with `TypeError` when schema contains non-string `pattern` values (e.g., `"pattern": 0.0`).
 
 ## [4.9.2](https://github.com/schemathesis/schemathesis/compare/v4.9.1...v4.9.2) - 2026-01-18
 
