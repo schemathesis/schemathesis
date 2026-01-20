@@ -1,0 +1,109 @@
+{
+  "operations": {
+    "GET /orders/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Order",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Order",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /warehouses/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Warehouse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /shipments": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "warehouse_id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Shipment",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Order": {
+      "fields": [
+        "id",
+        "shipping"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "warehouse_id",
+          "is_array": false,
+          "pointer": "/shipping/warehouse_id",
+          "target_field": "id",
+          "target_resource": "Warehouse"
+        }
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "shipping": [
+          "object"
+        ]
+      }
+    },
+    "Shipment": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    },
+    "Warehouse": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

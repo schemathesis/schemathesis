@@ -288,6 +288,14 @@
         "scope",
         "token_type"
       ],
+      "fk_fields": [
+        {
+          "field_name": "digilocker_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Digilocker"
+        }
+      ],
       "types": {
         "access_token": [
           "string"

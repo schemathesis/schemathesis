@@ -1023,6 +1023,14 @@
         "start_yards_to_goal",
         "yards"
       ],
+      "fk_fields": [
+        {
+          "field_name": "game_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Game"
+        }
+      ],
       "types": {
         "defense": [
           "string"
@@ -1133,6 +1141,26 @@
         "venue",
         "venue_id",
         "week"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "away_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Away"
+        },
+        {
+          "field_name": "home_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Home"
+        },
+        {
+          "field_name": "venue_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Venue"
+        }
       ],
       "types": {
         "attendance": [
@@ -1552,6 +1580,20 @@
         "yards_gained",
         "yards_to_goal"
       ],
+      "fk_fields": [
+        {
+          "field_name": "drive_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Drive"
+        },
+        {
+          "field_name": "game_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Game"
+        }
+      ],
       "types": {
         "away": [
           "string"
@@ -1842,6 +1884,14 @@
         "team",
         "weight",
         "year"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "recruit_ids",
+          "is_array": true,
+          "target_field": "id",
+          "target_resource": "Recruit"
+        }
       ],
       "types": {
         "first_name": [
@@ -2487,6 +2537,15 @@
         "mascot",
         "school",
         "twitter"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "venue_id",
+          "is_array": false,
+          "pointer": "/location/venue_id",
+          "target_field": "id",
+          "target_resource": "Venue"
+        }
       ],
       "types": {
         "abbreviation": [

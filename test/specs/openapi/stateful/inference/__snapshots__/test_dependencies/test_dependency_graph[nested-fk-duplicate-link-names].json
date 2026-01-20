@@ -1,0 +1,90 @@
+{
+  "operations": {
+    "GET /orders/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Order",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Order",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /warehouses/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Warehouse",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Order": {
+      "fields": [
+        "billing",
+        "id",
+        "shipping"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "warehouse_id",
+          "is_array": false,
+          "pointer": "/shipping/warehouse_id",
+          "target_field": "id",
+          "target_resource": "Warehouse"
+        },
+        {
+          "field_name": "warehouse_id",
+          "is_array": false,
+          "pointer": "/billing/warehouse_id",
+          "target_field": "id",
+          "target_resource": "Warehouse"
+        }
+      ],
+      "types": {
+        "billing": [
+          "object"
+        ],
+        "id": [
+          "string"
+        ],
+        "shipping": [
+          "object"
+        ]
+      }
+    },
+    "Warehouse": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

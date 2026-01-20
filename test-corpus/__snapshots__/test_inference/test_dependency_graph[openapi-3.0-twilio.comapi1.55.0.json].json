@@ -6200,6 +6200,14 @@
         "start",
         "uri"
       ],
+      "fk_fields": [
+        {
+          "field_name": "outgoing_caller_ids",
+          "is_array": true,
+          "target_field": "id",
+          "target_resource": "OutgoingCaller"
+        }
+      ],
       "types": {
         "end": [
           "integer"

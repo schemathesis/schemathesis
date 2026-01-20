@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1events~1{id}/get",
+    {
+      "GetSite": {
+        "operationRef": "#/paths/~1sites~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/location/site_ids/0"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

@@ -452,6 +452,15 @@
         "id",
         "type"
       ],
+      "nested_fk_fields": [
+        {
+          "field_name": "advisory_id",
+          "is_array": false,
+          "pointer": "/attributes/advisory_id",
+          "target_field": "id",
+          "target_resource": "Advisory"
+        }
+      ],
       "types": {
         "attributes": [
           "object"
@@ -598,6 +607,14 @@
         "stale_warning_timestamp",
         "third_party"
       ],
+      "fk_fields": [
+        {
+          "field_name": "insights_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Insights"
+        }
+      ],
       "types": {
         "created": [
           "string"
@@ -669,6 +686,15 @@
         "attributes",
         "id",
         "type"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "insights_id",
+          "is_array": false,
+          "pointer": "/attributes/insights_id",
+          "target_field": "id",
+          "target_resource": "Insights"
+        }
       ],
       "types": {
         "attributes": [

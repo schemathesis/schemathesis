@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1users/post",
+    {
+      "GetUser": {
+        "operationRef": "#/paths/~1users~1{user_id}~1posts~1{id}/get",
+        "parameters": {
+          "path.user_id": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

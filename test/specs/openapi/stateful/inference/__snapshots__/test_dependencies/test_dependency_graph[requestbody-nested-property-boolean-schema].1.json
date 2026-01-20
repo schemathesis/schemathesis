@@ -1,0 +1,20 @@
+[
+  [
+    "200",
+    "#/paths/~1warehouses/get",
+    {
+      "PostWarehouse": {
+        "operationRef": "#/paths/~1orders/post",
+        "requestBody": {
+          "shipping": {
+            "warehouse_id": "$response.body#/0/id"
+          }
+        },
+        "x-schemathesis": {
+          "is_inferred": true,
+          "merge_body": true
+        }
+      }
+    }
+  ]
+]

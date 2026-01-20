@@ -77,6 +77,14 @@
         "id",
         "league_id"
       ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        }
+      ],
       "types": {
         "id": [
           "integer"

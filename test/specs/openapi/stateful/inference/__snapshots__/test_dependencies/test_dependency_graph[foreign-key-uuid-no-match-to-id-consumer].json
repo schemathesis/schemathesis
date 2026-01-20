@@ -1,0 +1,78 @@
+{
+  "operations": {
+    "GET /sessions/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Session",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Session",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /users/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "User",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Session": {
+      "fields": [
+        "id",
+        "user_uuid"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "user_uuid",
+          "is_array": false,
+          "target_field": "uuid",
+          "target_resource": "User"
+        }
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "user_uuid": [
+          "string"
+        ]
+      }
+    },
+    "User": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

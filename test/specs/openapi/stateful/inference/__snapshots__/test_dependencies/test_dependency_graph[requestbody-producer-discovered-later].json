@@ -50,6 +50,14 @@
         "id",
         "total"
       ],
+      "fk_fields": [
+        {
+          "field_name": "customer_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Customer"
+        }
+      ],
       "types": {
         "customer_id": [
           "string"

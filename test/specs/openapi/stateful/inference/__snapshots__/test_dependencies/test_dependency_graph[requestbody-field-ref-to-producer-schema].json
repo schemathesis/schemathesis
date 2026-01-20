@@ -40,6 +40,14 @@
         "name",
         "recipient_id"
       ],
+      "fk_fields": [
+        {
+          "field_name": "recipient_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Recipient"
+        }
+      ],
       "types": {
         "id": [
           "string"

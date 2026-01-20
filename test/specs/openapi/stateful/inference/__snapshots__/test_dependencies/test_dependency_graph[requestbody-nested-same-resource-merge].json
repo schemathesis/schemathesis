@@ -1,0 +1,51 @@
+{
+  "operations": {
+    "GET /accounts": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Account",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /payments": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "transfer/account_id",
+          "resource": "Account",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "transfer/account_uuid",
+          "resource": "Account",
+          "resource_field": "uuid"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Account": {
+      "fields": [
+        "id",
+        "uuid"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "uuid": [
+          "string"
+        ]
+      }
+    }
+  }
+}

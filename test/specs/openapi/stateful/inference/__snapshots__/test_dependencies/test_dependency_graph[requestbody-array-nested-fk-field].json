@@ -1,0 +1,40 @@
+{
+  "operations": {
+    "GET /products": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Product",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /orders": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "items/0/product_id",
+          "resource": "Product",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Product": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

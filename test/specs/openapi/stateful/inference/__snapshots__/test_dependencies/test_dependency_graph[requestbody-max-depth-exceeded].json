@@ -1,0 +1,32 @@
+{
+  "operations": {
+    "GET /warehouses": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Warehouse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /orders": {
+      "inputs": [],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Warehouse": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}
