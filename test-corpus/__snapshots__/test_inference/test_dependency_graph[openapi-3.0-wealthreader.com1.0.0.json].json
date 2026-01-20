@@ -47,6 +47,15 @@
         "name",
         "statistics"
       ],
+      "nested_fk_fields": [
+        {
+          "field_name": "operation_id",
+          "is_array": false,
+          "pointer": "/statistics/operation_id",
+          "target_field": "id",
+          "target_resource": "Operation"
+        }
+      ],
       "types": {
         "bic": [
           "string"
@@ -73,6 +82,15 @@
         "payload",
         "statistics",
         "success"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "operation_id",
+          "is_array": false,
+          "pointer": "/statistics/operation_id",
+          "target_field": "id",
+          "target_resource": "Operation"
+        }
       ],
       "types": {
         "payload": [

@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1orders~1{id}/get",
+    {
+      "GetProduct": {
+        "operationRef": "#/paths/~1products~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/line_items/0/product_id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

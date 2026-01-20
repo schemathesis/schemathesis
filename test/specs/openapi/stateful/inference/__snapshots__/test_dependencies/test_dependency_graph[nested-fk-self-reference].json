@@ -1,0 +1,82 @@
+{
+  "operations": {
+    "GET /users/{user_id}/posts/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "user_id",
+          "resource": "User",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Post",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Post",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /users": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "User",
+          "status_code": "201"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Post": {
+      "fields": [
+        "content",
+        "id",
+        "mentioned"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "user_id",
+          "is_array": false,
+          "pointer": "/mentioned/user_id",
+          "target_field": "id",
+          "target_resource": "User"
+        }
+      ],
+      "types": {
+        "content": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ],
+        "mentioned": [
+          "object"
+        ]
+      }
+    },
+    "User": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

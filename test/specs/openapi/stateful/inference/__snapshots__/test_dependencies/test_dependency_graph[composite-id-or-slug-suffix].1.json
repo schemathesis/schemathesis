@@ -43,5 +43,20 @@
         }
       }
     }
+  ],
+  [
+    "200",
+    "#/paths/~1leagues~1{league_id_or_slug}~1matches/get",
+    {
+      "GetLeague": {
+        "operationRef": "#/paths/~1leagues~1{league_id_or_slug}/get",
+        "parameters": {
+          "path.league_id_or_slug": "$response.body#/0/league_id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
   ]
 ]

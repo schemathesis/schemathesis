@@ -1095,6 +1095,20 @@
         "winner_type",
         "year"
       ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
       "types": {
         "begin_at": [
           "array",
@@ -1195,6 +1209,26 @@
         "winner_id",
         "winner_type"
       ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
       "types": {
         "begin_at": [
           "array",
@@ -1286,6 +1320,36 @@
         "streams_list",
         "tournament_id",
         "winner_id"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "tournament_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Tournament"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "match_id",
+          "is_array": false,
+          "pointer": "/games/0/match_id",
+          "target_field": "id",
+          "target_resource": "Match"
+        },
+        {
+          "field_name": "match_id",
+          "is_array": false,
+          "pointer": "/previous_matches/0/match_id",
+          "target_field": "id",
+          "target_resource": "Match"
+        }
       ],
       "types": {
         "begin_at": [
@@ -1422,6 +1486,15 @@
         "object",
         "type"
       ],
+      "nested_fk_fields": [
+        {
+          "field_name": "videogame_id",
+          "is_array": false,
+          "pointer": "/object/videogame_id",
+          "target_field": "id",
+          "target_resource": "Videogame"
+        }
+      ],
       "types": {
         "change_type": [
           "string"
@@ -1459,6 +1532,22 @@
         "slug",
         "url",
         "videogame"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/series/0/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/series/0/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
       ],
       "types": {
         "id": [
@@ -1511,6 +1600,85 @@
         "endpoints",
         "event",
         "match"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "match_id",
+          "is_array": false,
+          "pointer": "/endpoints/0/match_id",
+          "target_field": "id",
+          "target_resource": "Match"
+        },
+        {
+          "field_name": "match_id",
+          "is_array": false,
+          "pointer": "/match/games/0/match_id",
+          "target_field": "id",
+          "target_resource": "Match"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/match/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/match/serie/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/match/serie/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "pointer": "/match/serie_id",
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/match/tournament/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "pointer": "/match/tournament/serie_id",
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/match/tournament/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        },
+        {
+          "field_name": "tournament_id",
+          "is_array": false,
+          "pointer": "/match/tournament_id",
+          "target_field": "id",
+          "target_resource": "Tournament"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/match/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
       ],
       "types": {
         "endpoints": [
@@ -1565,6 +1733,76 @@
         "videogame_version",
         "winner",
         "winner_id"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "tournament_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Tournament"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "match_id",
+          "is_array": false,
+          "pointer": "/games/0/match_id",
+          "target_field": "id",
+          "target_resource": "Match"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/serie/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/serie/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/tournament/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "pointer": "/tournament/serie_id",
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/tournament/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
       ],
       "types": {
         "begin_at": [
@@ -1929,6 +2167,43 @@
         "winner_type",
         "year"
       ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/tournaments/0/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "pointer": "/tournaments/0/serie_id",
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/tournaments/0/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
       "types": {
         "begin_at": [
           "array",
@@ -2050,6 +2325,56 @@
         "videogame",
         "winner_id",
         "winner_type"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "tournament_id",
+          "is_array": false,
+          "pointer": "/matches/0/tournament_id",
+          "target_field": "id",
+          "target_resource": "Tournament"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/matches/0/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/serie/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/serie/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
       ],
       "types": {
         "begin_at": [
@@ -2236,6 +2561,56 @@
         "winner_id",
         "winner_type"
       ],
+      "fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "serie_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Serie"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "tournament_id",
+          "is_array": false,
+          "pointer": "/matches/0/tournament_id",
+          "target_field": "id",
+          "target_resource": "Tournament"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/matches/0/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        },
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/serie/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/serie/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
+      ],
       "types": {
         "begin_at": [
           "array",
@@ -2343,6 +2718,22 @@
         "leagues",
         "name",
         "slug"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "league_id",
+          "is_array": false,
+          "pointer": "/leagues/0/series/0/league_id",
+          "target_field": "id",
+          "target_resource": "League"
+        },
+        {
+          "field_name": "winner_id",
+          "is_array": false,
+          "pointer": "/leagues/0/series/0/winner_id",
+          "target_field": "id",
+          "target_resource": "Winner"
+        }
       ],
       "types": {
         "current_version": [

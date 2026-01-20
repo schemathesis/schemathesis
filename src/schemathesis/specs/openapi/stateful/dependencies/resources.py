@@ -18,6 +18,8 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     ResourceDefinition,
     ResourceMap,
     extend_pointer,
+    extract_fk_fields,
+    extract_nested_fk_fields,
 )
 from schemathesis.specs.openapi.stateful.dependencies.naming import from_path
 from schemathesis.specs.openapi.stateful.dependencies.schemas import (
@@ -353,18 +355,33 @@ def _extract_resource_from_schema(
                     resolved_subschema = subschema
                 types[field] = set(get_type(cast(dict, resolved_subschema)))
             source = DefinitionSource.SCHEMA_WITH_PROPERTIES
+            # Pre-compute FK fields for efficient link generation
+            fk_fields = extract_fk_fields(fields)
+            # Extract nested FK fields from the schema
+            nested_fk_fields = extract_nested_fk_fields(resolved, resolver)
         else:
             fields = []
             types = {}
             source = DefinitionSource.SCHEMA_WITHOUT_PROPERTIES
+            fk_fields = []
+            nested_fk_fields = []
         if resource is not None:
             if resource.source < source:
                 resource.source = source
                 resource.fields = fields
                 resource.types = types
+                resource.fk_fields = fk_fields
+                resource.nested_fk_fields = nested_fk_fields
                 updated_resources.add(resource_name)
         else:
-            resource = ResourceDefinition(name=resource_name, fields=fields, types=types, source=source)
+            resource = ResourceDefinition(
+                name=resource_name,
+                fields=fields,
+                types=types,
+                source=source,
+                fk_fields=fk_fields,
+                nested_fk_fields=nested_fk_fields,
+            )
             resources[resource_name] = resource
 
     return resource
