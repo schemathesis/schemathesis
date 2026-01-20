@@ -18,6 +18,7 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
     OutputSlot,
     ResourceDefinition,
     ResourceMap,
+    infer_fk_target,
 )
 from schemathesis.specs.openapi.stateful.dependencies.resources import extract_resources_from_responses
 
@@ -344,6 +345,96 @@ def _resolve_body_dependencies(
             parameter_name=property_name,
             parameter_location=ParameterLocation.BODY,
         )
+
+    # Recursively find nested FK fields in request body
+    yield from _extract_nested_body_fk_fields(resolved, resources, path="")
+
+
+def _extract_nested_body_fk_fields(
+    schema: dict[str, Any],
+    resources: ResourceMap,
+    path: str,
+    max_depth: int = 5,
+) -> Iterator[InputSlot]:
+    """Recursively extract FK fields from nested request body schemas.
+
+    Scans nested objects and array items to find FK fields like:
+    - {shipping: {warehouse_id: "..."}} -> InputSlot for warehouse_id
+    - {items: [{product_id: "..."}]} -> InputSlot for product_id
+
+    """
+    if max_depth <= 0:
+        return
+
+    properties = schema.get("properties", {})
+
+    for property_name, subschema in properties.items():
+        if not isinstance(subschema, dict):
+            continue
+
+        # Build the path for nested fields
+        current_path = f"{path}/{property_name}" if path else property_name
+
+        # Check if this property is a nested object
+        prop_type = subschema.get("type")
+
+        if prop_type == "object" or "properties" in subschema:
+            # Recurse into nested objects
+            nested_props = subschema.get("properties", {})
+            for nested_name, nested_schema in nested_props.items():
+                if not isinstance(nested_schema, dict):
+                    continue
+
+                nested_path = f"{current_path}/{nested_name}"
+
+                # Check if nested field is a FK
+                fk_info = infer_fk_target(nested_name)
+                if fk_info is not None:
+                    target_resource_name, target_field, _ = fk_info
+                    resource = resources.get(target_resource_name)
+                    if resource is not None:
+                        yield InputSlot(
+                            resource=resource,
+                            resource_field=target_field,
+                            parameter_name=nested_path,
+                            parameter_location=ParameterLocation.BODY,
+                        )
+                    continue
+
+                # Recurse deeper
+                if nested_schema.get("type") == "object" or "properties" in nested_schema:
+                    yield from _extract_nested_body_fk_fields(nested_schema, resources, nested_path, max_depth - 1)
+
+        elif prop_type == "array":
+            # Check array items for FK fields
+            items = subschema.get("items")
+            if isinstance(items, dict):
+                items_path = f"{current_path}/0"
+
+                # Check if items have properties (object items)
+                items_props = items.get("properties", {})
+                for item_prop_name, item_prop_schema in items_props.items():
+                    if not isinstance(item_prop_schema, dict):
+                        continue
+
+                    item_path = f"{items_path}/{item_prop_name}"
+
+                    # Check if this item property is a FK
+                    fk_info = infer_fk_target(item_prop_name)
+                    if fk_info is not None:
+                        target_resource_name, target_field, _ = fk_info
+                        resource = resources.get(target_resource_name)
+                        if resource is not None:
+                            yield InputSlot(
+                                resource=resource,
+                                resource_field=target_field,
+                                parameter_name=item_path,
+                                parameter_location=ParameterLocation.BODY,
+                            )
+
+                # Recurse into array items
+                if items.get("type") == "object" or "properties" in items:
+                    yield from _extract_nested_body_fk_fields(items, resources, items_path, max_depth - 1)
 
 
 def update_input_field_bindings(resource_name: str, operations: OperationMap) -> None:

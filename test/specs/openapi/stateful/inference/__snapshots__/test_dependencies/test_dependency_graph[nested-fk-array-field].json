@@ -1,0 +1,79 @@
+{
+  "operations": {
+    "GET /events/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Event",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Event",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /sites/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Site",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Site",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Event": {
+      "fields": [
+        "id",
+        "location"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "site_ids",
+          "is_array": true,
+          "pointer": "/location/site_ids",
+          "target_field": "id",
+          "target_resource": "Site"
+        }
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "location": [
+          "object"
+        ]
+      }
+    },
+    "Site": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

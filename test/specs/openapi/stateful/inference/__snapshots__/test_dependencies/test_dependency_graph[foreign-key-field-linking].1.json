@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1orders~1{id}/get",
+    {
+      "GetCustomer": {
+        "operationRef": "#/paths/~1customers~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/customer_id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

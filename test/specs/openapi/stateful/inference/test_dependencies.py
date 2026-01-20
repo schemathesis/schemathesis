@@ -1708,6 +1708,1251 @@ def snapshot_json(snapshot):
             },
             id="prefix-matching-group-slug",
         ),
+        # Foreign key field linking: producer returns object with customer_id FK field,
+        # consumer expects Customer.id in path parameter
+        pytest.param(
+            {
+                # Producer: returns Order with customer_id FK field
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                # Consumer: needs Customer.id
+                **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "customer_id": {"type": "string"},
+                            "total": {"type": "number"},
+                        },
+                        "required": ["id", "customer_id"],
+                    },
+                    "Customer": SCHEMA_WITH_ID,
+                }
+            },
+            id="foreign-key-field-linking",
+        ),
+        # Multiple FK fields: booking with customer_id and event_id
+        pytest.param(
+            {
+                **operation("get", "/bookings/{id}", "200", component_ref("Booking"), [path_param("id")]),
+                **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+                **operation("get", "/events/{id}", "200", component_ref("Event"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Booking": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "customer_id": {"type": "string"},
+                            "event_id": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                    "Customer": SCHEMA_WITH_ID,
+                    "Event": SCHEMA_WITH_ID,
+                }
+            },
+            id="multiple-foreign-key-fields",
+        ),
+        # Array FK field: event with site_ids array
+        pytest.param(
+            {
+                **operation("get", "/events/{id}", "200", component_ref("Event"), [path_param("id")]),
+                **operation("get", "/sites/{id}", "200", component_ref("Site"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Event": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "site_ids": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["id"],
+                    },
+                    "Site": SCHEMA_WITH_ID,
+                }
+            },
+            id="array-foreign-key-field",
+        ),
+        # FK field with _uuid suffix does NOT link to consumer expecting id
+        # user_uuid -> GET /users/{id} (no match because consumer expects id, not uuid)
+        # This ensures FK suffix types are respected
+        pytest.param(
+            {
+                **operation("get", "/sessions/{id}", "200", component_ref("Session"), [path_param("id")]),
+                **operation("get", "/users/{id}", "200", component_ref("User"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Session": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "user_uuid": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                    "User": SCHEMA_WITH_ID,
+                }
+            },
+            id="foreign-key-uuid-no-match-to-id-consumer",
+        ),
+        # Multi-word snake_case FK: shipping_address_id -> ShippingAddress
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation(
+                    "get", "/shipping-addresses/{id}", "200", component_ref("ShippingAddress"), [path_param("id")]
+                ),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping_address_id": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                    "ShippingAddress": SCHEMA_WITH_ID,
+                }
+            },
+            id="foreign-key-multi-word-snake-case",
+        ),
+        # Embedded resource: Order contains embedded Customer object
+        # Should link GET /orders/{id} -> GET /customers/{id} via customer.id
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "total": {"type": "number"},
+                            "customer": component_ref("Customer"),  # Embedded resource
+                        },
+                        "required": ["id"],
+                    },
+                    "Customer": SCHEMA_WITH_ID,
+                }
+            },
+            id="embedded-resource-linking",
+        ),
+        # Nested FK field: Order.shipping.warehouse_id -> Warehouse
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},
+                                    "tracking": {"type": "string"},
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-field-linking",
+        ),
+        # Array of embedded resources: Order.line_items[].product_id -> Product
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/products/{id}", "200", component_ref("Product"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "line_items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "product_id": {"type": "string"},
+                                        "quantity": {"type": "integer"},
+                                    },
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Product": SCHEMA_WITH_ID,
+                }
+            },
+            id="array-nested-fk-field-linking",
+        ),
+        # Request body with nested FK field: POST /orders with {shipping: {warehouse_id: "..."}}
+        # Should create link from GET /warehouses to POST /orders
+        pytest.param(
+            {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "total": {"type": "number"},
+                                            "shipping": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "warehouse_id": {"type": "string"},
+                                                    "address": {"type": "string"},
+                                                },
+                                                "required": ["warehouse_id"],
+                                            },
+                                        },
+                                        "required": ["shipping"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-nested-fk-field",
+        ),
+        # Request body with FK field in array items: POST /orders with {items: [{product_id: "..."}]}
+        pytest.param(
+            {
+                **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "total": {"type": "number"},
+                                            "items": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "product_id": {"type": "string"},
+                                                        "quantity": {"type": "integer"},
+                                                    },
+                                                    "required": ["product_id"],
+                                                },
+                                            },
+                                        },
+                                        "required": ["items"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Product": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-array-nested-fk-field",
+        ),
+        # Request body with boolean schema for a property
+        pytest.param(
+            {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "warehouse_id": {"type": "string"},
+                                            "config": True,
+                                        },
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-property-boolean-schema",
+        ),
+        # Nested object with boolean schema for a property
+        pytest.param(
+            {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "shipping": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "warehouse_id": {"type": "string"},
+                                                    "metadata": True,
+                                                },
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-nested-property-boolean-schema",
+        ),
+        # Deeply nested FK field - multiple levels of non-FK objects
+        pytest.param(
+            {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "fulfillment": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "shipping": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "warehouse_id": {"type": "string"},
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-deeply-nested-fk-field",
+        ),
+        # Array items with boolean schema for a property
+        pytest.param(
+            {
+                **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "items": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "product_id": {"type": "string"},
+                                                        "metadata": True,
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Product": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-array-item-boolean-schema",
+        ),
+        # Deeply nested structure that exceeds the recursion depth limit
+        pytest.param(
+            {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "level1": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "level2": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "level3": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "level4": {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "level5": {
+                                                                                "type": "object",
+                                                                                "properties": {
+                                                                                    "level6": {
+                                                                                        "type": "object",
+                                                                                        "properties": {
+                                                                                            "level7": {
+                                                                                                "type": "object",
+                                                                                                "properties": {
+                                                                                                    "level8": {
+                                                                                                        "type": "object",
+                                                                                                        "properties": {
+                                                                                                            "level9": {
+                                                                                                                "type": "object",
+                                                                                                                "properties": {
+                                                                                                                    "level10": {
+                                                                                                                        "type": "object",
+                                                                                                                        "properties": {
+                                                                                                                            "warehouse_id": {
+                                                                                                                                "type": "string"
+                                                                                                                            },
+                                                                                                                        },
+                                                                                                                    },
+                                                                                                                },
+                                                                                                            },
+                                                                                                        },
+                                                                                                    },
+                                                                                                },
+                                                                                            },
+                                                                                        },
+                                                                                    },
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-max-depth-exceeded",
+        ),
+        # FK field points to non-existent resource (target_resource is None)
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                # No /customers endpoint - Customer resource doesn't exist
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "customer_id": {"type": "string"},  # FK to non-existent Customer
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="fk-field-to-nonexistent-resource",
+        ),
+        # Nested FK field pointing to non-existent resource
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                # No /warehouses endpoint - Warehouse resource doesn't exist
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},  # FK to non-existent Warehouse
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="nested-fk-to-nonexistent-resource",
+        ),
+        # Two consumers for the same resource - creates duplicate FK link names
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                # Two consumers for Customer, both expecting id - creates duplicate "GetCustomer" link
+                **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+                **operation(
+                    "get", "/customers/{customerId}", "200", component_ref("Customer"), [path_param("customerId")]
+                ),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "customer_id": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                    "Customer": SCHEMA_WITH_ID,
+                }
+            },
+            id="fk-duplicate-link-names",
+        ),
+        # Response schema with $ref that needs resolution for nested FK extraction
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": component_ref("ShippingDetails"),  # $ref needs resolution
+                        },
+                        "required": ["id"],
+                    },
+                    "ShippingDetails": {
+                        "type": "object",
+                        "properties": {
+                            "warehouse_id": {"type": "string"},
+                            "tracking": {"type": "string"},
+                        },
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-with-ref-resolution",
+        ),
+        # Response with array of items containing nested FK fields - tests MANY cardinality
+        pytest.param(
+            {
+                **operation("get", "/orders", "200", {"type": "array", "items": component_ref("Order")}),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-many-cardinality",
+        ),
+        # Nested FK field that is an array (site_ids inside nested object)
+        pytest.param(
+            {
+                **operation("get", "/events/{id}", "200", component_ref("Event"), [path_param("id")]),
+                **operation("get", "/sites/{id}", "200", component_ref("Site"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Event": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "location": {
+                                "type": "object",
+                                "properties": {
+                                    "site_ids": {"type": "array", "items": {"type": "string"}},  # Array FK
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Site": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-array-field",
+        ),
+        # Consumer expects body parameter - FK linking should skip this
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation_with_body(
+                    "post",
+                    "/invoices",
+                    "201",
+                    {"type": "object", "properties": {"customer_id": {"type": "string"}}, "required": ["customer_id"]},
+                    SCHEMA_WITH_ID,
+                    operation_id="createInvoice",
+                ),
+                **operation("get", "/customers/{id}", "200", component_ref("Customer"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "customer_id": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    },
+                    "Customer": SCHEMA_WITH_ID,
+                }
+            },
+            id="fk-skip-body-parameter-consumer",
+        ),
+        # Multiple nested FK fields creating duplicate link names
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},
+                                },
+                            },
+                            "billing": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},  # Duplicate FK to same resource
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-duplicate-link-names",
+        ),
+        # Nested FK with mismatched target field (uuid vs id)
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_uuid": {"type": "string"},  # uuid FK, but consumer expects id
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-mismatched-target-field",
+        ),
+        # Self-referencing nested FK - operation is both producer and consumer for FK target
+        # GET /users/{user_id}/posts/{id} returns Post with nested FK user_id -> User
+        # Same operation needs User via user_id path parameter (self-reference)
+        pytest.param(
+            {
+                **operation(
+                    "get",
+                    "/users/{user_id}/posts/{id}",
+                    "200",
+                    component_ref("Post"),
+                    [path_param("user_id"), path_param("id")],
+                ),
+                **operation("post", "/users", "201", component_ref("User")),
+            },
+            {
+                "schemas": {
+                    "User": SCHEMA_WITH_ID,
+                    "Post": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "content": {"type": "string"},
+                            "mentioned": {
+                                "type": "object",
+                                "properties": {
+                                    "user_id": {"type": "string"},  # Nested FK to User (same as path param)
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="nested-fk-self-reference",
+        ),
+        # Nested FK where consumer expects body parameter (should be skipped)
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation_with_body(
+                    "post",
+                    "/shipments",
+                    "201",
+                    {
+                        "type": "object",
+                        "properties": {"warehouse_id": {"type": "string"}},
+                        "required": ["warehouse_id"],
+                    },
+                    SCHEMA_WITH_ID,
+                    operation_id="createShipment",
+                ),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-skip-body-consumer",
+        ),
+        # Two consumers for nested FK - creates duplicate link names
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+                **operation(
+                    "get", "/warehouses/{warehouseId}", "200", component_ref("Warehouse"), [path_param("warehouseId")]
+                ),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": {
+                                "type": "object",
+                                "properties": {
+                                    "warehouse_id": {"type": "string"},
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-duplicate-consumers",
+        ),
+        # Response schema property with boolean value (not a dict)
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "metadata": True,  # Boolean schema property
+                            "config": True,  # Another boolean schema property
+                        },
+                        "required": ["id"],
+                    },
+                }
+            },
+            id="response-schema-boolean-properties",
+        ),
+        # Multiple request body FK fields requiring nested body merge
+        pytest.param(
+            {
+                **operation("get", "/warehouses", "200", {"type": "array", "items": component_ref("Warehouse")}),
+                **operation("get", "/carriers", "200", {"type": "array", "items": component_ref("Carrier")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "shipping": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "warehouse_id": {"type": "string"},
+                                                    "carrier_id": {"type": "string"},
+                                                },
+                                                "required": ["warehouse_id", "carrier_id"],
+                                            },
+                                        },
+                                        "required": ["shipping"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Warehouse": SCHEMA_WITH_ID,
+                    "Carrier": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-multiple-fk-fields-merge",
+        ),
+        # Request body with array items containing multiple FK fields (tests list merging)
+        pytest.param(
+            {
+                **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
+                **operation("get", "/suppliers", "200", {"type": "array", "items": component_ref("Supplier")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "items": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "product_id": {"type": "string"},
+                                                        "supplier_id": {"type": "string"},
+                                                    },
+                                                    "required": ["product_id", "supplier_id"],
+                                                },
+                                            },
+                                        },
+                                        "required": ["items"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Product": SCHEMA_WITH_ID,
+                    "Supplier": SCHEMA_WITH_ID,
+                }
+            },
+            id="requestbody-array-multiple-fk-fields-merge",
+        ),
+        # Deeply nested schema with $ref that triggers extract_nested_fk_fields resolution
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "shipping": component_ref("Shipping"),
+                        },
+                        "required": ["id"],
+                    },
+                    "Shipping": {
+                        "type": "object",
+                        "properties": {
+                            "location": component_ref("Location"),
+                        },
+                    },
+                    "Location": {
+                        "type": "object",
+                        "properties": {
+                            "warehouse_id": {"type": "string"},
+                            "address": {"type": "string"},
+                        },
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-refs-extract-fk-fields",
+        ),
+        # Nested FK extraction with max depth exceeded in response schema
+        pytest.param(
+            {
+                **operation("get", "/orders/{id}", "200", component_ref("Order"), [path_param("id")]),
+                **operation("get", "/warehouses/{id}", "200", component_ref("Warehouse"), [path_param("id")]),
+            },
+            {
+                "schemas": {
+                    "Order": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "l1": {
+                                "type": "object",
+                                "properties": {
+                                    "l2": {
+                                        "type": "object",
+                                        "properties": {
+                                            "l3": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "l4": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "l5": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "l6": {
+                                                                        "type": "object",
+                                                                        "properties": {
+                                                                            "warehouse_id": {"type": "string"},
+                                                                        },
+                                                                    },
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        "required": ["id"],
+                    },
+                    "Warehouse": SCHEMA_WITH_ID,
+                }
+            },
+            id="nested-fk-max-depth-response",
+        ),
+        # Multiple FK fields in request body pointing to the same resource (tests _merge_nested_body)
+        # account_id and account_uuid both parse to "Account" resource
+        pytest.param(
+            {
+                **operation("get", "/accounts", "200", {"type": "array", "items": component_ref("Account")}),
+                "/transfers": {
+                    "post": {
+                        "operationId": "createTransfer",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "account_id": {"type": "string"},
+                                            "account_uuid": {"type": "string"},  # Same resource, different field
+                                            "amount": {"type": "number"},
+                                        },
+                                        "required": ["account_id", "account_uuid"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Account": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "uuid": {"type": "string"},  # Both id and uuid fields
+                        },
+                        "required": ["id", "uuid"],
+                    },
+                }
+            },
+            id="requestbody-same-resource-multiple-fk-fields",
+        ),
+        # Nested request body with multiple FK fields at same nested path (tests nested merge)
+        pytest.param(
+            {
+                **operation("get", "/accounts", "200", {"type": "array", "items": component_ref("Account")}),
+                "/payments": {
+                    "post": {
+                        "operationId": "createPayment",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "transfer": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "account_id": {"type": "string"},
+                                                    "account_uuid": {"type": "string"},
+                                                },
+                                                "required": ["account_id", "account_uuid"],
+                                            },
+                                        },
+                                        "required": ["transfer"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Account": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "uuid": {"type": "string"},
+                        },
+                        "required": ["id", "uuid"],
+                    },
+                }
+            },
+            id="requestbody-nested-same-resource-merge",
+        ),
+        # Request body with array of FK fields pointing to same resource (tests list merge)
+        pytest.param(
+            {
+                **operation("get", "/products", "200", {"type": "array", "items": component_ref("Product")}),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "items": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "product_id": {"type": "string"},
+                                                        "product_uuid": {"type": "string"},
+                                                    },
+                                                    "required": ["product_id", "product_uuid"],
+                                                },
+                                            },
+                                        },
+                                        "required": ["items"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Product": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "uuid": {"type": "string"},
+                        },
+                        "required": ["id", "uuid"],
+                    },
+                }
+            },
+            id="requestbody-array-same-resource-list-merge",
+        ),
+        # Request body schema is a $ref that gets resolved
+        pytest.param(
+            {
+                **operation("get", "/users", "200", component_ref("User")),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OrderInput"}}},
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "User": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                    },
+                    "OrderInput": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {"type": "string"},
+                        },
+                    },
+                }
+            },
+            id="requestbody-schema-ref",
+        ),
+        # Body is array with items $ref AND has properties with FK - triggers mixed request_body types
+        pytest.param(
+            {
+                **operation("get", "/products", "200", component_ref("Product")),
+                "/orders": {
+                    "post": {
+                        "operationId": "createOrder",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {"$ref": "#/components/schemas/Product"},
+                                        "properties": {
+                                            "product_id": {"type": "string"},
+                                        },
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Product": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                    },
+                }
+            },
+            id="requestbody-array-and-property-same-resource",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

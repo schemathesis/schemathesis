@@ -5,12 +5,16 @@ import enum
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
+from schemathesis.specs.openapi.stateful.dependencies.naming import to_pascal_case
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
+
+if TYPE_CHECKING:
+    from schemathesis.core.compat import RefResolver
 
 
 @dataclass
@@ -36,6 +40,11 @@ class DependencyGraph:
         for resource in serialized["resources"].values():
             del resource["name"]
             del resource["source"]
+            # Simplify FK fields for readability
+            if not resource["fk_fields"]:
+                del resource["fk_fields"]
+            if not resource["nested_fk_fields"]:
+                del resource["nested_fk_fields"]
 
         return serialized
 
@@ -94,9 +103,9 @@ class DependencyGraph:
                             if isinstance(input_slot.parameter_name, int):
                                 request_body = [f"$response.body#{body_pointer}"]
                             else:
-                                request_body = {
-                                    input_slot.parameter_name: f"$response.body#{body_pointer}",
-                                }
+                                request_body = _build_nested_body(
+                                    input_slot.parameter_name, f"$response.body#{body_pointer}"
+                                )
                         else:
                             parameters = {
                                 f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
@@ -105,7 +114,7 @@ class DependencyGraph:
                         if existing is not None:
                             existing.parameters.update(parameters)
                             if isinstance(existing.request_body, dict) and isinstance(request_body, dict):
-                                existing.request_body.update(request_body)
+                                _merge_nested_body(existing.request_body, request_body)
                             else:
                                 existing.request_body = request_body
                             continue
@@ -137,6 +146,132 @@ class DependencyGraph:
                             status_code=output_slot.status_code,
                             links=links,
                         )
+
+        # Generate links from FK fields (e.g., customer_id -> GET /customers/{id})
+        yield from self._iter_fk_links(encoded_paths, consumers_by_resource)
+
+    def _iter_fk_links(
+        self,
+        encoded_paths: dict[int, str],
+        consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]],
+    ) -> Iterator[ResponseLinks]:
+        """Generate links from foreign key fields in producer responses.
+
+        For example, if GET /orders/{id} returns {"id": "...", "customer_id": "..."},
+        this creates a link to GET /customers/{id} using the customer_id field value.
+        """
+        for producer in self.operations.values():
+            producer_path = encoded_paths[id(producer)]
+            producer_id = id(producer)
+
+            for output_slot in producer.outputs:
+                # Skip primitive identifiers (they don't have FK fields)
+                if output_slot.is_primitive_identifier:
+                    continue
+
+                resource = output_slot.resource
+                fk_links: dict[str, LinkDefinition] = {}
+
+                for fk_field in resource.fk_fields:
+                    # Find the target resource in our resource map
+                    target_resource = self.resources.get(fk_field.target_resource)
+                    if target_resource is None:
+                        continue
+
+                    # Find consumers that need the target resource
+                    relevant_consumers = consumers_by_resource.get(id(target_resource), {})
+
+                    for consumer_id, (consumer, input_slots) in relevant_consumers.items():
+                        # Skip self-references
+                        if consumer_id == producer_id:
+                            continue
+
+                        consumer_path = encoded_paths[consumer_id]
+
+                        for input_slot in input_slots:
+                            # Match FK suffix to consumer's expected field
+                            # e.g., customer_id -> id, user_uuid -> uuid
+                            if input_slot.resource_field != fk_field.target_field:
+                                continue
+
+                            # Skip body parameters for FK linking
+                            if input_slot.parameter_location == ParameterLocation.BODY:
+                                continue
+
+                            # Build the body pointer to the FK field
+                            if fk_field.is_array:
+                                # For array FK, reference first element: /data/0/site_ids/0
+                                body_pointer = extend_pointer(
+                                    output_slot.pointer, fk_field.field_name, output_slot.cardinality
+                                )
+                                body_pointer += "/0"  # Access first element of the FK array
+                            else:
+                                body_pointer = extend_pointer(
+                                    output_slot.pointer, fk_field.field_name, output_slot.cardinality
+                                )
+
+                            link_name = f"{consumer.method.capitalize()}{fk_field.target_resource}"
+                            parameters = {
+                                f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
+                            }
+
+                            # Avoid duplicate links (same target operation)
+                            if link_name in fk_links:
+                                continue
+
+                            fk_links[link_name] = LinkDefinition(
+                                operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
+                                parameters=parameters,
+                                request_body={},
+                            )
+
+                # Process nested FK fields (e.g., shipping.warehouse_id, line_items[].product_id)
+                for nested_fk in resource.nested_fk_fields:
+                    target_resource = self.resources.get(nested_fk.target_resource)
+                    if target_resource is None:
+                        continue
+
+                    relevant_consumers = consumers_by_resource.get(id(target_resource), {})
+
+                    for consumer_id, (consumer, input_slots) in relevant_consumers.items():
+                        if consumer_id == producer_id:
+                            continue
+
+                        consumer_path = encoded_paths[consumer_id]
+
+                        for input_slot in input_slots:
+                            if input_slot.resource_field != nested_fk.target_field:
+                                continue
+                            if input_slot.parameter_location == ParameterLocation.BODY:
+                                continue
+
+                            # Build pointer: output_slot.pointer + nested_fk.pointer
+                            if output_slot.cardinality == Cardinality.MANY:
+                                base = output_slot.pointer.rstrip("/") + "/0"
+                            else:
+                                base = output_slot.pointer.rstrip("/")
+                            body_pointer = base + nested_fk.pointer
+                            if nested_fk.is_array:
+                                body_pointer += "/0"
+
+                            link_name = f"{consumer.method.capitalize()}{nested_fk.target_resource}"
+                            if link_name in fk_links:
+                                continue
+
+                            fk_links[link_name] = LinkDefinition(
+                                operation_ref=f"#/paths/{consumer_path}/{consumer.method}",
+                                parameters={
+                                    f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
+                                },
+                                request_body={},
+                            )
+
+                if fk_links:
+                    yield ResponseLinks(
+                        producer_operation_ref=f"#/paths/{producer_path}/{producer.method}",
+                        status_code=output_slot.status_code,
+                        links=fk_links,
+                    )
 
     def assert_fieldless_resources(self, key: str, known: dict[str, frozenset[str]]) -> None:  # pragma: no cover
         """Verify all resources have at least one field."""
@@ -175,6 +310,188 @@ class DependencyGraph:
                     else:
                         message += ". Resource has no fields"
                     raise AssertionError(message)
+
+
+# FK field suffix -> (target_field, is_array)
+# Maps FK naming conventions to the identifier field they reference
+FK_SUFFIX_MAP: dict[str, tuple[str, bool]] = {
+    "_ids": ("id", True),
+    "_uuids": ("uuid", True),
+    "_guids": ("guid", True),
+    "_id": ("id", False),
+    "_uuid": ("uuid", False),
+    "_guid": ("guid", False),
+}
+
+
+def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
+    """Extract target resource name and field from a FK field name.
+
+    Returns (resource_name, target_field, is_array) or None if not a FK field.
+
+    Examples:
+        customer_id -> ("Customer", "id", False)
+        site_ids -> ("Site", "id", True)
+        user_uuid -> ("User", "uuid", False)
+        session_guids -> ("Session", "guid", True)
+
+    """
+    field_lower = field.lower()
+
+    # Check suffixes (longer ones first to match _ids before _id)
+    for suffix, (target_field, is_array) in FK_SUFFIX_MAP.items():
+        # Skip bare identifier fields (not FKs, they're primary identifiers)
+        if field_lower == suffix.lstrip("_"):
+            return None
+        if field_lower.endswith(suffix) and len(field) > len(suffix):
+            base_name = field[: -len(suffix)]
+            if base_name:
+                return to_pascal_case(base_name), target_field, is_array
+
+    return None
+
+
+def extract_fk_fields(fields: list[str]) -> list[FKField]:
+    """Extract FK fields from a list of field names.
+
+    Pre-computes FK information once during resource creation
+    to avoid repeated inference during link generation.
+    """
+    result = []
+    for field in fields:
+        fk_info = infer_fk_target(field)
+        if fk_info is not None:
+            target_resource, target_field, is_array = fk_info
+            result.append(
+                FKField(
+                    field_name=field,
+                    target_resource=target_resource,
+                    target_field=target_field,
+                    is_array=is_array,
+                )
+            )
+    return result
+
+
+def extract_nested_fk_fields(
+    schema: Mapping[str, Any],
+    resolver: RefResolver,
+    pointer: str = "",
+    max_depth: int = 5,
+) -> list[NestedFKField]:
+    """Recursively extract FK fields from nested schema properties.
+
+    This finds FK fields (like warehouse_id, product_ids) at any nesting depth
+    within an object schema, including inside arrays.
+
+    Args:
+        schema: The JSON schema to scan
+        resolver: JSON reference resolver
+        pointer: Current JSON pointer path
+        max_depth: Maximum recursion depth to prevent infinite loops
+
+    Returns:
+        List of NestedFKField objects for all FK fields found
+
+    """
+    if max_depth <= 0:
+        return []
+
+    from schemathesis.specs.openapi.adapter.references import maybe_resolve
+
+    result: list[NestedFKField] = []
+    properties = schema.get("properties", {})
+    for field_name, field_schema in properties.items():
+        if not isinstance(field_schema, dict):
+            continue
+
+        field_pointer = f"{pointer}/{encode_pointer(field_name)}"
+
+        # Check if this field is a FK field
+        fk_info = infer_fk_target(field_name)
+        if fk_info is not None:
+            # Skip top-level FK fields - they're already captured in fk_fields
+            if pointer:
+                target_resource, target_field, is_array = fk_info
+                result.append(
+                    NestedFKField(
+                        pointer=field_pointer,
+                        field_name=field_name,
+                        target_resource=target_resource,
+                        target_field=target_field,
+                        is_array=is_array,
+                    )
+                )
+            continue  # Don't recurse into FK fields
+
+        # Resolve nested schema
+        _, resolved_field = maybe_resolve(field_schema, resolver, "")
+        field_type = resolved_field.get("type")
+
+        # Recurse into nested objects
+        if field_type == "object" or "properties" in resolved_field:
+            result.extend(extract_nested_fk_fields(resolved_field, resolver, field_pointer, max_depth - 1))
+
+        # Recurse into array items
+        elif field_type == "array":
+            items = resolved_field.get("items")
+            if isinstance(items, dict):
+                _, resolved_items = maybe_resolve(items, resolver, "")
+                if isinstance(resolved_items, dict):
+                    # Use /0 to indicate first array element
+                    items_pointer = f"{field_pointer}/0"
+                    result.extend(extract_nested_fk_fields(resolved_items, resolver, items_pointer, max_depth - 1))
+
+    return result
+
+
+def _build_nested_body(path: str, value: str) -> dict[str, Any]:
+    """Build a nested dict structure from a path like 'shipping/warehouse_id'.
+
+    Examples:
+        _build_nested_body("customer_id", "$val") -> {"customer_id": "$val"}
+        _build_nested_body("shipping/warehouse_id", "$val") -> {"shipping": {"warehouse_id": "$val"}}
+        _build_nested_body("items/0/product_id", "$val") -> {"items": [{"product_id": "$val"}]}
+
+    """
+    if "/" not in path:
+        return {path: value}
+
+    parts = path.split("/")
+    result: dict[str, Any] = {}
+    current = result
+
+    for i, part in enumerate(parts[:-1]):
+        next_part = parts[i + 1]
+        # Check if next part is an array index
+        if next_part.isdigit():
+            current[part] = [{}]
+            current = current[part][0]
+        elif part.isdigit():
+            # Skip array indices - we're already inside the array
+            continue
+        else:
+            current[part] = {}
+            current = current[part]
+
+    # Set the final value
+    final_key = parts[-1]
+    if not final_key.isdigit():
+        current[final_key] = value
+
+    return result
+
+
+def _merge_nested_body(target: dict[str, Any], source: dict[str, Any]) -> None:
+    """Deep merge source into target dict."""
+    for key, value in source.items():
+        if key in target and isinstance(target[key], dict) and isinstance(value, dict):
+            _merge_nested_body(target[key], value)
+        elif key in target and isinstance(target[key], list) and isinstance(value, list):
+            # Merge list items (for array body fields)
+            _merge_nested_body(target[key][0], value[0])
+        else:
+            target[key] = value
 
 
 def extend_pointer(base: str, field: str, cardinality: Cardinality) -> str:
@@ -311,6 +628,36 @@ class OutputSlot:
     is_primitive_identifier: bool = False
 
 
+@dataclass(slots=True)
+class FKField:
+    """A top-level foreign key field in a resource schema."""
+
+    # The FK field name (e.g., "customer_id")
+    field_name: str
+    # Target resource name inferred from field (e.g., "Customer")
+    target_resource: str
+    # Target field the FK references (e.g., "id", "uuid")
+    target_field: str
+    # Whether the FK field is an array (e.g., site_ids)
+    is_array: bool
+
+
+@dataclass(slots=True)
+class NestedFKField:
+    """A foreign key field found at a nested path in a resource schema."""
+
+    # JSON pointer path to the FK field (e.g., "/shipping/warehouse_id")
+    pointer: str
+    # The FK field name (e.g., "warehouse_id")
+    field_name: str
+    # Target resource name inferred from field (e.g., "Warehouse")
+    target_resource: str
+    # Target field the FK references (e.g., "id", "uuid")
+    target_field: str
+    # Whether the FK field is an array (e.g., site_ids)
+    is_array: bool
+
+
 @dataclass
 class ResourceDefinition:
     """A minimal description of a resource structure."""
@@ -322,17 +669,35 @@ class ResourceDefinition:
     types: dict[str, set[str]]
     # How this resource was created
     source: DefinitionSource
+    # Top-level FK fields (e.g., customer_id, order_ids)
+    fk_fields: list[FKField]
+    # FK fields found at nested paths in the schema
+    nested_fk_fields: list[NestedFKField]
 
-    __slots__ = ("name", "fields", "types", "source")
+    __slots__ = ("name", "fields", "types", "source", "fk_fields", "nested_fk_fields")
 
     @classmethod
     def without_properties(cls, name: str) -> ResourceDefinition:
-        return cls(name=name, fields=[], types={}, source=DefinitionSource.SCHEMA_WITHOUT_PROPERTIES)
+        return cls(
+            name=name,
+            fields=[],
+            types={},
+            source=DefinitionSource.SCHEMA_WITHOUT_PROPERTIES,
+            fk_fields=[],
+            nested_fk_fields=[],
+        )
 
     @classmethod
     def inferred_from_parameter(cls, name: str, parameter_name: str | None) -> ResourceDefinition:
         fields = [parameter_name] if parameter_name is not None else []
-        return cls(name=name, fields=fields, types={}, source=DefinitionSource.PARAMETER_INFERENCE)
+        return cls(
+            name=name,
+            fields=fields,
+            types={},
+            source=DefinitionSource.PARAMETER_INFERENCE,
+            fk_fields=[],
+            nested_fk_fields=[],
+        )
 
 
 class DefinitionSource(enum.IntEnum):

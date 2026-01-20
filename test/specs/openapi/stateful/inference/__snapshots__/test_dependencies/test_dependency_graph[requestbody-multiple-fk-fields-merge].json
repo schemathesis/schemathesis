@@ -1,0 +1,69 @@
+{
+  "operations": {
+    "GET /carriers": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Carrier",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /warehouses": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Warehouse",
+          "status_code": "200"
+        }
+      ]
+    },
+    "POST /orders": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "shipping/warehouse_id",
+          "resource": "Warehouse",
+          "resource_field": "id"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "shipping/carrier_id",
+          "resource": "Carrier",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Carrier": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    },
+    "Warehouse": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

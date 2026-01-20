@@ -1,0 +1,78 @@
+{
+  "operations": {
+    "GET /orders/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Order",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Order",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /shipping-addresses/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "ShippingAddress",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "ShippingAddress",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Order": {
+      "fields": [
+        "id",
+        "shipping_address_id"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "shipping_address_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "ShippingAddress"
+        }
+      ],
+      "types": {
+        "id": [
+          "string"
+        ],
+        "shipping_address_id": [
+          "string"
+        ]
+      }
+    },
+    "ShippingAddress": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

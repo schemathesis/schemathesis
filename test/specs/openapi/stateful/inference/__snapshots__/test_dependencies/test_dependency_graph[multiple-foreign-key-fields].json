@@ -1,0 +1,118 @@
+{
+  "operations": {
+    "GET /bookings/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Booking",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Booking",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /customers/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Customer",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Customer",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /events/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Event",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": [
+        {
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Event",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Booking": {
+      "fields": [
+        "customer_id",
+        "event_id",
+        "id"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "customer_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Customer"
+        },
+        {
+          "field_name": "event_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Event"
+        }
+      ],
+      "types": {
+        "customer_id": [
+          "string"
+        ],
+        "event_id": [
+          "string"
+        ],
+        "id": [
+          "string"
+        ]
+      }
+    },
+    "Customer": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    },
+    "Event": {
+      "fields": [
+        "id"
+      ],
+      "types": {
+        "id": [
+          "string"
+        ]
+      }
+    }
+  }
+}

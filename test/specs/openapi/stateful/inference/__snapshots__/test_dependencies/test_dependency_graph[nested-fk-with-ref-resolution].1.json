@@ -1,0 +1,32 @@
+[
+  [
+    "200",
+    "#/paths/~1orders~1{id}/get",
+    {
+      "GetWarehouse": {
+        "operationRef": "#/paths/~1warehouses~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/shipping/warehouse_id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ],
+  [
+    "200",
+    "#/paths/~1orders~1{id}/get",
+    {
+      "GetWarehouse": {
+        "operationRef": "#/paths/~1warehouses~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/shipping/warehouse_id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]
