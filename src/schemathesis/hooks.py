@@ -228,16 +228,19 @@ class HookDispatcher:
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
+            hook = _wrap_hook_for_generated_value(hook)
             strategy = strategy.filter(hook)
         for hook in self.get_all_by_name(f"map_{container}"):
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
+            hook = _wrap_hook_for_generated_value(hook)
             strategy = strategy.map(hook)
         for hook in self.get_all_by_name(f"flatmap_{container}"):
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
+            hook = _wrap_hook_for_generated_value(hook)
             strategy = strategy.flatmap(hook)
         return strategy
 
@@ -280,6 +283,24 @@ def has_var_keyword(hook: Callable) -> bool:
 def _should_skip_hook(hook: Callable, ctx: HookContext) -> bool:
     filter_set = getattr(hook, "filter_set", None)
     return filter_set is not None and ctx.operation is not None and not filter_set.match(ctx)
+
+
+def _wrap_hook_for_generated_value(hook: Callable) -> Callable:
+    """Wrap hook to handle GeneratedValue transparently.
+
+    In NEGATIVE mode, strategies yield GeneratedValue wrappers instead of raw dicts.
+    This wrapper ensures hooks always receive raw dict values and preserves the
+    GeneratedValue wrapper with its metadata after the hook processes the value.
+    """
+    from schemathesis.specs.openapi.negative import GeneratedValue
+
+    def wrapper(value: Any) -> Any:
+        if isinstance(value, GeneratedValue):
+            result = hook(value.value)
+            return GeneratedValue(value=result, meta=value.meta)
+        return hook(value)
+
+    return wrapper
 
 
 def apply_to_all_dispatchers(

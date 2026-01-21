@@ -2,11 +2,15 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.9.3...HEAD) - TBD
 
-## [4.9.3](https://github.com/schemathesis/schemathesis/compare/v4.9.2...v4.9.3) - 2026-01-21
-
 ### :rocket: Added
 
 - Detect foreign key fields (e.g., `customer_id`, `order_ids`) in responses and request bodies to generate additional stateful links.
+
+### :bug: Fixed
+
+- `map_*`, `filter_*`, and `flatmap_*` hooks receiving `GeneratedValue` wrappers instead of raw `dict` values in negative generation mode. [#3471](https://github.com/schemathesis/schemathesis/issues/3471)
+
+## [4.9.3](https://github.com/schemathesis/schemathesis/compare/v4.9.2...v4.9.3) - 2026-01-21
 
 ### :bug: Fixed
 
