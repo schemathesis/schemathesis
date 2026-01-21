@@ -127,6 +127,29 @@ def test_hooks_combination(wsgi_app_schema):
     test()
 
 
+def test_map_hooks_receive_dict_in_negative_mode(testdir, simple_openapi):
+    # Regression test for GH-3471
+    # map_* hooks should receive raw dict values, not GeneratedValue wrappers
+    testdir.make_test(
+        """
+def replacement(context, query):
+    # Should always receive a dict, never a GeneratedValue
+    assert isinstance(query, dict), f"Expected dict, got {type(query).__name__}"
+    return {"id": "fixed"}
+
+@schema.hooks.apply(replacement, name="map_query")
+@schema.parametrize()
+@settings(max_examples=5)
+def test_hook_receives_dict(case):
+    pass
+""",
+        schema=simple_openapi,
+        generation_modes=[GenerationMode.NEGATIVE],
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_per_test_hooks(testdir, simple_openapi):
     testdir.make_test(
         """
