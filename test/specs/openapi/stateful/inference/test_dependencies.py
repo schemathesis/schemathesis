@@ -3210,7 +3210,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
             return jsonify(
                 {
                     "id": "1",
-                    "name": product["name"],
+                    "name": "Product",
                     "price": None,  # Schema requires number, not null
                 }
             ), 200
@@ -3241,7 +3241,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 
     assert (
         cli.run(
-            "--max-examples=10",
+            "--max-examples=20",
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
@@ -3365,6 +3365,364 @@ def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_dependency_pruning_learns_to_avoid_incorrect_links(cli, app_runner, snapshot_cli, ctx):
+    item_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "internal_code": {"type": "string"},  # String, not a rating!
+        },
+        "required": ["id", "name", "internal_code"],
+    }
+
+    review_response_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "item_id": {"type": "string"},
+            "rating": {"type": "integer"},
+        },
+        "required": ["id", "item_id", "rating"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Item created",
+                            "content": {"application/json": {"schema": item_schema}},
+                            # WRONG LINKS: maps string to integer field
+                            # Normally, they will decrease the effectiveness of stateful tests A LOT
+                            "links": {
+                                f"createReview-{i}": {
+                                    "operationId": "createReview",
+                                    "parameters": {
+                                        "itemId": "$response.body#/id",
+                                    },
+                                    "requestBody": {
+                                        "rating": "$response.body#/internal_code",
+                                    },
+                                }
+                                for i in range(5)
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}/reviews": {
+                "post": {
+                    "operationId": "createReview",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                                    },
+                                    "required": ["rating"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Review created",
+                            "content": {"application/json": {"schema": review_response_schema}},
+                        },
+                        "400": {"description": "Validation error"},
+                        "404": {"description": "Item not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    items = {}
+    next_item_id = 1
+    next_review_id = 1
+
+    total_requests = 0
+    validation_failures = 0
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        nonlocal next_item_id
+        data = request.get_json() or {}
+
+        item_id = str(next_item_id)
+        next_item_id += 1
+
+        items[item_id] = {
+            "id": item_id,
+            "name": data.get("name", "Item"),
+            "internal_code": "INTERNAL-XYZ",  # String, not valid rating
+        }
+
+        return jsonify(items[item_id]), 201
+
+    @app.route("/items/<item_id>/reviews", methods=["POST"])
+    def create_review(item_id):
+        nonlocal next_review_id
+        nonlocal validation_failures
+        nonlocal total_requests
+
+        total_requests += 1
+
+        if item_id not in items:
+            return {"error": "Item not found"}, 404
+
+        data = request.get_json() or {}
+
+        rating = data.get("rating")
+
+        # Rating must be integer 1-5
+        if not isinstance(rating, int) or not (1 <= rating <= 5):
+            validation_failures += 1
+            return {"error": "Invalid rating"}, 400
+
+        next_review_id += 1
+
+        return jsonify(
+            # Use stable data to simplify the snapshot
+            {
+                "id": 12345,  # Should be string, not int
+                "item_id": "30",
+                "rating": 2,
+            }
+        ), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=50",
+            "-c response_schema_conformance",
+            "--continue-on-failure",
+            "--mode=positive",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )
+    # Pruning of links that don't work affects the success rate a lot
+    # Schemathesis should consistently get fewer validation errors from the tested API
+    # because it dynamically learns from feedback. Without pruning the failure rate here
+    # is normally >85%
+    assert validation_failures / total_requests < 0.65
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_dependency_pruning_learns_to_avoid_bad_field_in_link(cli, app_runner, snapshot_cli, ctx):
+    product_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "category": {"type": "string", "enum": ["electronics", "books", "clothing"]},
+            "internal_status": {"type": "string"},
+        },
+        "required": ["id", "name", "category", "internal_status"],
+    }
+
+    order_response_schema = {
+        "type": "object",
+        "properties": {
+            "id": {"type": "string"},
+            "product_id": {"type": "string"},
+            "category": {"type": "string"},
+            "status": {"type": "string"},
+            "quantity": {"type": "integer"},
+        },
+        "required": ["id", "product_id", "category", "status", "quantity"],
+    }
+
+    schema = ctx.openapi.build_schema(
+        {
+            "/products": {
+                "post": {
+                    "operationId": "createProduct",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "category": {"type": "string", "enum": ["electronics", "books", "clothing"]},
+                                    },
+                                    "required": ["name", "category"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Product created",
+                            "content": {"application/json": {"schema": product_schema}},
+                            "links": {
+                                "createOrder": {
+                                    "operationId": "createOrder",
+                                    "requestBody": {
+                                        # 2 correct mappings
+                                        "product_id": "$response.body#/id",
+                                        "category": "$response.body#/category",
+                                        # 1 WRONG mapping - internal status doesn't match order status enum
+                                        "status": "$response.body#/internal_status",
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "product_id": {"type": "string"},
+                                        "category": {"type": "string", "enum": ["electronics", "books", "clothing"]},
+                                        "status": {"type": "string", "enum": ["pending", "confirmed", "shipped"]},
+                                        "quantity": {"type": "integer", "minimum": 1},
+                                    },
+                                    "required": ["product_id", "category", "status", "quantity"],
+                                }
+                            },
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Order created",
+                            "content": {"application/json": {"schema": order_response_schema}},
+                        },
+                        "400": {"description": "Validation error"},
+                        "404": {"description": "Product not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    products = {}
+    next_product_id = 1
+    next_order_id = 1
+
+    total_requests = 0
+    validation_failures = 0
+
+    @app.route("/openapi.json")
+    def get_schema():
+        return jsonify(schema)
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        nonlocal next_product_id
+        data = request.get_json() or {}
+
+        product_id = str(next_product_id)
+        next_product_id += 1
+
+        products[product_id] = {
+            "id": product_id,
+            "name": data.get("name", "Product"),
+            "category": data.get("category", "electronics"),
+            # Wrong
+            "internal_status": "ACTIVE_INTERNAL",
+        }
+
+        return jsonify(products[product_id]), 201
+
+    @app.route("/orders", methods=["POST"])
+    def create_order():
+        nonlocal next_order_id, total_requests, validation_failures
+
+        total_requests += 1
+        data = request.get_json() or {}
+
+        product_id = data.get("product_id")
+        if product_id not in products:
+            validation_failures += 1
+            return {"error": "Product not found"}, 404
+
+        category = data.get("category")
+        if category != products[product_id]["category"]:
+            validation_failures += 1
+            return {"error": "Category mismatch"}, 400
+
+        status = data.get("status")
+        if status not in ["pending", "confirmed", "shipped"]:
+            validation_failures += 1
+            return {"error": f"Invalid status: {status}"}, 400
+
+        quantity = data.get("quantity")
+        if not isinstance(quantity, int) or quantity < 1:
+            validation_failures += 1
+            return {"error": "Invalid quantity"}, 400
+
+        order_id = str(next_order_id)
+        next_order_id += 1
+
+        return jsonify(
+            {
+                "id": order_id,
+                "product_id": product_id,
+                "category": category,
+                "status": status,
+                "quantity": quantity,
+            }
+        ), 201
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            "--max-examples=200",
+            "-c not_a_server_error",
+            "--continue-on-failure",
+            "--mode=positive",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )
+    # Normally all the requests will be rejected
+    assert validation_failures / total_requests < 0.7
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
 def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot_cli, ctx):
     order_response_schema = {
@@ -3439,7 +3797,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
         data = request.get_json() or {}
 
         if not isinstance(data, dict):
-            return {"error": "Invalid input"}
+            return {"error": "Invalid input"}, 400
 
         customer_id = str(next_customer_id)
         next_customer_id += 1
@@ -3454,19 +3812,19 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
         data = request.get_json() or {}
 
         if not isinstance(data, dict):
-            return {"error": "Invalid input"}
+            return {"error": "Invalid input"}, 400
 
         customer_id = data.get("customer_id")
-        order_id = str(next_order_id)
         next_order_id += 1
 
         # Bug: When customer_id is exists, we return total as string instead of number
         if customer_id in customers:
             return jsonify(
+                # Use static data to simplify the snapshot
                 {
-                    "id": order_id,
-                    "customer_id": customer_id,
-                    "total": str(data.get("total", 0)),
+                    "id": "42",
+                    "customer_id": "43",
+                    "total": "FOO",
                 }
             ), 201
 
@@ -3479,6 +3837,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
             "--max-examples=10",
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
+            "--mode=positive",
             "--phases=stateful",
         )
         == snapshot_cli
