@@ -63,7 +63,6 @@ def is_valid_query(query: dict[str, object]) -> bool:
 
 
 def is_valid_urlencoded(data: object) -> bool:
-    # TODO: write a test that will check if `requests` can send it
     if data is NOT_SET or isinstance(data, Mapping):
         return True
 
