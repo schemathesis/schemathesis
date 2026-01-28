@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.9.4...HEAD) - TBD
 
+### :bug: Fixed
+
+- Examples phase crashing with `RecursionError` when multiple `allOf` items reference the same schema target.
+
 ## [4.9.4](https://github.com/schemathesis/schemathesis/compare/v4.9.3...v4.9.4) - 2026-01-22
 
 ### :rocket: Added
