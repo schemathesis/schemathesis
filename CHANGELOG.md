@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Examples phase crashing with `RecursionError` when multiple `allOf` items reference the same schema target.
+- Coverage phase generating "missing Content-Type header" test with Content-Type header present due to automatic JSON body serialization.
 
 ## [4.9.4](https://github.com/schemathesis/schemathesis/compare/v4.9.3...v4.9.4) - 2026-01-22
 
