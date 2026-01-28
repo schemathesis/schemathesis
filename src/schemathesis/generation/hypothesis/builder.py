@@ -934,10 +934,14 @@ def _iter_coverage_cases(
                     value={k: v for k, v in container.items() if k != name},
                     generation_mode=GenerationMode.NEGATIVE,
                 )
+                kwargs = data.kwargs
+                # For missing Content-Type header test, don't send body
+                if location == ParameterLocation.HEADER and name.lower() == "content-type":
+                    kwargs = {k: v for k, v in kwargs.items() if k not in ("body", "media_type")}
 
-                if seen_negative.insert(data.kwargs):
+                if seen_negative.insert(kwargs):
                     yield operation.Case(
-                        **data.kwargs,
+                        **kwargs,
                         _meta=CaseMetadata(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                             components=data.components,

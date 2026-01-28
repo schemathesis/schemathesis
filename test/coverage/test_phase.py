@@ -3004,3 +3004,39 @@ def test_min_properties_fewer_than_required(ctx):
     assert len(below) == 0, (
         f"Should NOT generate OBJECT_BELOW_MIN_PROPERTIES when required > minProperties. Got: {below}"
     )
+
+
+def test_missing_content_type_header(ctx):
+    # Regression: "missing Content-Type header" test case should not include Content-Type in request
+    schema = build_schema(
+        ctx,
+        parameters=[
+            {"in": "header", "name": "Content-Type", "schema": {"type": "string"}, "required": True},
+        ],
+        request_body={
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "object"}}},
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/foo"]["post"]
+
+    missing_content_type_case = None
+
+    def find_case(case):
+        nonlocal missing_content_type_case
+        if case.meta.phase.name != TestPhase.COVERAGE:
+            return
+        phase_data = case.meta.phase.data
+        if phase_data.scenario == CoverageScenario.MISSING_PARAMETER and phase_data.parameter.lower() == "content-type":
+            missing_content_type_case = case
+
+    run_negative_test(operation, find_case)
+
+    assert missing_content_type_case is not None, "Should generate missing Content-Type case"
+
+    kwargs = missing_content_type_case.as_transport_kwargs(base_url="http://127.0.0.1")
+    request = Request(**kwargs).prepare()
+    assert "Content-Type" not in request.headers, (
+        f"Missing Content-Type test should not have Content-Type header, got: {dict(request.headers)}"
+    )
