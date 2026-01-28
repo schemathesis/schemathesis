@@ -2481,3 +2481,54 @@ def test_allof_not_referencing_root_schema(ctx):
     operation = schema["/second"]["GET"]
 
     assert list(extract_top_level(operation)) == []
+
+
+def test_allof_with_nested_refs_to_same_target():
+    # Regression test for infinite recursion when allOf items reference the same target
+    # and properties are merged into the resolved schema, creating a cycle through mutation
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"version": "0.1.0", "title": "Test"},
+        "paths": {
+            "/test": {
+                "post": {
+                    "parameters": [{"in": "body", "name": "body", "schema": {"$ref": "#/definitions/Item"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        "definitions": {
+            "Item": {
+                "properties": {
+                    "a-1": {
+                        "allOf": [{}],
+                        "properties": {
+                            "a-2": {
+                                "properties": {
+                                    "a-3": {
+                                        "allOf": [{"$ref": "#/definitions/Item/properties/a-1/allOf/0"}],
+                                        "properties": {
+                                            "a-4": {
+                                                "properties": {
+                                                    "a-5": {
+                                                        "allOf": [
+                                                            {"$ref": "#/definitions/Item/properties/a-1/allOf/0"}
+                                                        ],
+                                                        "properties": {},
+                                                    }
+                                                }
+                                            }
+                                        },
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["POST"]
+    # Should not raise RecursionError
+    assert list(extract_from_schemas(operation)) == []
