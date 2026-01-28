@@ -260,6 +260,9 @@ def _expand_subschemas(
                 subschema, expanded_path = _resolve_bundled(subschema, resolver, current_path)
             except InfiniteRecursiveReference:
                 return
+            # Clone after resolving to avoid mutating the original schema when merging
+            if isinstance(subschema, dict):
+                subschema = deepclone(subschema)
 
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
