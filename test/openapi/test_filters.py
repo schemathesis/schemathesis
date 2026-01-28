@@ -22,7 +22,6 @@ def test_is_valid_query(value, expected):
 
 @pytest.mark.hypothesis_nested
 def test_is_valid_query_strategy():
-    # TODO: A better test would be to try to send values over network
     strategy = st.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
 
     @given(strategy)
@@ -31,6 +30,37 @@ def test_is_valid_query_strategy():
         assert value == {"key": "1"}
 
     test()
+
+
+@pytest.mark.parametrize(
+    "valid_params",
+    [
+        {"key": "1"},
+        {"key": 1},
+        {"a": "b", "c": "d"},
+    ],
+    ids=["string-value", "int-value", "multiple-params"],
+)
+def test_valid_query_can_be_sent_by_requests(valid_params):
+    assert is_valid_query(valid_params)
+    req = requests.Request("GET", "http://example.com", params=valid_params)
+    prepared = req.prepare()
+    assert "?" in prepared.url
+
+
+@pytest.mark.parametrize(
+    "invalid_params",
+    [
+        {"key": "\udcff"},
+        {"\udcff": "value"},
+    ],
+    ids=["surrogate-in-value", "surrogate-in-key"],
+)
+def test_invalid_query_fails_with_requests(invalid_params):
+    assert not is_valid_query(invalid_params)
+    req = requests.Request("GET", "http://example.com", params=invalid_params)
+    with pytest.raises(UnicodeEncodeError):
+        req.prepare()
 
 
 @pytest.mark.parametrize("value", ["/", "\udc9b"])
