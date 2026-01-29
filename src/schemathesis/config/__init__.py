@@ -206,7 +206,7 @@ class SchemathesisConfig(DiffBase):
     @classmethod
     def from_dict(cls, data: dict) -> SchemathesisConfig:
         """Create a config instance from a dictionary."""
-        from jsonschema.exceptions import ValidationError
+        from jsonschema_rs import ValidationError
 
         from schemathesis.config._validator import CONFIG_VALIDATOR
 

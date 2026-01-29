@@ -3,10 +3,14 @@ from __future__ import annotations
 import difflib
 from typing import TYPE_CHECKING
 
+from jsonschema_rs import ValidationErrorKind
+
+from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import SchemathesisError
+from schemathesis.core.transforms import resolve_path
 
 if TYPE_CHECKING:
-    from jsonschema import ValidationError
+    from jsonschema_rs import ValidationError
 
 
 class ConfigError(SchemathesisError):
@@ -15,32 +19,33 @@ class ConfigError(SchemathesisError):
     @classmethod
     def from_validation_error(cls, error: ValidationError) -> ConfigError:
         message = error.message
-        if error.validator == "enum":
+        if error.kind.name == "enum":
             message = _format_enum_error(error)
-        elif error.validator == "minimum":
+        elif error.kind.name == "minimum":
             message = _format_minimum_error(error)
-        elif error.validator == "required":
+        elif error.kind.name == "required":
             message = _format_required_error(error)
-        elif error.validator == "type":
+        elif error.kind.name == "type":
             message = _format_type_error(error)
-        elif error.validator == "minProperties":
+        elif error.kind.name == "minProperties":
             message = _format_min_properties_error(error)
-        elif error.validator == "additionalProperties":
+        elif error.kind.name == "additionalProperties":
             message = _format_additional_properties_error(error)
-        elif error.validator == "anyOf":
+        elif error.kind.name == "anyOf":
             message = _format_anyof_error(error)
-        elif error.validator == "oneOf":
+        elif error.kind.name == "oneOf":
             message = _format_oneof_error(error)
         return cls(message)
 
 
 def _format_minimum_error(error: ValidationError) -> str:
-    assert isinstance(error.validator_value, int | float)
-    section = path_to_section_name(list(error.path)[:-1] if error.path else [])
-    assert error.path
+    variants = resolve_path(CONFIG_SCHEMA, error.schema_path)
+    assert isinstance(variants, int | float)
+    section = path_to_section_name(error.instance_path[:-1])
+    assert error.instance_path
 
-    prop_name = error.path[-1]
-    min_value = error.validator_value
+    prop_name = error.instance_path[-1]
+    min_value = error.kind.value
     actual_value = error.instance
 
     return (
@@ -50,20 +55,23 @@ def _format_minimum_error(error: ValidationError) -> str:
 
 
 def _format_required_error(error: ValidationError) -> str:
-    assert isinstance(error.validator_value, list)
-    missing_keys = sorted(set(error.validator_value) - set(error.instance))
+    variants = resolve_path(CONFIG_SCHEMA, error.schema_path)
+    assert isinstance(variants, list)
+    assert isinstance(error.instance, dict)
+    missing_keys = sorted(set(variants) - set(error.instance))
 
-    section = path_to_section_name(list(error.path))
+    section = path_to_section_name(error.instance_path)
 
     details = "\n".join(f"  - '{key}'" for key in missing_keys)
     return f"Error in {section} section:\n  Missing required properties:\n\n{details}\n\n"
 
 
 def _format_enum_error(error: ValidationError) -> str:
-    assert isinstance(error.validator_value, list)
-    valid_values = sorted(error.validator_value)
+    variants = resolve_path(CONFIG_SCHEMA, error.schema_path)
+    assert isinstance(variants, list)
+    valid_values = sorted(variants)
 
-    path = list(error.path)
+    path = error.instance_path
 
     if path and isinstance(path[-1], int):
         idx = path[-1]
@@ -91,10 +99,10 @@ def _format_enum_error(error: ValidationError) -> str:
 
 
 def _format_type_error(error: ValidationError) -> str:
-    expected = error.validator_value
+    expected = resolve_path(CONFIG_SCHEMA, error.schema_path)
     assert isinstance(expected, str | list)
-    section = path_to_section_name(list(error.path)[:-1] if error.path else [])
-    assert error.path
+    section = path_to_section_name(list(error.instance_path)[:-1] if error.instance_path else [])
+    assert error.instance_path
 
     type_phrases = {
         "object": "an object",
@@ -105,7 +113,7 @@ def _format_type_error(error: ValidationError) -> str:
         "integer": "an integer",
         "null": "null",
     }
-    message = f"Error in {section} section:\n  Type error:\n\n  - '{error.path[-1]}' -> Must be "
+    message = f"Error in {section} section:\n  Type error:\n\n  - '{error.instance_path[-1]}' -> Must be "
 
     if isinstance(expected, list):
         message += f"one of: {' or '.join(expected)}"
@@ -117,10 +125,13 @@ def _format_type_error(error: ValidationError) -> str:
 
 
 def _format_additional_properties_error(error: ValidationError) -> str:
-    valid = list(error.schema.get("properties", {}))
+    schema = resolve_path(CONFIG_SCHEMA, error.schema_path[:-1])
+    assert isinstance(schema, dict)
+    valid = list(schema.get("properties", {}))
+    assert isinstance(error.instance, dict)
     unknown = sorted(set(error.instance) - set(valid))
     valid_list = ", ".join(f"'{prop}'" for prop in valid)
-    section = path_to_section_name(list(error.path))
+    section = path_to_section_name(list(error.instance_path))
 
     details = []
     for prop in unknown:
@@ -138,15 +149,15 @@ def _format_additional_properties_error(error: ValidationError) -> str:
 
 
 def _format_min_properties_error(error: ValidationError) -> str:
-    if list(error.schema_path) == ["properties", "auth", "properties", "openapi", "minProperties"]:
-        section = path_to_section_name(list(error.path))
+    if list(error.schema_path) == ["$defs", "AuthConfig", "properties", "openapi", "minProperties"]:
+        section = path_to_section_name(error.instance_path)
         return f"Error in {section} section:\n  At least one Open API auth definition is required."
     return error.message  # pragma: no cover
 
 
 def _format_anyof_error(error: ValidationError) -> str:
-    if list(error.schema_path) == ["properties", "operations", "items", "anyOf"]:
-        section = path_to_section_name(list(error.path))
+    if list(error.schema_path) == ["$defs", "OperationConfig", "anyOf"]:
+        section = path_to_section_name(error.instance_path)
         return (
             f"Error in {section} section:\n  At least one filter is required when defining [[operations]].\n\n"
             "Please specify at least one include or exclude filter property (e.g., include-path, exclude-tag, etc.)."
@@ -163,32 +174,41 @@ def _format_anyof_error(error: ValidationError) -> str:
 
 def _format_oneof_error(error: ValidationError) -> str:
     """Format oneOf validation errors, particularly for auth.openapi."""
-    if list(error.path)[:2] == ["auth", "openapi"] and len(error.path) == 3:
-        section = path_to_section_name(list(error.path))
+    if list(error.instance_path)[:2] == ["auth", "openapi"] and len(error.instance_path) == 3:
+        section = path_to_section_name(error.instance_path)
 
         # Try to find the most relevant context error
-        if error.context and isinstance(error.instance, dict) and error.instance:
-            for one_of_error in error.context:
-                if one_of_error.validator == "required":
-                    required_fields = set(one_of_error.validator_value)
-                    # HTTP Basic auth is the only case where we can provide a helpful hint
-                    if ("username" in error.instance or "password" in error.instance) and required_fields == {
-                        "username",
-                        "password",
-                    }:
-                        missing = sorted(required_fields - set(error.instance.keys()))
-                        missing_list = "\n".join(f"  - '{field}'" for field in missing)
-                        return f"Error in {section} section:\n  Missing required property (HTTP Basic):\n\n{missing_list}\n"
-                elif one_of_error.validator == "additionalProperties":
-                    # Find the invalid property
-                    valid = {"api_key", "username", "password", "bearer"}
-                    invalid = [k for k in error.instance.keys() if k not in valid]
-                    if invalid:
-                        return (
-                            f"Error in {section} section:\n  Invalid property:\n\n"
-                            f"  - '{invalid[0]}' is not allowed\n\n"
-                            "Valid properties: 'api_key', 'username', 'password', 'bearer'"
-                        )
+        if (
+            isinstance(error.kind, (ValidationErrorKind.OneOfMultipleValid, ValidationErrorKind.OneOfNotValid))
+            and error.kind.context
+            and isinstance(error.instance, dict)
+            and error.instance
+        ):
+            # Each subschema in `oneOf` may have multiple errors
+            for errors in error.kind.context:
+                for one_of_error in errors:
+                    if one_of_error.kind.name == "required":
+                        variants = resolve_path(CONFIG_SCHEMA, one_of_error.schema_path)
+                        assert isinstance(variants, list)
+                        required_fields = set(variants)
+                        # HTTP Basic auth is the only case where we can provide a helpful hint
+                        if ("username" in error.instance or "password" in error.instance) and required_fields == {
+                            "username",
+                            "password",
+                        }:
+                            missing = sorted(required_fields - set(error.instance.keys()))
+                            missing_list = "\n".join(f"  - '{field}'" for field in missing)
+                            return f"Error in {section} section:\n  Missing required property (HTTP Basic):\n\n{missing_list}\n"
+                    elif one_of_error.kind.name == "additionalProperties":
+                        # Find the invalid property
+                        valid = {"api_key", "username", "password", "bearer"}
+                        invalid = [k for k in error.instance.keys() if k not in valid]
+                        if invalid:
+                            return (
+                                f"Error in {section} section:\n  Invalid property:\n\n"
+                                f"  - '{invalid[0]}' is not allowed\n\n"
+                                "Valid properties: 'api_key', 'username', 'password', 'bearer'"
+                            )
 
         return (
             f"Error in {section} section:\n  Configuration does not match any valid auth scheme.\n\n"
