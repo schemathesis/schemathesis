@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import string
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import lru_cache
 from typing import Any, TypeVar, overload
 
@@ -146,8 +146,12 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     if not pointer.startswith("/"):
         return UNRESOLVABLE
 
+    return resolve_path(document, iter_decoded_pointer_segments(pointer))
+
+
+def resolve_path(document: Any, path: Iterable[str | int]) -> dict | list | str | int | float | None | Unresolvable:
     target = document
-    for token in iter_decoded_pointer_segments(pointer):
+    for token in path:
         if isinstance(target, dict):
             target = target.get(token, UNRESOLVABLE)
             if target is UNRESOLVABLE:
