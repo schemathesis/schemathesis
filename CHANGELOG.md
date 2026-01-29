@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.9.4...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.9.5...HEAD) - TBD
+
+## [4.9.5](https://github.com/schemathesis/schemathesis/compare/v4.9.4...v4.9.5) - 2026-01-29
 
 ### :bug: Fixed
 
