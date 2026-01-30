@@ -29,7 +29,7 @@ ________________________________ Stateful tests ________________________________
 
 - Response violates schema
 
-    'customer_id' is a required property
+    "customer_id" is a required property
 
     Schema:
 

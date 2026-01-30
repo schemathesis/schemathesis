@@ -34,7 +34,7 @@ __________________________________ GET /items __________________________________
 
 - Response violates schema
 
-    'not an array' is not of type 'array'
+    "not an array" is not of type "array"
 
     Schema:
 

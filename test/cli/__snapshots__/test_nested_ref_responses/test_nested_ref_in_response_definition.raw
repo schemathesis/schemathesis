@@ -34,7 +34,7 @@ __________________________________ GET /users __________________________________
 
 - Response violates schema
 
-    'not-an-integer' is not of type 'integer'
+    "not-an-integer" is not of type "integer"
 
     Schema at /properties/id:
 
@@ -48,7 +48,7 @@ __________________________________ GET /users __________________________________
 
 [200] OK:
 
-    `{"email":"test@example.com","id":"not-an-integer"}`
+    `{"email":"test@example.com","id":"not-an-integer","name":"test"}`
 
 Reproduce with:
 

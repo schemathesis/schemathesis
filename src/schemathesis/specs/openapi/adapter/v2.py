@@ -1,3 +1,4 @@
+import jsonschema_rs
 from jsonschema import Draft4Validator
 
 from schemathesis.specs.openapi.adapter import (
@@ -61,3 +62,4 @@ get_parameter_serializer: GetParameterSerializer = parameter_serializers.seriali
 extract_security_definitions: ExtractSecurityDefinitions = security.extract_security_definitions_v2
 
 jsonschema_validator_cls = Draft4Validator
+jsonschema_rs_validator_cls = jsonschema_rs.Draft4Validator

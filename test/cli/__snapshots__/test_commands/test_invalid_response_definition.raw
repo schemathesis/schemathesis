@@ -41,7 +41,7 @@ Problematic definition:
     "ABC"
 
 Error details:
-    'ABC' is not of type 'object'
+    "ABC" is not of type "object"
 
 See: https://spec.openapis.org/oas/v3.0.2#schema-object
 

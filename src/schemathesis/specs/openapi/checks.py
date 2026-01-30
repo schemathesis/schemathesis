@@ -9,6 +9,8 @@ from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
+import jsonschema_rs
+
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
@@ -169,8 +171,6 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
 @requires_openapi_schema
 @skips_on_unexpected_http_status
 def response_headers_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    import jsonschema
-
     from schemathesis.specs.openapi.schemas import _maybe_raise_one_or_more
 
     # Find the matching response definition
@@ -193,12 +193,13 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
             coerced = _coerce_header_value(value, header.schema)
             try:
                 header.validator.validate(coerced)
-            except jsonschema.ValidationError as exc:
+            except jsonschema_rs.ValidationError as exc:
                 errors.append(
                     JsonSchemaError.from_exception(
                         title="Response header does not conform to the schema",
                         operation=case.operation.label,
                         exc=exc,
+                        root_schema=header.schema,
                         config=case.operation.schema.config.output,
                         name_to_uri=header.name_to_uri,
                     )
