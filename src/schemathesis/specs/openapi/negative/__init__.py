@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
-import jsonschema
+import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
@@ -15,6 +15,7 @@ from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.transport.serialization import Binary
 
 from .mutations import MutationContext, MutationMetadata
 
@@ -65,7 +66,7 @@ class CacheKey:
     operation_name: str
     location: str
     schema: JsonSchema
-    validator_cls: type[jsonschema.Validator]
+    validator_cls: type[jsonschema_rs.Validator]
     custom_format_names: frozenset[str]
 
     __slots__ = ("operation_name", "location", "schema", "validator_cls", "custom_format_names")
@@ -79,38 +80,46 @@ def _always_invalid(value: Any) -> bool:
     return False
 
 
-@lru_cache
-def _build_format_checker(custom_format_names: frozenset[str]) -> jsonschema.FormatChecker:
-    """Build a format checker that handles both standard and custom formats.
+# Formats that should always be treated as invalid for negative testing.
+# These are OpenAPI-specific formats that jsonschema-rs doesn't validate,
+# so without this, any value would pass validation and get filtered out.
+_ALWAYS_INVALID_FORMATS = frozenset({"binary", "byte"})
 
-    For custom formats not in the standard checker, we add a check that always fails.
-    This is because arbitrary strings are almost certainly not valid for custom formats
-    (e.g., uuid4, phone numbers, etc.).
+
+def _is_unconstrained_binary_schema(schema: JsonSchema) -> bool:
+    """Check if schema is an unconstrained binary/byte format that accepts any value.
+
+    A schema like {"format": "binary"} without a type constraint accepts any JSON value,
+    since JSON Schema format validation only applies to strings. For such schemas, we can't
+    meaningfully filter generated values because everything matches.
     """
-    checker = jsonschema.FormatChecker()
-    standard = jsonschema.Draft202012Validator.FORMAT_CHECKER
+    if not isinstance(schema, dict):
+        return False
+    # Has binary/byte format but no type constraint
+    return schema.get("format") in _ALWAYS_INVALID_FORMATS and "type" not in schema
 
-    # Copy all standard checks
-    for name in standard.checkers:
-        func, raises = standard.checkers[name]
-        checker.checkers[name] = (func, raises)
 
-    # For custom formats not in standard checker, add "always invalid" checks
-    for name in custom_format_names:
-        if name not in checker.checkers:
-            checker.checkers[name] = (_always_invalid, ())
+def _contains_binary(value: Any) -> bool:
+    """Check if the value contains any Binary instances.
 
-    return checker
+    Binary is a special wrapper type that jsonschema-rs cannot validate.
+    """
+    if isinstance(value, Binary):
+        return True
+    if isinstance(value, dict):
+        return any(_contains_binary(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_contains_binary(v) for v in value)
+    return False
 
 
 @lru_cache
-def get_validator(cache_key: CacheKey) -> jsonschema.Validator:
+def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     """Get JSON Schema validator for the given schema."""
-    # Each operation / location combo has only a single schema, therefore could be cached
-    format_checker = _build_format_checker(cache_key.custom_format_names)
     return cache_key.validator_cls(
         cache_key.schema,
-        format_checker=format_checker,
+        formats=dict.fromkeys(cache_key.custom_format_names | _ALWAYS_INVALID_FORMATS, _always_invalid),
+        validate_formats=True,
     )
 
 
@@ -138,7 +147,7 @@ def negative_schema(
     generation_config: GenerationConfig,
     *,
     custom_formats: dict[str, st.SearchStrategy[str]],
-    validator_cls: type[jsonschema.Validator],
+    validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
     """A strategy for instances that DO NOT match the input schema.
@@ -153,15 +162,22 @@ def negative_schema(
     validator = get_validator(cache_key)
     keywords, non_keywords = split_schema(cache_key)
 
+    # For unconstrained binary/byte schemas, skip the validation filter entirely.
+    # Such schemas accept any value (no type constraint + format only applies to strings),
+    # so we can't meaningfully filter generated values.
+    skip_validation_filter = _is_unconstrained_binary_schema(schema)
+
     if location == ParameterLocation.QUERY:
 
         def filter_values(value: dict[str, Any]) -> bool:
-            return is_non_empty_query(value) and not validator.is_valid(value)
+            return is_non_empty_query(value) and (
+                skip_validation_filter or _contains_binary(value) or not validator.is_valid(value)
+            )
 
     else:
 
         def filter_values(value: dict[str, Any]) -> bool:
-            return not validator.is_valid(value)
+            return skip_validation_filter or _contains_binary(value) or not validator.is_valid(value)
 
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value

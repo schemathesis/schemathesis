@@ -520,7 +520,7 @@ class OpenApiBody(OpenApiComponent):
             ParameterLocation.BODY,
             self.media_type,
             generation_config,
-            operation.schema.adapter.jsonschema_validator_cls,
+            operation.schema.adapter.jsonschema_rs_validator_cls,
             self.name_to_uri,
         )
 
@@ -949,7 +949,7 @@ class OpenApiParameterSet(ParameterSet):
                 self.location,
                 None,
                 generation_config,
-                operation.schema.adapter.jsonschema_validator_cls,
+                operation.schema.adapter.jsonschema_rs_validator_cls,
                 self.name_to_uri,
             )
 

@@ -6,7 +6,7 @@ from flask import Flask, jsonify
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from schemathesis.specs.openapi.patterns import translate_to_python_regex, update_quantifier
+from schemathesis.specs.openapi.patterns import normalize_regex, update_quantifier
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeat is only available in Python 3.11+"
@@ -179,8 +179,8 @@ def test_update_quantifier_invalid_pattern():
         (r"\p{Script=Latin}", None),
     ],
 )
-def test_translate_to_python_regex(pattern, expected):
-    assert translate_to_python_regex(pattern) == expected
+def test_normalize_regex(pattern, expected):
+    assert normalize_regex(pattern) == expected
     if expected:
         re.compile(expected)
 
