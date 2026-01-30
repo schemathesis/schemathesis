@@ -827,7 +827,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             },
             [6, 7, 10, 9],
         ),
-        # Unsatisfiable allOf
+        # Unsatisfiable allOf - PCRE pattern not supported by Python regex
         (
             {
                 "allOf": [
@@ -837,6 +837,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             },
             [],
         ),
+        # Unsatisfiable allOf - invalid pattern type
         (
             {
                 "allOf": [

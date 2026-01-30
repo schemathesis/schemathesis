@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from jsonschema_rs import Validator
+
 from schemathesis import transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, load_all_checks, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
@@ -248,18 +250,24 @@ class Case:
         self,
         location: ParameterLocation,
         value: Any,
-        validator_cls: type,
+        validator_cls: type[Validator],
     ) -> bool:
         """Validate a component value against its schema."""
+        from requests.structures import CaseInsensitiveDict
+
         if location == ParameterLocation.BODY:
             # Validate body against media type schema
             if isinstance(value, NotSet) or value is None:
                 return False
             for alternative in self.operation.body:
+                if isinstance(value, dict) and any(isinstance(v, bytes) for v in value.values()):
+                    return False
                 if alternative.media_type == self.media_type:
                     return validator_cls(alternative.optimized_schema).is_valid(value)
         # Validate other locations against container schema
         container = getattr(self.operation, location.container_name)
+        if isinstance(value, CaseInsensitiveDict):
+            value = dict(value)
         return validator_cls(container.schema).is_valid(value)
 
     def _hash_container(self, value: Any) -> int:
