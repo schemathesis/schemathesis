@@ -1501,6 +1501,12 @@ def _is_invalid_format(v: Any, format: str) -> bool:
 def _negative_format(
     ctx: CoverageContext, schema: JsonSchemaObject, format: str
 ) -> Generator[GeneratedValue, None, None]:
+    # Only generate negative format cases for formats that have validation semantics.
+    # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
+    # Formats like "password" have no validation - any string is valid.
+    # We can only generate truly invalid data for formats in FORMAT_CHECKER (e.g., "email", "uri", "uuid").
+    if format not in jsonschema.Draft202012Validator.FORMAT_CHECKER.checkers:
+        return
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format.setdefault("type", "string")
@@ -1508,11 +1514,10 @@ def _negative_format(
         # Empty path parameters are invalid
         without_format["minLength"] = 1
     strategy = from_schema(without_format)
-    if format in jsonschema.Draft202012Validator.FORMAT_CHECKER.checkers:
-        if format == "hostname":
-            strategy = strategy.filter(_is_invalid_hostname)
-        else:
-            strategy = strategy.filter(functools.partial(_is_invalid_format, format=format))
+    if format == "hostname":
+        strategy = strategy.filter(_is_invalid_hostname)
+    else:
+        strategy = strategy.filter(functools.partial(_is_invalid_format, format=format))
     yield NegativeValue(
         ctx.generate_from(strategy),
         scenario=CoverageScenario.INVALID_FORMAT,
