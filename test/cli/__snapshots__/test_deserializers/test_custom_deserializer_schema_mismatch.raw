@@ -34,7 +34,7 @@ __________________________________ GET /data ___________________________________
 
 - Response violates schema
 
-    'notanumber' is not of type 'integer'
+    "notanumber" is not of type "integer"
 
     Schema at /properties/count:
 

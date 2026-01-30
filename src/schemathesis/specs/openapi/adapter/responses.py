@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from collections.abc import ItemsView, Iterator, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
+
+import jsonschema_rs
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError, RefResolver
@@ -14,9 +16,6 @@ from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.utils import expand_status_code
-
-if TYPE_CHECKING:
-    from jsonschema.protocols import Validator
 
 # Cache key when no Content-Type header is present
 _NO_MEDIA_TYPE = ""
@@ -40,7 +39,7 @@ class CachedValidation:
     __slots__ = ("schema", "validator", "name_to_uri")
 
     schema: JsonSchema | None
-    validator: Validator | None
+    validator: jsonschema_rs.Validator | None
     name_to_uri: dict[str, str]
 
 
@@ -100,18 +99,12 @@ class OpenApiResponse:
         cached = self._validation_cache[cache_key]
         return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type, name_to_uri=cached.name_to_uri)
 
-    def _build_validator(self, schema: JsonSchema) -> Validator | None:
-        from jsonschema import Draft202012Validator
+    def _build_validator(self, schema: JsonSchema) -> jsonschema_rs.Validator | None:
+        return self.adapter.jsonschema_rs_validator_cls(schema, validate_formats=True)
 
-        self.adapter.jsonschema_validator_cls.check_schema(schema)
-        return self.adapter.jsonschema_validator_cls(
-            schema,
-            # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
-            format_checker=Draft202012Validator.FORMAT_CHECKER,
-            resolver=RefResolver.from_schema(schema),
-        )
-
-    def get_validator_for_schema(self, resolved_media_type: str | None, schema: JsonSchema | None) -> Validator | None:
+    def get_validator_for_schema(
+        self, resolved_media_type: str | None, schema: JsonSchema | None
+    ) -> jsonschema_rs.Validator | None:
         """Get or build validator for a schema corresponding to a specific media type.
 
         This method is primarily used by the validation logic in schemas.py.
@@ -445,7 +438,7 @@ class OpenApiResponseHeader:
 
     def __post_init__(self) -> None:
         self._bundle: Bundle | NotSet = NOT_SET
-        self._validator: Validator | NotSet = NOT_SET
+        self._validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
     @property
     def is_required(self) -> bool:
@@ -471,19 +464,10 @@ class OpenApiResponseHeader:
         return self._get_bundle().name_to_uri
 
     @property
-    def validator(self) -> Validator:
+    def validator(self) -> jsonschema_rs.Validator:
         """JSON Schema validator for this header."""
-        from jsonschema import Draft202012Validator
-
-        schema = self.schema
         if self._validator is NOT_SET:
-            self.adapter.jsonschema_validator_cls.check_schema(schema)
-            self._validator = self.adapter.jsonschema_validator_cls(
-                schema,
-                # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
-                format_checker=Draft202012Validator.FORMAT_CHECKER,
-                resolver=RefResolver.from_schema(schema),
-            )
+            self._validator = self.adapter.jsonschema_rs_validator_cls(self.schema, validate_formats=True)
         assert not isinstance(self._validator, NotSet)
         return self._validator
 

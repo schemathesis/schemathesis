@@ -348,7 +348,7 @@ def test_response_schema_conformance_type_after_large_required(openapi_30, respo
         str(exc.value)
         == """Response violates schema
 
-'not an object' is not of type 'object'
+"not an object" is not of type "object"
 
 Schema:
 
@@ -628,7 +628,7 @@ The following media types are documented in the schema:
         str(exc.value.exceptions[1])
         == """Response violates schema
 
-'success' is a required property
+"success" is a required property
 
 Schema:
 
@@ -1112,7 +1112,7 @@ Value:
         str(exc.value.exceptions[1])
         == """Response header does not conform to the schema
 
-'Invalid' is not a 'date-time'
+"Invalid" is not a "date-time"
 
 Schema:
 

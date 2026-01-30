@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, NoReturn
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
+    import jsonschema_rs
     from jsonschema import SchemaError as JsonSchemaError
     from jsonschema import ValidationError
     from requests import RequestException
@@ -121,27 +122,72 @@ class InvalidSchema(SchemathesisError):
         config: OutputConfig,
         location: SchemaLocation | None = None,
     ) -> InvalidSchema:
+        # This default message contains the instance which we already printed
+        if "is not valid under any of the given schemas" in error.message:
+            error_message = "The provided definition doesn't match any of the expected formats or types."
+        else:
+            error_message = error.message
+        return cls._from_raw_components(
+            instance_path=list(error.absolute_path),
+            location_path=list(error.path),
+            instance=error.instance,
+            error_message=error_message,
+            path=path,
+            method=method,
+            config=config,
+            location=location,
+        )
+
+    @classmethod
+    def from_jsonschema_rs_error(
+        cls,
+        error: jsonschema_rs.ValidationError,
+        path: str | None,
+        method: str | None,
+        config: OutputConfig,
+        location: SchemaLocation | None = None,
+    ) -> InvalidSchema:
+        return cls._from_raw_components(
+            instance_path=error.instance_path,
+            location_path=error.instance_path,
+            instance=error.instance,
+            error_message=error.message,
+            path=path,
+            method=method,
+            config=config,
+            location=location,
+        )
+
+    @classmethod
+    def _from_raw_components(
+        cls,
+        *,
+        instance_path: list[str | int],
+        location_path: list[str | int],
+        instance: Any,
+        error_message: str,
+        path: str | None,
+        method: str | None,
+        config: OutputConfig,
+        location: SchemaLocation | None,
+    ) -> InvalidSchema:
         if location is not None:
             message = location.message
-        elif error.absolute_path:
-            part = error.absolute_path[-1]
-            if isinstance(part, int) and len(error.absolute_path) > 1:
-                parent = error.absolute_path[-2]
+        elif instance_path:
+            part = instance_path[-1]
+            if isinstance(part, int) and len(instance_path) > 1:
+                parent = instance_path[-2]
                 message = f"Invalid definition for element at index {part} in `{parent}`"
             else:
                 message = f"Invalid `{part}` definition"
         else:
             message = "Invalid schema definition"
-        error_path = " -> ".join(str(entry) for entry in error.path) or "[root]"
+        error_path = " -> ".join(str(entry) for entry in location_path) or "[root]"
         message += f"\n\nLocation:\n    {error_path}"
-        instance = truncate_json(error.instance, config=config)
-        message += f"\n\nProblematic definition:\n{indent(instance, '    ')}"
+        truncated_instance = truncate_json(instance, config=config)
+        message += f"\n\nProblematic definition:\n{indent(truncated_instance, '    ')}"
         message += "\n\nError details:\n    "
-        # This default message contains the instance which we already printed
-        if "is not valid under any of the given schemas" in error.message:
-            message += "The provided definition doesn't match any of the expected formats or types."
-        else:
-            message += error.message
+        message += error_message
         message += "\n\n"
         if location is not None:
             message += f"See: {location.specification_url}"

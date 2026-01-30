@@ -27,7 +27,7 @@ _________________________________ POST /tasks __________________________________
 
 - Response violates schema
 
-    'title' is a required property
+    "title" is a required property
 
     Schema:
 

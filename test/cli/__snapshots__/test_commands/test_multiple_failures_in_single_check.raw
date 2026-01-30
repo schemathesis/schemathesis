@@ -34,7 +34,7 @@ _________________________________ GET /success _________________________________
 
 - Response violates schema
 
-    {} is not of type 'integer'
+    {} is not of type "integer"
 
     Schema:
 

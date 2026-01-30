@@ -29,7 +29,7 @@ ________________________________ Stateful tests ________________________________
 
 - Response violates schema
 
-    '0' is not of type 'number'
+    "0" is not of type "number"
 
     Schema at /properties/total:
 

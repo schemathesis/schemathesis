@@ -27,7 +27,7 @@ _____________________________ GET /users/{user_id} _____________________________
 
 - Response violates schema
 
-    'name' is a required property
+    "name" is a required property
 
     Schema:
 
