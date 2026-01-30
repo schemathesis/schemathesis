@@ -6,7 +6,7 @@ from typing import Any, overload
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import deepclone
-from schemathesis.specs.openapi.patterns import is_valid_python_regex, translate_to_python_regex, update_quantifier
+from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex, update_quantifier
 
 
 @overload
@@ -70,12 +70,19 @@ def _to_json_schema(
         schema["format"] = "binary"
     # Handle unsupported regex patterns - try translation first, remove if that fails
     pattern = schema.get("pattern")
-    if pattern is not None and not is_valid_python_regex(pattern):
-        translated = translate_to_python_regex(pattern)
-        if translated is not None:
-            schema["pattern"] = translated
-        else:
-            del schema["pattern"]
+    if pattern is not None:
+        if not is_valid_python_regex(pattern):
+            # Pattern is invalid Python regex - try to translate PCRE constructs
+            translated = normalize_regex(pattern)
+            if translated is not None:
+                schema["pattern"] = translated
+            else:
+                del schema["pattern"]
+        elif isinstance(pattern, str) and (pattern.startswith(r"\A") or pattern.endswith(r"\Z")):
+            # Pattern uses Python-specific anchors that need Rust translation for jsonschema-rs
+            translated = normalize_regex(pattern)
+            if translated is not None:
+                schema["pattern"] = translated
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value
@@ -86,7 +93,9 @@ def _to_json_schema(
                 continue
             is_required = subschema.get("required")
             if is_required is True:
-                schema.setdefault("required", []).append(name)
+                required = schema.setdefault("required", [])
+                if name not in required:
+                    required.append(name)
                 del subschema["required"]
             elif is_required is False:
                 if "required" in schema and name in schema["required"]:

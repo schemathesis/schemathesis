@@ -122,8 +122,12 @@ _UNICODE_PROPERTY_MAP = (
 
 
 @lru_cache(maxsize=256)
-def translate_to_python_regex(pattern: object) -> str | None:
-    """Translate PCRE-style Unicode property escapes to Python equivalents.
+def normalize_regex(pattern: object) -> str | None:
+    r"""Translate PCRE-style Unicode property escapes and Python-specific anchors.
+
+    Handles:
+    - PCRE Unicode property escapes (\p{L}, \pL, etc.) -> Python equivalents
+    - Python anchors (\A, \Z) -> Rust-compatible equivalents (^, $)
 
     Returns the translated pattern if successful, None if translation failed
     or the result is not a valid Python regex.
@@ -136,7 +140,10 @@ def translate_to_python_regex(pattern: object) -> str | None:
         esc in pattern
         for esc in (r"\pL", r"\pN", r"\pP", r"\pM", r"\pS", r"\pC", r"\pZ", r"\PL", r"\PN", r"\PC", r"\PM")
     )
-    if not has_braced and not has_shorthand:
+    # Check for Python-specific anchors that need Rust translation
+    has_python_anchors = pattern.startswith(r"\A") or pattern.endswith(r"\Z")
+
+    if not has_braced and not has_shorthand and not has_python_anchors:
         return None  # No translation needed
 
     translated = pattern
@@ -146,6 +153,12 @@ def translate_to_python_regex(pattern: object) -> str | None:
     # Check if there are still untranslated Unicode property escapes
     if r"\p{" in translated or r"\P{" in translated:
         return None  # Contains unsupported escapes
+
+    # Translate Python-specific anchors to Rust equivalents for jsonschema-rs
+    if translated.startswith(r"\A"):
+        translated = "^" + translated[2:]
+    if translated.endswith(r"\Z"):
+        translated = translated[:-2] + "$"
 
     # Verify the translated pattern is valid
     if is_valid_python_regex(translated):

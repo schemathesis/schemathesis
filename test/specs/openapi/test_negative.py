@@ -1,7 +1,6 @@
 import uuid
 from urllib.parse import urlparse
 
-import jsonschema
 import jsonschema_rs
 import pytest
 import requests
@@ -89,7 +88,7 @@ def test_top_level_strategy(data, location, schema):
             media_type="application/json",
             custom_formats=get_default_format_strategies(),
             generation_config=GenerationConfig(),
-            validator_cls=jsonschema.Draft4Validator,
+            validator_cls=jsonschema_rs.Draft4Validator,
         )
     )
     assert isinstance(result, GeneratedValue)
@@ -465,7 +464,7 @@ def test_negative_query_respects_allow_extra_parameter_toggle(data):
             location=ParameterLocation.QUERY,
             media_type=None,
             custom_formats=get_default_format_strategies(),
-            validator_cls=jsonschema.Draft4Validator,
+            validator_cls=jsonschema_rs.Draft4Validator,
             generation_config=GenerationConfig(allow_extra_parameters=False),
         )
     )

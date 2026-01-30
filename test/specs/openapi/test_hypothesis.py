@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
-from jsonschema import Draft4Validator
+from jsonschema_rs import Draft4Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig

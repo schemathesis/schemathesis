@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 from urllib.parse import quote_plus
 
-import jsonschema.protocols
+import jsonschema_rs
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -57,7 +57,7 @@ VALID_HEADER_PROBABILITY = 0.95
 # Note: 0x09 (HTAB) is valid per RFC, so excluded from this set
 INVALID_HEADER_CHARS = "".join(chr(i) for i in range(9)) + "".join(chr(i) for i in range(10, 32)) + "\x7f"
 StrategyFactory = Callable[
-    [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema.protocols.Validator]],
+    [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema_rs.Validator]],
     st.SearchStrategy,
 ]
 
@@ -497,7 +497,7 @@ def _build_form_strategy_with_encoding(
                 ParameterLocation.BODY,
                 parameter.media_type,
                 generation_config,
-                operation.schema.adapter.jsonschema_validator_cls,
+                operation.schema.adapter.jsonschema_rs_validator_cls,
             )
 
     # Build fixed dictionary strategy with optional properties
@@ -802,7 +802,7 @@ def make_positive_strategy(
     location: ParameterLocation,
     media_type: str | None,
     generation_config: GenerationConfig,
-    validator_cls: type[jsonschema.protocols.Validator],
+    validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
@@ -826,7 +826,7 @@ def make_negative_strategy(
     location: ParameterLocation,
     media_type: str | None,
     generation_config: GenerationConfig,
-    validator_cls: type[jsonschema.protocols.Validator],
+    validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(generation_config, GenerationMode.NEGATIVE)
