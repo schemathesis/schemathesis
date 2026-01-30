@@ -10,7 +10,7 @@ from warnings import WarningMessage, catch_warnings
 import requests
 from hypothesis.errors import InvalidArgument
 from jsonschema.exceptions import SchemaError as JsonSchemaError
-from jsonschema.exceptions import ValidationError
+from jsonschema_rs import ValidationError
 from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
 
@@ -216,9 +216,7 @@ def run_test(
                     path=operation.path,
                     method=operation.method,
                     config=ctx.config.output,
-                    location=SchemaLocation.maybe_from_error_path(
-                        list(exc.absolute_path), ctx.schema.specification.version
-                    ),
+                    location=SchemaLocation.maybe_from_error_path(exc.instance_path, ctx.schema.specification.version),
                 )
             )
     except InvalidArgument as exc:
