@@ -1,7 +1,7 @@
 """Benchmarks for the coverage phase."""
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema_rs import Draft202012Validator
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.coverage import CoverageContext, cover_schema_iter

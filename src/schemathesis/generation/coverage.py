@@ -89,6 +89,21 @@ def conforms_to_format(value: Any, format: str) -> bool:
     return _get_format_validator(format).is_valid(value)
 
 
+def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
+    """Recursively remove 'examples' field from a schema for jsonschema-rs compatibility."""
+    result = {}
+    for key, value in schema.items():
+        if key == "examples":
+            continue
+        if isinstance(value, dict):
+            result[key] = _remove_examples(value)
+        elif isinstance(value, list):
+            result[key] = [_remove_examples(item) if isinstance(item, dict) else item for item in value]  # type: ignore[assignment]
+        else:
+            result[key] = value
+    return result
+
+
 def _replace_zero_with_nonzero(x: float) -> float:
     return x or 0.0
 
@@ -198,7 +213,7 @@ class CoverageContext:
     is_required: bool
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
-    validator_cls: type[jsonschema.protocols.Validator]
+    validator_cls: type[jsonschema_rs.Validator]
     _resolver: RefResolver | None
     allow_extra_parameters: bool
 
@@ -225,7 +240,7 @@ class CoverageContext:
         is_required: bool,
         path: list[str | int] | None = None,
         custom_formats: dict[str, st.SearchStrategy],
-        validator_cls: type[jsonschema.protocols.Validator],
+        validator_cls: type[jsonschema_rs.Validator],
         _resolver: RefResolver | None = None,
         allow_extra_parameters: bool = True,
     ) -> None:
@@ -1681,12 +1696,15 @@ def _negative_type(
             del schema["pattern"]
             return
 
-    validator = ctx.validator_cls(
-        schema,
-        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
-    )
-    is_valid = validator.is_valid
+    if isinstance(schema, dict) and BUNDLE_STORAGE_KEY in ctx.root_schema:
+        schema = dict(schema)
+        schema[BUNDLE_STORAGE_KEY] = ctx.root_schema[BUNDLE_STORAGE_KEY]
+
+    schema = _remove_examples(schema)
+
     try:
+        validator = ctx.validator_cls(schema, validate_formats=True)
+        is_valid = validator.is_valid
         is_valid(None)
         apply_validation = True
     except Exception:
@@ -1694,6 +1712,9 @@ def _negative_type(
         # In such a scenario it is better to generate at least something with some chances to have a false
         # positive failure
         apply_validation = False
+
+        def is_valid(x: object) -> bool:
+            return True
 
     def _does_not_match_the_original_schema(value: Any) -> bool:
         return not is_valid(str(value))
