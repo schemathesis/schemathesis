@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 
 def setup() -> None:
+    import jsonschema_rs
     from hypothesis import core as root_core
     from hypothesis.internal.conjecture import engine
     from hypothesis.internal.entropy import deterministic_PRNG
@@ -119,3 +120,41 @@ def setup() -> None:
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
+
+    # Patch make_validator to use jsonschema-rs for instance validation
+    from schemathesis.transport.serialization import Binary
+
+    _original_get_validator_class = _canonicalise._get_validator_class
+    _original_make_validator = _canonicalise.make_validator
+
+    def _contains_binary(value: Any) -> bool:
+        """Check if the value contains any Binary instances."""
+        if isinstance(value, Binary):
+            return True
+        if isinstance(value, dict):
+            return any(_contains_binary(v) for v in value.values())
+        if isinstance(value, list):
+            return any(_contains_binary(v) for v in value)
+        return False
+
+    class _ValidatorWrapper:
+        """Wrapper around validator that handles Binary instances."""
+
+        __slots__ = ("_validator",)
+
+        def __init__(self, validator: Any) -> None:
+            self._validator = validator
+
+        def is_valid(self, value: Any) -> bool:
+            if _contains_binary(value):
+                return True
+            return self._validator.is_valid(value)
+
+    def make_validator(schema: dict[str, Any]) -> _ValidatorWrapper:
+        try:
+            return _ValidatorWrapper(jsonschema_rs.Draft7Validator(schema))
+        except (ValueError, TypeError):
+            return _ValidatorWrapper(_original_make_validator(schema))
+
+    _canonicalise.make_validator = make_validator
+    _from_schema.make_validator = make_validator
