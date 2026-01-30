@@ -43,7 +43,7 @@ Reproduce with:
 
 - Response violates schema
 
-    'message' is a required property
+    "message" is a required property
 
     Schema:
 

@@ -31,7 +31,7 @@ _____________________________ GET /users/{user_id} _____________________________
 
 - Response violates schema
 
-    'email' is a required property
+    "email" is a required property
 
     Schema:
 

@@ -34,7 +34,7 @@ ________________________________ Stateful tests ________________________________
 
 - Response violates schema
 
-    None is not of type 'string'
+    null is not of type "string"
 
     Schema at /properties/name:
 

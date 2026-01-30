@@ -29,7 +29,7 @@ ________________________________ Stateful tests ________________________________
 
 - Response violates schema
 
-    None is not of type 'number'
+    null is not of type "number"
 
     Schema at /properties/price:
 

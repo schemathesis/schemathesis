@@ -34,7 +34,7 @@ _______________________________ GET /conformance _______________________________
 
 - Response violates schema
 
-    'e32ab85ed4634c38a320eb0b22460da9' is not one of ['foo']
+    "e32ab85ed4634c38a320eb0b22460da9" is not one of "foo"
 
     Schema at /properties/value:
 

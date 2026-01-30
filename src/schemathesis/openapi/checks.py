@@ -7,9 +7,10 @@ from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.jsonschema.bundler import unbundle
 from schemathesis.core.output import truncate_json
+from schemathesis.core.transforms import resolve_path
 
 if TYPE_CHECKING:
-    from jsonschema import ValidationError
+    import jsonschema_rs
 
 
 class UndefinedStatusCode(Failure):
@@ -123,48 +124,53 @@ class JsonSchemaError(Failure):
         *,
         title: str = "Response violates schema",
         operation: str,
-        exc: ValidationError,
+        exc: jsonschema_rs.ValidationError,
+        root_schema: dict[str, Any] | bool,
         config: OutputConfig | None = None,
         name_to_uri: dict[str, str] | None = None,
     ) -> JsonSchemaError:
-        schema_path = list(exc.absolute_schema_path)
+        if exc.schema_path:
+            parent_path = exc.schema_path[:-1]
+            schema = resolve_path(root_schema, parent_path)
+        else:
+            schema = root_schema
+
+        assert isinstance(schema, (dict, bool))
 
         # Reorder schema to prioritize the failing keyword in the output
-        schema_to_display = exc.schema
-        if isinstance(schema_to_display, dict) and schema_path:
-            failing_keyword = schema_path[-1]
-            if isinstance(failing_keyword, str) and failing_keyword in schema_to_display:
-                # Create a new dict with the failing keyword first
-                schema_to_display = {
-                    failing_keyword: schema_to_display[failing_keyword],
-                    **{k: v for k, v in schema_to_display.items() if k != failing_keyword},
+        if isinstance(schema, dict) and exc.schema_path:
+            failing_keyword = exc.schema_path[-1]
+            if isinstance(failing_keyword, str) and failing_keyword in schema:
+                schema = {
+                    failing_keyword: schema[failing_keyword],
+                    **{k: v for k, v in schema.items() if k != failing_keyword},
                 }
+
         # Restore original $ref paths for display if mapping is available
         if name_to_uri:
-            schema_to_display = unbundle(schema_to_display, name_to_uri)
-        schema = textwrap.indent(
-            truncate_json(schema_to_display, config=config or OutputConfig(), max_lines=20), prefix="    "
+            schema = unbundle(schema, name_to_uri)
+
+        schema_str = textwrap.indent(
+            truncate_json(schema, config=config or OutputConfig(), max_lines=20), prefix="    "
         )
         value = textwrap.indent(
             truncate_json(exc.instance, config=config or OutputConfig(), max_lines=20), prefix="    "
         )
-        schema_path = list(exc.absolute_schema_path)
-        if len(schema_path) > 1:
-            # Exclude the last segment, which is already in the schema
+        if len(exc.schema_path) > 1:
             schema_title = "Schema at "
-            for segment in schema_path[:-1]:
+            for segment in exc.schema_path[:-1]:
                 schema_title += f"/{segment}"
         else:
             schema_title = "Schema"
-        message = f"{exc.message}\n\n{schema_title}:\n\n{schema}\n\nValue:\n\n{value}"
+        full_message = f"{exc.message}\n\n{schema_title}:\n\n{schema_str}\n\nValue:\n\n{value}"
         return cls(
             operation=operation,
             title=title,
-            message=message,
+            message=full_message,
             validation_message=exc.message,
-            schema_path=schema_path,
-            schema=exc.schema,
-            instance_path=list(exc.absolute_path),
+            schema_path=exc.schema_path,
+            schema=schema if isinstance(schema, dict) else {},
+            instance_path=exc.instance_path,
             instance=exc.instance,
         )
 

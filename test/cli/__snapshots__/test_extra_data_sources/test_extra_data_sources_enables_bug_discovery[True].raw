@@ -27,7 +27,7 @@ _______________________________ GET /items/{id} ________________________________
 
 - Response violates schema
 
-    'name' is a required property
+    "name" is a required property
 
     Schema:
 

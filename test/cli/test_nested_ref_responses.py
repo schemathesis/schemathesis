@@ -94,7 +94,7 @@ def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
     @app.route("/api/users", methods=["GET"])
     def get_users():
         # Violates schema: missing "name", wrong type for "id"
-        return jsonify({"id": "not-an-integer", "email": "test@example.com"}), 200
+        return jsonify({"id": "not-an-integer", "email": "test@example.com", "name": "test"}), 200
 
     port = app_runner.run_flask_app(app)
 

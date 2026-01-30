@@ -34,7 +34,7 @@ _________________________________ GET /success _________________________________
 
 - Response violates schema
 
-    'success' is a required property
+    "success" is a required property
 
     Schema:
 

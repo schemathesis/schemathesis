@@ -354,7 +354,7 @@ def test_response_conformance_invalid(real_app_schema):
     assert check.failure_info.failure.title == "Response violates schema", check
     assert (
         check.failure_info.failure.message
-        == """'success' is a required property
+        == """"success" is a required property
 
 Schema:
 
@@ -379,12 +379,12 @@ Value:
     assert check.failure_info.failure.instance == {"random": "key"}
     assert check.failure_info.failure.instance_path == []
     assert check.failure_info.failure.schema == {
-        "properties": {"success": {"type": "boolean"}},
         "required": ["success"],
+        "properties": {"success": {"type": "boolean"}},
         "type": "object",
     }
     assert check.failure_info.failure.schema_path == ["required"]
-    assert check.failure_info.failure.validation_message == "'success' is a required property"
+    assert check.failure_info.failure.validation_message == '"success" is a required property'
 
 
 @pytest.mark.operations("success")

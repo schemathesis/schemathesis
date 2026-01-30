@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 import jsonschema
+import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
@@ -622,8 +623,8 @@ class OpenApiSchema(BaseSchema):
 
         try:
             validator = definition.get_validator_for_schema(resolved.media_type, resolved.schema)
-        except jsonschema.SchemaError as exc:
-            raise InvalidSchema.from_jsonschema_error(
+        except jsonschema_rs.ValidationError as exc:
+            raise InvalidSchema.from_jsonschema_rs_error(
                 exc,
                 path=operation.path,
                 method=operation.method,
@@ -668,19 +669,12 @@ class OpenApiSchema(BaseSchema):
 
         try:
             validator.validate(data)
-        except jsonschema.SchemaError as exc:
-            raise InvalidSchema.from_jsonschema_error(
-                exc,
-                path=operation.path,
-                method=operation.method,
-                config=self.config.output,
-                location=SchemaLocation.response_schema(self.specification.version),
-            ) from exc
-        except jsonschema.ValidationError as exc:
+        except jsonschema_rs.ValidationError as exc:
             failures.append(
                 JsonSchemaError.from_exception(
                     operation=operation.label,
                     exc=exc,
+                    root_schema=resolved.schema,
                     config=operation.schema.config.output,
                     name_to_uri=resolved.name_to_uri,
                 )
