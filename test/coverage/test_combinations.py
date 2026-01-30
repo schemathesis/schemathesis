@@ -153,7 +153,8 @@ class AnyNumber:
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
         ({"format": "date-time"}, [AnyString()]),
         ({"format": "hostname"}, [AnyString()]),
-        ({"format": "unknown"}, [AnyString()]),
+        # Unknown formats have no validation semantics, so no negative cases can be generated
+        ({"format": "unknown"}, []),
         ({"uniqueItems": True}, [["null", "null"]]),
         ({"maximum": 5}, [6]),
         ({"minimum": 5}, [4]),
