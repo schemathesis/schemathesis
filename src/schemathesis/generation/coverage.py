@@ -26,6 +26,7 @@ from typing import Any, TypeVar, cast
 from urllib.parse import quote_plus
 
 import jsonschema.protocols
+import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
@@ -46,6 +47,46 @@ from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
 from ..specs.openapi.patterns import update_quantifier
+
+VALIDATED_FORMATS = frozenset(
+    {
+        "date",
+        "date-time",
+        "duration",
+        "email",
+        "hostname",
+        "idn-email",
+        "idn-hostname",
+        "ipv4",
+        "ipv6",
+        "iri",
+        "iri-reference",
+        "json-pointer",
+        "regex",
+        "relative-json-pointer",
+        "time",
+        "uri",
+        "uri-reference",
+        "uri-template",
+        "uuid",
+    }
+)
+
+_FORMAT_VALIDATORS: dict[str, jsonschema_rs.Draft202012Validator] = {}
+
+
+def _get_format_validator(format: str) -> jsonschema_rs.Draft202012Validator:
+    """Get or create a cached validator for checking a specific format."""
+    if format not in _FORMAT_VALIDATORS:
+        _FORMAT_VALIDATORS[format] = jsonschema_rs.Draft202012Validator(
+            {"type": "string", "format": format}, validate_formats=True
+        )
+    return _FORMAT_VALIDATORS[format]
+
+
+def conforms_to_format(value: Any, format: str) -> bool:
+    """Check if a value conforms to a JSON Schema format."""
+    return _get_format_validator(format).is_valid(value)
 
 
 def _replace_zero_with_nonzero(x: float) -> float:
@@ -1491,11 +1532,11 @@ def _negative_required(
 
 
 def _is_invalid_hostname(v: Any) -> bool:
-    return v == "" or not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, "hostname")
+    return v == "" or not conforms_to_format(v, "hostname")
 
 
 def _is_invalid_format(v: Any, format: str) -> bool:
-    return not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
+    return not conforms_to_format(v, format)
 
 
 def _negative_format(
@@ -1504,8 +1545,8 @@ def _negative_format(
     # Only generate negative format cases for formats that have validation semantics.
     # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
     # Formats like "password" have no validation - any string is valid.
-    # We can only generate truly invalid data for formats in FORMAT_CHECKER (e.g., "email", "uri", "uuid").
-    if format not in jsonschema.Draft202012Validator.FORMAT_CHECKER.checkers:
+    # We can only generate truly invalid data for formats in VALIDATED_FORMATS (e.g., "email", "uri", "uuid").
+    if format not in VALIDATED_FORMATS:
         return
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
