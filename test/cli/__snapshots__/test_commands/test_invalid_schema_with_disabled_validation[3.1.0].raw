@@ -39,12 +39,12 @@ Location:
 
 Problematic definition:
     {
-        "scheme": "bearer",
-        "bearerFormat": "uuid"
+        "bearerFormat": "uuid",
+        "scheme": "bearer"
     }
 
 Error details:
-    'type' is a required property
+    "type" is a required property
 
 See: https://spec.openapis.org/oas/v3.1.0#security-scheme-object
 
