@@ -5,7 +5,7 @@ import csv
 import json
 from uuid import uuid4
 
-import jsonschema
+import jsonschema_rs
 from aiohttp import web
 
 from schemathesis.config._output import MAX_PAYLOAD_SIZE
@@ -71,7 +71,7 @@ async def payload(request: web.Request) -> web.Response:
             raise web.HTTPBadRequest(text="Invalid JSON")  # noqa: B904
         try:
             PAYLOAD_VALIDATOR.validate(data)
-        except jsonschema.ValidationError as exc:
+        except jsonschema_rs.ValidationError as exc:
             raise web.HTTPBadRequest(text=str(exc))  # noqa: B904
         return web.json_response(body=body)
     return web.json_response({"name": "Nothing!"})

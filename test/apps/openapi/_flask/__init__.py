@@ -4,7 +4,7 @@ import logging
 from time import sleep
 from uuid import uuid4
 
-import jsonschema
+import jsonschema_rs
 import yaml
 from flask import Flask, Response, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
@@ -71,7 +71,7 @@ def create_app(
             data = request.json
             try:
                 PAYLOAD_VALIDATOR.validate(data)
-            except jsonschema.ValidationError:
+            except jsonschema_rs.ValidationError:
                 return jsonify({"detail": "Validation error"}), 400
         except BadRequest:
             data = {"name": "Nothing!"}

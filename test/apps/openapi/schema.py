@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-import jsonschema
+import jsonschema_rs
 
 
 class Operation(Enum):
@@ -115,7 +115,7 @@ PAYLOAD = {
     "additionalProperties": False,
 }
 
-PAYLOAD_VALIDATOR = jsonschema.validators.Draft4Validator({"anyOf": [{"type": "null"}, PAYLOAD]})
+PAYLOAD_VALIDATOR = jsonschema_rs.Draft4Validator({"anyOf": [{"type": "null"}, PAYLOAD]})
 
 
 def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
