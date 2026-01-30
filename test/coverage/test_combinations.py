@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from unittest.mock import ANY
 
-import jsonschema.validators
 import jsonschema_rs
 import pytest
 
@@ -85,7 +84,7 @@ def ctx_factory():
             generation_modes=generation_modes,
             is_required=is_required,
             custom_formats=get_default_format_strategies(),
-            validator_cls=jsonschema.validators.Draft202012Validator,
+            validator_cls=jsonschema_rs.Draft4Validator,
             allow_extra_parameters=allow_extra_parameters,
         )
 
@@ -1260,7 +1259,7 @@ def test_negative_one_of(schema, expected):
         generation_modes=[GenerationMode.NEGATIVE],
         is_required=True,
         custom_formats=get_default_format_strategies(),
-        validator_cls=jsonschema.validators.Draft202012Validator,
+        validator_cls=jsonschema_rs.Draft202012Validator,
     )
     covered = cover_schema(nctx, schema)
     assert_not_conform(covered, schema)
