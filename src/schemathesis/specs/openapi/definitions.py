@@ -1,13 +1,11 @@
 # These schemas are copied from https://github.com/OAI/OpenAPI-Specification/tree/master/schemas
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+import jsonschema_rs
 
 from schemathesis.core.lazy_import import lazy_import
-
-if TYPE_CHECKING:
-    from jsonschema import Validator
-
 
 SWAGGER_20 = {
     "title": "A JSON Schema for Swagger 2.0 API.",
@@ -2568,17 +2566,11 @@ _VALIDATORS = [
 __all__ = ["SWAGGER_20", "OPENAPI_30", "OPENAPI_31", "OPENAPI_32", *_VALIDATORS]
 
 _imports = {
-    "SWAGGER_20_VALIDATOR": lambda: make_validator(SWAGGER_20),
-    "OPENAPI_30_VALIDATOR": lambda: make_validator(OPENAPI_30),
-    "OPENAPI_31_VALIDATOR": lambda: make_validator(OPENAPI_31),
-    "OPENAPI_32_VALIDATOR": lambda: make_validator(OPENAPI_32),
+    "SWAGGER_20_VALIDATOR": lambda: jsonschema_rs.Draft4Validator(SWAGGER_20),
+    "OPENAPI_30_VALIDATOR": lambda: jsonschema_rs.Draft4Validator(OPENAPI_30),
+    "OPENAPI_31_VALIDATOR": lambda: jsonschema_rs.Draft202012Validator(OPENAPI_31),
+    "OPENAPI_32_VALIDATOR": lambda: jsonschema_rs.Draft202012Validator(OPENAPI_32),
 }
-
-
-def make_validator(schema: dict[str, Any]) -> Validator:
-    import jsonschema
-
-    return jsonschema.validators.validator_for(schema)(schema)
 
 
 def __getattr__(name: str) -> Any:

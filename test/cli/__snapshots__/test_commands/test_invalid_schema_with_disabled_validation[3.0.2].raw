@@ -39,8 +39,8 @@ Location:
 
 Problematic definition:
     {
-        "scheme": "bearer",
-        "bearerFormat": "uuid"
+        "bearerFormat": "uuid",
+        "scheme": "bearer"
     }
 
 Error details:

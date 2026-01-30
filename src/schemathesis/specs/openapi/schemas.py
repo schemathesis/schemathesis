@@ -366,13 +366,13 @@ class OpenApiSchema(BaseSchema):
             raise InvalidSchema.from_reference_resolution_error(error, path=path, method=method) from None
         try:
             self.validate()
-        except jsonschema.ValidationError as exc:
+        except jsonschema_rs.ValidationError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc,
                 path=path,
                 method=method,
                 config=self.config.output,
-                location=SchemaLocation.maybe_from_error_path(list(exc.absolute_path), self.specification.version),
+                location=SchemaLocation.maybe_from_error_path(exc.instance_path, self.specification.version),
             ) from None
         raise InvalidSchema(SCHEMA_ERROR_SUGGESTION, path=path, method=method) from error
 
@@ -624,7 +624,7 @@ class OpenApiSchema(BaseSchema):
         try:
             validator = definition.get_validator_for_schema(resolved.media_type, resolved.schema)
         except jsonschema_rs.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_rs_error(
+            raise InvalidSchema.from_jsonschema_error(
                 exc,
                 path=operation.path,
                 method=operation.method,

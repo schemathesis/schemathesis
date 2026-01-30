@@ -16,7 +16,6 @@ from schemathesis.core.output import truncate_json
 if TYPE_CHECKING:
     import jsonschema_rs
     from jsonschema import SchemaError as JsonSchemaError
-    from jsonschema import ValidationError
     from requests import RequestException
 
     from schemathesis.config import OutputConfig
@@ -116,42 +115,22 @@ class InvalidSchema(SchemathesisError):
     @classmethod
     def from_jsonschema_error(
         cls,
-        error: ValidationError | JsonSchemaError,
-        path: str | None,
-        method: str | None,
-        config: OutputConfig,
-        location: SchemaLocation | None = None,
-    ) -> InvalidSchema:
-        # This default message contains the instance which we already printed
-        if "is not valid under any of the given schemas" in error.message:
-            error_message = "The provided definition doesn't match any of the expected formats or types."
-        else:
-            error_message = error.message
-        return cls._from_raw_components(
-            instance_path=list(error.absolute_path),
-            location_path=list(error.path),
-            instance=error.instance,
-            error_message=error_message,
-            path=path,
-            method=method,
-            config=config,
-            location=location,
-        )
-
-    @classmethod
-    def from_jsonschema_rs_error(
-        cls,
         error: jsonschema_rs.ValidationError,
         path: str | None,
         method: str | None,
         config: OutputConfig,
         location: SchemaLocation | None = None,
     ) -> InvalidSchema:
+        # This default message contains the instance which we already printed
+        if "is not valid under any of the schemas" in error.message:
+            error_message = "The provided definition doesn't match any of the expected formats or types."
+        else:
+            error_message = error.message
         return cls._from_raw_components(
             instance_path=error.instance_path,
             location_path=error.instance_path,
             instance=error.instance,
-            error_message=error.message,
+            error_message=error_message,
             path=path,
             method=method,
             config=config,

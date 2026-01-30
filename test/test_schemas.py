@@ -1,6 +1,6 @@
 import platform
 
-import jsonschema
+import jsonschema_rs
 import pytest
 import requests
 
@@ -232,14 +232,14 @@ def test_openapi_3_2_smoke():
 @pytest.mark.parametrize(
     ("version", "invalid_schema", "expected_error"),
     [
-        ("3.0.0", {"openapi": "3.0.0"}, "'info' is a required property"),
-        ("3.1.0", {"openapi": "3.1.0"}, "'info' is a required property"),
-        ("3.2.0", {"openapi": "3.2.0"}, "'info' is a required property"),
+        ("3.0.0", {"openapi": "3.0.0"}, '"info" is a required property'),
+        ("3.1.0", {"openapi": "3.1.0"}, '"info" is a required property'),
+        ("3.2.0", {"openapi": "3.2.0"}, '"info" is a required property'),
     ],
     ids=["openapi-3.0", "openapi-3.1", "openapi-3.2"],
 )
 def test_validate_v3_rejects_invalid_schema(version, invalid_schema, expected_error):
-    with pytest.raises(jsonschema.ValidationError, match=expected_error):
+    with pytest.raises(jsonschema_rs.ValidationError, match=expected_error):
         validators.validate_v3(invalid_schema)
 
 
