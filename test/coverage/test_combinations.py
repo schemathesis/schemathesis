@@ -4,6 +4,7 @@ import json
 from unittest.mock import ANY
 
 import jsonschema.validators
+import jsonschema_rs
 import pytest
 
 from schemathesis.core.parameters import ParameterLocation
@@ -40,31 +41,31 @@ def assert_unique(values: list):
 
 
 def assert_conform(values: list, schema: dict):
+    try:
+        validator = jsonschema_rs.Draft7Validator(schema, validate_formats=True)
+    except jsonschema_rs.ValidationError:
+        # Schema itself is invalid (e.g., pattern: 0.0), skip validation
+        return
     for value in values:
         if isinstance(value, GeneratedValue):
             value = value.value
-        jsonschema.validate(
-            value,
-            schema,
-            cls=jsonschema.Draft7Validator,
-            format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
-        )
+        validator.validate(value)
 
 
 def assert_not_conform(values: list, schema: dict):
     if isinstance(schema, dict) and schema.get("format") == "unknown":
         # Can't validate the format
         return
+    try:
+        validator = jsonschema_rs.Draft7Validator(schema, validate_formats=True)
+    except jsonschema_rs.ValidationError:
+        # Schema itself is invalid (e.g., pattern: 0.0), skip validation
+        return
     for entry in values:
         try:
-            jsonschema.validate(
-                entry,
-                schema,
-                cls=jsonschema.Draft7Validator,
-                format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
-            )
+            validator.validate(entry)
             raise AssertionError(f"Value {entry} conforms to {schema}")
-        except (jsonschema.ValidationError, ValueError):
+        except (jsonschema_rs.ValidationError, ValueError):
             pass
 
 
