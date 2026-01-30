@@ -25,7 +25,7 @@ from json.encoder import JSONEncoder, encode_basestring_ascii
 from typing import Any, TypeVar, cast
 from urllib.parse import quote_plus
 
-import jsonschema.protocols
+import jsonschema.exceptions
 import jsonschema_rs
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
@@ -534,7 +534,7 @@ def _cover_positive_for_type(
             if len(all_of) == 1:
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
-                with suppress(jsonschema.SchemaError):
+                with suppress(jsonschema_rs.ValidationError):
                     for idx, sub_schema in enumerate(all_of):
                         if isinstance(sub_schema, dict) and "$ref" in sub_schema:
                             all_of[idx] = ctx.resolve_ref(sub_schema["$ref"])
@@ -574,11 +574,11 @@ def _ignore_unfixable(
     # Cache exception types here as `jsonschema` uses a custom `__getattr__` on the module level
     # and it may cause errors during the interpreter shutdown
     ref_error: type[Exception] = RefResolutionError,
-    schema_error: type[Exception] = jsonschema.SchemaError,
+    schema_error: type[Exception] = jsonschema.exceptions.SchemaError,
 ) -> Generator:
     try:
         yield
-    except (Unsatisfiable, ref_error, schema_error):
+    except (Unsatisfiable, ref_error, jsonschema_rs.ValidationError, schema_error):
         pass
     except InvalidArgument as exc:
         message = str(exc)
@@ -910,9 +910,12 @@ def cover_schema_iter(
                             yield from cover_schema_iter(nctx, canonical, seen)
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
-                    resolver = ctx.resolver
+                    # Resolve refs before creating validators
+                    resolved_schemas = [
+                        ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
+                    ]
                     # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems -> items)
-                    validators = [jsonschema.Draft7Validator(sub_schema, resolver=resolver) for sub_schema in value]
+                    validators = [jsonschema_rs.Draft7Validator(sub_schema) for sub_schema in resolved_schemas]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -922,9 +925,12 @@ def cover_schema_iter(
                                 yield value
                 elif key == "oneOf":
                     nctx = ctx.with_negative()
-                    resolver = ctx.resolver
+                    # Resolve refs before creating validators
+                    resolved_schemas = [
+                        ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
+                    ]
                     # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems -> items)
-                    validators = [jsonschema.Draft7Validator(sub_schema, resolver=resolver) for sub_schema in value]
+                    validators = [jsonschema_rs.Draft7Validator(sub_schema) for sub_schema in resolved_schemas]
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -937,7 +943,7 @@ def cover_schema_iter(
                     yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen))
 
 
-def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema.Validator]) -> bool:
+def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
     for vidx, validator in enumerate(validators):
         if idx == vidx:
             # This one is being negated
@@ -947,7 +953,7 @@ def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema.Valida
     return False
 
 
-def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema.Validator]) -> bool:
+def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
     valid_count = 0
     for vidx, validator in enumerate(validators):
         if idx == vidx:

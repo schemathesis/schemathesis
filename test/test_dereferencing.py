@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from flask import Flask, jsonify
 from hypothesis import HealthCheck, given, settings
-from jsonschema.validators import Draft4Validator
+from jsonschema_rs import Draft4Validator
 from werkzeug.exceptions import InternalServerError
 
 import schemathesis

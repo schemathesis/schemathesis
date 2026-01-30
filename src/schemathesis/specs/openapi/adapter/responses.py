@@ -100,7 +100,7 @@ class OpenApiResponse:
         return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type, name_to_uri=cached.name_to_uri)
 
     def _build_validator(self, schema: JsonSchema) -> jsonschema_rs.Validator | None:
-        return self.adapter.jsonschema_rs_validator_cls(schema, validate_formats=True)
+        return self.adapter.jsonschema_validator_cls(schema, validate_formats=True)
 
     def get_validator_for_schema(
         self, resolved_media_type: str | None, schema: JsonSchema | None
@@ -467,7 +467,7 @@ class OpenApiResponseHeader:
     def validator(self) -> jsonschema_rs.Validator:
         """JSON Schema validator for this header."""
         if self._validator is NOT_SET:
-            self._validator = self.adapter.jsonschema_rs_validator_cls(self.schema, validate_formats=True)
+            self._validator = self.adapter.jsonschema_validator_cls(self.schema, validate_formats=True)
         assert not isinstance(self._validator, NotSet)
         return self._validator
 
