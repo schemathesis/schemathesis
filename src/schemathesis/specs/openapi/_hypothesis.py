@@ -497,7 +497,7 @@ def _build_form_strategy_with_encoding(
                 ParameterLocation.BODY,
                 parameter.media_type,
                 generation_config,
-                operation.schema.adapter.jsonschema_rs_validator_cls,
+                operation.schema.adapter.jsonschema_validator_cls,
             )
 
     # Build fixed dictionary strategy with optional properties
