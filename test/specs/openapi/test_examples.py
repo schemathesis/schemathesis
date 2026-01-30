@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from unittest.mock import ANY
 
-import jsonschema
+import jsonschema_rs
 import pytest
 from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
@@ -911,7 +911,7 @@ def test_partial_examples(ctx):
     # Then all generated examples should have those missing parts generated according to the API schema
     example = examples.generate_one(strategy)
     parameters_schema = parameters_to_json_schema(operation.path_parameters, ParameterLocation.PATH)
-    jsonschema.validate(example.path_parameters, parameters_schema)
+    jsonschema_rs.validate(parameters_schema, example.path_parameters)
 
 
 def test_partial_examples_without_null_bytes_and_formats(ctx):
@@ -2331,8 +2331,8 @@ def test_allof_with_required_field_should_not_use_incomplete_property_examples(c
 
     validation_error = None
     try:
-        jsonschema.validate(example.value, body_schema)
-    except jsonschema.ValidationError as e:
+        jsonschema_rs.validate(body_schema, example.value)
+    except jsonschema_rs.ValidationError as e:
         validation_error = e
 
     assert validation_error is None, (
@@ -2344,8 +2344,8 @@ def test_allof_with_required_field_should_not_use_incomplete_property_examples(c
     for strategy in strategies:
         case = examples.generate_one(strategy)
         try:
-            jsonschema.validate(case.body, body_schema)
-        except jsonschema.ValidationError as e:
+            jsonschema_rs.validate(body_schema, case.body)
+        except jsonschema_rs.ValidationError as e:
             pytest.fail(f"Generated invalid case {case.body}: {e}")
 
 
@@ -2393,7 +2393,7 @@ def test_anyof_with_required_constraints(ctx):
 
     body_schema = list(operation.body)[0].optimized_schema
     for example in extracted:
-        jsonschema.validate(example["value"], body_schema)
+        jsonschema_rs.validate(body_schema, example["value"])
 
 
 def test_non_string_pattern_in_schema(ctx):
