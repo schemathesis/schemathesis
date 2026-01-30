@@ -1,6 +1,71 @@
+import json
+
 import pytest
 from _pytest.main import ExitCode
 from flask import Flask, jsonify, request
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
+    # GH-3480: Schemathesis incorrectly reports data as invalid for format: password
+    # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
+    # With only `type: string, format: password`, any string is valid.
+    # Schemathesis incorrectly treats generated data as schema-violating and expects rejection.
+    #
+    # The coverage phase generates format-specific negative cases via _negative_format,
+    # which incorrectly claims values don't match the 'password' format.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "password",
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/", methods=["POST"])
+    def root():
+        # Reject non-strings with 422 (proper validation behavior)
+        # Accept all strings (including empty) since format:password has no validation semantics
+        data = request.get_data()
+        try:
+            body = json.loads(data)
+            if not isinstance(body, str):
+                return jsonify({"error": "expected string"}), 422
+        except (json.JSONDecodeError, ValueError):
+            return jsonify({"error": "invalid json"}), 422
+        return jsonify({"result": "ok"}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    # No failure should be reported since any string is valid for format: password in OpenAPI 3.0
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--phases=coverage",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
 
 
 def test_negative_metadata_required_property(ctx, app_runner, cli):
