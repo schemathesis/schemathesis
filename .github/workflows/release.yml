@@ -15,8 +15,8 @@ jobs:
         include:
           - dockerfile: Dockerfile
             tag-suffix: ""
-          - dockerfile: Dockerfile.bookworm
-            tag-suffix: "-bookworm"
+          - dockerfile: Dockerfile.trixie
+            tag-suffix: "-trixie"
 
     steps:
       - uses: actions/checkout@v6
@@ -39,8 +39,8 @@ jobs:
           if [ "${{ env.is_prerelease }}" == "false" ]; then
             if [ "${{ matrix.tag-suffix }}" == "" ]; then
               echo "stable_tag=type=raw,value=stable" >> $GITHUB_OUTPUT
-            elif [ "${{ matrix.tag-suffix }}" == "-bookworm" ]; then
-              echo "stable_tag=type=raw,value=stable-bookworm" >> $GITHUB_OUTPUT
+            elif [ "${{ matrix.tag-suffix }}" == "-trixie" ]; then
+              echo "stable_tag=type=raw,value=stable-trixie" >> $GITHUB_OUTPUT
             else
               echo "stable_tag=" >> $GITHUB_OUTPUT
             fi

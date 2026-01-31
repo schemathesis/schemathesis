@@ -16,8 +16,8 @@ jobs:
         include:
           - dockerfile: Dockerfile
             tag: "latest"
-          - dockerfile: Dockerfile.bookworm
-            tag: "latest-bookworm"
+          - dockerfile: Dockerfile.trixie
+            tag: "latest-trixie"
 
     steps:
       - uses: actions/checkout@v6
