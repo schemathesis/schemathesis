@@ -20,8 +20,9 @@ from schemathesis.transport.serialization import Binary
 from .mutations import MutationContext, MutationMetadata
 
 SYNTAX_FUZZING_PROBABILITY = 0.05
-# Large size limit for regex patterns to support schemas with large quantifiers (e.g., {1,51200})
-_PATTERN_OPTIONS = jsonschema_rs.RegexOptions(size_limit=1_000_000_000)
+# Use FancyRegexOptions to support lookahead/lookbehind assertions common in ECMA-262 patterns,
+# with a large size limit to handle schemas with large quantifiers (e.g., {1,51200})
+_PATTERN_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=1_000_000_000)
 
 if TYPE_CHECKING:
     from .types import Draw, Schema
