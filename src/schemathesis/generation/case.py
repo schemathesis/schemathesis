@@ -38,6 +38,17 @@ def _default_headers() -> CaseInsensitiveDict:
 _NOTSET_HASH = 0x7F3A9B2C
 
 
+def _contains_bytes(value: Any) -> bool:
+    """Check if value contains bytes anywhere in nested structure."""
+    if isinstance(value, bytes):
+        return True
+    if isinstance(value, dict):
+        return any(_contains_bytes(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_contains_bytes(item) for item in value)
+    return False
+
+
 @dataclass
 class Case:
     """Generated test case data for a single API operation."""
@@ -260,7 +271,7 @@ class Case:
             if isinstance(value, NotSet) or value is None:
                 return False
             for alternative in self.operation.body:
-                if isinstance(value, dict) and any(isinstance(v, bytes) for v in value.values()):
+                if _contains_bytes(value):
                     return False
                 if alternative.media_type == self.media_type:
                     return validator_cls(alternative.optimized_schema).is_valid(value)

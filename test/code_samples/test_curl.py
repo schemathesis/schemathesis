@@ -4,7 +4,16 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.shell import ShellType
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    FuzzingPhaseData,
+    GenerationInfo,
+    PhaseInfo,
+    TestPhase,
+)
 from schemathesis.generation.modes import GenerationMode
 from test.apps.openapi._fastapi import create_app
 from test.apps.openapi._fastapi.app import app
@@ -184,4 +193,62 @@ def test_shell_aware_escaping(curl, monkeypatch, shell_type, case_kwargs, expect
     command = case.as_curl_command()
 
     assert command == expected_command
+    curl.assert_valid(command)
+
+
+def test_multipart_with_array_of_bytes_body(curl):
+    # When the body contains an array with bytes values (e.g., multiple file uploads)
+    multipart_schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "files": {
+                                                "type": "array",
+                                                "items": {"type": "string", "format": "binary"},
+                                            }
+                                        },
+                                        "required": ["files"],
+                                    }
+                                }
+                            },
+                            "required": True,
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    multipart_schema.config.update(base_url="http://127.0.0.1")
+    operation = multipart_schema["/upload"]["POST"]
+    meta = CaseMetadata(
+        generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE),
+        components={ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.POSITIVE)},
+        phase=PhaseInfo(
+            name=TestPhase.FUZZING,
+            data=FuzzingPhaseData(
+                description="",
+                parameter=None,
+                parameter_location=None,
+                location=None,
+            ),
+        ),
+    )
+    meta.mark_dirty(ParameterLocation.BODY)
+    case = operation.Case(
+        body={"files": [b"\x89PNG\r\n\x1a\n", b"\x89PNG\r\n\x1a\n"]},
+        media_type="multipart/form-data",
+        _meta=meta,
+    )
+    # Then as_curl_command should not raise an error
+    command = case.as_curl_command()
     curl.assert_valid(command)
