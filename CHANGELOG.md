@@ -9,6 +9,7 @@
 ### :wrench: Changed
 
 - Use `jsonschema-rs` for data validation instead of `jsonschema`.
+- Docker images now use free-threaded Python 3.14 with GIL disabled (`PYTHON_GIL=0`), providing up to 65% faster multi-worker execution.
 
 ## [4.9.5](https://github.com/schemathesis/schemathesis/compare/v4.9.4...v4.9.5) - 2026-01-29
 

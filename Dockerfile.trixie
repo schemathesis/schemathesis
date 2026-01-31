@@ -1,0 +1,49 @@
+FROM debian:trixie-slim
+
+LABEL Name=Schemathesis
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Configure uv to use managed Python in a shared location
+ENV UV_PYTHON_PREFERENCE=only-managed
+ENV UV_PYTHON_INSTALL_DIR=/opt/python
+
+# Install free-threaded Python 3.14 to shared location
+RUN uv python install 3.14t
+
+RUN groupadd --gid 1000 --system schemathesis && \
+    useradd --uid 1000 --system schemathesis -g schemathesis -s /sbin/nologin
+
+COPY --chown=1000:1000 pyproject.toml README.md src ./
+
+# Create virtual environment with free-threaded Python
+RUN uv venv --python 3.14t /opt/venv
+
+# Install ca-certificates for curl, build tools for native extensions
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y ca-certificates build-essential libffi-dev libssl-dev curl \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && PATH=$HOME/.cargo/bin:$PATH VIRTUAL_ENV=/opt/venv uv pip install --no-cache-dir ./ \
+    && apt remove -y build-essential libffi-dev libssl-dev curl \
+    && PATH=$HOME/.cargo/bin:$PATH rustup self uninstall -y \
+    && apt -y autoremove \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Needed for the `.hypothesis` directory
+RUN chown -R 1000:1000 /app
+
+USER schemathesis
+
+# Set PATH to use the virtual environment
+ENV PATH="/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV=/opt/venv
+
+# Disable GIL at runtime for true parallelism with --workers
+ENV PYTHON_GIL=0
+ENV SCHEMATHESIS_DOCKER_IMAGE=3.14t-trixie
+
+ENTRYPOINT ["schemathesis"]
