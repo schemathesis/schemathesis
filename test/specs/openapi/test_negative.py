@@ -710,6 +710,53 @@ def test_multiple_mutations_clear_description():
     test()
 
 
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "([\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF]){1,51200}",
+        "^([^\\x00-\\x1F\\x7F-\\x9F]){1,100000}$",
+    ],
+    ids=["unicode_extended_range", "hex_escape"],
+)
+@pytest.mark.hypothesis_nested
+def test_large_quantifier_patterns(pattern):
+    # Large quantifiers can exceed jsonschema_rs's default compiled regex size limit
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.2",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/test": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "value": {"type": "string", "pattern": pattern},
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/test"]["POST"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def inner(case):
+        pass
+
+    inner()
+
+
 @pytest.mark.hypothesis_nested
 def test_path_parameters_never_contain_slash():
     # When fuzzing path parameters, mutated values should never contain `/`
