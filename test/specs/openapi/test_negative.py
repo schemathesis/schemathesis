@@ -715,11 +715,13 @@ def test_multiple_mutations_clear_description():
     [
         "([\\u0009\\u000A\\u000D\\u0020-\\u007E\\u00A1-\\u00FF]){1,51200}",
         "^([^\\x00-\\x1F\\x7F-\\x9F]){1,100000}$",
+        "(?!^.*--)(?!^[0-9]+$)(?!^-)(?!.*-$)^[A-Za-z0-9-]+$",
+        "^[0-9a-z\\.\\-]*(?<!\\.)$",
     ],
-    ids=["unicode_extended_range", "hex_escape"],
+    ids=["unicode_extended_range", "hex_escape", "negative_lookahead", "negative_lookbehind"],
 )
 @pytest.mark.hypothesis_nested
-def test_large_quantifier_patterns(pattern):
+def test_ecma_regex_patterns(pattern):
     # Large quantifiers can exceed jsonschema_rs's default compiled regex size limit
     schema = schemathesis.openapi.from_dict(
         {
