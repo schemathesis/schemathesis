@@ -29,7 +29,7 @@ Schemathesis dev
      ✅ 1 passed
 
 =================================== FAILURES ===================================
-__________________________________ POST /foo ___________________________________
+__________________________________ TRACE /foo __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Unsupported methods
@@ -46,7 +46,8 @@ Reproduce with:
 
     curl -X TRACE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
 
-2. Test Case ID: <PLACEHOLDER>
+_________________________________ DELETE /foo __________________________________
+1. Test Case ID: <PLACEHOLDER>
 
 - Custom check failed: `failed`
 
