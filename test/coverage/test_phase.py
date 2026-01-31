@@ -2264,6 +2264,31 @@ def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli, openapi
     )
 
 
+@pytest.mark.openapi_version("3.0")
+def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli, openapi3_base_url):
+    # Regression test for GH-3322
+    # When coverage phase tests unexpected HTTP methods (e.g., PATCH on a GET endpoint),
+    # the failure header should show the actual tested method, not the original endpoint's method
+    raw_schema = {
+        "/resource": {
+            "get": {"responses": {"200": {"description": "OK"}}},
+        }
+    }
+    schema_path = ctx.openapi.write_schema(raw_schema)
+
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "--checks=unsupported_method",
+            f"--url={openapi3_base_url}",
+            "--phases=coverage",
+            "--mode=negative",
+        )
+        == snapshot_cli
+    )
+
+
 def test_missing_authorization(ctx, cli, snapshot_cli, openapi3_base_url):
     # The reproduction code should not contain auth if it is explicitly specified
     schema_path = ctx.openapi.write_schema(

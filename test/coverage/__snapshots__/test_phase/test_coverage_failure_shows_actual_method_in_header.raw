@@ -21,7 +21,7 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-___________________ TRACE /organizations/{organization_id}/ ____________________
+_______________________________ TRACE /resource ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Unsupported methods
@@ -36,7 +36,7 @@ ___________________ TRACE /organizations/{organization_id}/ ____________________
 
 Reproduce with:
 
-    curl -X TRACE http://127.0.0.1/api/organizations/42/
+    curl -X TRACE http://127.0.0.1/api/resource
 
 =================================== SUMMARY ====================================
 
