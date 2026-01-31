@@ -1209,6 +1209,9 @@ class CurlWrapper:
     testdir: field()
 
     def run(self, command: str):
+        # Strip warning messages that may be appended to the command
+        if "⚠️" in command:
+            command = command.split("⚠️")[0].strip()
         return self.testdir.run(*shlex.split(command))
 
     def assert_valid(self, command: str):
