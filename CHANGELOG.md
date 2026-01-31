@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- Incorrect HTTP method shown in failure headers during coverage phase. [#3322](https://github.com/schemathesis/schemathesis/issues/3322)
 - False positive `negative_data_rejection` failures for `format: password` and other formats without validation semantics. [#3480](https://github.com/schemathesis/schemathesis/issues/3480)
 
 ### :wrench: Changed

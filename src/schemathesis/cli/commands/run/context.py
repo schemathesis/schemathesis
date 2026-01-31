@@ -14,6 +14,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, ScenarioRecorder
 from schemathesis.generation.case import Case
+from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
@@ -59,7 +60,8 @@ class Statistic:
         """Update statistics and store failures from a new batch of checks."""
         from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
-        failures = self.failures.get(recorder.label, {})
+        # Track failures per-label (may differ from recorder.label when method differs)
+        failures_by_label: dict[str, dict[str, GroupedFailures]] = {}
 
         self.total_cases += len(recorder.cases)
 
@@ -104,7 +106,17 @@ class Statistic:
 
             if current_case_failures:
                 assert last_failure_info is not None
-                failures[case_id] = GroupedFailures(
+                # Compute correct label for UNSPECIFIED_HTTP_METHOD coverage scenario (GH-3322)
+                meta = case.value._meta
+                if (
+                    meta is not None
+                    and isinstance(meta.phase.data, CoveragePhaseData)
+                    and meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD
+                ):
+                    label = f"{case.value.method} {case.value.path}"
+                else:
+                    label = recorder.label
+                failures_by_label.setdefault(label, {})[case_id] = GroupedFailures(
                     case_id=case_id,
                     code_sample=last_failure_info.code_sample,
                     failures=current_case_failures,
@@ -178,10 +190,12 @@ class Statistic:
                             )
                         )
 
-        if failures:
+        for label, failures in failures_by_label.items():
             for group in failures.values():
                 group.failures = sorted(set(group.failures))
-            self.failures[recorder.label] = failures
+            existing = self.failures.get(label, {})
+            existing.update(failures)
+            self.failures[label] = existing
 
         if extraction_failures:
             self.extraction_failures.update(extraction_failures)
