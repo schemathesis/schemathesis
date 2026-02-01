@@ -189,6 +189,36 @@ def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kw
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
 
 
+def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
+    # Patterns with large quantifiers require pattern_options with sufficient size_limit
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "key",
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^.{1,262144}$",
+                            },
+                        },
+                    ]
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["POST"]
+    case = operation.Case(
+        _meta=build_metadata(query=GenerationMode.NEGATIVE),
+        query={"key": "valid", "unknown": "extra"},
+    )
+    # Should not raise - the validator should handle patterns with large quantifiers
+    assert has_only_additional_properties_in_non_body_parameters(case) is True
+
+
 def test_negative_data_rejection_on_additional_properties(response_factory, sample_schema):
     # See GH-2312
     response = response_factory.requests()

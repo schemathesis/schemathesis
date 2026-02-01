@@ -38,6 +38,9 @@ from schemathesis.openapi.checks import (
 from schemathesis.specs.openapi.utils import expand_status_code, expand_status_codes
 from schemathesis.transport.prepare import prepare_path
 
+# Large size limit for regex patterns to support schemas with large quantifiers (e.g., {1,262144})
+_PATTERN_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=1_000_000_000)
+
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
@@ -560,7 +563,9 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 continue
 
             value_without_additional_properties = {k: v for k, v in value.items() if k in container}
-            if not validator_cls(schema).is_valid(value_without_additional_properties):
+            if not validator_cls(schema, pattern_options=_PATTERN_OPTIONS).is_valid(
+                value_without_additional_properties
+            ):
                 # Other types of negation found
                 return False
     # Only additional properties are added
