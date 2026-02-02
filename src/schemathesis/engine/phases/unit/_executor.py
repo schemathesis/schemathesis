@@ -29,6 +29,7 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SchemaLocation,
     SerializationNotPossible,
+    is_regex_validation_error,
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
@@ -167,12 +168,15 @@ def run_test(
             status = Status.FAILURE
     except BaseExceptionGroup as exc:
         status = Status.ERROR
-        # Check if any exception in the group is an unrecoverable network error
+        # Check for errors in the exception group
         for sub_exc in exc.exceptions:
-            code_sample = state.get_code_sample_for(sub_exc)
-            if code_sample is not None:
-                clear_hypothesis_notes(sub_exc)
-                yield non_fatal_error(sub_exc, code_sample=code_sample)
+            if is_regex_validation_error(sub_exc):
+                yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
+            else:
+                code_sample = state.get_code_sample_for(sub_exc)
+                if code_sample is not None:
+                    clear_hypothesis_notes(sub_exc)
+                    yield non_fatal_error(sub_exc, code_sample=code_sample)
     except hypothesis.errors.FailedHealthCheck as exc:
         status = Status.ERROR
         yield non_fatal_error(build_health_check_error(operation, exc, with_tip=False))
@@ -237,6 +241,13 @@ def run_test(
     except JsonSchemaError as exc:
         status = Status.ERROR
         yield non_fatal_error(InvalidRegexPattern.from_schema_error(exc, from_examples=False))
+    except ValidationError as exc:
+        status = Status.ERROR
+        if is_regex_validation_error(exc):
+            yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(exc))
+        else:
+            code_sample = state.get_code_sample_for(exc)
+            yield non_fatal_error(exc, code_sample=code_sample)
     except Exception as exc:
         status = Status.ERROR
         clear_hypothesis_notes(exc)
@@ -281,7 +292,10 @@ def run_test(
     invalid_regex = InvalidRegexMark.get(test_function)
     if invalid_regex is not None and status != Status.ERROR:
         status = Status.ERROR
-        yield non_fatal_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
+        if isinstance(invalid_regex, ValidationError):
+            yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex))
+        else:
+            yield non_fatal_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
 
     invalid_headers = InvalidHeadersExampleMark.get(test_function)
     if invalid_headers:

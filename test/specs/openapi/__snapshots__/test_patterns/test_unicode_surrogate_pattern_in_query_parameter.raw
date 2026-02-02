@@ -1,0 +1,54 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ 🚫  Fuzzing (in 0.00s)
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+__________________________________ GET /test ___________________________________
+Schema Error
+
+Failed to generate test cases for this API operation because of unsupported regular expression `([\u0020-\uD7FF\uE000-\uFFFD\uD800\uDBFF-\uDC00\uDFFF\t\r\n]){0,255}`
+
+Tip: Ensure your regex follows ECMA 262 (JavaScript) syntax.
+For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  🚫 Fuzzing
+  ⏭  Stateful (disabled)
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

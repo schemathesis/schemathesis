@@ -11,10 +11,11 @@ from textwrap import indent
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, NoReturn
 
+from jsonschema_rs import ValidationError
+
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
-    import jsonschema_rs
     from jsonschema import SchemaError as JsonSchemaError
     from requests import RequestException
 
@@ -115,7 +116,7 @@ class InvalidSchema(SchemathesisError):
     @classmethod
     def from_jsonschema_error(
         cls,
-        error: jsonschema_rs.ValidationError,
+        error: ValidationError,
         path: str | None,
         method: str | None,
         config: OutputConfig,
@@ -349,6 +350,18 @@ class InvalidRegexPattern(InvalidSchema):
                 f"unsupported regular expression `{error.instance}`"
             )
         return cls(message)
+
+    @classmethod
+    def from_jsonschema_rs_error(cls, error: ValidationError) -> InvalidRegexPattern:
+        return cls(
+            "Failed to generate test cases for this API operation because of "
+            f"unsupported regular expression `{error.instance}`"
+        )
+
+
+def is_regex_validation_error(exc: Exception) -> bool:
+    """Check if exception is a jsonschema_rs.ValidationError for invalid regex."""
+    return isinstance(exc, ValidationError) and exc.kind.name == "format" and exc.kind.value == "regex"
 
 
 class InvalidHeadersExample(InvalidSchema):

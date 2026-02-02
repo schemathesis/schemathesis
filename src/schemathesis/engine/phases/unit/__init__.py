@@ -11,13 +11,22 @@ import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
+from hypothesis.errors import InvalidArgument
+from jsonschema_rs import ValidationError
+
 from schemathesis.config import (
     CoveragePhaseConfig,
     ExamplesPhaseConfig,
     FuzzingPhaseConfig,
     OperationOrdering,
 )
-from schemathesis.core.errors import AuthenticationError, HookExecutionError, InvalidSchema
+from schemathesis.core.errors import (
+    AuthenticationError,
+    HookExecutionError,
+    InvalidRegexPattern,
+    InvalidSchema,
+    is_regex_validation_error,
+)
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
@@ -178,7 +187,7 @@ def worker_task(
     phase: PhaseName,
     suite_id: uuid.UUID,
 ) -> None:
-    from hypothesis.errors import HypothesisWarning, InvalidArgument
+    from hypothesis.errors import HypothesisWarning
 
     from schemathesis.engine.phases.unit._executor import run_test, test_func
     from schemathesis.generation.hypothesis.builder import create_test
@@ -248,7 +257,9 @@ def worker_task(
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
-                    except (InvalidSchema, InvalidArgument, AuthenticationError) as exc:
+                    except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:
+                        if is_regex_validation_error(exc):
+                            exc = InvalidRegexPattern.from_jsonschema_rs_error(exc)
                         on_error(exc, method=operation.method, path=operation.path)
                         continue
 
