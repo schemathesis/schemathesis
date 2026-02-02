@@ -20,6 +20,7 @@ from hypothesis import strategies as st
 from hypothesis._settings import all_settings
 from hypothesis.errors import Unsatisfiable
 from jsonschema.exceptions import SchemaError
+from jsonschema_rs import ValidationError
 from requests.models import CaseInsensitiveDict
 
 from schemathesis import auths
@@ -33,6 +34,7 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
     UnresolvableReference,
+    is_regex_validation_error,
 )
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
@@ -322,6 +324,7 @@ def generate_example_cases(
         UnresolvableReference,
         SerializationNotPossible,
         SchemaError,
+        ValidationError,
     ) as exc:
         result = []
         if isinstance(exc, Unsatisfiable):
@@ -329,6 +332,8 @@ def generate_example_cases(
         if isinstance(exc, SerializationNotPossible):
             NonSerializableMark.set(test, exc)
         if isinstance(exc, SchemaError):
+            InvalidRegexMark.set(test, exc)
+        if is_regex_validation_error(exc):
             InvalidRegexMark.set(test, exc)
         if isinstance(exc, InfiniteRecursiveReference):
             InfiniteRecursiveReferenceMark.set(test, exc)
@@ -1142,7 +1147,7 @@ def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, N
 
 UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")
 NonSerializableMark = Mark[SerializationNotPossible](attr_name="non_serializable")
-InvalidRegexMark = Mark[SchemaError](attr_name="invalid_regex")
+InvalidRegexMark = Mark[SchemaError | ValidationError](attr_name="invalid_regex")
 InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
 MissingPathParameters = Mark[InvalidSchema](attr_name="missing_path_parameters")
 InfiniteRecursiveReferenceMark = Mark[InfiniteRecursiveReference](attr_name="infinite_recursive_reference")
