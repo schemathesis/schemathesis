@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.9.5...HEAD) - TBD
 
+### :rocket: Added
+
+- Negative testing support for GraphQL schemas. [#2355](https://github.com/schemathesis/schemathesis/issues/2355)
+
 ### :bug: Fixed
 
 - Incorrect HTTP method shown in failure headers during coverage phase. [#3322](https://github.com/schemathesis/schemathesis/issues/3322)

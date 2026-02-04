@@ -1,3 +1,5 @@
+import json
+from unittest import SkipTest
 from unittest.mock import ANY, Mock
 
 import pytest
@@ -10,10 +12,22 @@ from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.config import ChecksConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
-from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.core.failures import AcceptedNegativeData, Failure, FailureGroup
+from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.transport import USER_AGENT, Response
+from schemathesis.generation import GenerationMode
+from schemathesis.generation.case import Case
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    FuzzingPhaseData,
+    GenerationInfo,
+    PhaseInfo,
+    TestPhase,
+)
+from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError
 from schemathesis.graphql.loaders import extract_schema_from_response, get_introspection_query
-from schemathesis.specs.graphql.validation import validate_graphql_response
+from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
 from schemathesis.specs.openapi.checks import (
     ensure_resource_availability,
     ignored_auth,
@@ -113,6 +127,35 @@ def test_client_error(graphql_schema):
     with pytest.raises(FailureGroup) as exc:
         case.call_and_validate()
     assert "Syntax Error: Unexpected Name 'invalid'." in str(exc.value.exceptions[0])
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        # Client error: no data, no path in error
+        ({"data": None, "errors": [{"message": "Missing required arg"}]}, True),
+        # Client error: explicit null data, no path
+        ({"errors": [{"message": "Syntax error"}]}, True),
+        # Server error: has path (resolver execution failed)
+        ({"data": None, "errors": [{"message": "Resolver error", "path": ["field"]}]}, False),
+        # Server error: has partial data
+        ({"data": {"field": "value"}, "errors": [{"message": "Error"}]}, False),
+        # No errors at all
+        ({"data": {"field": "value"}}, False),
+        # Empty errors array
+        ({"data": None, "errors": []}, False),
+    ],
+    ids=[
+        "client_error_no_data_no_path",
+        "client_error_missing_data_key",
+        "server_error_has_path",
+        "server_error_has_partial_data",
+        "no_errors",
+        "empty_errors_array",
+    ],
+)
+def test_is_client_error(payload, expected):
+    assert is_client_error(payload) == expected
 
 
 def test_server_error(graphql_path, app_runner):
@@ -254,7 +297,7 @@ def test_schema_error(testdir, cli, snapshot_cli, schema, extension, graphql_url
 
 @pytest.mark.parametrize("arg", ["--include-name=Query.getBooks", "--exclude-name=Query.getBooks"])
 def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
-    assert cli.run(graphql_url, "--max-examples=1", arg) == snapshot_cli
+    assert cli.run(graphql_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
 
 
 def test_disallow_null(ctx, cli, testdir, snapshot_cli, graphql_url):
@@ -350,3 +393,138 @@ def test_ignored_checks(graphql_schema, check):
     # Just in case
     case = graphql_schema["Query"]["getBooks"].Case()
     assert check(None, None, case)
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_mode_cli(cli, graphql_url, snapshot_cli):
+    # Test that negative mode generates invalid queries for mutations with required arguments
+    assert cli.run(graphql_url, "--max-examples=1", "--mode=negative") == snapshot_cli
+
+
+def test_negative_mode_skip_when_impossible(graphql_schema):
+    operation = graphql_schema["Query"]["getBooks"]
+    graphql_schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
+
+    with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
+
+        @given(strategy)
+        @settings(max_examples=1)
+        def test_(case):
+            pass
+
+        test_()
+
+
+def test_negative_mode_fallback_to_positive(graphql_schema):
+    operation = graphql_schema["Query"]["getBooks"]
+    graphql_schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
+    strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
+
+    @given(strategy)
+    @settings(max_examples=1)
+    def test_(case):
+        assert "getBooks" in case.body
+        assert case.meta.generation.mode == GenerationMode.POSITIVE
+
+    test_()
+
+
+def _make_graphql_case_with_mode(graphql_schema, mode):
+    operation = graphql_schema["Mutation"]["addBook"]
+    meta = CaseMetadata(
+        generation=GenerationInfo(time=0.0, mode=mode),
+        components={ParameterLocation.BODY: ComponentInfo(mode=mode)},
+        phase=PhaseInfo(
+            name=TestPhase.FUZZING,
+            data=FuzzingPhaseData(
+                description="Negative test case" if mode == GenerationMode.NEGATIVE else "Positive test case",
+                parameter=None,
+                parameter_location=ParameterLocation.BODY,
+                location=None,
+            ),
+        ),
+    )
+    return Case(
+        operation=operation,
+        method="POST",
+        path="/graphql",
+        body='{ addBook(title: "test", author: "test") { id } }',
+        media_type="application/json",
+        meta=meta,
+    )
+
+
+def _make_mock_response(content, status_code=200):
+    response = requests.Response()
+    response._content = json.dumps(content).encode("utf-8")
+    response.status_code = status_code
+    response.headers["Content-Type"] = "application/json"
+    response.request = requests.PreparedRequest()
+    response.request.prepare(method="POST", url="http://127.0.0.1/graphql")
+    return Response.from_requests(response, True)
+
+
+def test_not_a_server_error_graphql_negative_mode_accepted_invalid_data(graphql_schema):
+    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+    response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
+    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    with pytest.raises(AcceptedNegativeData, match="Invalid data should have been rejected"):
+        not_a_server_error(ctx, response, case)
+
+
+def test_not_a_server_error_graphql_negative_mode_client_error_passes(graphql_schema):
+    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+    response = _make_mock_response(
+        {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
+    )
+    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    result = not_a_server_error(ctx, response, case)
+    assert result is None
+
+
+def test_not_a_server_error_graphql_positive_mode_client_error_raises(graphql_schema):
+    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.POSITIVE)
+    response = _make_mock_response(
+        {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
+    )
+    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    with pytest.raises(GraphQLClientError, match="Field 'addBook' argument 'title' is required"):
+        not_a_server_error(ctx, response, case)
+
+
+def test_not_a_server_error_graphql_negative_mode_server_error_raises(graphql_schema):
+    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+    response = _make_mock_response(
+        {"data": None, "errors": [{"message": "Internal error in resolver", "path": ["addBook"]}]}
+    )
+    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    with pytest.raises(GraphQLServerError, match="Internal error in resolver"):
+        not_a_server_error(ctx, response, case)
+
+
+def test_not_a_server_error_graphql_negative_mode_includes_description(graphql_schema):
+    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+    response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
+    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    with pytest.raises(AcceptedNegativeData) as exc_info:
+        not_a_server_error(ctx, response, case)
+
+    assert "Negative test case" in exc_info.value.message
+
+
+def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(graphql_schema):
+    case = graphql_schema["Mutation"]["addBook"].Case()
+    response = _make_mock_response(
+        {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
+    )
+    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    # Without meta, should fall through to normal validation and raise GraphQLClientError
+    with pytest.raises(GraphQLClientError):
+        not_a_server_error(ctx, response, case)

@@ -8,7 +8,7 @@ Schemathesis generates three types of data:
 - **Valid test data** that follows schema constraints
 - **Invalid test data** that deliberately breaks constraints
 
-The data covers all JSON Schema types for OpenAPI and valid queries for GraphQL.
+The data covers all JSON Schema types for OpenAPI and both valid and invalid queries for GraphQL.
 
 Note, that some generated data may be rejected by your API if the validation rules are not expressed in your schema.
 
@@ -79,17 +79,6 @@ Schemathesis differs from other API testing tools in several ways:
 - **Schema-first workflow**: While tools like Postman or Insomnia focus on manual request creation, Schemathesis derives all test cases directly from your API specification.
 
 Compared to tools like Dredd, Schemathesis focuses more on finding unexpected edge cases through property-based testing rather than verifying documented examples.
-
-## What are the limitations of Schemathesis?
-
-Schemathesis has the following limitations:
-
-### GraphQL Limitations
-
-- **Negative Testing:**  
-  Schemathesis does not support generating invalid inputs for GraphQL endpoints. The `--mode negative` and `--mode all` options are applicable only to OpenAPI schemas.
-
-If you encounter issues not listed here, please report them on our [GitHub issues page](https://github.com/schemathesis/schemathesis/issues).
 
 ## Why is Schemathesis skipping my Authorization header?
 
