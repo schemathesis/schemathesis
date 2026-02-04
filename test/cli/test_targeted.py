@@ -48,6 +48,7 @@ def test_custom_metric_graphql(cli, new_metric, graphql_url):
         graphql_url,
         "--suppress-health-check=too_slow,filter_too_much",
         "--max-examples=1",
+        "--mode=positive",
         hooks=new_metric,
     )
     # Then the test run should be successful

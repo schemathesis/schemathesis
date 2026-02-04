@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import (
+    AcceptedNegativeData,
     CustomFailure,
     Failure,
     FailureGroup,
@@ -121,8 +122,9 @@ def check(func: CheckFunction) -> CheckFunction:
 @check
 def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
+    from schemathesis.graphql.checks import GraphQLClientError
     from schemathesis.specs.graphql.schemas import GraphQLSchema
-    from schemathesis.specs.graphql.validation import validate_graphql_response
+    from schemathesis.specs.graphql.validation import is_client_error, validate_graphql_response
     from schemathesis.specs.openapi.utils import expand_status_codes
 
     expected_statuses = expand_status_codes(ctx.config.not_a_server_error.expected_statuses or [])
@@ -131,9 +133,32 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
     if status_code not in expected_statuses:
         raise ServerError(operation=case.operation.label, status_code=status_code)
     if isinstance(case.operation.schema, GraphQLSchema):
+        is_negative_mode = case.meta is not None and case.meta.generation.mode.is_negative
         try:
             data = response.json()
+            if is_negative_mode:
+                errors = data.get("errors")
+                if errors is None or len(errors) == 0:
+                    # No errors = invalid data was accepted - this is a failure
+                    description = ""
+                    if case.meta and case.meta.phase.data.description:
+                        description = f"\n{case.meta.phase.data.description}"
+                    raise AcceptedNegativeData(
+                        operation=case.operation.label,
+                        message=f"Invalid data should have been rejected by GraphQL schema validation{description}",
+                        status_code=response.status_code,
+                        expected_statuses=[],
+                    )
+                # Has errors = correctly rejected, check if it's a client error (expected)
+                if is_client_error(data):
+                    # GraphQL correctly rejected the invalid query - test passes
+                    return None
+                # Otherwise it's a server error - fall through to normal validation
             validate_graphql_response(case, data)
+        except GraphQLClientError:
+            # Re-raise only if not in negative mode
+            if not is_negative_mode:
+                raise
         except json.JSONDecodeError as exc:
             raise MalformedJson.from_exception(operation=case.operation.label, exc=exc) from None
     return None

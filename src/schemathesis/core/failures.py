@@ -236,6 +236,34 @@ class MalformedJson(Failure):
         )
 
 
+class AcceptedNegativeData(Failure):
+    """Response with negative data was accepted."""
+
+    __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        message: str,
+        status_code: int,
+        expected_statuses: list[str],
+        title: str = "API accepted schema-violating request",
+        case_id: str | None = None,
+    ) -> None:
+        self.operation = operation
+        self.message = message
+        self.status_code = status_code
+        self.expected_statuses = expected_statuses
+        self.title = title
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
+
+    @property
+    def _unique_key(self) -> str:
+        return str(self.status_code)
+
+
 class FailureGroup(BaseExceptionGroup):
     """Multiple distinct check failures."""
 

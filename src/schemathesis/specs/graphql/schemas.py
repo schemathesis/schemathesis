@@ -13,6 +13,7 @@ from typing import (
     NoReturn,
     cast,
 )
+from unittest import SkipTest
 from urllib.parse import urlsplit
 
 from hypothesis import strategies as st
@@ -346,6 +347,8 @@ def graphql_cases(
     extra_data_source: ExtraDataSource | None = None,
 ) -> Any:
     import graphql
+    from hypothesis.errors import InvalidArgument
+    from hypothesis_graphql import Mode as GqlMode
     from hypothesis_graphql import strategies as gql_st
 
     start = time.monotonic()
@@ -357,6 +360,8 @@ def graphql_cases(
     hook_context = HookContext(operation=operation)
     custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
     generation = operation.schema.config.generation_for(operation=operation, phase="fuzzing")
+    gql_mode = GqlMode.NEGATIVE if generation_mode == GenerationMode.NEGATIVE else GqlMode.POSITIVE
+    effective_mode = generation_mode
     strategy = strategy_factory(
         operation.schema.client_schema,  # type: ignore[attr-defined]
         fields=[definition.field_name],
@@ -365,9 +370,31 @@ def graphql_cases(
         allow_x00=generation.allow_x00,
         allow_null=generation.graphql_allow_null,
         codec=generation.codec,
+        mode=gql_mode,
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
-    body = draw(strategy)
+    try:
+        body = draw(strategy)
+    except InvalidArgument:
+        # Negative mode is not possible for this operation (no required arguments or scalar types to violate)
+        if generation.modes == [GenerationMode.NEGATIVE]:
+            raise SkipTest("Impossible to generate negative test cases for this GraphQL operation") from None
+        # Fall back to positive mode when both modes are enabled
+        effective_mode = GenerationMode.POSITIVE
+        fallback_strategy = strategy_factory(
+            operation.schema.client_schema,  # type: ignore[attr-defined]
+            fields=[definition.field_name],
+            custom_scalars=custom_scalars,
+            print_ast=_noop,
+            allow_x00=generation.allow_x00,
+            allow_null=generation.graphql_allow_null,
+            codec=generation.codec,
+            mode=GqlMode.POSITIVE,
+        )
+        fallback_strategy = apply_to_all_dispatchers(operation, hook_context, hooks, fallback_strategy, "body").map(
+            graphql.print_ast
+        )
+        body = draw(fallback_strategy)
 
     path_parameters_ = _generate_parameter(
         ParameterLocation.PATH, path_parameters, draw, operation, hook_context, hooks
@@ -376,15 +403,16 @@ def graphql_cases(
     cookies_ = _generate_parameter(ParameterLocation.COOKIE, cookies, draw, operation, hook_context, hooks)
     query_ = _generate_parameter(ParameterLocation.QUERY, query, draw, operation, hook_context, hooks)
 
+    description = "Positive test case" if effective_mode == GenerationMode.POSITIVE else "Negative test case"
     _phase_data = {
         TestPhase.EXAMPLES: ExamplesPhaseData(
-            description="Positive test case",
+            description=description,
             parameter=None,
             parameter_location=None,
             location=None,
         ),
         TestPhase.FUZZING: FuzzingPhaseData(
-            description="Positive test case",
+            description=description,
             parameter=None,
             parameter_location=None,
             location=None,
@@ -400,11 +428,11 @@ def graphql_cases(
         _meta=CaseMetadata(
             generation=GenerationInfo(
                 time=time.monotonic() - start,
-                mode=generation_mode,
+                mode=effective_mode,
             ),
             phase=PhaseInfo(name=phase, data=phase_data),
             components={
-                kind: ComponentInfo(mode=generation_mode)
+                kind: ComponentInfo(mode=effective_mode)
                 for kind, value in [
                     (ParameterLocation.QUERY, query_),
                     (ParameterLocation.PATH, path_parameters_),

@@ -96,7 +96,7 @@ Generates data that **should be accepted** by your API — valid according to yo
 Generates data that **should be rejected** by your API — deliberately invalid according to your schema.
 
 ```python
-# Schema: {"type": "string", "minLength": 3}  
+# Schema: {"type": "string", "minLength": 3}
 # Negative examples: 42, [], "", "ab"
 ```
 
@@ -104,9 +104,19 @@ Generates data that **should be rejected** by your API — deliberately invalid 
     Schemathesis mutates your schema to produce invalid data.
 
 ```bash
-# Enable negative testing
 schemathesis run --mode=negative https://api.example.com/openapi.json
 ```
+
+### GraphQL Negative Testing
+
+Negative testing works for GraphQL by generating queries with:
+
+- **Wrong types** — Passing a String where an Int is expected
+- **Invalid enum values** — Using values not defined in the enum
+- **Missing required arguments** — Omitting non-nullable arguments
+
+!!! note "Skipped operations"
+    Operations without required arguments are skipped in `--mode=negative` (nothing to invalidate). With `--mode=all`, they fall back to positive testing.
 
 ## Serialization Process
 
