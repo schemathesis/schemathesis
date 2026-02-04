@@ -1,7 +1,10 @@
 def test_basic_pytest_graphql(testdir, graphql_path, graphql_url):
     testdir.make_test(
         f"""
+from schemathesis.generation import GenerationMode
+
 schema = schemathesis.graphql.from_url('{graphql_url}')
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @schema.parametrize()
 @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
@@ -32,8 +35,10 @@ def test_from_wsgi(testdir, graphql_path):
     testdir.make_test(
         f"""
 from test.apps._graphql._flask.app import app
+from schemathesis.generation import GenerationMode
 
 schema = schemathesis.graphql.from_wsgi("{graphql_path}", app=app)
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @schema.parametrize()
 @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])

@@ -14,14 +14,13 @@ import jsonschema_rs
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario, FuzzingPhaseData
 from schemathesis.openapi.checks import (
-    AcceptedNegativeData,
     EnsureResourceAvailability,
     IgnoredAuth,
     JsonSchemaError,

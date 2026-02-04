@@ -1400,7 +1400,7 @@ def test_force_color(cli, schema_url):
 @pytest.mark.parametrize("graphql_path", ["/graphql", "/foo"])
 def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
-    assert cli.run(graphql_url, "--max-examples=5", *args) == snapshot_cli
+    assert cli.run(graphql_url, "--max-examples=5", "--mode=positive", *args) == snapshot_cli
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
@@ -1618,7 +1618,7 @@ def test_wait_for_schema(cli, schema_path, app_factory, app_runner):
     app.run = run_with_delay
     port = app_runner.run_flask_app(app)
     schema_url = f"http://127.0.0.1:{port}/{schema_path}"
-    cli.run_and_assert(schema_url, "--wait-for-schema=1", "--max-examples=1")
+    cli.run_and_assert(schema_url, "--wait-for-schema=1", "--max-examples=1", "--mode=positive")
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
