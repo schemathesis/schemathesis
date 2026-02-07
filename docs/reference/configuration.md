@@ -562,10 +562,17 @@ These settings can only be applied at the project level.
 
     Lists the HTTP methods to use when generating test cases with methods not specified in the API during the **coverage** phase.
     Schemathesis will limit negative testing of unexpected methods to those in the array; if omitted, all HTTP methods not specified in the spec are applied.
+    Set to an empty array to disable unsupported method testing entirely.
+
+    Responses to these requests are validated by the [`unsupported_method`](checks.md#unsupported_method) check.
 
     ```toml
     [phases.coverage]
+    # Only test PATCH as an unsupported method
     unexpected-methods = ["PATCH"]
+
+    # Disable unsupported method testing entirely
+    # unexpected-methods = []
     ```
 
 #### `phases.stateful.max-steps`
