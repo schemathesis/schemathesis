@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Misleading "Schema Error: Cannot generate test data" when `filter_case` hook rejects all generated cases. Now reports "Hook Error" with actionable guidance.
 - Incorrect HTTP method shown in failure headers during coverage phase. [#3322](https://github.com/schemathesis/schemathesis/issues/3322)
 - False positive `negative_data_rejection` failures for `format: password` and other formats without validation semantics. [#3480](https://github.com/schemathesis/schemathesis/issues/3480)
 

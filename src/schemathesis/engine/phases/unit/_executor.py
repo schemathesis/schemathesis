@@ -183,7 +183,9 @@ def run_test(
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.ERROR
-        yield non_fatal_error(build_unsatisfiable_error(operation, with_tip=False))
+        yield non_fatal_error(
+            build_unsatisfiable_error(operation, with_tip=False, filter_tracker=operation.filter_case_tracker)
+        )
     except AuthenticationError as exc:
         status = Status.ERROR
         yield non_fatal_error(exc)

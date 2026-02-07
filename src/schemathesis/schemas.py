@@ -23,6 +23,7 @@ from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
+from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark, _should_skip_hook
 
@@ -622,6 +623,7 @@ class APIOperation(Generic[P, R, S]):
     cookies: ParameterSet[P] = field(default_factory=ParameterSet)
     query: ParameterSet[P] = field(default_factory=ParameterSet)
     body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
+    filter_case_tracker: FilterCaseTracker | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.label is None:
@@ -708,8 +710,19 @@ class APIOperation(Generic[P, R, S]):
             for hook in dispatcher.get_all_by_name("filter_case"):
                 if _should_skip_hook(hook, context):
                     continue
-                hook = partial(hook, context)
-                _strategy = _strategy.filter(hook)
+                bound_hook = partial(hook, context)
+                if self.filter_case_tracker is None:
+                    self.filter_case_tracker = FilterCaseTracker()
+                tracker = self.filter_case_tracker
+
+                def _tracking_filter(
+                    case: Case, _hook: Callable = bound_hook, _tracker: FilterCaseTracker = tracker
+                ) -> bool:
+                    result = _hook(case)
+                    _tracker.record(result)
+                    return result
+
+                _strategy = _strategy.filter(_tracking_filter)
             for hook in dispatcher.get_all_by_name("map_case"):
                 if _should_skip_hook(hook, context):
                     continue
