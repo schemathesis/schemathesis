@@ -65,3 +65,19 @@ def before_init_operation(context, operation):
     )
     # Then it should be reported as a hook error, not a schema error
     assert cli.main("run", schema_url, hooks=module) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_filter_case_rejects_all(ctx, cli, schema_url, snapshot_cli):
+    # When the `filter_case` hook rejects all generated test cases
+    module = ctx.write_pymodule(
+        """
+@schemathesis.hook
+def filter_case(context, case):
+    return False
+"""
+    )
+    # Then it should be reported as a hook error, not a schema error
+    assert cli.main("run", schema_url, "--max-examples=10", hooks=module) == snapshot_cli

@@ -107,6 +107,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE: "Serialization not possible",
             RuntimeErrorKind.AUTHENTICATION_ERROR: "Authentication Error",
             RuntimeErrorKind.HOOK_EXECUTION_ERROR: "Hook Error",
+            RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK: "Hook Error",
         }.get(self._kind, "Runtime Error")
 
     @property
@@ -158,6 +159,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
             RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
+            RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE,
@@ -244,6 +246,7 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
     return {
         RuntimeErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--tls-verify=false`')}.",
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE: "Review all parameters and request body schemas for conflicting constraints.",
+        RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK: "Review your `filter_case` hook to ensure it accepts at least some generated cases.",
         RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Review your endpoint filters to include linked operations",
         RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex follows ECMA 262 (JavaScript) syntax.\n"
         "For guidance, visit: https://json-schema.org/understanding-json-schema/reference/regular_expressions",
@@ -272,6 +275,7 @@ class RuntimeErrorKind(str, enum.Enum):
 
     # Hypothesis issues
     HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
+    HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK = "hypothesis_unsatisfiable_filter_hook"
     HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR = "hypothesis_unsupported_graphql_scalar"
     HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE = "hypothesis_health_check_data_too_large"
     HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH = "hypothesis_health_check_filter_too_much"
@@ -319,6 +323,8 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
     ):
         return RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE
     if isinstance(error, hypothesis.errors.Unsatisfiable):
+        if "filter_case" in str(error):
+            return RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE_FILTER_HOOK
         return RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE
     if isinstance(error, hypothesis.errors.FailedHealthCheck):
         health_check = extract_health_check_error(error)
