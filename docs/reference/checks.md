@@ -216,7 +216,9 @@ Return 405 for methods not listed in the OpenAPI spec
 ```
 
 !!! note "Coverage phase"
-    Triggered during coverage phase scenarios that test undocumented HTTP methods
+    Triggered during coverage phase scenarios that test undocumented HTTP methods.
+    Disabling this check only suppresses failure reporting — requests with unsupported methods are still sent.
+    To stop sending these requests entirely, use [`phases.coverage.unexpected-methods`](configuration.md#phasescoverageunexpected-methods).
 
 ---
 
