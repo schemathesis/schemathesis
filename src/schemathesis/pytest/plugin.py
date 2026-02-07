@@ -405,7 +405,9 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         except Unsatisfiable:
             operation = ApiOperationMark.get(pyfuncitem.obj)
             assert operation is not None
-            raise build_unsatisfiable_error(operation, with_tip=True) from None
+            raise build_unsatisfiable_error(
+                operation, with_tip=True, filter_tracker=operation.filter_case_tracker
+            ) from None
         except SchemaError as exc:
             raise InvalidRegexPattern.from_schema_error(exc, from_examples=False) from exc
 

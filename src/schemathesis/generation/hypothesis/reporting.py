@@ -40,6 +40,35 @@ GENERIC_UNSATISFIABLE_MESSAGE = f"""Cannot generate test data for this operation
 Unable to identify the specific parameter. Common causes:
 {UNSATISFIABILITY_CAUSE}"""
 
+FILTER_CASE_UNSATISFIABLE_MESSAGE = """Your `filter_case` hook rejected all generated test cases
+
+Schemathesis generated test data, but every case was rejected by your hook."""
+
+
+@dataclass
+class FilterCaseTracker:
+    __slots__ = ("total", "rejected")
+
+    total: int
+    rejected: int
+
+    def __init__(self) -> None:
+        self.total = 0
+        self.rejected = 0
+
+    def record(self, accepted: bool) -> None:
+        self.total += 1
+        if not accepted:
+            self.rejected += 1
+
+    @property
+    def has_data(self) -> bool:
+        return self.total > 0
+
+    @property
+    def all_rejected(self) -> bool:
+        return self.has_data and self.rejected == self.total
+
 
 @dataclass
 class UnsatisfiableParameter:
@@ -90,8 +119,17 @@ def find_unsatisfiable_parameter(operation: APIOperation) -> UnsatisfiableParame
     return None
 
 
-def build_unsatisfiable_error(operation: APIOperation, *, with_tip: bool) -> Unsatisfiable:
+def build_unsatisfiable_error(
+    operation: APIOperation, *, with_tip: bool, filter_tracker: FilterCaseTracker | None = None
+) -> Unsatisfiable:
     __tracebackhide__ = True
+
+    if filter_tracker is not None and filter_tracker.all_rejected:
+        message = FILTER_CASE_UNSATISFIABLE_MESSAGE
+        if with_tip:
+            message += "\n\nTip: Review your `filter_case` hook to ensure it accepts at least some generated cases"
+        return Unsatisfiable(message)
+
     unsatisfiable = find_unsatisfiable_parameter(operation)
 
     if unsatisfiable is not None:

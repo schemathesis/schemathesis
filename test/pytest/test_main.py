@@ -844,6 +844,29 @@ def extract_hypothesis_error(text):
     return "\n".join(result_lines)
 
 
+@pytest.mark.operations("success")
+def test_filter_case_rejects_all(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+
+@schema.hook
+def filter_case(context, case):
+    return False
+
+@schema.parametrize()
+@settings(max_examples=10)
+def test(case):
+    pass
+"""
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    output = result.stdout.str()
+    assert "filter_case" in output
+    assert "hook rejected all generated test cases" in output
+
+
 @pytest.mark.operations("unsatisfiable")
 def test_unsatisfiable_schema(testdir, openapi3_schema_url, snapshot):
     testdir.make_test(
