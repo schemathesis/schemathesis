@@ -806,3 +806,61 @@ def test_path_parameters_never_contain_slash():
             assert "/" not in str(value)
 
     test()
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_integer_path_parameter_no_false_positive(ctx, app_runner, cli, snapshot_cli):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/device/audio/sources/{idx}": {
+                "delete": {
+                    "parameters": [
+                        {
+                            "name": "idx",
+                            "in": "path",
+                            "required": True,
+                            "schema": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9,
+                            },
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "Source was deleted correctly"},
+                        "400": {"description": "Source index is not valid"},
+                        "404": {"description": "Source doesn't exist"},
+                    },
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/device/audio/sources/<idx>", methods=["DELETE"])
+    def delete_source(idx):
+        try:
+            idx_int = int(idx)
+        except (ValueError, TypeError):
+            return jsonify({"error": "Source index is not valid"}), 400
+        if not (0 <= idx_int <= 9):
+            return jsonify({"error": "Source index is not valid"}), 400
+        return jsonify({"status": "deleted"}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--phases=coverage",
+            "--max-examples=10",
+            "--suppress-health-check=filter_too_much",
+        )
+        == snapshot_cli
+    )

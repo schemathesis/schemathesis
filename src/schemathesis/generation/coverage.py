@@ -1592,6 +1592,14 @@ def _is_non_integer_float(x: float) -> bool:
     return x != int(x)
 
 
+def _is_not_numeric_string(x: str) -> bool:
+    try:
+        float(x)
+        return False
+    except (ValueError, TypeError):
+        return True
+
+
 def is_valid_header_value(value: Any) -> bool:
     value = str(value)
     if not is_latin_1_encodable(value):
@@ -1682,6 +1690,11 @@ def _negative_type(
         strategies.pop("integer", None)
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
+    # For path/query parameters, numeric strings like "9" serialize identically to integer 9 in the URL,
+    # making them indistinguishable and causing false positive failures
+    if ctx.location in (ParameterLocation.PATH, ParameterLocation.QUERY) and ("integer" in types or "number" in types):
+        if "string" in strategies:
+            strategies["string"] = strategies["string"].filter(_is_not_numeric_string)
     if ctx.location == ParameterLocation.QUERY:
         strategies.pop("object", None)
     # Form-urlencoded property-level mutations with null/array/object serialize to empty

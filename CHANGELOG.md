@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.10.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for integer/number path parameters in the coverage phase.
+
 ## [4.10.0](https://github.com/schemathesis/schemathesis/compare/v4.9.5...v4.10.0) - 2026-02-07
 
 ### :rocket: Added
