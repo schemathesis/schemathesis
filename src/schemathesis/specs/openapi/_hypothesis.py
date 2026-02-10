@@ -208,9 +208,11 @@ def openapi_cases(
                 if body_generator.is_negative:
                     # For negative strategies, unwrap GeneratedValue, apply transformation, then rewrap
                     strategy = strategy.map(
-                        lambda x: GeneratedValue(prepare_urlencoded_form(x.value), x.meta)
-                        if isinstance(x, GeneratedValue)
-                        else prepare_urlencoded_form(x)
+                        lambda x: (
+                            GeneratedValue(prepare_urlencoded_form(x.value), x.meta)
+                            if isinstance(x, GeneratedValue)
+                            else prepare_urlencoded_form(x)
+                        )
                     ).filter(lambda x: is_valid_urlencoded_form(x.value if isinstance(x, GeneratedValue) else x))
                 else:
                     strategy = strategy.map(prepare_urlencoded_form).filter(is_valid_urlencoded_form)

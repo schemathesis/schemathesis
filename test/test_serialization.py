@@ -565,13 +565,15 @@ PRIMITIVE_SCHEMA_STRATEGY = (
     | st.fixed_dictionaries({"type": st.just("boolean")}, optional={"xml": XML_OBJECT_STRATEGY})
 )
 SCHEMA_OBJECT_STRATEGY = st.deferred(
-    lambda: st.fixed_dictionaries(
-        {"type": st.just("object")},
-        optional={
-            "properties": st.dictionaries(SIMPLE_TEXT_STRATEGY, SCHEMA_OBJECT_STRATEGY | PRIMITIVE_SCHEMA_STRATEGY)
-        },
+    lambda: (
+        st.fixed_dictionaries(
+            {"type": st.just("object")},
+            optional={
+                "properties": st.dictionaries(SIMPLE_TEXT_STRATEGY, SCHEMA_OBJECT_STRATEGY | PRIMITIVE_SCHEMA_STRATEGY)
+            },
+        )
+        | st.fixed_dictionaries({"type": st.just("array"), "items": SCHEMA_OBJECT_STRATEGY})
     )
-    | st.fixed_dictionaries({"type": st.just("array"), "items": SCHEMA_OBJECT_STRATEGY})
 )
 
 
