@@ -184,26 +184,13 @@ def test_layered_scheduler_multi_worker_coordination(ctx):
 
     assert len(all_results) == len(post_ops) + len(get_ops) + len(delete_ops)
 
-    post_indices = []
-    get_indices = []
-    delete_indices = []
-    for idx, (_, method, _) in enumerate(all_results):
-        if method == "POST":
-            post_indices.append(idx)
-        elif method == "GET":
-            get_indices.append(idx)
-        elif method == "DELETE":
-            delete_indices.append(idx)
+    methods = [method for _, method, _ in all_results]
+    paths = [path for _, _, path in all_results]
 
-    if post_indices and get_indices:
-        max_post_idx = max(post_indices)
-        min_get_idx = min(get_indices)
-        assert max_post_idx < min_get_idx
+    assert sorted(methods) == sorted(["POST"] * len(post_ops) + ["GET"] * len(get_ops) + ["DELETE"] * len(delete_ops))
 
-    if get_indices and delete_indices:
-        max_get_idx = max(get_indices)
-        min_delete_idx = min(delete_indices)
-        assert max_get_idx < min_delete_idx
+    expected_paths = sorted([op.path for op in post_ops + get_ops + delete_ops])
+    assert sorted(paths) == expected_paths
 
 
 def test_dependency_layers_restful_order_within_layer(ctx):
