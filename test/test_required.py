@@ -84,7 +84,7 @@ def test_without_required(ctx, testdir, version, param):
     testdir.make_test(
         f"""
 @schema.parametrize()
-@settings(max_examples=100, phases=[Phase.generate])
+@settings(max_examples=200, phases=[Phase.generate])
 def test_has_none(request, case):
     # This test should find `NOT_SET` values
     if "{location}" == "body":

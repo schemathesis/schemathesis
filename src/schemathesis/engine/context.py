@@ -35,7 +35,7 @@ class EngineContext:
         "outcome_cache",
         "start_time",
         "observations",
-        "_session",
+        "_thread_local",
         "_transport_kwargs_cache",
         "_extra_data_source",
         "_extra_data_source_lock",
@@ -47,14 +47,13 @@ class EngineContext:
         schema: BaseSchema,
         stop_event: threading.Event,
         observations: Observations | None = None,
-        session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
         self.control = ExecutionControl(stop_event=stop_event, max_failures=schema.config.max_failures)
         self.outcome_cache = {}
         self.start_time = time.monotonic()
         self.observations = observations
-        self._session = session
+        self._thread_local = threading.local()
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
         self._extra_data_source: ExtraDataSource | None = None
         self._extra_data_source_lock = threading.Lock()
@@ -112,8 +111,9 @@ class EngineContext:
         return self.outcome_cache.get(hash(case), NOT_SET)
 
     def get_session(self, *, operation: APIOperation | None = None) -> requests.Session:
-        if self._session is not None:
-            return self._session
+        session = getattr(self._thread_local, "session", None)
+        if session is not None:
+            return session
         import requests
 
         session = requests.Session()
@@ -133,26 +133,27 @@ class EngineContext:
         proxy = config.proxy_for(operation=operation)
         if proxy is not None:
             session.proxies["all"] = proxy
+        self._thread_local.session = session
         return session
 
     def get_transport_kwargs(self, operation: APIOperation | None = None) -> dict[str, Any]:
         key = operation.label if operation is not None else None
         cached = self._transport_kwargs_cache.get(key)
-        if cached is not None:
-            return cached.copy()
-        config = self.config
-        kwargs: dict[str, Any] = {
-            "session": self.get_session(operation=operation),
-            "headers": config.headers_for(operation=operation),
-            "max_redirects": config.max_redirects_for(operation=operation),
-            "timeout": config.request_timeout_for(operation=operation),
-            "verify": config.tls_verify_for(operation=operation),
-            "cert": config.request_cert_for(operation=operation),
-        }
-        proxy = config.proxy_for(operation=operation)
-        if proxy is not None:
-            kwargs["proxies"] = {"all": proxy}
-        self._transport_kwargs_cache[key] = kwargs
+        if cached is None:
+            config = self.config
+            cached = {
+                "headers": config.headers_for(operation=operation),
+                "max_redirects": config.max_redirects_for(operation=operation),
+                "timeout": config.request_timeout_for(operation=operation),
+                "verify": config.tls_verify_for(operation=operation),
+                "cert": config.request_cert_for(operation=operation),
+            }
+            proxy = config.proxy_for(operation=operation)
+            if proxy is not None:
+                cached["proxies"] = {"all": proxy}
+            self._transport_kwargs_cache[key] = cached
+        kwargs = cached.copy()
+        kwargs["session"] = self.get_session(operation=operation)
         return kwargs
 
     @property
