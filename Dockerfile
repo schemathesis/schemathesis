@@ -28,7 +28,8 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
 
 WORKDIR /tmp/Python-${PYTHON_VERSION}
 
-# Flags match docker-library/python official images
+# PGO (--enable-optimizations) disabled: hangs on Alpine/musl in test_datetime
+# Still optimized with: -O2, LTO, stripped binaries
 RUN CFLAGS="-O2 -fno-omit-frame-pointer" \
     CXXFLAGS="-O2 -fno-omit-frame-pointer" \
     LDFLAGS="-Wl,--strip-all" \
@@ -36,7 +37,6 @@ RUN CFLAGS="-O2 -fno-omit-frame-pointer" \
         --prefix=/opt/python \
         --enable-shared \
         --with-lto \
-        --enable-optimizations \
         --disable-gil \
         --disable-test-modules \
         --with-system-ffi \
