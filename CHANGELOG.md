@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.10.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- Connection failures when using multiple workers on free-threaded Python due to shared `requests.Session` across threads. [#3507](https://github.com/schemathesis/schemathesis/issues/3507)
+
 ## [4.10.1](https://github.com/schemathesis/schemathesis/compare/v4.10.0...v4.10.1) - 2026-02-10
 
 ### :bug: Fixed
