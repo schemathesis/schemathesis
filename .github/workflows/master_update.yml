@@ -51,3 +51,5 @@ jobs:
           tags: |
             schemathesis/schemathesis:${{ matrix.tag }}
             ghcr.io/schemathesis/schemathesis:${{ matrix.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
