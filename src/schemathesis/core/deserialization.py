@@ -216,3 +216,71 @@ def _deserialize_json(_ctx: DeserializationContext, response: Response) -> Any:
 def _deserialize_yaml(_ctx: DeserializationContext, response: Response) -> Any:
     encoding = response.encoding or "utf-8"
     return deserialize_yaml(response.content.decode(encoding))
+
+
+def _flush_sse_event(
+    events: list[dict[str, Any]],
+    current_event: dict[str, Any],
+    current_data_lines: list[str],
+    *,
+    last_event_id: str | None,
+) -> None:
+    if not current_data_lines:
+        return
+    event = dict(current_event)
+    event["data"] = "\n".join(current_data_lines)
+    event.setdefault("event", "message")
+    if "id" not in event and last_event_id is not None:
+        event["id"] = last_event_id
+    events.append(event)
+
+
+def _parse_sse_events(content: bytes, encoding: str = "utf-8") -> list[dict[str, Any]]:
+    """Parse SSE event stream into a list of event objects."""
+    text = content.decode(encoding)
+    # Some servers include a UTF-8 BOM in the first chunk; strip it to avoid corrupting the first field name.
+    text = text.removeprefix("\ufeff")
+    # Normalize line endings: \r\n -> \n, then lone \r -> \n
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    events: list[dict[str, Any]] = []
+    current_event: dict[str, Any] = {}
+    current_data_lines: list[str] = []
+    last_event_id: str | None = None
+
+    for line in text.split("\n"):
+        if line == "":
+            if current_data_lines or current_event:
+                _flush_sse_event(events, current_event, current_data_lines, last_event_id=last_event_id)
+                current_event = {}
+                current_data_lines = []
+        elif line.startswith(":"):
+            continue
+        else:
+            if ":" in line:
+                field, _, value = line.partition(":")
+                # Per SSE spec, strip a single leading space from the value
+                value = value.removeprefix(" ")
+            else:
+                # Line with no colon: field name is the entire line, value is empty
+                field = line
+                value = ""
+            if field == "data":
+                current_data_lines.append(value)
+            elif field == "retry":
+                current_event[field] = value
+            elif field == "event":
+                current_event[field] = value
+            elif field == "id":
+                current_event[field] = value
+                last_event_id = value
+
+    if current_data_lines or current_event:
+        _flush_sse_event(events, current_event, current_data_lines, last_event_id=last_event_id)
+
+    return events
+
+
+@deserializer("text/event-stream")
+def _deserialize_sse(_ctx: DeserializationContext, response: Response) -> list[dict[str, Any]]:
+    # SSE streams are always UTF-8 per spec, regardless of transport-level default encoding heuristics.
+    return _parse_sse_events(response.content, "utf-8")

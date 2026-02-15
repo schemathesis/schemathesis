@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.10.2...HEAD) - TBD
 
+### :rocket: Added
+
+- Server-Sent Events (`text/event-stream`) response validation using `itemSchema` from OpenAPI 3.2. [#3064](https://github.com/schemathesis/schemathesis/issues/3064)
+
 ## [4.10.2](https://github.com/schemathesis/schemathesis/compare/v4.10.1...v4.10.2) - 2026-02-15
 
 ### :bug: Fixed

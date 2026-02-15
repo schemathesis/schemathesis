@@ -288,11 +288,16 @@ def extract_response_schema_v3(
 
 
 def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | None:
-    options = iter(response.get("content", {}).values())
-    media_type = next(options, None)
-    # "schema" is an optional key in the `MediaType` object
-    if media_type is not None:
-        return media_type.get("schema")
+    content = response.get("content", {})
+    options = iter(content.items())
+    entry = next(options, None)
+    if entry is not None:
+        media_type_key, media_type_object = entry
+        # OpenAPI 3.2: "itemSchema" takes priority for text/event-stream
+        if _is_sse_media_type(media_type_key):
+            item_schema = media_type_object.get("itemSchema")
+            return item_schema if item_schema is not None else media_type_object.get("schema")
+        return media_type_object.get("schema")
     return None
 
 
@@ -392,11 +397,23 @@ def extract_schema_for_media_type_v3(
     if not isinstance(media_type_object, dict):
         return None
 
-    schema = media_type_object.get("schema")
+    # OpenAPI 3.2: use itemSchema for text/event-stream
+    if _is_sse_media_type(media_type):
+        item_schema = media_type_object.get("itemSchema")
+        schema = item_schema if item_schema is not None else media_type_object.get("schema")
+    else:
+        schema = media_type_object.get("schema")
     if schema is None:
         return None
 
     return prepare_response_media_type_schema(schema, resolver, scope, nullable_keyword)
+
+
+def _is_sse_media_type(value: str) -> bool:
+    try:
+        return media_types.is_sse(value)
+    except MalformedMediaType:
+        return False
 
 
 def _bundle_in_scope(schema: JsonSchema, resolver: RefResolver, scope: str) -> Bundle:

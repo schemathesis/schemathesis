@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
@@ -14,10 +13,11 @@ import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
+    MalformedMediaType,
     SCHEMA_ERROR_SUGGESTION,
     InfiniteRecursiveReference,
     InvalidSchema,
@@ -41,6 +41,7 @@ from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, Open
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity, OpenApiSecurityParameters
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
+from schemathesis.specs.openapi.content_keywords import make_sse_content_validator
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -667,18 +668,67 @@ class OpenApiSchema(BaseSchema):
             _maybe_raise_one_or_more(failures)
             return None
 
-        try:
-            validator.validate(data)
-        except jsonschema_rs.ValidationError as exc:
-            failures.append(
-                JsonSchemaError.from_exception(
-                    operation=operation.label,
-                    exc=exc,
-                    root_schema=resolved.schema,
-                    config=operation.schema.config.output,
-                    name_to_uri=resolved.name_to_uri,
+        if media_types.is_sse(content_type):
+            def deserialize_embedded_payload(content_media_type: str, payload: str) -> Any:
+                embedded_response = Response(
+                    status_code=response.status_code,
+                    headers={"content-type": [content_media_type]},
+                    content=payload.encode("utf-8"),
+                    request=response.request,
+                    elapsed=response.elapsed,
+                    verify=response.verify,
+                    message=response.message,
+                    http_version=response.http_version,
+                    encoding="utf-8",
                 )
-            )
+                return deserialization.deserialize_response(embedded_response, content_media_type, context=context)
+
+            try:
+                sse_validator = make_sse_content_validator(
+                    resolved.schema, self.adapter, deserialize_payload=deserialize_embedded_payload
+                )
+            except jsonschema_rs.ValidationError as exc:
+                raise InvalidSchema.from_jsonschema_error(
+                    exc,
+                    path=operation.path,
+                    method=operation.method,
+                    config=self.config.output,
+                    location=SchemaLocation.response_schema(self.specification.version),
+                ) from exc
+            except (MalformedMediaType, ValueError) as exc:
+                raise InvalidSchema(
+                    f"Invalid response schema for SSE content validation:\n\n  {exc}",
+                    path=operation.path,
+                    method=operation.method,
+                ) from exc
+            for idx, event_data in enumerate(data):
+                try:
+                    sse_validator.validate(event_data)
+                except jsonschema_rs.ValidationError as exc:
+                    failures.append(
+                        JsonSchemaError.from_exception(
+                            title=f"SSE event #{idx} violates schema",
+                            operation=operation.label,
+                            exc=exc,
+                            root_schema=resolved.schema,
+                            config=operation.schema.config.output,
+                            name_to_uri=resolved.name_to_uri,
+                        )
+                    )
+                    break
+        else:
+            try:
+                validator.validate(data)
+            except jsonschema_rs.ValidationError as exc:
+                failures.append(
+                    JsonSchemaError.from_exception(
+                        operation=operation.label,
+                        exc=exc,
+                        root_schema=resolved.schema,
+                        config=operation.schema.config.output,
+                        name_to_uri=resolved.name_to_uri,
+                    )
+                )
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 
