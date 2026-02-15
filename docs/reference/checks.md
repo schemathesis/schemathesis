@@ -147,6 +147,18 @@ Validates the response body against its JSON Schema definition. Catches format m
 
 Errors are deduplicated per schema path. Use `[output]` configuration options to expand or truncate large payloads in failure messages.
 
+#### Server-Sent Events
+
+For `text/event-stream` responses, Schemathesis validates each event individually against the `itemSchema` defined in the OpenAPI 3.2 response. Each failure is prefixed with its event index:
+
+```text
+- SSE event payload violates content schema
+
+  Event #1: "not_an_integer" is not of type "integer"
+```
+
+When `itemSchema` properties use `contentMediaType` and `contentSchema`, the embedded payload is deserialized and validated against the nested schema. For example, a `data` field with `contentMediaType: application/json` and `contentSchema: {type: object}` causes Schemathesis to parse the JSON payload and validate it — not just treat it as a raw string.
+
 ---
 
 ## Input handling

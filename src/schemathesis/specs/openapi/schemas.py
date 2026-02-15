@@ -21,6 +21,7 @@ from schemathesis.core.errors import (
     SCHEMA_ERROR_SUGGESTION,
     InfiniteRecursiveReference,
     InvalidSchema,
+    MalformedMediaType,
     OperationNotFound,
     SchemaLocation,
 )
@@ -41,6 +42,7 @@ from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, Open
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity, OpenApiSecurityParameters
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
+from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
 
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
@@ -621,8 +623,16 @@ class OpenApiSchema(BaseSchema):
         if resolved.schema is None:
             return None
 
+        sse_validator = None
+        validator = None
         try:
-            validator = definition.get_validator_for_schema(resolved.media_type, resolved.schema)
+            sse_validator = definition.get_sse_validator(resolved.media_type, resolved.schema)
+        except (MalformedMediaType, ValueError) as exc:
+            raise InvalidSchema(
+                f"Invalid response schema for SSE content validation:\n\n  {exc}",
+                path=operation.path,
+                method=operation.method,
+            ) from exc
         except jsonschema_rs.ValidationError as exc:
             raise InvalidSchema.from_jsonschema_error(
                 exc,
@@ -631,8 +641,19 @@ class OpenApiSchema(BaseSchema):
                 config=self.config.output,
                 location=SchemaLocation.response_schema(self.specification.version),
             ) from exc
-        if validator is None:
-            return None
+        if sse_validator is None:
+            try:
+                validator = definition.get_validator(resolved.media_type, resolved.schema)
+            except jsonschema_rs.ValidationError as exc:
+                raise InvalidSchema.from_jsonschema_error(
+                    exc,
+                    path=operation.path,
+                    method=operation.method,
+                    config=self.config.output,
+                    location=SchemaLocation.response_schema(self.specification.version),
+                ) from exc
+            if validator is None:
+                return None
 
         if resolved_content_type is None:
             formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_media_types]
@@ -667,18 +688,62 @@ class OpenApiSchema(BaseSchema):
             _maybe_raise_one_or_more(failures)
             return None
 
-        try:
-            validator.validate(data)
-        except jsonschema_rs.ValidationError as exc:
-            failures.append(
-                JsonSchemaError.from_exception(
-                    operation=operation.label,
-                    exc=exc,
-                    root_schema=resolved.schema,
-                    config=operation.schema.config.output,
-                    name_to_uri=resolved.name_to_uri,
+        if sse_validator is not None:
+
+            def deserialize_embedded_payload(content_media_type: str, payload: str) -> Any:
+                embedded_response = Response(
+                    status_code=response.status_code,
+                    headers={"content-type": [content_media_type]},
+                    content=payload.encode("utf-8"),
+                    request=response.request,
+                    elapsed=response.elapsed,
+                    verify=response.verify,
+                    message=response.message,
+                    http_version=response.http_version,
+                    encoding="utf-8",
                 )
-            )
+                return deserialization.deserialize_response(embedded_response, content_media_type, context=context)
+
+            with sse_validator.with_deserializer(deserialize_embedded_payload):
+                for idx, event_data in enumerate(data):
+                    try:
+                        sse_validator.validate(event_data)
+                    except jsonschema_rs.ValidationError as exc:
+                        cause = exc.__cause__
+                        if isinstance(cause, ContentSchemaViolation):
+                            failure = JsonSchemaError.from_exception(
+                                title="SSE event payload violates content schema",
+                                operation=operation.label,
+                                exc=cause.original,
+                                root_schema=cause.content_schema,
+                                config=operation.schema.config.output,
+                                name_to_uri=resolved.name_to_uri,
+                            )
+                        else:
+                            failure = JsonSchemaError.from_exception(
+                                title="SSE event violates schema",
+                                operation=operation.label,
+                                exc=exc,
+                                root_schema=resolved.schema,
+                                config=operation.schema.config.output,
+                                name_to_uri=resolved.name_to_uri,
+                            )
+                        failure.message = f"Event #{idx}: {failure.message}"
+                        if failure not in failures:
+                            failures.append(failure)
+        elif validator is not None:
+            try:
+                validator.validate(data)
+            except jsonschema_rs.ValidationError as exc:
+                failures.append(
+                    JsonSchemaError.from_exception(
+                        operation=operation.label,
+                        exc=exc,
+                        root_schema=resolved.schema,
+                        config=operation.schema.config.output,
+                        name_to_uri=resolved.name_to_uri,
+                    )
+                )
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 

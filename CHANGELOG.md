@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.10.2...HEAD) - TBD
 
+### :rocket: Added
+
+- Server-Sent Events (`text/event-stream`) response validation. [#3064](https://github.com/schemathesis/schemathesis/issues/3064)
+
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for `application/xml` bodies in the coverage phase due to type mutations producing wire-identical bytes. [#3525](https://github.com/schemathesis/schemathesis/issues/3525)
