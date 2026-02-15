@@ -1,0 +1,100 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+___________________________________ GET /sse ___________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- SSE event violates schema
+
+    Event #0: {"data":"{\"value\": \"wrong\"}","event":"update"} is not valid under any of the schemas listed in the 'oneOf' keyword
+
+    Schema:
+
+        {
+            "oneOf": [
+                {
+                    "properties": {
+                        "data": {
+                            "contentMediaType": "application/json",
+                            "contentSchema": {
+                                "properties": {
+                                    "value": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "value"
+                                ],
+                                "type": "object"
+                            }
+                        },
+                        "event": {
+            // Output truncated...
+        }
+
+    Value:
+
+        {
+            "data": "{\"value\": \"wrong\"}",
+            "event": "update"
+        }
+
+[200] OK:
+
+    `event: update
+    data: {"value": "wrong"}
+    `
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ SSE event violates schema: 1
+
+Test cases:
+  N generated, N found N unique failures, N skipped
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================
