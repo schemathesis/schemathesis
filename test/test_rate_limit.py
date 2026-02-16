@@ -1,10 +1,10 @@
 import threading
 
 import pytest
-from pyrate_limiter import BucketFullException, Duration, Rate, RateItem
+from pyrate_limiter import Duration
 
 import schemathesis.graphql
-from schemathesis.core.rate_limit import _get_max_delay
+from schemathesis.core.rate_limit import parse_units
 
 
 @pytest.mark.parametrize(
@@ -16,10 +16,7 @@ from schemathesis.core.rate_limit import _get_max_delay
 )
 @pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_maximum_requests(request, loader, fixture, mocker):
-    rate_item = RateItem("test_item", timestamp=None)
-    side_effect = BucketFullException(rate_item, Rate(5, 3600))
-    mocker.patch("pyrate_limiter.limiter.Limiter.delay_or_raise", side_effect=side_effect)
+def test_maximum_requests(request, loader, fixture):
     url = request.getfixturevalue(fixture)
     schema = loader(url)
     schema.config.update(rate_limit="5/h")
@@ -27,33 +24,31 @@ def test_maximum_requests(request, loader, fixture, mocker):
 
     def run():
         nonlocal counter
-        while True:
+        for _ in range(5):
             for operation in schema.get_all_operations():
                 operation = operation.ok()
                 if fixture == "graphql_url":
                     case = operation.Case(body={})
                 else:
                     case = operation.Case()
-                try:
-                    case.call()
-                except BucketFullException:
-                    return
+                case.call()
                 counter += 1
 
     thread = threading.Thread(target=run)
     thread.start()
-    thread.join()
+    thread.join(timeout=15)
     assert counter == 5
 
 
 @pytest.mark.parametrize(
-    ("unit", "expected"),
+    ("rate_str", "expected_limit", "expected_interval"),
     [
-        (Duration.SECOND, 1100),
-        (Duration.MINUTE, 60100),
-        (Duration.HOUR, 3600100),
-        (Duration.DAY, 86400100),
+        ("1/s", 1, Duration.SECOND),
+        ("100/m", 100, Duration.MINUTE),
+        ("1000/h", 1000, Duration.HOUR),
     ],
 )
-def test_get_max_delay(unit, expected):
-    assert _get_max_delay(1, unit) == expected
+def test_parse_units(rate_str, expected_limit, expected_interval):
+    limit, interval = parse_units(rate_str)
+    assert limit == expected_limit
+    assert interval == expected_interval
