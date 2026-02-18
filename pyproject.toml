@@ -33,7 +33,6 @@ classifiers = [
 ]
 dependencies = [
   "click>=8.0,<9",
-  "colorama>=0.4,<1.0",
   "harfile>=0.4.0,<1.0",
   "httpx>=0.22.0,<1.0",
   "hypothesis>=6.108.0,<7",
