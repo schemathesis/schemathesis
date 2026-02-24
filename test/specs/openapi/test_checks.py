@@ -11,6 +11,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
+    CoveragePhaseData,
     CoverageScenario,
     FuzzingPhaseData,
     GenerationInfo,
@@ -22,6 +23,7 @@ from schemathesis.specs.openapi.checks import (
     _body_negation_becomes_valid_after_serialization,
     _is_prefix_operation,
     has_only_additional_properties_in_non_body_parameters,
+    missing_required_header,
     negative_data_rejection,
     positive_data_acceptance,
     response_schema_conformance,
@@ -467,6 +469,37 @@ def verify_missing_required_header(cassette_path, header, expected_status):
     assert missing_header_check["status"] == expected_status
 
 
+@pytest.mark.operations("basic")
+def test_missing_required_header_default_accepts_401(ctx, cli, openapi3_base_url, tmp_path):
+    # Non-Authorization required headers may be rejected with 401 by auth-first middleware.
+    cassette_path = tmp_path / "missing_token_header.yaml"
+
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/basic": {
+                "get": {
+                    "parameters": [
+                        {"name": "X-API-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    cli.run(
+        str(schema_path),
+        f"--url={openapi3_base_url}",
+        f"--report-vcr-path={cassette_path}",
+        "--phases=coverage",
+        "--mode=negative",
+        "--checks=missing_required_header",
+        "--max-examples=1",
+    )
+
+    verify_missing_required_header(cassette_path, "X-API-Token", "SUCCESS")
+
+
 @pytest.mark.operations("success")
 def test_missing_required_accept_header(ctx, cli, openapi3_base_url, tmp_path):
     cassette_path = tmp_path / "missing_accept_header.yaml"
@@ -524,6 +557,64 @@ def test_missing_required_authorization_if_provided_explicitly(cli, openapi3_sch
     )
 
     verify_missing_required_header(cassette_path, "Authorization", "SUCCESS")
+
+
+@pytest.mark.parametrize(
+    ("status_code", "should_raise"),
+    [
+        (400, False),
+        (401, False),
+        (403, False),
+        (406, False),
+        (422, False),
+        (200, True),
+        (500, True),
+    ],
+)
+def test_missing_required_header_default_statuses(ctx, response_factory, status_code, should_raise):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {"name": "X-API-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["GET"]
+    response = response_factory.requests(status_code=status_code)
+    case = operation.Case(
+        _meta=CaseMetadata(
+            generation=GenerationInfo(time=0.1, mode=GenerationMode.NEGATIVE),
+            components={},
+            phase=PhaseInfo(
+                name=TestPhase.COVERAGE,
+                data=CoveragePhaseData(
+                    scenario=CoverageScenario.MISSING_PARAMETER,
+                    description="Missing `X-API-Token` at header",
+                    location="header",
+                    parameter="X-API-Token",
+                    parameter_location=ParameterLocation.HEADER,
+                ),
+            ),
+        ),
+    )
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+    )
+    if should_raise:
+        with pytest.raises(Failure):
+            missing_required_header(check_ctx, response, case)
+    else:
+        assert missing_required_header(check_ctx, response, case) is None
 
 
 @pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])
