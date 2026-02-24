@@ -10,6 +10,7 @@
 
 - Avoid extra transitive dependencies from `jsonschema`.
 - Remove `colorama` from dependencies.
+- Support for `pyrate-limiter>=4.0`.
 
 ## [4.10.2](https://github.com/schemathesis/schemathesis/compare/v4.10.1...v4.10.2) - 2026-02-15
 
