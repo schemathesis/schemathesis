@@ -190,12 +190,14 @@ By default, `expected-statuses` includes `401/403/404/409/5xx` to account for au
 
 ### `missing_required_header`
 
-Verifies the API rejects requests when required headers are missing. The API should respond with `406 Not Acceptable` (or `401 Unauthorized` for `Authorization` headers).
+Verifies the API rejects requests when required headers are missing.
+
+By default, non-`Authorization` headers are considered correctly rejected with `400`, `401`, `403`, `406`, or `422`. `Authorization` is stricter and expects `401 Unauthorized`.
 
 ```text
 - Missing header not rejected
 
-Got 200 when missing required 'X-API-Key' header, expected 406
+Got 200 when missing required 'X-API-Key' header, expected 400, 401, 403, 406, 422
 ```
 
 !!! note "Coverage phase"
