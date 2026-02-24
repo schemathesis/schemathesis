@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.10.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- Coverage phase generating schema-invalid positive values for schemas with `anyOf`/`oneOf` and `required` constraints. [#3520](https://github.com/schemathesis/schemathesis/issues/3520)
+
 ### :wrench: Changed
 
 - Avoid extra transitive dependencies from `jsonschema`.

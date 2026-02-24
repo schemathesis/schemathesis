@@ -509,6 +509,44 @@ class HashSet:
         self._data.clear()
 
 
+_COMBINATOR_KEYS = frozenset({"anyOf", "oneOf", "allOf", "not", "if", "then", "else"})
+
+
+def _with_effective_required(schema: JsonSchemaObject) -> JsonSchemaObject:
+    existing_required: list[str] = schema.get("required", [])
+    properties = schema.get("properties", {})
+    if not properties:
+        return schema
+    for key in ("anyOf", "oneOf"):
+        sub_schemas = schema.get(key)
+        if sub_schemas:
+            for sub_schema in sub_schemas:
+                if isinstance(sub_schema, dict) and "required" in sub_schema:
+                    extra = [f for f in sub_schema["required"] if f not in existing_required and f in properties]
+                    if extra:
+                        return {**schema, "required": list(existing_required) + extra}
+                    break
+    return schema
+
+
+def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> JsonSchema:
+    if not isinstance(sub, dict):
+        return sub
+    result: dict[str, Any] = {
+        k: (deepclone(v) if k == "properties" else v) for k, v in parent.items() if k not in _COMBINATOR_KEYS
+    }
+    for key, value in sub.items():
+        if key == "required" and "required" in result:
+            parent_req: list[str] = result["required"] if isinstance(result["required"], list) else [result["required"]]
+            sub_req: list[str] = value if isinstance(value, list) else [value]
+            result["required"] = list(dict.fromkeys(parent_req + sub_req))
+        elif key == "properties" and "properties" in result:
+            result["properties"] = {**result["properties"], **value}
+        else:
+            result[key] = value
+    return result
+
+
 def _cover_positive_for_type(
     ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -528,7 +566,7 @@ def _cover_positive_for_type(
             sub_schemas = schema.get(key)
             if sub_schemas is not None:
                 for sub_schema in sub_schemas:
-                    yield from cover_schema_iter(ctx, sub_schema)
+                    yield from cover_schema_iter(ctx, _merge_with_parent_context(schema, sub_schema))
         all_of = schema.get("allOf")
         if all_of is not None:
             if len(all_of) == 1:
@@ -558,9 +596,9 @@ def _cover_positive_for_type(
             elif ty == "array":
                 yield from _positive_array(ctx, schema, cast(list, template))
             elif ty == "object":
-                yield from _positive_object(ctx, schema, cast(dict, template))
+                yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
         elif "properties" in schema or "required" in schema:
-            yield from _positive_object(ctx, schema, cast(dict, template))
+            yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
         elif "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode
