@@ -1973,3 +1973,113 @@ def test_negative_binary_string_type_violation(ctx_factory):
     ]
     assert len(non_string_values) > 0, "Should generate non-string type violations for binary format"
     assert_not_conform(covered, schema)
+
+
+def test_anyof_with_required_constraints(pctx):
+    # See GH-3520
+    schema = {
+        "type": "object",
+        "anyOf": [
+            {"required": ["name"]},
+            {"required": ["id"]},
+        ],
+        "properties": {
+            "type": {"type": "string"},
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+        },
+    }
+    covered = cover_schema(pctx, schema)
+    assert covered == [
+        {"type": "", "id": "", "name": ""},
+        {"id": "", "name": ""},
+        {"type": "", "name": ""},
+        {"name": ""},
+        {"type": "", "id": "", "name": ""},
+        {"id": "", "name": ""},
+        {"type": "", "id": ""},
+        {"id": ""},
+        {"id": "", "name": "", "type": ""},
+        {"id": "", "name": ""},
+        {"name": "", "type": ""},
+        {"name": ""},
+    ]
+    assert_conform(covered, schema)
+
+
+def test_merge_with_parent_context_bool_subschema(pctx):
+    schema = {
+        "type": "object",
+        "anyOf": [
+            True,
+            {"required": ["name"]},
+        ],
+        "properties": {
+            "name": {"type": "string"},
+        },
+    }
+    covered = cover_schema(pctx, schema)
+    object_values = [v for v in covered if isinstance(v, dict)]
+    assert len(object_values) > 0
+    assert_conform(object_values, schema)
+
+
+def test_merge_with_parent_context_merges_required_lists(pctx):
+    # Parent has `required` AND sub has `required` - the two lists get merged
+    schema = {
+        "type": "object",
+        "required": ["type"],
+        "anyOf": [
+            {"required": ["name"]},
+        ],
+        "properties": {
+            "type": {"type": "string"},
+            "name": {"type": "string"},
+        },
+    }
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+    # The merged sub inherits "type" from parent and adds "name" from sub
+    assert all("type" in v and "name" in v for v in covered if isinstance(v, dict))
+
+
+def test_merge_with_parent_context_merges_properties_dicts(pctx):
+    # Parent has `properties` AND sub has `properties` - they get merged.
+    schema = {
+        "type": "object",
+        "properties": {
+            "type": {"type": "string"},
+            "name": {"type": "string"},
+        },
+        "anyOf": [
+            {
+                "properties": {"id": {"type": "integer"}},
+                "required": ["name"],
+            },
+        ],
+    }
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+    # The merged sub has access to parent's properties + sub's "id" property
+    assert any("id" in v for v in covered if isinstance(v, dict))
+
+
+def test_with_effective_required_break_when_no_extra_fields(pctx):
+    # break fires when the first dict sub-schema with `required` contributes no extra fields
+    # because all its required fields are already in the parent's required list
+    schema = {
+        "type": "object",
+        "required": ["name"],
+        "anyOf": [
+            {"required": ["name"]},  # "name" already required by parent -> extra=[] -> break
+            {"required": ["id"]},  # never reached due to break above
+        ],
+        "properties": {
+            "name": {"type": "string"},
+            "id": {"type": "string"},
+        },
+    }
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+    # All positive values must include "name" (always required by parent)
+    assert all("name" in v for v in covered if isinstance(v, dict))
