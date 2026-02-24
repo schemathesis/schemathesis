@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - Coverage phase generating schema-invalid positive values for schemas with `anyOf`/`oneOf` and `required` constraints. [#3520](https://github.com/schemathesis/schemathesis/issues/3520)
+- `missing_required_header` now accepts `400`, `401`, `403`, and `422` (in addition to `406`) for missing non-`Authorization` required headers. [#3521](https://github.com/schemathesis/schemathesis/issues/3521)
 
 ### :wrench: Changed
 
