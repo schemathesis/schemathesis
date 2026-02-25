@@ -9,7 +9,6 @@ from unittest import SkipTest
 
 import pytest
 from hypothesis.core import HypothesisHandle
-from pytest_subtests import SubTests
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
@@ -259,15 +258,15 @@ class LazySchema:
                     fail_on_no_matches(node_id)
                 request.session.testscollected += len(tests)
                 suspend_capture_ctx = _get_capturemanager(request)
-                subtests = SubTests(request.node.ihook, suspend_capture_ctx, request)
+                subtests = pytest.Subtests(request.node.ihook, suspend_capture_ctx, request, _ispytest=True)
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
-                        subtests.item._nodeid = f"{node_id}[{operation.method.upper()} {operation.path}]"
+                        request.node._nodeid = f"{node_id}[{operation.method.upper()} {operation.path}]"
                         run_subtest(operation, fixtures, sub_test, subtests)
                     else:
-                        _schema_error(subtests, result.err(), node_id)
-                subtests.item._nodeid = node_id
+                        _schema_error(subtests, result.err(), node_id, request.node)
+                request.node._nodeid = node_id
 
             sig = signature(test_func)
             if "self" in sig.parameters:
@@ -310,7 +309,9 @@ def _get_capturemanager(request: FixtureRequest) -> Generator | type[nullcontext
     return nullcontext
 
 
-def run_subtest(operation: APIOperation, fixtures: dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
+def run_subtest(
+    operation: APIOperation, fixtures: dict[str, Any], sub_test: Callable, subtests: pytest.Subtests
+) -> None:
     """Run the given subtest with pytest fixtures."""
     __tracebackhide__ = True
 
@@ -324,13 +325,14 @@ def run_subtest(operation: APIOperation, fixtures: dict[str, Any], sub_test: Cal
 SEPARATOR = "\n===================="
 
 
-def _schema_error(subtests: SubTests, error: InvalidSchema, node_id: str) -> None:
+def _schema_error(subtests: pytest.Subtests, error: InvalidSchema, node_id: str, node: pytest.Function) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
-    kwargs = {"path": error.path}
+    kwargs: dict[str, Any] = {}
     if error.method:
         kwargs["method"] = error.method.upper()
-    subtests.item._nodeid = _get_partial_node_name(node_id, **kwargs)
+    kwargs["path"] = error.path
+    node._nodeid = _get_partial_node_name(node_id, **kwargs)
     __tracebackhide__ = True
     with subtests.test(**kwargs):
         sub_test()

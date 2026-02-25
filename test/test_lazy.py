@@ -877,7 +877,7 @@ def test_api(case):
     result = testdir.runpytest("-v")
 
     # Then `POST /users` should be excluded, only `GET /users` and `GET /products` should be tested
-    # With pytest-subtests, the main test passes once, with 2 subtests (not 3)
+    # With pytest subtests, the main test passes once, with 2 subtests (not 3)
     result.assert_outcomes(passed=1)
 
     assert "POST /users" not in result.stdout.str()

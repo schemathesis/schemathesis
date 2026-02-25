@@ -10,10 +10,10 @@ import pytest
 from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
+from _pytest.subtests import SubtestReport
 from hypothesis.errors import FailedHealthCheck, InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 from pluggy import Result as PluggyResult
-from pytest_subtests.plugin import SubTestReport
 
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
@@ -271,7 +271,7 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
 
 @hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    if isinstance(report, SubTestReport) and report.passed:
+    if isinstance(report, SubtestReport) and report.passed:
         report._schemathesis_ignore_in_summary = True
 
 
@@ -292,21 +292,17 @@ def pytest_report_teststatus(
 ) -> Generator[None, None, None]:
     outcome = yield
     result = cast(PluggyResult[tuple[str, str, str] | None], outcome)
-    if not isinstance(report, SubTestReport):
+    if not isinstance(report, SubtestReport):
         return
 
-    description = report.sub_test_description()
-    shortletter = getattr(config.option, "no_subtests_shortletter", False)
+    description = report._sub_test_description()
 
     if report.passed:
-        short = "" if shortletter else ","
-        result.force_result(("passed", short, f"{description} SUBPASS"))
+        result.force_result(("passed", ",", f"{description} SUBPASS"))
     elif report.skipped:
-        short = "" if shortletter else "-"
-        result.force_result(("skipped", short, f"{description} SUBSKIP"))
+        result.force_result(("skipped", "-", f"{description} SUBSKIP"))
     elif report.outcome == "failed":
-        short = "" if shortletter else "u"
-        result.force_result(("failed", short, f"{description} SUBFAIL"))
+        result.force_result(("failed", "u", f"{description} SUBFAIL"))
 
 
 @pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
