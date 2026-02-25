@@ -8,6 +8,7 @@ import jsonschema_rs
 import pytest
 from flask import Flask, jsonify, request
 from hypothesis import Phase, settings
+from hypothesis import strategies as st
 from requests import Request
 from requests.models import RequestEncodingMixin
 
@@ -3061,3 +3062,34 @@ def test_missing_content_type_header(ctx):
     assert "Content-Type" not in request.headers, (
         f"Missing Content-Type test should not have Content-Type header, got: {dict(request.headers)}"
     )
+
+
+def test_path_parameter_with_slash_in_custom_format(ctx):
+    # See GH-3527
+    schemathesis.openapi.format("ipv4-network", st.sampled_from(["0.0.0.0/0"]))
+    schema = build_schema(
+        ctx,
+        path="/blocks/{block}",
+        method="get",
+        parameters=[
+            {
+                "name": "block",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string", "format": "ipv4-network"},
+            }
+        ],
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/blocks/{block}"]["get"]
+
+    path_values = []
+
+    def collect(case):
+        if case.meta.phase.name == TestPhase.COVERAGE:
+            path_values.append(case.path_parameters.get("block"))
+
+    run_positive_test(operation, collect)
+
+    assert path_values, "No coverage cases generated"
+    assert all(v == "0.0.0.0%2F0" for v in path_values), f"Unexpected values: {path_values}"
