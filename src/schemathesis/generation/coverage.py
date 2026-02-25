@@ -36,6 +36,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.media_types import is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -323,16 +324,14 @@ class CoverageContext:
         return True
 
     def will_be_serialized_to_string(self) -> bool:
-        return self.location in ("query", "path", "header", "cookie") or (
-            self.location == "body"
-            and self.media_type
-            in frozenset(
-                [
-                    ("multipart", "form-data"),
-                    ("application", "x-www-form-urlencoded"),
-                ]
-            )
-        )
+        if self.location in ("query", "path", "header", "cookie"):
+            return True
+        if self.location == "body" and self.media_type is not None:
+            if self.media_type in frozenset([("multipart", "form-data"), ("application", "x-www-form-urlencoded")]):
+                return True
+            if is_xml_parts(self.media_type):
+                return True
+        return False
 
     def can_be_negated(self, schema: JsonSchemaObject) -> bool:
         # Path, query, header, and cookie parameters will be stringified anyway
@@ -1740,6 +1739,16 @@ def _negative_type(
         strategies.pop("null", None)
         strategies.pop("array", None)
         strategies.pop("object", None)
+    # XML body: null and empty string both serialize to an empty element (<RootTag></RootTag>),
+    # indistinguishable from an empty object {} at the wire level
+    if (
+        "object" in types
+        and ctx.location == ParameterLocation.BODY
+        and ctx.media_type is not None
+        and is_xml_parts(ctx.media_type)
+    ):
+        strategies.pop("null", None)
+        strategies.pop("string", None)
     if filter_func is not None:
         for ty, strategy in strategies.items():
             strategies[ty] = strategy.filter(filter_func)
@@ -1774,6 +1783,9 @@ def _negative_type(
             return True
 
     def _does_not_match_the_original_schema(value: Any) -> bool:
+        # For XML, None serializes to "" (empty element content), not to "None"
+        if ctx.media_type is not None and is_xml_parts(ctx.media_type) and value is None:
+            return not is_valid("")
         return not is_valid(str(value))
 
     if ctx.location == ParameterLocation.PATH:
