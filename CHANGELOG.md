@@ -12,6 +12,7 @@
 - Avoid extra transitive dependencies from `jsonschema`.
 - Remove `colorama` from dependencies.
 - Support for `pyrate-limiter>=4.0`.
+- Use pytest 9 native subtests and drop `pytest-subtests` dependency. [#3522](https://github.com/schemathesis/schemathesis/issues/3522)
 
 ## [4.10.2](https://github.com/schemathesis/schemathesis/compare/v4.10.1...v4.10.2) - 2026-02-15
 

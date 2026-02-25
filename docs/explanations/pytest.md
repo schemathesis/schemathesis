@@ -75,7 +75,7 @@ def test_api(case):
 **Key differences:**
 
 - **Schema loading:** Happens during test execution (not import time)
-- **Test output:** Uses pytest-subtests instead of parametrization
+- **Test output:** Uses pytest subtests instead of parametrization
 - **Fixture support:** Schema can depend on other pytest fixtures
 
 ## Error Handling and Reporting
