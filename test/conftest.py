@@ -39,6 +39,7 @@ from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.specs.openapi import media_types
+from schemathesis.specs.openapi.formats import STRING_FORMATS
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
@@ -73,6 +74,7 @@ output.SCHEMATHESIS_VERSION = "dev"
 def reset_hooks():
     # Store built-in deserializers to restore after test
     builtin_deserializers = deserialization.deserializers().copy()
+    builtin_string_formats = set(STRING_FORMATS.keys())
 
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
@@ -92,6 +94,10 @@ def reset_hooks():
     deserialization.unregister_deserializer(*current)
     for media_type, func in builtin_deserializers.items():
         deserialization.register_deserializer(func, media_type)
+    # Remove any string formats registered during the test
+    for name in list(STRING_FORMATS.keys()):
+        if name not in builtin_string_formats:
+            del STRING_FORMATS[name]
 
 
 @pytest.fixture(scope="session")

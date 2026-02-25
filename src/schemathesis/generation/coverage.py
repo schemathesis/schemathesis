@@ -1067,7 +1067,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     if min_length == 0:
         min_length = None
     max_length = schema.get("maxLength")
-    if ctx.location == "path":
+    if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
         schema = _ensure_valid_path_parameter_schema(schema)
     elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in FORMAT_STRATEGIES):
         # Don't apply it for known formats - they will insure the correct format during generation
