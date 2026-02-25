@@ -79,6 +79,12 @@ def is_xml(value: str) -> bool:
     return sub == "xml" or sub.endswith("+xml")
 
 
+def is_xml_parts(media_type: tuple[str, str]) -> bool:
+    """Detect variations of the ``application/xml`` media type from a parsed tuple."""
+    _, sub = media_type
+    return sub == "xml" or sub.endswith("+xml")
+
+
 def matches_parts(expected: tuple[str, str], actual: tuple[str, str]) -> bool:
     """Check if two parsed media types match with wildcard support."""
     expected_main, expected_sub = expected
