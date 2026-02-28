@@ -4,7 +4,7 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, cast
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, unquote
 
 import jsonschema_rs
 from hypothesis import event, note, reject
@@ -690,12 +690,13 @@ def generate_parameter(
         extra_data_source=extra_data_source,
         mix_examples=mix_examples,
     )
+    if value is not None and location == ParameterLocation.PATH:
+        value = quote_all(value)
+
     used_generator: GenerationMode | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
-        if value is not None and location == ParameterLocation.PATH:
-            value = quote_all(value)
         used_generator = None
     return ValueContainer(value=value, location=location, generator=used_generator, meta=metadata)
 
@@ -860,12 +861,15 @@ def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
 
     for key, value in parameters.items():
         if isinstance(value, str):
-            if value == ".":
+            # Unquote first to keep quoting idempotent for already-escaped inputs.
+            # E.g. "%2E" should stay escaped and not become a raw "."
+            decoded = unquote(value)
+            if decoded == ".":
                 parameters[key] = "%2E"
-            elif value == "..":
+            elif decoded == "..":
                 parameters[key] = "%2E%2E"
             else:
-                parameters[key] = quote_plus(value)
+                parameters[key] = quote_plus(decoded)
     return parameters
 
 
