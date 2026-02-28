@@ -403,6 +403,7 @@ class OpenApiBody(OpenApiComponent):
         "_examples",
         "_positive_strategy_cache",
         "_negative_strategy_cache",
+        "_is_negatable",
     )
 
     @classmethod
@@ -447,6 +448,18 @@ class OpenApiBody(OpenApiComponent):
         super().__post_init__()
         self._positive_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
         self._negative_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
+        self._is_negatable: bool | NotSet = NOT_SET
+
+    @property
+    def is_negatable(self) -> bool:
+        """Whether this body schema can be negated for negative test generation."""
+        if self._is_negatable is NOT_SET:
+            from schemathesis.specs.openapi.negative.utils import can_negate
+
+            schema = self.optimized_schema
+            self._is_negatable = isinstance(schema, dict) and can_negate(schema)
+        assert not isinstance(self._is_negatable, NotSet)
+        return self._is_negatable
 
     @property
     def location(self) -> ParameterLocation:
