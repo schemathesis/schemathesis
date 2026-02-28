@@ -49,11 +49,11 @@ def _run_negative_benchmark(benchmark, op):
     benchmark(_run)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="negative-strategy-large-spec")
 def test_negative_strategy_large_spec(benchmark):
     _run_negative_benchmark(benchmark, STRIPE_POST_OP)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="negative-strategy-openai-chat")
 def test_negative_strategy_openai_chat(benchmark):
     _run_negative_benchmark(benchmark, OPENAI_CHAT_OP)
