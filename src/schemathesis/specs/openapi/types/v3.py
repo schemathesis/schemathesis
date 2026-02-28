@@ -89,7 +89,7 @@ class ParameterWithSchema(TypedDict):
     examples: NotRequired[dict[str, ExampleOrRef]]
 
 
-_ParameterIn = TypedDict("_ParameterIn", {"in": Literal["path", "query", "header", "cookie"]})
+_ParameterIn = TypedDict("_ParameterIn", {"in": Literal["path", "query", "querystring", "header", "cookie"]})
 
 
 class ParameterWithSchemaAndIn(ParameterWithSchema, _ParameterIn):
