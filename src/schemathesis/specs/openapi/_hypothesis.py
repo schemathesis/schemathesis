@@ -154,7 +154,7 @@ def openapi_cases(
             body_generator = generation_mode
             if generation_mode.is_negative:
                 # Consider only schemas that are possible to negate
-                candidates = [item for item in operation.body.items if can_negate(item.optimized_schema)]
+                candidates = [item for item in operation.body.items if item.is_negatable]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
