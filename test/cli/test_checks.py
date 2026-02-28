@@ -175,6 +175,56 @@ def test_negative_data_rejection_path_parameter_type_mutation(ctx, app_runner, c
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, app_runner, cli, snapshot_cli):
+    # Like the integer variant, string mutations for a float path parameter can decode to valid floats.
+    # E.g., "+1.5" becomes /api/rate/%2B1.5 - URL-decoded to "+1.5" which float() accepts.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/rate/{value}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "value",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "number"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Success"}},
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/api/rate/<path:value>", methods=["GET"])
+    def rate(value):
+        try:
+            float(value)
+            return "", 200
+        except ValueError:
+            return "", 400
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--phases=fuzzing",
+            "--max-examples=200",
+        )
+        == snapshot_cli
+    )
+
+
 def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_runner, cli, snapshot_cli):
     # See GH-2913
     raw_schema = ctx.openapi.build_schema(
