@@ -19,6 +19,7 @@
 ### :rocket: Performance
 
 - ~2x faster negative test generation for operations with complex schemas. Schema reference resolution is now skipped entirely for ref-free schemas and cached across repeated calls for schemas with references.
+- Avoid unnecessary serialization during negative test generation.
 - Cache `can_negate` results during negative test generation.
 - Upgrade to `jsonschema-rs` 0.43.0 and use `validator_cls_for` for draft detection.
 
