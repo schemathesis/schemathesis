@@ -18,6 +18,7 @@ from schemathesis.core.errors import (
     SerializationError,
     SerializationNotPossible,
 )
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY
 from schemathesis.core.transforms import deepclone
 from schemathesis.transport.asgi import ASGI_TRANSPORT
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
@@ -308,6 +309,35 @@ def test_unknown_multipart_fields_openapi2(ctx):
         ("note", "foo"),
         ("unknown", "seen"),
     ]
+
+
+def test_internal_raw_query_marker_does_not_consume_user_query_parameter(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": RAW_QUERY_STRING_KEY,
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["visible"]},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/test"]["GET"]
+    case = operation.Case(query={RAW_QUERY_STRING_KEY: "visible"})
+
+    serialized_requests = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized_requests["params"] == {RAW_QUERY_STRING_KEY: "visible"}
+
+    serialized_wsgi = WSGI_TRANSPORT.serialize_case(case)
+    assert serialized_wsgi["query_string"] == {RAW_QUERY_STRING_KEY: "visible"}
 
 
 @pytest.mark.filterwarnings("error")

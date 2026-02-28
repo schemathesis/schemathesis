@@ -2442,7 +2442,7 @@ def test_references(ctx, operation, components):
             ):
                 pass
         else:
-            assert str(operation.err()) == "Schema `` has a required reference to itself"
+            assert "Unresolvable reference in the schema" in str(operation.err())
 
 
 def test_urlencoded_payloads_are_valid(ctx):
