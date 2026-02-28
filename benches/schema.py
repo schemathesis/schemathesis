@@ -73,7 +73,7 @@ RESPONSE = Response(
 patch("schemathesis.Case.call", return_value=RESPONSE).start()
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="iter-operations")
 @pytest.mark.parametrize(
     "raw_schema, loader",
     [
@@ -98,7 +98,7 @@ def test_iter_operations(benchmark, raw_schema, loader):
     benchmark(_iter_operations)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="measure-statistic")
 @pytest.mark.parametrize(
     "raw_schema, loader",
     [
@@ -118,7 +118,7 @@ def test_measure_statistic(benchmark, raw_schema, loader):
     benchmark(schema._measure_statistic)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="get-operation")
 @pytest.mark.parametrize(
     "schema, key",
     [
@@ -137,7 +137,7 @@ def test_get_operation(benchmark, schema, key):
     benchmark(_get)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="find-operation-by-id")
 @pytest.mark.parametrize(
     "schema, key",
     [
@@ -150,7 +150,7 @@ def test_find_operation_by_id(benchmark, schema, key):
     benchmark(schema.find_operation_by_id, key)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="find-operation-by-reference")
 @pytest.mark.parametrize(
     "schema, key",
     [
@@ -169,7 +169,7 @@ def _optimized_schema(operations):
             _ = parameter.optimized_schema
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="as-json-schema")
 @pytest.mark.parametrize("operations", [BBCI_OPERATIONS, VMWARE_OPERATIONS], ids=("bbci", "vmware"))
 def test_as_json_schema(operations, benchmark):
     benchmark(_optimized_schema, operations)
@@ -186,7 +186,7 @@ def _get_parameters_strategy(operations, config):
             get_parameters_strategy(operation.ok(), GenerationMode.POSITIVE, location, config)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="get-parameters-strategy")
 @pytest.mark.parametrize(
     "operations, config",
     [
@@ -199,7 +199,7 @@ def test_get_parameters_strategy(benchmark, operations, config):
     benchmark(_get_parameters_strategy, operations, config)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="events")
 def test_events(benchmark):
     def _events_run():
         engine = from_schema(BBCI_SCHEMA)
@@ -236,20 +236,20 @@ def _collect_cassette_entries(schema):
 
 
 @pytest.mark.parametrize("schema", [VMWARE_SCHEMA], ids=("vmware",))
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="vcr")
 def test_vcr(benchmark, schema):
     entries = _collect_cassette_entries(schema)
     benchmark(_write_vcr, entries, schema.config)
 
 
 @pytest.mark.parametrize("schema", [BBCI_SCHEMA, VMWARE_SCHEMA], ids=("bbci", "vmware"))
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="har")
 def test_har(benchmark, schema):
     entries = _collect_cassette_entries(schema)
     benchmark(_write_har, entries, schema.config)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="deepclone")
 @pytest.mark.parametrize(
     "schema",
     [
@@ -269,7 +269,7 @@ def test_deepclone(benchmark, schema):
     benchmark(deepclone, schema)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="dependency-analysis")
 @pytest.mark.parametrize(
     "schema",
     [
@@ -283,7 +283,7 @@ def test_dependency_analysis(benchmark, schema):
     benchmark(dependencies.analyze, schema)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="link-generation")
 @pytest.mark.parametrize(
     "schema",
     [
@@ -297,7 +297,7 @@ def test_link_generation(benchmark, schema):
     benchmark(lambda: list(graph.iter_links()))
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="dependency-layers")
 @pytest.mark.parametrize(
     "schema",
     [
@@ -316,7 +316,7 @@ def _load_from_file(loader, json_string):
     return loader(json_string, config=CONFIG)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="load-from-file")
 @pytest.mark.parametrize(
     "raw_schema, loader",
     [
@@ -337,7 +337,7 @@ def test_load_from_file(benchmark, raw_schema, loader):
     benchmark(_load_from_file, loader, serialized)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="as-state-machine")
 @pytest.mark.parametrize(
     "raw_schema",
     [
