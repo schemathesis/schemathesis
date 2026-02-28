@@ -203,7 +203,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     )
     assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 8
+    assert len(cassette["http_interactions"]) == 9
     command = f"st run --report-vcr-path={cassette_path} --max-examples={hypothesis_max_examples or 2} {schema_url}"
     assert cassette["command"] == command
 

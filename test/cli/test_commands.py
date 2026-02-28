@@ -152,7 +152,7 @@ def test_certificates(cli, schema_url, mocker):
     with cert.private_key_pem.tempfile() as cert_path:
         cli.run_and_assert(schema_url, f"--request-cert={cert_path}")
         # Then both schema & test network calls should use this cert
-        assert len(request.call_args_list) == 9
+        assert len(request.call_args_list) == 10
         assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
 
 
@@ -462,7 +462,7 @@ def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 def test_continue_on_failure(cli, schema_url):
     result = cli.run_and_assert(schema_url, "--continue-on-failure", exit_code=ExitCode.TESTS_FAILED)
-    assert "113 generated" in result.stdout
+    assert "114 generated" in result.stdout
 
 
 @pytest.mark.operations("multiple_failures")
