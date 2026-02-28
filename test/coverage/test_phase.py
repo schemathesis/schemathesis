@@ -2143,7 +2143,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
 
     run_negative_test(operation, test)
 
-    assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+    assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT", "QUERY"}
 
     methods = set()
 
@@ -3157,3 +3157,52 @@ def test_xml_none_property_mutation_filtered_when_schema_accepts_empty_string(ct
     assert null_property_mutations == [], (
         f"None mutation for XML string field with maxLength:0 should be filtered, got: {null_property_mutations}"
     )
+
+
+def test_query_method_appears_in_unspecified_methods(ctx):
+    schema = ctx.openapi.build_schema(
+        {"/search": {"post": {"responses": {"200": {"description": "OK"}}}}},
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/search"]["post"]
+
+    methods = set()
+
+    def test(case):
+        if case.meta.phase.name != TestPhase.COVERAGE:
+            return
+        if case.meta.phase.data.scenario != CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+            return
+        methods.add(case.method)
+
+    run_negative_test(operation, test)
+
+    assert "QUERY" in methods
+
+
+def test_query_method_excluded_from_unexpected_when_defined(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "query": {"responses": {"200": {"description": "OK"}}},
+                "post": {"responses": {"200": {"description": "OK"}}},
+            }
+        },
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/search"]["post"]
+
+    methods = set()
+
+    def test(case):
+        if case.meta.phase.name != TestPhase.COVERAGE:
+            return
+        if case.meta.phase.data.scenario != CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+            return
+        methods.add(case.method)
+
+    run_negative_test(operation, test)
+
+    assert "QUERY" not in methods

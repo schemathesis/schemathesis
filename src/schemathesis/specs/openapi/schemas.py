@@ -59,7 +59,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.generation.stateful import APIStateMachine
 
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
+HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"})
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema, InfiniteRecursiveReference)
 
 _V3_1 = version.parse("3.1")

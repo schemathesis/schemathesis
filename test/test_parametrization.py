@@ -464,7 +464,7 @@ def test_b(request, case):
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
     # "/users" path is excluded in the first test function
-    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 16"])
+    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 18"])
 
 
 @pytest.mark.parametrize(
@@ -489,7 +489,7 @@ def test_(request, case):
     result = testdir.runpytest("-s")
     # Then it should be correctly processed
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 8"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 9"])
 
 
 def test_invalid_schema(testdir):
@@ -537,7 +537,7 @@ def test_(request, case):
     result = testdir.runpytest()
     # Then test should be executed
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 21$"])
 
 
 def test_exception_during_test(testdir):

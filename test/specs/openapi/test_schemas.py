@@ -141,6 +141,23 @@ def test_operation_lookup_non_mapping_shared_params(ctx, paths):
         schema.find_operation_by_reference("#/paths/~1alias/get")
 
 
+def test_query_method_operation_is_discovered(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "query": {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 1
+    assert operations[0].ok().method == "query"
+
+
 def test_non_string_parameter_location():
     # When a parameter has an invalid non-string `in` value (e.g., empty dict),
     # schema loading should skip the invalid parameter without crashing
