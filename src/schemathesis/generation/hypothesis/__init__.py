@@ -18,6 +18,7 @@ def setup() -> None:
     from hypothesis_jsonschema._resolve import LocalResolver
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
+    from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
 
@@ -53,8 +54,14 @@ def setup() -> None:
 
         def __init__(self, schema: dict[str, Any]) -> None:
             self.schema = schema
-            self.serialized = json.dumps(schema, sort_keys=True)
-            self.encoded = hash(self.serialized)
+            bundle = schema.get(BUNDLE_STORAGE_KEY)
+            if bundle is not None:
+                _for_hash = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
+                self.serialized = json.dumps(_for_hash, sort_keys=True)
+                self.encoded = hash((self.serialized, id(bundle)))
+            else:
+                self.serialized = json.dumps(schema, sort_keys=True)
+                self.encoded = hash(self.serialized)
 
         def __eq__(self, other: CacheableSchema) -> bool:  # type: ignore[override]
             return self.encoded == other.encoded
@@ -139,6 +146,24 @@ def setup() -> None:
     _from_schema.resolve_all_refs = resolve_all_refs
     _canonicalise.get_type = _get_type
     _canonicalise.CacheableSchema = CacheableSchema
+
+    # Patch canonicalish to skip x-bundled during the deep-copy serialisation.
+    _original_canonicalish = _canonicalise.canonicalish
+
+    def _fast_canonicalish(schema: Any) -> dict[str, Any]:
+        if not isinstance(schema, dict) or BUNDLE_STORAGE_KEY not in schema:
+            return _original_canonicalish(schema)
+        bundle = schema[BUNDLE_STORAGE_KEY]
+        schema_without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
+        result = _original_canonicalish(schema_without_bundle)
+        # Restore x-bundled so downstream $ref resolution can find bundled schemas.
+        if isinstance(result, dict) and result and result != {"not": {}}:
+            result[BUNDLE_STORAGE_KEY] = bundle
+        return result
+
+    _canonicalise.canonicalish = _fast_canonicalish
+    _from_schema.canonicalish = _fast_canonicalish
+    _resolve.canonicalish = _fast_canonicalish
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
