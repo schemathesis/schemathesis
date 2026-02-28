@@ -904,6 +904,10 @@ def _iter_coverage_cases(
         if generate_duplicate_query_parameters and operation.query and "query" in template:
             container = template["query"]
             for parameter in operation.query:
+                if parameter.definition.get("in") == "querystring":
+                    # Duplicate parameter semantics don't apply to querystring parameters;
+                    # they use content-based serialization, not individual key-value pairs.
+                    continue
                 instant = Instant()
                 # Could be absent if value schema can't be negated
                 # I.e. contains just `default` value without any other keywords

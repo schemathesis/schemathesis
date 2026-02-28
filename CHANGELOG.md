@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - OpenAPI 3.2 `QUERY` HTTP method support.
+- OpenAPI 3.2 `in: querystring` parameters support.
 - Server-Sent Events (`text/event-stream`) response validation. [#3064](https://github.com/schemathesis/schemathesis/issues/3064)
 
 ### :bug: Fixed
@@ -17,6 +18,7 @@
 - `missing_required_header` now accepts `400`, `401`, `403`, and `422` (in addition to `406`) for missing non-`Authorization` required headers. [#3521](https://github.com/schemathesis/schemathesis/issues/3521)
 - Coverage phase silently replacing path parameter values with `"value"` when a custom format (e.g., `ipv4-network`) generates strings containing `/`. [#3527](https://github.com/schemathesis/schemathesis/issues/3527)
 - Examples phase not escaping path examples containing `/` when some path parameters were generated from schema. [#3533](https://github.com/schemathesis/schemathesis/issues/3533)
+- Unresolvable `$ref`s inside parameter `content` schemas now reported as schema errors at load time instead of crashing at generation time.
 
 ### :rocket: Performance
 

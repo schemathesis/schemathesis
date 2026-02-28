@@ -9,6 +9,16 @@ LOCATION_TO_CONTAINER = {
 }
 
 
+class RawQueryString(str):
+    """Internal wrapper for pre-serialized raw query string chunks."""
+
+    __slots__ = ()
+
+
+# Internal key used to carry raw query string payloads for OpenAPI 3.2 `in: querystring`.
+RAW_QUERY_STRING_KEY = "x-schemathesis-raw-query-string"
+
+
 class ParameterLocation(str, Enum):
     """API parameter location."""
 

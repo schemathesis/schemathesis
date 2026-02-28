@@ -818,11 +818,15 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                 ("header", "headers"),
                 ("cookie", "cookies"),
                 ("query", "query"),
+                # `params` is the requests-style kwarg for query parameters passed directly via call_and_validate
+                ("query", "params"),
             ):
                 if container_name in kwargs:
-                    container = kwargs[container_name].copy()
-                    _remove_auth_from_container(container, security_parameters, location=location)
-                    kwargs[container_name] = container
+                    container = kwargs[container_name]
+                    if isinstance(container, dict):
+                        container = container.copy()
+                        _remove_auth_from_container(container, security_parameters, location=location)
+                        kwargs[container_name] = container
             kwargs.pop("session", None)
             kwargs.pop("auth", None)
             if case.operation.app is not None:
@@ -944,8 +948,11 @@ def _contains_auth(
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_query(parameter):
-            if (ctx._override and name in ctx._override.query) or (
-                response._override and name in response._override.query
+            transport_params = ctx._transport_kwargs.get("params") if ctx._transport_kwargs else None
+            if (
+                (ctx._override and name in ctx._override.query)
+                or (response._override and name in response._override.query)
+                or (isinstance(transport_params, dict) and name in transport_params)
             ):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED

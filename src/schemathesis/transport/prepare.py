@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
@@ -136,7 +136,28 @@ def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: Sa
             kwargs["cookies"] = dict(kwargs["cookies"])
             sanitize_value(kwargs["cookies"], config=config)
         if kwargs["params"]:
-            kwargs["params"] = dict(kwargs["params"])
-            sanitize_value(kwargs["params"], config=config)
+            if isinstance(kwargs["params"], Mapping):
+                kwargs["params"] = dict(kwargs["params"])
+                sanitize_value(kwargs["params"], config=config)
+            elif isinstance(kwargs["params"], str):
+                kwargs["params"] = _sanitize_query_string(kwargs["params"], config=config)
 
     return requests.Request(**kwargs).prepare()
+
+
+def _sanitize_query_string(query: str, *, config: SanitizationConfig) -> str:
+    parts = []
+    for chunk in query.split("&"):
+        if not chunk:
+            continue
+        if "=" not in chunk:
+            # Bare key with no value (e.g. raw query string flags); preserve as-is
+            parts.append(chunk)
+        else:
+            key, _, value = chunk.partition("=")
+            lower_key = key.lower()
+            if lower_key in config.keys_to_sanitize or any(marker in lower_key for marker in config.sensitive_markers):
+                parts.append(urlencode([(key, config.replacement)]))
+            else:
+                parts.append(chunk)
+    return "&".join(parts)

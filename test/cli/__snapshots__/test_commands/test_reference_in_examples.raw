@@ -22,9 +22,13 @@ Schemathesis dev
 
 ==================================== ERRORS ====================================
 __________________________________ POST /test __________________________________
-Runtime Error
+Schema Error
 
-Reference `t` cannot be resolved
+Unresolvable reference in the schema
+
+Error details:
+    Reference: t
+    File reference could not be resolved. Check that the file exists.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -42,7 +46,7 @@ Test Phases:
   ⏭  Stateful (disabled)
 
 Errors:
-  🚫 Runtime Error: 1
+  🚫 Schema Error: 1
 
 Test cases:
   No test cases were generated
