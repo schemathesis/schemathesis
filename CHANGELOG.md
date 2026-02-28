@@ -15,6 +15,10 @@
 - Coverage phase silently replacing path parameter values with `"value"` when a custom format (e.g., `ipv4-network`) generates strings containing `/`. [#3527](https://github.com/schemathesis/schemathesis/issues/3527)
 - Examples phase not escaping path examples containing `/` when some path parameters were generated from schema. [#3533](https://github.com/schemathesis/schemathesis/issues/3533)
 
+### :rocket: Performance
+
+- ~2x faster negative test generation for operations with complex schemas. Schema reference resolution is now skipped entirely for ref-free schemas and cached across repeated calls for schemas with references.
+
 ### :wrench: Changed
 
 - Avoid extra transitive dependencies from `jsonschema`.
