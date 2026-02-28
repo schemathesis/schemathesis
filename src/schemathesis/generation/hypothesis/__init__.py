@@ -49,11 +49,12 @@ def setup() -> None:
         will have the same validator.
         """
 
-        __slots__ = ("schema", "encoded")
+        __slots__ = ("schema", "encoded", "serialized")
 
         def __init__(self, schema: dict[str, Any]) -> None:
             self.schema = schema
-            self.encoded = hash(json.dumps(schema, sort_keys=True))
+            self.serialized = json.dumps(schema, sort_keys=True)
+            self.encoded = hash(self.serialized)
 
         def __eq__(self, other: CacheableSchema) -> bool:  # type: ignore[override]
             return self.encoded == other.encoded
@@ -69,6 +70,10 @@ def setup() -> None:
         """LRU resolver cache."""
         return LocalResolver.from_schema(cache_key.schema)
 
+    # Cache for fully-resolved schema output, keyed by schema hash.
+    # Avoids re-traversing schemas with the same JSON content.
+    _resolve_result_cache: dict[int, dict[str, Any]] = {}
+
     def resolve_all_refs(
         schema: Literal[True, False] | dict[str, Any],
         *,
@@ -80,10 +85,22 @@ def setup() -> None:
             return {"not": {}}
         if not schema:
             return schema
-        if resolver is None:
-            resolver = get_resolver(CacheableSchema(schema))
 
         _resolve_all_refs = resolve_all_refs
+        top_level = resolver is None
+        schema_hash: int | None = None
+
+        if top_level:
+            cache_key = CacheableSchema(schema)
+            # No need to traverse if there are no references
+            if '"$ref"' not in cache_key.serialized:
+                return schema
+            schema_hash = cache_key.encoded
+            if schema_hash in _resolve_result_cache:
+                return deepclone(_resolve_result_cache[schema_hash])
+            resolver = get_resolver(cache_key)
+
+        assert resolver is not None
 
         if "$ref" in schema:
             s = dict(schema)
@@ -91,11 +108,14 @@ def setup() -> None:
             url, resolved = resolver.resolve(ref)
             resolver.push_scope(url)
             try:
-                return merged(
+                result = merged(
                     [_resolve_all_refs(s, resolver=resolver), _resolve_all_refs(deepclone(resolved), resolver=resolver)]
                 )
             finally:
                 resolver.pop_scope()
+            if schema_hash is not None:
+                _resolve_result_cache[schema_hash] = deepclone(result)
+            return result
 
         for key, value in schema.items():
             if key in SCHEMA_KEYS:
@@ -107,6 +127,8 @@ def setup() -> None:
                 schema[key] = {
                     k: _resolve_all_refs(v, resolver=resolver) if isinstance(v, dict) else v for k, v in value.items()
                 }
+        if schema_hash is not None:
+            _resolve_result_cache[schema_hash] = deepclone(schema)
         return schema
 
     root_core.RepresentationPrinter = RepresentationPrinter
