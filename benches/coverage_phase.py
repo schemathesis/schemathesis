@@ -38,7 +38,7 @@ BASIC_TYPES = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-basic-types")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", BASIC_TYPES, ids=lambda x: f"basic-{x['type']}")
 def test_basic_types(benchmark, ctx, schema):
@@ -53,7 +53,7 @@ STRING_CONSTRAINTS = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-string-constraints")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", STRING_CONSTRAINTS, ids=lambda x: f"string-{list(x.keys())[1]}")
 def test_string_constraints(benchmark, ctx, schema):
@@ -67,7 +67,7 @@ NUMBER_CONSTRAINTS = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-number-constraints")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", NUMBER_CONSTRAINTS, ids=lambda x: f"number-{list(x.keys())[1]}")
 def test_number_constraints(benchmark, ctx, schema):
@@ -81,7 +81,7 @@ ARRAY_CONSTRAINTS = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-array-constraints")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", ARRAY_CONSTRAINTS, ids=lambda x: f"array-{list(x.keys())[1]}")
 def test_array_constraints(benchmark, ctx, schema):
@@ -95,7 +95,7 @@ OBJECT_CONSTRAINTS = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-object-constraints")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", OBJECT_CONSTRAINTS, ids=lambda x: f"object-{list(x.keys())[1]}")
 def test_object_constraints(benchmark, ctx, schema):
@@ -110,7 +110,7 @@ COMBINED_SCHEMAS = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-combined-schemas")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", COMBINED_SCHEMAS, ids=lambda x: f"combined-{list(x.keys())[0]}")
 def test_combined_schemas(benchmark, ctx, schema):
@@ -148,7 +148,7 @@ COMPLEX_NESTED_SCHEMAS = [
 ]
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="coverage-complex-nested-schemas")
 @pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
 @pytest.mark.parametrize("schema", COMPLEX_NESTED_SCHEMAS, ids=lambda x: f"complex-{x['type']}")
 def test_complex_nested_schemas(benchmark, ctx, schema):

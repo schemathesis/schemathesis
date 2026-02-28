@@ -35,6 +35,6 @@ RECURSIVE_SCHEMA = {
 }
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="resolve-pointer")
 def test_resolve_pointer():
     resolve_pointer(RECURSIVE_SCHEMA, "/paths/~1foo/post/requestBody/content/application~1json/schema")

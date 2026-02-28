@@ -4,7 +4,7 @@ from schemathesis.core.compat import RefResolver
 from schemathesis.core.jsonschema import bundle
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="bundle-flat-references")
 def test_bundle_many_flat_references(benchmark):
     definitions = {}
     for i in range(50):
@@ -23,7 +23,7 @@ def test_bundle_many_flat_references(benchmark):
     benchmark(bundle, schema, resolver, inline_recursive=True)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="bundle-deep-nested-references")
 def test_bundle_deep_nested_references(benchmark):
     definitions = {}
     for i in range(20):
@@ -42,7 +42,7 @@ def test_bundle_deep_nested_references(benchmark):
     benchmark(bundle, schema, resolver, inline_recursive=True)
 
 
-@pytest.mark.benchmark
+@pytest.mark.benchmark(group="bundle-duplicate-references")
 def test_bundle_duplicate_references(benchmark):
     definitions = {
         "User": {
