@@ -914,6 +914,52 @@ def test_partial_examples(ctx):
     jsonschema_rs.validate(parameters_schema, example.path_parameters)
 
 
+def test_partial_path_examples_are_escaped(ctx):
+    # See GH-3533
+    # When only some path parameters come from examples, example values should still be escaped.
+    schema = ctx.openapi.build_schema(
+        {
+            "/blocks/{network}/{l3vpn}/{block}": {
+                "put": {
+                    "parameters": [
+                        {
+                            "name": "network",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["default"]},
+                        },
+                        {
+                            "name": "l3vpn",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["0"]},
+                        },
+                        {
+                            "name": "block",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "ipv4-network"},
+                            "example": "192.168.1.0/24",
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/blocks/{network}/{l3vpn}/{block}"]["PUT"]
+    strategy = operation.get_strategies_from_examples()[0]
+
+    example = examples.generate_one(strategy)
+
+    assert example.path_parameters == {
+        "network": "default",
+        "l3vpn": "0",
+        "block": "192.168.1.0%2F24",
+    }
+
+
 def test_partial_examples_without_null_bytes_and_formats(ctx):
     schemathesis.openapi.format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
     schema = ctx.openapi.build_schema(

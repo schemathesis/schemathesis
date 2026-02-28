@@ -464,7 +464,18 @@ def test_optional_form_data(ctx, openapi3_base_url):
     inner()
 
 
-@pytest.mark.parametrize(("value", "expected"), [(".", "%2E"), ("..", "%2E%2E"), (".foo", ".foo")])
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (".", "%2E"),
+        ("..", "%2E%2E"),
+        (".foo", ".foo"),
+        ("%2E", "%2E"),
+        ("%2e", "%2E"),
+        ("%2E%2E", "%2E%2E"),
+        ("%2e%2e", "%2E%2E"),
+    ],
+)
 def test_path_parameters_quotation(value, expected):
     # See GH-1036
     assert quote_all({"foo": value})["foo"] == expected
