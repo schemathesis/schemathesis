@@ -13,6 +13,10 @@ env:
 jobs:
   benchmarks:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    name: "Run benchmarks (Shard #${{ matrix.shard }})"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -26,4 +30,4 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           mode: "simulation"
-          run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
+          run: uvx --from=pytest --with=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio --test-group=${{ matrix.shard }} --test-group-count=4
