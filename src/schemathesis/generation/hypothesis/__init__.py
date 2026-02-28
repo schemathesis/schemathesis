@@ -147,10 +147,8 @@ def setup() -> None:
     from schemathesis.transport.serialization import Binary
 
     _original_get_validator_class = _canonicalise._get_validator_class
-    _original_make_validator = _canonicalise.make_validator
 
     def _contains_binary(value: Any) -> bool:
-        """Check if the value contains any Binary instances."""
         if isinstance(value, Binary):
             return True
         if isinstance(value, dict):
@@ -160,8 +158,6 @@ def setup() -> None:
         return False
 
     class _ValidatorWrapper:
-        """Wrapper around validator that handles Binary instances."""
-
         __slots__ = ("_validator",)
 
         def __init__(self, validator: Any) -> None:
@@ -174,9 +170,18 @@ def setup() -> None:
 
     def make_validator(schema: dict[str, Any]) -> _ValidatorWrapper:
         try:
-            return _ValidatorWrapper(jsonschema_rs.Draft7Validator(schema))
-        except (ValueError, TypeError):
-            return _ValidatorWrapper(_original_make_validator(schema))
+            return _ValidatorWrapper(jsonschema_rs.validator_for(schema))
+        except (jsonschema_rs.ValidationError, ValueError, TypeError):
+            cls = _original_get_validator_class(schema)
+            return _ValidatorWrapper(cls(schema))
+
+    def _get_validator_class(schema: dict[str, Any]) -> Any:
+        try:
+            jsonschema_rs.meta.validate(schema)
+            return jsonschema_rs.validator_cls_for(schema)
+        except (jsonschema_rs.ValidationError, ValueError, TypeError):
+            return _original_get_validator_class(schema)
 
     _canonicalise.make_validator = make_validator
     _from_schema.make_validator = make_validator
+    _canonicalise._get_validator_class = _get_validator_class
