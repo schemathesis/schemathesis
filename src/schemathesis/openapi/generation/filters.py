@@ -1,5 +1,6 @@
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import unquote
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -35,7 +36,14 @@ def is_invalid_path_parameter(value: Any) -> bool:
     # For non-strings (dicts, lists), their str() is what appears in the URL
     str_value = value if isinstance(value, str) else str(value)
 
-    if "/" in str_value or "}" in str_value or "{" in str_value:
+    # `%2F` is decoded by many HTTP stacks before routing, effectively turning it into `/`.
+    # Reject such values to avoid ambiguous path resolution.
+    if (
+        (isinstance(value, str) and "/" in unquote(str_value))
+        or "/" in str_value
+        or "}" in str_value
+        or "{" in str_value
+    ):
         return True
 
     # Avoid situations when the path parameter contains only NULL bytes.
