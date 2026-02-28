@@ -90,7 +90,16 @@ def test_is_prefix_operation(lhs, lhs_vars, rhs, rhs_vars, expected):
 
 
 def build_metadata(
-    path_parameters=None, query=None, headers=None, cookies=None, body=None, generation_mode=GenerationMode.POSITIVE
+    path_parameters=None,
+    query=None,
+    headers=None,
+    cookies=None,
+    body=None,
+    generation_mode=GenerationMode.POSITIVE,
+    description="",
+    parameter=None,
+    parameter_location=None,
+    location=None,
 ):
     return CaseMetadata(
         generation=GenerationInfo(
@@ -111,10 +120,10 @@ def build_metadata(
         phase=PhaseInfo(
             name=TestPhase.FUZZING,
             data=FuzzingPhaseData(
-                description="",
-                parameter=None,
-                parameter_location=None,
-                location=None,
+                description=description,
+                parameter=parameter,
+                parameter_location=parameter_location,
+                location=location,
             ),
         ),
     )
@@ -700,3 +709,110 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
 
     # Should return None (no error) because the serialized value is valid
     assert result is None
+
+
+def test_negative_data_rejection_path_string_numeric_serialization(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/run/{id}": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/api/run/{id}"]["POST"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+            description="Invalid type string (expected integer)",
+            parameter="id",
+            parameter_location=ParameterLocation.PATH,
+        ),
+        # Encoded `+1` decodes back to an integer-like value accepted by many servers
+        path_parameters={"id": "%2B1"},
+    )
+    response = response_factory.requests(status_code=200)
+
+    assert (
+        negative_data_rejection(
+            CheckContext(
+                override=None,
+                auth=None,
+                headers=None,
+                config=ChecksConfig(),
+                transport_kwargs=None,
+            ),
+            response,
+            case,
+        )
+        is None
+    )
+
+
+def test_negative_data_rejection_path_string_numeric_serialization_with_other_negation(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/run/{id}": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer"},
+                        },
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/api/run/{id}"]["POST"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            path_parameters=GenerationMode.NEGATIVE,
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+            description="Invalid type string (expected integer)",
+            parameter="id",
+            parameter_location=ParameterLocation.PATH,
+        ),
+        path_parameters={"id": "%2B1"},
+        query={"key": "abc"},
+    )
+    response = response_factory.requests(status_code=200)
+
+    with pytest.raises(Failure):
+        negative_data_rejection(
+            CheckContext(
+                override=None,
+                auth=None,
+                headers=None,
+                config=ChecksConfig(),
+                transport_kwargs=None,
+            ),
+            response,
+            case,
+        )
