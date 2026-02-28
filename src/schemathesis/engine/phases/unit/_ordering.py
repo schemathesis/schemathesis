@@ -37,7 +37,7 @@ def _compute_restful_layers(operations: Iterable[APIOperation]) -> list[list[API
 
     The heuristic is:
     - Layer 0: POST, PUT (populate resources)
-    - Layer 1: GET, PATCH, HEAD, OPTIONS (read/update - test against created data)
+    - Layer 1: GET, PATCH, HEAD, OPTIONS, QUERY (read/update - test against created data)
     - Layer 2: DELETE (cleanup - remove resources last)
 
     This ordering provides better test coverage even without explicit dependencies,
@@ -52,14 +52,14 @@ def _compute_restful_layers(operations: Iterable[APIOperation]) -> list[list[API
 
     """
     layer_0: list[APIOperation] = []  # POST, PUT
-    layer_1: list[APIOperation] = []  # GET, PATCH, HEAD, OPTIONS
+    layer_1: list[APIOperation] = []  # GET, PATCH, HEAD, OPTIONS, QUERY
     layer_2: list[APIOperation] = []  # DELETE + others (TRACE?)
 
     for op in operations:
         method_upper = op.method.upper()
         if method_upper in ("POST", "PUT"):
             layer_0.append(op)
-        elif method_upper in ("GET", "PATCH", "HEAD", "OPTIONS"):
+        elif method_upper in ("GET", "PATCH", "HEAD", "OPTIONS", "QUERY"):
             layer_1.append(op)
         else:
             layer_2.append(op)

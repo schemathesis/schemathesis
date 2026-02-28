@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- OpenAPI 3.2 `QUERY` HTTP method support.
 - Server-Sent Events (`text/event-stream`) response validation. [#3064](https://github.com/schemathesis/schemathesis/issues/3064)
 
 ### :bug: Fixed

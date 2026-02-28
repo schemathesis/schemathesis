@@ -9,7 +9,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
 
-DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace"}
+DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace", "query"}
 
 
 @dataclass(repr=False)
