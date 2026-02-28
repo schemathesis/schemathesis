@@ -368,8 +368,12 @@ class OpenApiParameter(OpenApiComponent):
     @property
     def location(self) -> ParameterLocation:
         """Where this parameter is located."""
+        location = self.definition.get("in")
+        if location == "querystring":
+            # It is checked explicitly as the `ParameterLocation.QUERY` has a different value
+            return ParameterLocation.QUERY
         try:
-            return ParameterLocation(self.definition["in"])
+            return ParameterLocation(location)
         except ValueError:
             return ParameterLocation.UNKNOWN
 
@@ -628,14 +632,30 @@ def _bundle_parameter(
     scope, definition = maybe_resolve(parameter, resolver, "")
     schema = definition.get("schema")
     name_to_uri = {}
-    if schema is not None:
-        definition = {k: v for k, v in definition.items() if k != "schema"}
+    if schema is not None or "content" in definition:
+        definition = dict(definition)
         # Push the resolved scope so nested $refs are resolved relative to the parameter's location
         resolver.push_scope(scope)
         try:
-            bundled = bundler.bundle(schema, resolver, inline_recursive=True)
-            definition["schema"] = bundled.schema
-            name_to_uri = bundled.name_to_uri
+            if schema is not None:
+                bundled = bundler.bundle(schema, resolver, inline_recursive=True)
+                definition["schema"] = bundled.schema
+                name_to_uri.update(bundled.name_to_uri)
+            content = definition.get("content")
+            if isinstance(content, dict):
+                updated_content: dict[str, Any] = {}
+                for media_type, media_type_object in content.items():
+                    if not isinstance(media_type_object, Mapping):
+                        updated_content[media_type] = media_type_object
+                        continue
+                    media_type_object = dict(media_type_object)
+                    nested_schema = media_type_object.get("schema")
+                    if isinstance(nested_schema, dict):
+                        bundled = bundler.bundle(nested_schema, resolver, inline_recursive=True)
+                        media_type_object["schema"] = bundled.schema
+                        name_to_uri.update(bundled.name_to_uri)
+                    updated_content[media_type] = media_type_object
+                definition["content"] = updated_content
         except BundleError as exc:
             location = parameter.get("in", "")
             name = parameter.get("name", "<UNKNOWN>")
@@ -726,11 +746,24 @@ def iter_parameters_v3(
     # TODO: Typing
     operation = definition
 
+    seen_querystring = False
+    seen_query = False
+
     for parameter in chain(definition.get("parameters", []), shared_parameters):
         parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
         location = parameter.get("in")
         if not isinstance(location, str):
             continue
+        if location == "querystring":
+            if seen_querystring:
+                raise InvalidSchema("OpenAPI 3.2 allows at most one `querystring` parameter per operation")
+            if seen_query:
+                raise InvalidSchema("OpenAPI 3.2 does not allow `query` and `querystring` parameters together")
+            seen_querystring = True
+        elif location == "query":
+            if seen_querystring:
+                raise InvalidSchema("OpenAPI 3.2 does not allow `query` and `querystring` parameters together")
+            seen_query = True
         if location in HEADER_LOCATIONS:
             check_header_name(parameter["name"])
 

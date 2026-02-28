@@ -4,7 +4,7 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, ParameterLocation, RawQueryString
 from schemathesis.core.shell import ShellType
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -80,6 +80,16 @@ def test_explicit_headers(curl):
     case = schema["/users"]["GET"].Case(headers={name: value})
     command = case.as_curl_command()
     assert command == f"curl -X GET -H '{name}: {value}' http://localhost/users"
+    curl.assert_valid(command)
+
+
+def test_as_curl_command_sanitizes_string_query_params(curl):
+    case = schema["/users"]["GET"].Case(
+        query={RAW_QUERY_STRING_KEY: RawQueryString("payload"), "api_key": "super-secret-token"}
+    )
+    command = case.as_curl_command()
+    assert "api_key=%5BFiltered%5D" in command
+    assert "super-secret-token" not in command
     curl.assert_valid(command)
 
 

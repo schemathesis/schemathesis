@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
@@ -136,7 +136,22 @@ def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: Sa
             kwargs["cookies"] = dict(kwargs["cookies"])
             sanitize_value(kwargs["cookies"], config=config)
         if kwargs["params"]:
-            kwargs["params"] = dict(kwargs["params"])
-            sanitize_value(kwargs["params"], config=config)
+            if isinstance(kwargs["params"], Mapping):
+                kwargs["params"] = dict(kwargs["params"])
+                sanitize_value(kwargs["params"], config=config)
+            elif isinstance(kwargs["params"], str):
+                kwargs["params"] = _sanitize_query_string(kwargs["params"], config=config)
 
     return requests.Request(**kwargs).prepare()
+
+
+def _sanitize_query_string(query: str, *, config: SanitizationConfig) -> str:
+    pairs = parse_qsl(query, keep_blank_values=True)
+    sanitized = []
+    for key, value in pairs:
+        lower_key = key.lower()
+        if lower_key in config.keys_to_sanitize or any(marker in lower_key for marker in config.sensitive_markers):
+            sanitized.append((key, config.replacement))
+        else:
+            sanitized.append((key, value))
+    return urlencode(sanitized, doseq=True)

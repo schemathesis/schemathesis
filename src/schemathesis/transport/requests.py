@@ -3,13 +3,14 @@ from __future__ import annotations
 import binascii
 import inspect
 import os
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
 from io import BytesIO
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from schemathesis.core import NotSet
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
@@ -24,11 +25,33 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
+def _normalize_query_component(params: Any) -> str:
+    if params is None:
+        return ""
+    if isinstance(params, str):
+        return params.lstrip("?")
+    if isinstance(params, Mapping):
+        return urlencode(params, doseq=True)
+    if isinstance(params, tuple | list):
+        return urlencode(params, doseq=True)
+    return str(params)
+
+
+def _merge_query_components(left: Any, right: Any) -> str:
+    left_chunk = _normalize_query_component(left)
+    right_chunk = _normalize_query_component(right)
+    if not left_chunk:
+        return right_chunk
+    if not right_chunk:
+        return left_chunk
+    return f"{left_chunk}&{right_chunk}"
+
+
 class RequestsTransport(BaseTransport["requests.Session"]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         base_url = kwargs.get("base_url")
         headers = kwargs.get("headers")
-        params = kwargs.get("params")
+        params_override = kwargs.get("params")
         cookies = kwargs.get("cookies")
 
         final_headers = prepare_headers(case, headers)
@@ -60,9 +83,17 @@ class RequestsTransport(BaseTransport["requests.Session"]):
                 final_headers.setdefault(key, value)
 
         params = case.query
+        raw_query = None
+        if isinstance(params, Mapping):
+            params = dict(params)
+            marker_value = params.get(RAW_QUERY_STRING_KEY)
+            if isinstance(marker_value, RawQueryString):
+                raw_query = str(params.pop(RAW_QUERY_STRING_KEY))
+        if raw_query is not None:
+            params = _merge_query_components(raw_query, params)
 
         # Replace empty dictionaries with empty strings, so the parameters actually present in the query string
-        if any(value == {} for value in (params or {}).values()):
+        if isinstance(params, Mapping) and any(value == {} for value in (params or {}).values()):
             params = dict(params)
             for key, value in params.items():
                 if value == {}:
@@ -77,8 +108,11 @@ class RequestsTransport(BaseTransport["requests.Session"]):
             **extra,
         }
 
-        if params is not None:
-            merge_at(data, "params", params)
+        if params_override is not None:
+            if isinstance(data.get("params"), str) or isinstance(params_override, str):
+                data["params"] = _merge_query_components(data.get("params"), params_override)
+            else:
+                merge_at(data, "params", params_override)
         if cookies is not None:
             merge_at(data, "cookies", cookies)
 

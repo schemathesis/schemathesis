@@ -7,6 +7,7 @@ import requests
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
 from schemathesis.core.failures import Failure
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
 from schemathesis.openapi.checks import JsonSchemaError
@@ -227,6 +228,81 @@ def test_openapi_3_2_smoke():
     assert len(operations) == 1
     assert operations[0].ok().path == "/users"
     assert operations[0].ok().method == "get"
+
+
+def test_openapi_3_2_querystring_parameter_is_collected():
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+        "paths": {
+            "/search": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ignored",
+                            "in": "querystring",
+                            "required": True,
+                            "content": {
+                                "application/x-www-form-urlencoded": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"q": {"type": "string"}},
+                                        "required": ["q"],
+                                    }
+                                }
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/search"]["GET"]
+    assert len(operation.query.items) == 1
+    assert operation.query.items[0].definition["in"] == "querystring"
+    assert operation.query.items[0].location == ParameterLocation.QUERY
+
+
+@pytest.mark.parametrize(
+    "parameters",
+    [
+        [
+            {"name": "q", "in": "query", "schema": {"type": "string"}},
+            {"name": "ignored", "in": "querystring", "content": {"application/json": {"schema": {"type": "object"}}}},
+        ],
+        [
+            {
+                "name": "ignored1",
+                "in": "querystring",
+                "content": {"application/json": {"schema": {"type": "object"}}},
+            },
+            {
+                "name": "ignored2",
+                "in": "querystring",
+                "content": {"application/json": {"schema": {"type": "object"}}},
+            },
+        ],
+    ],
+    ids=["query-and-querystring", "multiple-querystring"],
+)
+def test_openapi_3_2_querystring_parameter_constraints(parameters):
+    raw_schema = {
+        "openapi": "3.2.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+        "paths": {
+            "/search": {
+                "get": {
+                    "parameters": parameters,
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    with pytest.raises(InvalidSchema, match="Invalid `parameters` definition"):
+        schema["/search"]["GET"]
 
 
 @pytest.mark.parametrize(

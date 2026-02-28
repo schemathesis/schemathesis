@@ -657,6 +657,7 @@ class APIOperation(Generic[P, R, S]):
             "header": self.headers,
             "cookie": self.cookies,
             "query": self.query,
+            "querystring": self.query,
             "body": self.body,
         }.get(location)
 

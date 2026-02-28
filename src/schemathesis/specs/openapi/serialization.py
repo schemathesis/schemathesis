@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
 from typing import Any
+from urllib.parse import quote
 
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER, RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.schemas import APIOperation
 
 Generated = dict[str, Any]
@@ -49,11 +50,14 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
     for definition in definitions:
         name = definition["name"]
         if "content" in definition:
-            # https://swagger.io/docs/specification/describing-parameters/#schema-vs-content
-            options = iter(definition["content"].keys())
-            media_type = next(options, None)
-            if media_type == "application/json":
-                yield to_json(name)
+            if definition["in"] == "querystring":
+                yield from _serialize_querystring_openapi3(name, definition["content"])
+            else:
+                # https://swagger.io/docs/specification/describing-parameters/#schema-vs-content
+                options = iter(definition["content"].keys())
+                media_type = next(options, None)
+                if media_type == "application/json":
+                    yield to_json(name)
         else:
             # Simple serialization
             style = definition.get("style")
@@ -71,6 +75,93 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 yield from _serialize_header_openapi3(name, type_, explode)
             elif definition["in"] == "cookie":
                 yield from _serialize_cookie_openapi3(name, type_, explode)
+
+
+def _serialize_querystring_openapi3(
+    name: str, content: Mapping[str, Any]
+) -> Generator[Callable[[Generated], Generated], None, None]:
+    options = iter(content.items())
+    media_type, media_type_object = next(options, (None, None))
+    if media_type is None:
+        return
+
+    if media_type == "application/x-www-form-urlencoded":
+        yield _serialize_querystring_urlencoded(name, media_type_object)
+    else:
+        yield _serialize_querystring_other_media_type(name, media_type)
+
+
+def _serialize_querystring_urlencoded(name: str, media_type_object: Any) -> Callable[[Generated], Generated]:
+    serializer = _build_urlencoded_serializer(media_type_object)
+
+    def _map(item: Generated) -> Generated:
+        payload = item.pop(name, None)
+        if payload is None:
+            return item
+        if isinstance(payload, Mapping):
+            serialized = serializer(dict(payload))
+            if isinstance(serialized, Mapping):
+                item.update(serialized)
+            else:
+                _append_raw_query_string(item, serialized)
+        else:
+            _append_raw_query_string(item, str(payload))
+        return item
+
+    return _map
+
+
+def _serialize_querystring_other_media_type(name: str, media_type: str) -> Callable[[Generated], Generated]:
+    def _map(item: Generated) -> Generated:
+        payload = item.pop(name, None)
+        if payload is None:
+            return item
+
+        if media_type == "application/json":
+            serialized = json.dumps(payload, separators=(",", ":"))
+        elif isinstance(payload, bytes):
+            serialized = payload.decode("utf-8", errors="ignore")
+        else:
+            serialized = str(payload)
+
+        _append_raw_query_string(item, quote(serialized, safe=""))
+        return item
+
+    return _map
+
+
+def _build_urlencoded_serializer(media_type_object: Any) -> Callable[[Generated], Generated]:
+    schema = media_type_object.get("schema", {}) if isinstance(media_type_object, Mapping) else {}
+    properties = schema.get("properties", {}) if isinstance(schema, Mapping) else {}
+    encoding = media_type_object.get("encoding", {}) if isinstance(media_type_object, Mapping) else {}
+    definitions = []
+    if isinstance(properties, Mapping):
+        for property_name, property_schema in properties.items():
+            definition: dict[str, Any] = {"name": property_name, "in": "query", "schema": property_schema}
+            property_encoding = encoding.get(property_name) if isinstance(encoding, Mapping) else None
+            if isinstance(property_encoding, Mapping):
+                style = property_encoding.get("style", "form")
+                definition["style"] = style
+                definition["explode"] = property_encoding.get("explode", style == "form")
+            else:
+                definition["style"] = "form"
+                definition["explode"] = True
+            definitions.append(definition)
+    serializer = serialize_openapi3_parameters(definitions)
+    return serializer or (lambda x: x)
+
+
+def _append_raw_query_string(item: Generated, value: Any) -> None:
+    if value is None:
+        return
+    chunk = str(value).lstrip("?")
+    if not chunk:
+        return
+    current = item.get(RAW_QUERY_STRING_KEY)
+    if isinstance(current, RawQueryString):
+        item[RAW_QUERY_STRING_KEY] = RawQueryString(f"{current}&{chunk}")
+    else:
+        item[RAW_QUERY_STRING_KEY] = RawQueryString(chunk)
 
 
 def _serialize_path_openapi3(

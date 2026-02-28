@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import NotSet
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
@@ -20,7 +21,7 @@ from schemathesis.transport.prepare import (
     prepare_headers,
     prepare_path,
 )
-from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.requests import REQUESTS_TRANSPORT, _merge_query_components
 from schemathesis.transport.serialization import serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
@@ -30,7 +31,7 @@ if TYPE_CHECKING:
 class WSGITransport(BaseTransport["werkzeug.Client"]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         headers = kwargs.get("headers")
-        params = kwargs.get("params")
+        params_override = kwargs.get("params")
 
         final_headers = prepare_headers(case, headers)
 
@@ -49,17 +50,28 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
         else:
             extra = {}
 
+        query_string = case.query
+        if isinstance(query_string, dict):
+            query_string = dict(query_string)
+            marker_value = query_string.get(RAW_QUERY_STRING_KEY)
+            if isinstance(marker_value, RawQueryString):
+                raw_query = str(query_string.pop(RAW_QUERY_STRING_KEY))
+                query_string = _merge_query_components(raw_query, query_string)
+
         data = {
             "method": case.method,
             "path": case.operation.schema.get_full_path(prepare_path(case.path, case.path_parameters)),
             # Convert to regular dict for Werkzeug compatibility
             "headers": dict(final_headers),
-            "query_string": case.query,
+            "query_string": query_string,
             **extra,
         }
 
-        if params is not None:
-            merge_at(data, "query_string", params)
+        if params_override is not None:
+            if isinstance(data.get("query_string"), str) or isinstance(params_override, str):
+                data["query_string"] = _merge_query_components(data.get("query_string"), params_override)
+            else:
+                merge_at(data, "query_string", params_override)
 
         return data
 

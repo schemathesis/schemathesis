@@ -1,9 +1,11 @@
 import json
 from email.message import EmailMessage
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
 import pytest
-from hypothesis import given, settings
+import requests
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
@@ -413,6 +415,136 @@ def test_content_serialization(testdir):
         {"in": "query", "name": "filter", "required": True, "content": {"application/json": {"schema": OBJECT_SCHEMA}}}
     )
     assert_generates(testdir, raw_schema, ({"filter": JSONString('{"r": "100", "g": "200", "b": "150"}')},), "query")
+
+
+@pytest.mark.hypothesis_nested
+@given(st.data())
+@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_querystring_urlencoded_default_serialization(ctx, data):
+    # Example from OAS 3.2: {"foo": "a + b", "bar": true} -> foo=a+%2B+b&bar=true
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ignored",
+                            "in": "querystring",
+                            "required": True,
+                            "content": {
+                                "application/x-www-form-urlencoded": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "foo": {"type": "string", "enum": ["a + b"]},
+                                            "bar": {"type": "boolean", "enum": [True]},
+                                        },
+                                        "required": ["foo", "bar"],
+                                        "additionalProperties": False,
+                                    }
+                                }
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = data.draw(schema["/teapot"]["GET"].as_strategy())
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+    prepared = requests.Request("GET", "http://127.0.0.1:1/teapot", params=kwargs["params"]).prepare()
+    query_string = urlsplit(prepared.url).query
+    assert query_string in ("foo=a+%2B+b&bar=true", "bar=true&foo=a+%2B+b")
+
+
+@pytest.mark.hypothesis_nested
+@given(st.data())
+@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_querystring_urlencoded_uses_encoding_styles(ctx, data):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ignored",
+                            "in": "querystring",
+                            "required": True,
+                            "content": {
+                                "application/x-www-form-urlencoded": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "bbox": {
+                                                "type": "array",
+                                                "minItems": 4,
+                                                "maxItems": 4,
+                                                "items": {"type": "number", "enum": [1.1]},
+                                            }
+                                        },
+                                        "required": ["bbox"],
+                                        "additionalProperties": False,
+                                    },
+                                    "encoding": {"bbox": {"style": "pipeDelimited", "explode": False}},
+                                }
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = data.draw(schema["/teapot"]["GET"].as_strategy())
+    assert case.query == {"bbox": "1.1|1.1|1.1|1.1"}
+
+
+@pytest.mark.hypothesis_nested
+@given(st.data())
+@settings(max_examples=5, suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_querystring_json_serialization_is_sent_as_raw_query(ctx, data):
+    # Example from OAS 3.2: {"numbers":[1,2],"flag":null}
+    # -> %7B%22numbers%22%3A%5B1%2C2%5D%2C%22flag%22%3Anull%7D
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "ignored",
+                            "in": "querystring",
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "numbers": {"type": "array", "enum": [[1, 2]]},
+                                            "flag": {"type": "null"},
+                                        },
+                                        "required": ["numbers", "flag"],
+                                        "additionalProperties": False,
+                                    }
+                                }
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.2.0",
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = data.draw(schema["/teapot"]["GET"].as_strategy())
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1:1")
+    decoded = json.loads(unquote(kwargs["params"]))
+    assert decoded == {"numbers": [1, 2], "flag": None}
 
 
 def make_array_schema(location, style):
