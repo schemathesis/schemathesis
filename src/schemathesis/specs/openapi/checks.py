@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import wraps
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import jsonschema_rs
 
@@ -373,6 +373,82 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     return False
 
 
+def _path_string_type_mutation_becomes_valid_after_serialization(case: Case) -> bool:
+    """Check if string type mutation for a numeric path parameter remains semantically valid.
+
+    Path parameters are sent as strings and URL-decoded by servers before routing/handling.
+    Therefore, a negative string mutation for an integer/number parameter can still be accepted
+    when the decoded value is parseable as that numeric type (e.g. `%2B1` -> `+1`).
+    """
+    from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
+
+    meta = case.meta
+    if meta is None:
+        return False
+
+    path_component = meta.components.get(ParameterLocation.PATH)
+    if path_component is None or not path_component.mode.is_negative:
+        return False
+
+    # If there are other negative components, we should still validate them.
+    for location in (
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+        ParameterLocation.BODY,
+    ):
+        component = meta.components.get(location)
+        if component is not None and component.mode.is_negative:
+            return False
+
+    phase_data = meta.phase.data
+    if (
+        not isinstance(phase_data, FuzzingPhaseData)
+        or phase_data.parameter_location != ParameterLocation.PATH
+        or not phase_data.description
+        or not phase_data.description.startswith("Invalid type string")
+    ):
+        return False
+
+    if not case.path_parameters:
+        return False
+
+    names = [phase_data.parameter] if phase_data.parameter else list(case.path_parameters.keys())
+    for param_name in names:
+        if (
+            param_name is None
+            or param_name not in case.path_parameters
+            or param_name not in case.operation.path_parameters
+        ):
+            continue
+
+        value = case.path_parameters[param_name]
+        if not isinstance(value, str):
+            continue
+
+        parameter = case.operation.path_parameters.get(param_name)
+        if parameter is None:
+            continue
+        assert isinstance(parameter, OpenApiParameter)
+        expected_types = get_type(parameter.definition.get("schema", {}))
+        decoded = unquote(value)
+
+        if "integer" in expected_types:
+            try:
+                int(decoded)
+                return True
+            except ValueError:
+                continue
+        if "number" in expected_types:
+            try:
+                float(decoded)
+                return True
+            except ValueError:
+                continue
+
+    return False
+
+
 def _has_unverifiable_mutations(case: Case) -> bool:
     """Check if mutations cannot be verified as actually producing invalid data.
 
@@ -412,6 +488,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not has_only_additional_properties_in_non_body_parameters(case)
         and not _body_negation_becomes_valid_after_serialization(case)
         and not _single_element_array_becomes_valid_after_serialization(case)
+        and not _path_string_type_mutation_becomes_valid_after_serialization(case)
         and not _has_unverifiable_mutations(case)
     ):
         extra_info = ""
