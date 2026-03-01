@@ -24,6 +24,7 @@
 - Replace `json.dumps(sort_keys=True)` with `jsonschema_rs.canonical.json.to_string` for faster serialization.
 - Patch `hypothesis-jsonschema` to use `jsonschema_rs.canonical.json.to_string` instead of a custom encoder.
 - Cache `can_negate` results during negative test generation.
+- Use `st.permutations` instead of `st.lists` with `unique_by` for mutation ordering, reducing wasted Hypothesis draws.
 - Upgrade to `jsonschema-rs` 0.43.0 and use `validator_cls_for` for draft detection.
 - Replace custom `deepclone` implementation with `jsonschema_rs.canonical.schema.clone`.
 

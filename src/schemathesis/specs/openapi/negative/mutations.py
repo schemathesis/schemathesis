@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
 from typing import Any, TypeAlias, TypeVar
@@ -146,14 +146,14 @@ class MutationContext:
             #   - remove required parameters
             #   - negate constraints (only `additionalProperties` in this case)
             #   - mutate individual properties
-            mutations = draw(ordered((remove_required_property, negate_constraints, change_properties)))
+            mutations = draw(st.permutations((remove_required_property, negate_constraints, change_properties)))
         elif self.is_path_location:
             # The same as above, but we can only mutate individual properties as their names are predefined in the
             # path template, and all of them are required.
             mutations = [change_properties]
         else:
             # Body can be of any type and does not have any specific type semantic.
-            mutations = draw(ordered(get_mutations(draw, self.keywords)))
+            mutations = draw(st.permutations(get_mutations(draw, self.keywords)))
         # Deep copy all keywords to avoid modifying the original schema
         new_schema = deepclone(self.keywords)
         # Add x-bundled before mutations so they can resolve bundled references
@@ -410,7 +410,7 @@ def change_properties(
     # one property
     ordered_properties = [
         (name, canonicalish(subschema) if isinstance(subschema, bool) else subschema)
-        for name, subschema in draw(ordered(properties, unique_by=lambda x: x[0]))
+        for name, subschema in draw(st.permutations(properties))
     ]
     nested_metadata = None
     for property_name, property_schema in ordered_properties:
@@ -657,16 +657,4 @@ def get_mutations(draw: Draw, schema: JsonSchemaObject) -> tuple[Mutation, ...]:
         options.extend([change_properties, remove_required_property])
     elif "array" in types:
         options.append(change_items)
-    return draw(ordered(options))
-
-
-def ident(x: T) -> T:
-    return x
-
-
-def ordered(items: Sequence[T], unique_by: Callable[[T], Any] = ident) -> st.SearchStrategy[list[T]]:
-    """Returns a strategy that generates randomly ordered lists of T.
-
-    NOTE. Items should be unique.
-    """
-    return st.lists(st.sampled_from(items), min_size=len(items), unique_by=unique_by)
+    return draw(st.permutations(options))

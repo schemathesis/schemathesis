@@ -160,8 +160,7 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, 
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapshot_cli):
+def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli):
     raw_schema = ctx.openapi.build_schema(
         {
             "/endpoint": {
@@ -191,17 +190,15 @@ def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapsh
 
     port = app_runner.run_flask_app(app)
 
-    assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
-            "--checks=negative_data_rejection",
-            "--mode=negative",
-            "--phases=fuzzing",
-            "--max-examples=10",
-            "--seed=3",
-        )
-        == snapshot_cli
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--max-examples=10",
     )
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "Invalid component: parameter `age` in query" in result.stdout
 
 
 @pytest.mark.parametrize(
