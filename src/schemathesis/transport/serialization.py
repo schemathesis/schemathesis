@@ -35,6 +35,20 @@ class Binary(str):
         return f"Binary(data={self.data!r})"
 
 
+def contains_binary(value: Any) -> bool:
+    """Check if the value contains any Binary instances.
+
+    Binary is a special wrapper type that jsonschema-rs cannot validate.
+    """
+    if isinstance(value, Binary):
+        return True
+    if isinstance(value, dict):
+        return any(contains_binary(v) for v in value.values())
+    if isinstance(value, list):
+        return any(contains_binary(v) for v in value)
+    return False
+
+
 def serialize_json(value: Any) -> dict[str, Any]:
     if isinstance(value, bytes):
         # Possible to get via explicit examples, e.g. `externalValue`
