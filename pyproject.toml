@@ -57,7 +57,7 @@ tests = [
   "aiohttp>=3.9.1,<4.0",
   "coverage>=6",
   "fastapi>=0.86.0",
-  "Flask>=2.1.1,<3.0",
+  "Flask>=2.1.1,<4.0",
   "hypothesis-openapi>=0.2,<1; python_version >= '3.10'",
   "pydantic>=1.10.2",
   "pytest-asyncio>=1.0,<2.0",
@@ -68,10 +68,10 @@ tests = [
   "strawberry-graphql[fastapi]>=0.109.0",
   "syrupy>=4,<6.0",
   "tomli-w>=1.2.0",
-  "trustme>=0.9.0,<1.0",
+  "trustme>=0.9.0,<2.0",
 ]
 cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3"]
-bench = ["pytest-codspeed==4.2.0", "pytest-test-groups==1.2.1"]
+bench = ["pytest-codspeed==4.3.0", "pytest-test-groups==1.2.1"]
 docs = ["mkdocs-material", "mkdocstrings[python]"]
 profiling = ["pyinstrument>=5.1"]
 dev = ["schemathesis[tests,cov,bench,docs]"]
