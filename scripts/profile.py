@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import webbrowser
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,55 @@ def _get_profiler() -> Any:
         click.echo("pyinstrument is not installed. Run: uv pip install '.[profiling]'", err=True)
         sys.exit(1)
     return Profiler()
+
+
+def _load_schema(schema_path: str, base_url: str | None) -> Any:
+    import schemathesis
+
+    if schema_path.lower().startswith(("http://", "https://")):
+        return schemathesis.openapi.from_url(schema_path)
+    kwargs: dict[str, Any] = {}
+    if base_url:
+        kwargs["base_url"] = base_url
+    return schemathesis.openapi.from_path(schema_path, **kwargs)
+
+
+def _parse_modes(mode: str) -> list[Any]:
+    from schemathesis.generation.modes import GenerationMode
+
+    if mode == "all":
+        return list(GenerationMode)
+    if mode == "positive":
+        return [GenerationMode.POSITIVE]
+    return [GenerationMode.NEGATIVE]
+
+
+def _build_operation_filter(include_name: tuple[str, ...]) -> set[str]:
+    result: set[str] = set()
+    for op in include_name:
+        parts = op.strip().split(None, 1)
+        if len(parts) == 2:
+            result.add(f"{parts[0].upper()} {parts[1]}")
+    return result
+
+
+def _iter_operations(schema: Any, operation_filter: set[str]) -> Generator[Any, None, None]:
+    from schemathesis.core.result import Err
+
+    for result in schema.get_all_operations():
+        if isinstance(result, Err):
+            click.echo(f"Skipping invalid operation: {result.err()}", err=True)
+            continue
+        operation = result.ok()
+        method = operation.method.upper()
+        path = operation.path
+        if operation_filter and f"{method} {path}" not in operation_filter:
+            continue
+        yield operation
+
+
+def _normalize_path(text: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", text).strip("_")
 
 
 @click.command("cli", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})  # type: ignore[untyped-decorator]
@@ -90,7 +140,7 @@ def cli(
         webbrowser.open(Path(output_path).resolve().as_uri())
 
 
-@click.command("generate")  # type: ignore[untyped-decorator]
+@click.command("fuzzing")  # type: ignore[untyped-decorator]
 @click.argument("schema_path")  # type: ignore[untyped-decorator]
 @click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")  # type: ignore[untyped-decorator]
 @click.option(  # type: ignore[untyped-decorator]
@@ -142,11 +192,8 @@ def generate(
     from hypothesis import HealthCheck, Phase, Verbosity, given, seed, settings
     from hypothesis.errors import Unsatisfiable
 
-    import schemathesis
     from schemathesis import Case
-    from schemathesis.core.result import Err
     from schemathesis.generation import hypothesis
-    from schemathesis.generation.modes import GenerationMode
 
     hypothesis.setup()
 
@@ -154,42 +201,18 @@ def generate(
     click.echo(f"Output:    {output_dir}/")
     click.echo()
 
-    if schema_path.lower().startswith(("http://", "https://")):
-        schema = schemathesis.openapi.from_url(schema_path)
-    else:
-        kwargs: dict[str, Any] = {}
-        if base_url:
-            kwargs["base_url"] = base_url
-        schema = schemathesis.openapi.from_path(schema_path, **kwargs)
-
-    if mode == "all":
-        modes = list(GenerationMode)
-    elif mode == "positive":
-        modes = [GenerationMode.POSITIVE]
-    else:
-        modes = [GenerationMode.NEGATIVE]
-
-    operation_filter: set[str] = set()
-    for op in include_name:
-        parts = op.strip().split(None, 1)
-        if len(parts) == 2:
-            operation_filter.add(f"{parts[0].upper()} {parts[1]}")
+    schema = _load_schema(schema_path, base_url)
+    modes = _parse_modes(mode)
+    operation_filter = _build_operation_filter(include_name)
 
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     records: list[ProfileRecord] = []
 
-    for result in schema.get_all_operations():
-        if isinstance(result, Err):
-            click.echo(f"Skipping invalid operation: {result.err()}", err=True)
-            continue
-        operation = result.ok()
+    for operation in _iter_operations(schema, operation_filter):
         method = operation.method.upper()
         path = operation.path
-
-        if operation_filter and f"{method} {path}" not in operation_filter:
-            continue
 
         for gen_mode in modes:
             strategy = operation.as_strategy(generation_mode=gen_mode)
@@ -219,7 +242,7 @@ def generate(
 
             elapsed = time.perf_counter() - t0
             mode_label = gen_mode.value
-            html_path = out_dir / f"{_normalize_path(method)}_{_normalize_path(path)}_{mode_label}.html"
+            html_path = out_dir / f"{_normalize_path(method)}_{_normalize_path(path)}_fuzzing_{mode_label}.html"
             html_path.write_text(profiler.output_html(), encoding="utf-8")
 
             record = ProfileRecord(method, path, mode_label, elapsed, html_path)
@@ -245,8 +268,119 @@ def generate(
         )
 
 
-def _normalize_path(text: str) -> str:
-    return re.sub(r"[^a-zA-Z0-9_-]", "_", text).strip("_")
+@click.command("coverage")  # type: ignore[untyped-decorator]
+@click.argument("schema_path")  # type: ignore[untyped-decorator]
+@click.option("--url", "base_url", default=None, help="API base URL (required for file-based schemas)")  # type: ignore[untyped-decorator]
+@click.option(  # type: ignore[untyped-decorator]
+    "--include-name",
+    "include_name",
+    multiple=True,
+    metavar="METHOD PATH",
+    help='Match operations by method + path, e.g. "POST /chat/completions".',
+)
+@click.option(  # type: ignore[untyped-decorator]
+    "--mode",
+    type=click.Choice(["positive", "negative", "all"]),
+    default="all",
+    show_default=True,
+    help="Test data generation mode",
+)
+@click.option(  # type: ignore[untyped-decorator]
+    "--output-dir",
+    "output_dir",
+    default="profiles",
+    show_default=True,
+    help="Directory to write per-operation HTML profiles.",
+)
+@click.option(  # type: ignore[untyped-decorator]
+    "--open",
+    "open_result",
+    is_flag=True,
+    default=False,
+    help="Open each profile HTML in the browser after generation.",
+)
+def coverage(
+    schema_path: str,
+    base_url: str | None,
+    include_name: tuple[str, ...],
+    mode: str,
+    output_dir: str,
+    open_result: bool,
+) -> None:
+    """Profile coverage-phase case generation per operation in isolation.
+
+    SCHEMA_PATH may be a file path or a URL.
+    """
+    _get_profiler()
+
+    from schemathesis.generation import hypothesis
+    from schemathesis.generation.hypothesis.builder import generate_coverage_cases
+
+    hypothesis.setup()
+
+    click.echo(f"Profiling: {schema_path}")
+    click.echo(f"Output:    {output_dir}/")
+    click.echo()
+
+    schema = _load_schema(schema_path, base_url)
+    modes = _parse_modes(mode)
+    operation_filter = _build_operation_filter(include_name)
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    records: list[ProfileRecord] = []
+    case_counts: dict[Path, int] = {}
+
+    for operation in _iter_operations(schema, operation_filter):
+        method = operation.method.upper()
+        path = operation.path
+        config = operation.schema.config
+        phases_cfg = config.phases_for(operation=operation)
+
+        for gen_mode in modes:
+            profiler = _get_profiler()
+            t0 = time.perf_counter()
+            with profiler:
+                cases = list(
+                    generate_coverage_cases(
+                        operation=operation,
+                        generation_modes=[gen_mode],
+                        auth_storage=None,
+                        as_strategy_kwargs={},
+                        generate_duplicate_query_parameters=phases_cfg.coverage.generate_duplicate_query_parameters,
+                        unexpected_methods=phases_cfg.coverage.unexpected_methods,
+                        generation_config=config.generation,
+                    )
+                )
+            elapsed = time.perf_counter() - t0
+            case_count = len(cases)
+            mode_label = gen_mode.value
+            html_path = out_dir / f"{_normalize_path(method)}_{_normalize_path(path)}_coverage_{mode_label}.html"
+            html_path.write_text(profiler.output_html(), encoding="utf-8")
+
+            record = ProfileRecord(method, path, mode_label, elapsed, html_path)
+            records.append(record)
+            case_counts[html_path] = case_count
+            click.echo(f"  {method:7} {path:50} [{mode_label:8}]  {elapsed:7.2f}s  ({case_count} cases)")
+
+            if open_result:
+                webbrowser.open(html_path.resolve().as_uri())
+
+    if not records:
+        click.echo("No operations profiled.")
+        return
+
+    records.sort(key=lambda r: r.elapsed, reverse=True)
+
+    click.echo()
+    click.echo(f"{'METHOD':<7}  {'PATH':<50}  {'MODE':<8}  {'TOTAL':>8}  {'CASES':>6}  PROFILE")
+    click.echo("-" * 100)
+    for record in records:
+        click.echo(
+            f"{record.method:<7}  {record.path:<50}  {record.mode:<8}  "
+            f"{record.elapsed:7.2f}s  {case_counts[record.html_path]:6}  {record.html_path}"
+        )
 
 
 @click.group()  # type: ignore[untyped-decorator]
@@ -256,6 +390,7 @@ def main() -> None:
 
 main.add_command(cli, name="cli")
 main.add_command(generate, name="generate")
+main.add_command(coverage, name="coverage")
 
 if __name__ == "__main__":
     main()
