@@ -28,7 +28,7 @@ jobs:
 
       - run: python benches/memory/measure.py
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: memory-benchmark-results
           path: memory-benchmark-results/
