@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from functools import lru_cache
 from typing import Any, Literal
 
@@ -13,7 +12,7 @@ def setup() -> None:
     from hypothesis.internal.reflection import is_first_param_referenced_in_function
     from hypothesis.strategies._internal import collections, core
     from hypothesis.vendor import pretty
-    from hypothesis_jsonschema import _canonicalise, _from_schema, _resolve
+    from hypothesis_jsonschema import _canonicalise, _encode, _from_schema, _resolve
     from hypothesis_jsonschema._canonicalise import SCHEMA_KEYS, SCHEMA_OBJECT_KEYS, merged
     from hypothesis_jsonschema._resolve import LocalResolver
 
@@ -28,6 +27,9 @@ def setup() -> None:
         pass
 
     # A set of performance-related patches
+    _encode.encode_canonical_json = jsonschema_rs.canonical.json.to_string
+    _canonicalise.encode_canonical_json = jsonschema_rs.canonical.json.to_string
+    _from_schema.encode_canonical_json = jsonschema_rs.canonical.json.to_string
 
     # This one is used a lot, and under the hood it re-parses the AST of the same function
     def _is_first_param_referenced_in_function(f: Any) -> bool:
@@ -57,10 +59,10 @@ def setup() -> None:
             bundle = schema.get(BUNDLE_STORAGE_KEY)
             if bundle is not None:
                 _for_hash = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
-                self.serialized = json.dumps(_for_hash, sort_keys=True)
+                self.serialized = jsonschema_rs.canonical.json.to_string(_for_hash)
                 self.encoded = hash((self.serialized, id(bundle)))
             else:
-                self.serialized = json.dumps(schema, sort_keys=True)
+                self.serialized = jsonschema_rs.canonical.json.to_string(schema)
                 self.encoded = hash(self.serialized)
 
         def __eq__(self, other: CacheableSchema) -> bool:  # type: ignore[override]

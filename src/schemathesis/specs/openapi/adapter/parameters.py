@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import chain
 from random import Random
 from typing import TYPE_CHECKING, Any, cast
+
+import jsonschema_rs
 
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
@@ -64,7 +65,7 @@ EXAMPLE_USAGE_PROBABILITY = 0.20
 
 def _variant_key(variant: dict[str, Any]) -> str:
     """Create a stable string key for a variant dict."""
-    return json.dumps(variant, sort_keys=True, default=str)
+    return jsonschema_rs.canonical.json.to_string(variant)
 
 
 def build_hybrid_strategy(

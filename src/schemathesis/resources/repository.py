@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-import json
 import threading
 from collections import defaultdict, deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
+
+import jsonschema_rs
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import status_code_matches
@@ -142,7 +143,7 @@ class ResourceRepository:
         assert context_order is not None, "Context order should be created for all resources"
 
         # Create a stable key for the context
-        context_key = json.dumps(context, sort_keys=True) if context else ""
+        context_key = jsonschema_rs.canonical.json.to_string(context) if context else ""
 
         instance = ResourceInstance(
             data=data, source_operation=source_operation, status_code=status_code, context=context
