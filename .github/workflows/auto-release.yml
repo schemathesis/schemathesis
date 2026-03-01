@@ -1,0 +1,39 @@
+name: Auto-release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    name: Create GitHub release
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Get release notes
+        run: python changelog.py notes ${{ steps.version.outputs.version }} > release_notes.md
+
+      - name: Create GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          PRERELEASE=""
+          if [[ "$TAG" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
+            PRERELEASE="--prerelease"
+          fi
+          gh release create "$TAG" \
+            --title "Release ${{ steps.version.outputs.version }}" \
+            --notes-file release_notes.md \
+            --verify-tag \
+            $PRERELEASE
