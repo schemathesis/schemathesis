@@ -1,6 +1,6 @@
-import json
 from pathlib import Path
 
+import jsonschema_rs
 import pytest
 from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
@@ -290,7 +290,7 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
         "$ref": Path(str(testdir.tmpdir / "bar.json")).as_uri() + "#/bar"
     }
 
-    original = json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True)
+    original = jsonschema_rs.canonical.json.to_string(deeply_nested_schema)
     schema = schemathesis.openapi.from_dict(deeply_nested_schema)
 
     @given(schema["/data"]["GET"].as_strategy())
@@ -303,7 +303,7 @@ def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     test()
 
     # And the original schema is not mutated
-    assert json.dumps(deeply_nested_schema, sort_keys=True, ensure_ascii=True) == original
+    assert jsonschema_rs.canonical.json.to_string(deeply_nested_schema) == original
 
 
 def make_header_param(schema, **kwargs):

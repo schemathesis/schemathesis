@@ -31,7 +31,10 @@ def assert_unique(values: list):
         if isinstance(value, GeneratedValue):
             value = value.value
         if isinstance(value, (dict | list)):
-            serialized = json.dumps(value, sort_keys=True)
+            try:
+                serialized = jsonschema_rs.canonical.json.to_string(value)
+            except ValueError:
+                serialized = json.dumps(value, sort_keys=True)
             key = (type(value), serialized)
         else:
             key = (type(value), value)

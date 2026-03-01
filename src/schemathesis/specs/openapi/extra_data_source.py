@@ -5,6 +5,8 @@ import threading
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, TypeAlias
 
+import jsonschema_rs
+
 from schemathesis.core import NOT_SET, deserialization
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
@@ -240,7 +242,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 # Only include if we filled ALL requirements
                 if len(variant) == len(requirements):
                     # Deduplicate by serializing the variant
-                    key = json.dumps(variant, sort_keys=True, default=str)
+                    key = jsonschema_rs.canonical.json.to_string(variant)
                     if key not in seen:
                         seen.add(key)
                         variants.append(variant)
@@ -263,7 +265,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 dedup_key = (type(value), value)
             else:
                 try:
-                    serialized = json.dumps(value, sort_keys=True, default=str)
+                    serialized = jsonschema_rs.canonical.json.to_string(value)
                     dedup_key = (type(value), serialized)
                 except (TypeError, ValueError):
                     continue
@@ -337,5 +339,5 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not resource_params:
             resource_params = dict(case.path_parameters)
 
-        variant_key = json.dumps(resource_params, sort_keys=True, default=str)
+        variant_key = jsonschema_rs.canonical.json.to_string(resource_params)
         self.usage_tracker.record_successful_delete(variant_key)
