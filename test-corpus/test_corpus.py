@@ -9,6 +9,7 @@ import requests
 from jsonschema.exceptions import SchemaError
 
 import schemathesis
+import schemathesis.graphql as _graphql
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
@@ -46,6 +47,7 @@ CORPUS_FILE_NAMES = (
     "openapi-3.1",
 )
 CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
+GRAPHQL_CORPUS = read_corpus_file("graphql")
 
 RESPONSE = Response(
     status_code=200,
@@ -59,6 +61,8 @@ patch("schemathesis.Case.call", return_value=RESPONSE).start()
 
 
 def pytest_generate_tests(metafunc):
+    if "corpus" not in metafunc.fixturenames:
+        return
     filenames = [(filename, member.name) for filename, corpus in CORPUS_FILES.items() for member in corpus.getmembers()]
     metafunc.parametrize("corpus, filename", filenames)
 
@@ -492,6 +496,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Failed to generate test cases from examples for this API operation" in formatted:
         return True
+    if "Unknown GraphQL Scalar" in formatted:
+        return True
     if formatted.splitlines()[-1].startswith("Path parameters") and formatted.endswith("are not defined"):
         return True
     if "Failed Health Check" in formatted:
@@ -531,3 +537,38 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
     if (schema_id, event.label) in KNOWN_ISSUES:
         return True
     return False
+
+
+GRAPHQL_FILENAMES = [member.name for member in GRAPHQL_CORPUS.getmembers()]
+
+
+@pytest.mark.parametrize("filename", GRAPHQL_FILENAMES)
+def test_graphql(filename):
+    raw_content = GRAPHQL_CORPUS.extractfile(filename).read()
+    raw_schema = json_loads(raw_content)
+    schema = _graphql.from_dict(raw_schema)
+    schema.config.update(base_url="http://127.0.0.1:8080/graphql")
+    schema.config.generation.update(database=None, max_examples=1)
+    schema.config.output.sanitization.update(enabled=False)
+    schema.config.update(suppress_health_check=list(HealthCheck))
+    schema.config.phases.update(phases=["fuzzing"])
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
+
+    handlers = [
+        JunitXMLHandler(output=StringIO()),
+        CassetteWriter(format=ReportFormat.VCR, output=StringIO(), config=schema.config),
+        CassetteWriter(format=ReportFormat.HAR, output=StringIO(), config=schema.config),
+        NdjsonWriter(output=StringIO(), config=schema.config),
+    ]
+    ctx = ExecutionContext(schema.config)
+
+    try:
+        for event in from_schema(schema).execute():
+            if isinstance(event, events.Interrupted):
+                pytest.exit("Keyboard Interrupt")
+            assert_event(filename, event)
+            for handler in handlers:
+                handler.handle_event(ctx, event)
+    finally:
+        for handler in handlers:
+            handler.shutdown(ctx)
