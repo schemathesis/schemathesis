@@ -391,16 +391,16 @@ def test_default(corpus, filename):
             handler.shutdown(ctx)
 
 
-def test_coverage_phase(corpus, filename):
+@pytest.mark.parametrize("mode", [GenerationMode.POSITIVE, GenerationMode.NEGATIVE], ids=["positive", "negative"])
+def test_coverage_phase(corpus, filename, mode):
     if filename in SLOW_COVERAGE:
         pytest.skip("Data generation is extremely slow for this schema")
     schema = _load_schema(corpus, filename)
-    modes = list(GenerationMode)
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
             for _ in _iter_coverage_cases(
                 operation=operation.ok(),
-                generation_modes=modes,
+                generation_modes=[mode],
                 generate_duplicate_query_parameters=False,
                 unexpected_methods=set(),
                 generation_config=schema.config.generation,
