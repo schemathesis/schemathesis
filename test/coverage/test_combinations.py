@@ -1975,6 +1975,22 @@ def test_negative_binary_string_type_violation(ctx_factory):
     assert_not_conform(covered, schema)
 
 
+def test_negative_oneof_with_binary_format_items(ctx_factory):
+    ctx = ctx_factory(location=ParameterLocation.BODY, generation_modes=[GenerationMode.NEGATIVE])
+    schema = {
+        "oneOf": [
+            {
+                "type": "array",
+                "items": {"type": "string", "format": "binary"},
+                "maxItems": 10,
+            },
+            {"type": "string"},
+        ]
+    }
+    covered = cover_schema(ctx, schema)
+    assert_unique(covered)
+
+
 def test_anyof_with_required_constraints(pctx):
     # See GH-3520
     schema = {

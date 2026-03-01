@@ -9,6 +9,7 @@
 
 ### :bug: Fixed
 
+- `ValueError: Unsupported type: 'Binary'` crash in the coverage phase when a `oneOf`/`anyOf` schema has a sub-schema with `format: binary` array items.
 - False positive `negative_data_rejection` for `application/xml` bodies in the coverage phase due to type mutations producing wire-identical bytes. [#3525](https://github.com/schemathesis/schemathesis/issues/3525)
 - False positive `negative_data_rejection` in the fuzzing phase for integer/number path parameters when string type mutations serialize to URL-decoded numeric values (e.g., `%2B1` -> `+1`).
 - Coverage phase generating schema-invalid positive values for schemas with `anyOf`/`oneOf` and `required` constraints. [#3520](https://github.com/schemathesis/schemathesis/issues/3520)

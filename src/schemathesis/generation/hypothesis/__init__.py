@@ -169,18 +169,9 @@ def setup() -> None:
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
 
     # Patch make_validator to use jsonschema-rs for instance validation
-    from schemathesis.transport.serialization import Binary
+    from schemathesis.transport.serialization import contains_binary
 
     _original_get_validator_class = _canonicalise._get_validator_class
-
-    def _contains_binary(value: Any) -> bool:
-        if isinstance(value, Binary):
-            return True
-        if isinstance(value, dict):
-            return any(_contains_binary(v) for v in value.values())
-        if isinstance(value, list):
-            return any(_contains_binary(v) for v in value)
-        return False
 
     class _ValidatorWrapper:
         __slots__ = ("_validator",)
@@ -189,7 +180,7 @@ def setup() -> None:
             self._validator = validator
 
         def is_valid(self, value: Any) -> bool:
-            if _contains_binary(value):
+            if contains_binary(value):
                 return True
             return self._validator.is_valid(value)
 
