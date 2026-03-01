@@ -58,7 +58,7 @@ tests = [
   "coverage>=6",
   "fastapi>=0.86.0",
   "Flask>=2.1.1,<4.0",
-  "hypothesis-openapi>=0.2,<1; python_version >= '3.10'",
+  "hypothesis-openapi>=0.3,<1",
   "pydantic>=1.10.2",
   "pytest-asyncio>=1.0,<2.0",
   "pytest-httpserver>=1.0,<2.0",
