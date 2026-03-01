@@ -15,7 +15,7 @@ from schemathesis.core.jsonschema import ALL_KEYWORDS
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.transport.serialization import Binary
+from schemathesis.transport.serialization import contains_binary
 
 from .mutations import MutationContext, MutationMetadata
 
@@ -102,20 +102,6 @@ def _is_unconstrained_binary_schema(schema: JsonSchema) -> bool:
     return schema.get("format") in _ALWAYS_INVALID_FORMATS and "type" not in schema
 
 
-def _contains_binary(value: Any) -> bool:
-    """Check if the value contains any Binary instances.
-
-    Binary is a special wrapper type that jsonschema-rs cannot validate.
-    """
-    if isinstance(value, Binary):
-        return True
-    if isinstance(value, dict):
-        return any(_contains_binary(v) for v in value.values())
-    if isinstance(value, list):
-        return any(_contains_binary(v) for v in value)
-    return False
-
-
 @lru_cache
 def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
     """Get JSON Schema validator for the given schema."""
@@ -175,13 +161,13 @@ def negative_schema(
 
         def filter_values(value: dict[str, Any]) -> bool:
             return is_non_empty_query(value) and (
-                skip_validation_filter or _contains_binary(value) or not validator.is_valid(value)
+                skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
             )
 
     else:
 
         def filter_values(value: dict[str, Any]) -> bool:
-            return skip_validation_filter or _contains_binary(value) or not validator.is_valid(value)
+            return skip_validation_filter or contains_binary(value) or not validator.is_valid(value)
 
     def generate_value_with_metadata(value: tuple[dict, MutationMetadata]) -> st.SearchStrategy:
         schema, metadata = value

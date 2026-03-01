@@ -44,6 +44,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
+from schemathesis.transport.serialization import contains_binary
 
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
@@ -981,6 +982,8 @@ def cover_schema_iter(
 
 
 def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
+    if contains_binary(value):
+        return False
     for vidx, validator in enumerate(validators):
         if idx == vidx:
             # This one is being negated
@@ -991,6 +994,9 @@ def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema_rs.Val
 
 
 def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
+    if contains_binary(value):
+        # Binary values cannot be validated by jsonschema_rs; treat as not matching any other sub-schema
+        return True
     valid_count = 0
     for vidx, validator in enumerate(validators):
         if idx == vidx:
