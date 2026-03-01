@@ -13,7 +13,11 @@ from typing import Any
 
 import click
 
-DEFAULT_CLI_PROFILE_FILENAME = "profile_cli.html"
+DEFAULT_CLI_PROFILE_FILENAME = "profiles/profile_cli.html"
+
+# Corpus tooling lives one level up from scripts/
+_CORPUS_TOOLS_DIR = Path(__file__).parent.parent / "corpus"
+_CORPUS_SCHEME = "corpus://"
 
 
 @dataclass
@@ -38,15 +42,95 @@ def _get_profiler() -> Any:
     return Profiler()
 
 
+def _parse_corpus_path(schema_path: str) -> tuple[str, str]:
+    """Parse 'corpus://CORPUS_NAME/SCHEMA_NAME' into (corpus_name, schema_name).
+
+    Example: 'corpus://openapi-3.0/vercel.com/0.0.1.json'
+      -> corpus_name='openapi-3.0', schema_name='vercel.com/0.0.1.json'
+    """
+    remainder = schema_path[len(_CORPUS_SCHEME) :]
+    corpus_name, _, schema_name = remainder.partition("/")
+    if not corpus_name or not schema_name:
+        raise click.BadParameter(
+            f"corpus:// path must be 'corpus://CORPUS_NAME/SCHEMA_NAME', got: {schema_path!r}",
+        )
+    return corpus_name, schema_name
+
+
+def _load_corpus_dict(schema_path: str) -> dict[str, Any]:
+    """Load a schema dict from a corpus:// path."""
+    import sys
+
+    sys.path.insert(0, str(_CORPUS_TOOLS_DIR))
+    from tools import load_from_corpus, read_corpus_file
+
+    corpus_name, schema_name = _parse_corpus_path(schema_path)
+    with read_corpus_file(corpus_name) as tar:
+        return load_from_corpus(schema_name, tar)
+
+
 def _load_schema(schema_path: str, base_url: str | None) -> Any:
     import schemathesis
 
+    if schema_path.startswith(_CORPUS_SCHEME):
+        schema_dict = _load_corpus_dict(schema_path)
+        kwargs: dict[str, Any] = {}
+        if base_url:
+            kwargs["base_url"] = base_url
+        return schemathesis.openapi.from_dict(schema_dict, **kwargs)
     if schema_path.lower().startswith(("http://", "https://")):
         return schemathesis.openapi.from_url(schema_path)
-    kwargs: dict[str, Any] = {}
+    kwargs = {}
     if base_url:
         kwargs["base_url"] = base_url
     return schemathesis.openapi.from_path(schema_path, **kwargs)
+
+
+_MOCK_BASE_URL = "http://localhost"
+
+
+def _install_call_mock() -> None:
+    """Patch Case.call so the CLI never makes real HTTP requests."""
+    from unittest.mock import patch
+
+    import requests
+
+    from schemathesis.core.transport import Response
+
+    mock_response = Response(
+        status_code=200,
+        headers={"Content-Type": ["application/json"]},
+        content=b"{}",
+        request=requests.Request(method="GET", url=f"{_MOCK_BASE_URL}/test").prepare(),
+        elapsed=0.1,
+        verify=False,
+    )
+    patch("schemathesis.Case.call", return_value=mock_response).start()
+
+
+def _resolve_corpus_args(args: list[str]) -> tuple[list[str], list[str]]:
+    """Replace any corpus:// arg with a temp file path, injecting --url automatically.
+
+    Returns (updated_args, tmp_paths).
+    """
+    import json
+    import tempfile
+
+    updated = []
+    tmp_paths = []
+    for arg in args:
+        if arg.startswith(_CORPUS_SCHEME):
+            schema_dict = _load_corpus_dict(arg)
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+            json.dump(schema_dict, tmp)
+            tmp.flush()
+            tmp.close()
+            updated.append(tmp.name)
+            updated.append(f"--url={_MOCK_BASE_URL}")
+            tmp_paths.append(tmp.name)
+        else:
+            updated.append(arg)
+    return updated, tmp_paths
 
 
 def _parse_modes(mode: str) -> list[Any]:
@@ -92,7 +176,7 @@ def _normalize_path(text: str) -> str:
     "--output",
     "output_file",
     default=None,
-    help=f"Output file path (default: {DEFAULT_CLI_PROFILE_FILENAME}).",
+    help=f"Output HTML file path (default: {DEFAULT_CLI_PROFILE_FILENAME}).",
 )
 @click.option("--open", "open_result", is_flag=True, default=False, help="Open the result file after profiling.")  # type: ignore[untyped-decorator]
 @click.argument("raw_args", nargs=-1, type=click.UNPROCESSED)  # type: ignore[untyped-decorator]
@@ -106,7 +190,13 @@ def cli(
     Pass schemathesis arguments after '--':
 
         python scripts/profile.py cli -- run schema.yaml --max-examples=5
+
+    corpus:// paths are extracted to a temp file and HTTP calls are mocked automatically:
+
+        python scripts/profile.py cli -- run corpus://openapi-3.1/vercel.com/0.0.1.json --max-examples=5
     """
+    import os
+
     args = list(raw_args)
     if args and args[0] == "--":
         args = args[1:]
@@ -114,7 +204,12 @@ def cli(
     if not args:
         raise click.UsageError("No schemathesis arguments provided. Pass them after '--'.")
 
-    output_path = output_file or DEFAULT_CLI_PROFILE_FILENAME
+    args, tmp_paths = _resolve_corpus_args(args)
+    if tmp_paths:
+        _install_call_mock()
+
+    output_path = Path(output_file or DEFAULT_CLI_PROFILE_FILENAME)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     profiler = _get_profiler()
 
     from schemathesis.cli import schemathesis
@@ -126,18 +221,22 @@ def cli(
     click.echo(f"Output:    {output_path}")
     click.echo()
 
-    with profiler:
-        try:
-            schemathesis.main(args=args, standalone_mode=False)
-        except SystemExit:
-            pass
-        except Exception as exc:  # noqa: BLE001
-            click.echo(f"schemathesis exited with error: {exc}", err=True)
+    try:
+        with profiler:
+            try:
+                schemathesis.main(args=args, standalone_mode=False)
+            except SystemExit:
+                pass
+            except Exception as exc:  # noqa: BLE001
+                click.echo(f"schemathesis exited with error: {exc}", err=True)
+    finally:
+        for tmp in tmp_paths:
+            os.unlink(tmp)
 
-    Path(output_path).write_text(profiler.output_html(), encoding="utf-8")
+    output_path.write_text(profiler.output_html(), encoding="utf-8")
     click.echo(f"Profile written to: {output_path}")
     if open_result:
-        webbrowser.open(Path(output_path).resolve().as_uri())
+        webbrowser.open(output_path.resolve().as_uri())
 
 
 @click.command("fuzzing")  # type: ignore[untyped-decorator]
@@ -174,7 +273,7 @@ def cli(
     default=False,
     help="Open each profile HTML in the browser after generation.",
 )
-def generate(
+def fuzzing(
     schema_path: str,
     base_url: str | None,
     include_name: tuple[str, ...],
@@ -185,7 +284,9 @@ def generate(
 ) -> None:
     """Profile data generation per operation in isolation.
 
-    SCHEMA_PATH may be a file path or a URL.
+    SCHEMA_PATH may be a file path, a URL, or a corpus:// path:
+
+        python scripts/profile.py generate corpus://openapi-3.0/vercel.com/0.0.1.json
     """
     _get_profiler()
 
@@ -309,7 +410,9 @@ def coverage(
 ) -> None:
     """Profile coverage-phase case generation per operation in isolation.
 
-    SCHEMA_PATH may be a file path or a URL.
+    SCHEMA_PATH may be a file path, a URL, or a corpus:// path:
+
+        python scripts/profile.py coverage corpus://openapi-3.0/vercel.com/0.0.1.json --mode negative
     """
     _get_profiler()
 
@@ -389,7 +492,7 @@ def main() -> None:
 
 
 main.add_command(cli, name="cli")
-main.add_command(generate, name="generate")
+main.add_command(fuzzing, name="fuzzing")
 main.add_command(coverage, name="coverage")
 
 if __name__ == "__main__":
