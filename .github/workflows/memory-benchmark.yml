@@ -12,6 +12,7 @@ permissions:
 jobs:
   memory-benchmark:
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
