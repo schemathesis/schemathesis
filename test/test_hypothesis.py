@@ -54,6 +54,56 @@ def test_canonicalish_keeps_bundle_when_bundled_ref_present():
 
 
 @pytest.mark.parametrize(
+    ("left", "right"),
+    [
+        ({}, {"type": "integer", "minimum": 1, "maximum": 1}),
+        ({"type": "integer", "minimum": 1, "maximum": 1}, {}),
+        (True, {"type": "integer", "minimum": 1, "maximum": 1}),
+        ({"type": "integer", "minimum": 1, "maximum": 1}, True),
+    ],
+    ids=["empty-left", "empty-right", "true-left", "true-right"],
+)
+def test_merged_truthy_identity(left, right):
+    setup()
+
+    expected = canonicalise.canonicalish(right if left in ({}, True) else left)
+
+    assert canonicalise.merged([left, right]) == expected
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "mutation_path"),
+    [
+        (
+            {"type": "object", "properties": {"a": {"type": "integer"}}},
+            {"required": ["a"]},
+            ("properties", "a", "type"),
+        ),
+        (
+            {"type": "array", "items": {"type": "integer"}},
+            {"minItems": 1},
+            ("items", "type"),
+        ),
+    ],
+    ids=["object-property", "array-items"],
+)
+def test_merged_cache_returns_fresh_copy(left, right, mutation_path):
+    setup()
+
+    first = canonicalise.merged([left, right])
+    assert isinstance(first, dict)
+
+    target = first
+    for key in mutation_path[:-1]:
+        target = target[key]
+    target[mutation_path[-1]] = "string"
+
+    second = canonicalise.merged([left, right])
+
+    assert second != first
+
+
+@pytest.mark.parametrize(
     ("schema", "expected_module"),
     [
         ({"type": "string", "pattern": r"([\u0009-\u00FF]){1,51200}"}, "jsonschema_rs"),
