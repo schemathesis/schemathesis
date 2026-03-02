@@ -29,7 +29,8 @@
 - Cache `can_negate` results during negative test generation.
 - Upgrade to `jsonschema-rs` 0.43.0 and use `validator_cls_for` for draft detection.
 - Replace custom `deepclone` implementation with `jsonschema_rs.canonical.schema.clone`.
-- Speed up the `hypothesis-jsonschema` patch layer by caching repeated merges and skipping identity merges
+- Speed up the `hypothesis-jsonschema` patch layer by caching repeated merges and skipping identity merges.
+- Avoid template generation in negative-only coverage phase.
 
 ### :wrench: Changed
 

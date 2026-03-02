@@ -12,6 +12,7 @@ from schemathesis.generation.coverage import (
     CoverageContext,
     CoverageScenario,
     GeneratedValue,
+    _cover_positive_for_type,
     _positive_number,
     _positive_string,
     cover_schema_iter,
@@ -1910,6 +1911,42 @@ def test_not_schema_generation_modes_consistency(
     assert len(negative_only_positive) == 0, (
         f"Negative mode should not generate positive cases, but got {len(negative_only_positive)}"
     )
+
+
+@pytest.mark.parametrize(
+    ("schema", "ty"),
+    [
+        (
+            {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+            "object",
+        ),
+        (
+            {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "array",
+        ),
+        (
+            {"properties": {"name": {"type": "string"}}, "required": ["name"]},
+            None,
+        ),
+    ],
+    ids=["object", "array", "implicit-object"],
+)
+def test_cover_positive_for_type_skips_template_generation_in_negative_mode(ctx_factory, schema, ty, monkeypatch):
+    ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE])
+    calls = 0
+    original = CoverageContext.generate_from_schema
+
+    def wrapped(self, schema):
+        nonlocal calls
+        calls += 1
+        return original(self, schema)
+
+    monkeypatch.setattr(CoverageContext, "generate_from_schema", wrapped)
+
+    values = list(_cover_positive_for_type(ctx, schema, ty))
+
+    assert values == []
+    assert calls == 0
 
 
 def test_items_false_with_prefix_items(pctx):
