@@ -53,11 +53,11 @@ OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWAGGER_20)
 
-VMWARE_SCHEMA.config.generation.update(max_examples=1)
+VMWARE_SCHEMA.config.generation.update(max_examples=1, database=None)
 VMWARE_SCHEMA.config.seed = 42
 VMWARE_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
 
-BBCI_SCHEMA.config.generation.update(max_examples=1)
+BBCI_SCHEMA.config.generation.update(max_examples=1, database=None)
 BBCI_SCHEMA.config.seed = 42
 BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
 
