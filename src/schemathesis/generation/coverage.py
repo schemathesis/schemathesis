@@ -550,6 +550,11 @@ def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> Jso
 def _cover_positive_for_type(
     ctx: CoverageContext, schema: JsonSchemaObject, ty: str | None, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
+    # In negative-only mode this function never yields values.
+    # Avoid expensive template generation in that case.
+    if GenerationMode.POSITIVE not in ctx.generation_modes:
+        return
+
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty)
         template = ctx.generate_from_schema(template_schema)
