@@ -17,7 +17,7 @@ def setup() -> None:
     from hypothesis_jsonschema._resolve import LocalResolver
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
-    from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
+    from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
 
@@ -152,12 +152,23 @@ def setup() -> None:
     # Patch canonicalish to skip x-bundled during the deep-copy serialisation.
     _original_canonicalish = _canonicalise.canonicalish
 
+    def _has_bundle_ref(obj: Any) -> bool:
+        if isinstance(obj, dict):
+            ref = obj.get("$ref")
+            if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
+                return True
+            return any(_has_bundle_ref(v) for v in obj.values())
+        if isinstance(obj, list):
+            return any(_has_bundle_ref(item) for item in obj)
+        return False
+
     def _fast_canonicalish(schema: Any) -> dict[str, Any]:
         if not isinstance(schema, dict) or BUNDLE_STORAGE_KEY not in schema:
             return _original_canonicalish(schema)
         bundle = schema[BUNDLE_STORAGE_KEY]
         schema_without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
-        result = _original_canonicalish(schema_without_bundle)
+        schema_for_canonicalish = schema if _has_bundle_ref(schema_without_bundle) else schema_without_bundle
+        result = _original_canonicalish(schema_for_canonicalish)
         # Restore x-bundled so downstream $ref resolution can find bundled schemas.
         if isinstance(result, dict) and result and result != {"not": {}}:
             result[BUNDLE_STORAGE_KEY] = bundle

@@ -5,11 +5,13 @@ import pytest
 from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
 from hypothesis.internal.observability import with_observability_callback
+from hypothesis_jsonschema import _canonicalise as canonicalise
 
 import schemathesis
 from schemathesis.core import NOT_SET
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
@@ -35,6 +37,19 @@ def make_operation(schema, **kwargs) -> APIOperation:
         security=schema._parse_security({}),
         **kwargs,
     )
+
+
+def test_canonicalish_keeps_bundle_when_bundled_ref_present():
+    setup()
+    schema = {
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1,
+        BUNDLE_STORAGE_KEY: {"schema1": {"type": "integer"}},
+    }
+
+    assert canonicalise.canonicalish(schema) == {"const": 1, BUNDLE_STORAGE_KEY: schema[BUNDLE_STORAGE_KEY]}
 
 
 @pytest.mark.parametrize("location", sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN}))
