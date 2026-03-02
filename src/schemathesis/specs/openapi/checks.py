@@ -15,7 +15,7 @@ import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
-from schemathesis.core.jsonschema import get_type
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -36,9 +36,6 @@ from schemathesis.openapi.checks import (
 )
 from schemathesis.specs.openapi.utils import expand_status_code, expand_status_codes
 from schemathesis.transport.prepare import prepare_path
-
-# Large size limit for regex patterns to support schemas with large quantifiers (e.g., {1,262144})
-_PATTERN_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=1_000_000_000)
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -639,7 +636,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 continue
 
             value_without_additional_properties = {k: v for k, v in value.items() if k in container}
-            if not validator_cls(schema, pattern_options=_PATTERN_OPTIONS).is_valid(
+            if not validator_cls(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(
                 value_without_additional_properties
             ):
                 # Other types of negation found

@@ -17,9 +17,12 @@ def setup() -> None:
     from hypothesis_jsonschema._resolve import LocalResolver
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
-    from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
+    from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS, REFERENCE_TO_BUNDLE_PREFIX
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
+
+    if getattr(setup, "_is_patched", False):
+        return
 
     # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
     # if e.g. Schemathesis CLI is used with multiple workers
@@ -182,6 +185,7 @@ def setup() -> None:
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
 
     # Patch make_validator to use jsonschema-rs for instance validation
+    from schemathesis.core.errors import is_regex_validation_error
     from schemathesis.transport.serialization import contains_binary
 
     _original_get_validator_class = _canonicalise._get_validator_class
@@ -197,20 +201,72 @@ def setup() -> None:
                 return True
             return self._validator.is_valid(value)
 
+    # `jsonschema_rs.validator_for` defaults to Draft 2020-12 when no `$schema` is present,
+    # but hypothesis-jsonschema defaults to Draft 7. Schemas using Draft 4/7 features
+    # (e.g. tuple `items`) are rejected by 2020-12, so we fall back through older drafts.
+    # TODO: remove once hypothesis-jsonschema propagates the draft version consistently.
+    def _make_rust_validator(schema: dict[str, Any]) -> Any:
+        last_error: jsonschema_rs.ValidationError | None = None
+        try:
+            return jsonschema_rs.validator_for(schema, pattern_options=FANCY_REGEX_OPTIONS)
+        except jsonschema_rs.ValidationError as exc:
+            last_error = exc
+            if is_regex_validation_error(exc):
+                raise
+
+        for cls in (jsonschema_rs.Draft7Validator, jsonschema_rs.Draft4Validator):
+            try:
+                return cls(schema, pattern_options=FANCY_REGEX_OPTIONS)
+            except jsonschema_rs.ValidationError as exc:
+                last_error = exc
+                if is_regex_validation_error(exc):
+                    raise
+
+        assert last_error is not None
+        raise last_error
+
     def make_validator(schema: dict[str, Any]) -> _ValidatorWrapper:
         try:
-            return _ValidatorWrapper(jsonschema_rs.validator_for(schema))
-        except (jsonschema_rs.ValidationError, ValueError, TypeError):
+            validator = _make_rust_validator(schema)
+            return _ValidatorWrapper(validator)
+        except jsonschema_rs.ValidationError:
+            # Either no Rust draft can compile this schema, or the regex engine differs.
+            # In both cases fall back to the original Hypothesis validator.
             cls = _original_get_validator_class(schema)
             return _ValidatorWrapper(cls(schema))
 
     def _get_validator_class(schema: dict[str, Any]) -> Any:
-        try:
-            jsonschema_rs.meta.validate(schema)
-            return jsonschema_rs.validator_cls_for(schema)
-        except (jsonschema_rs.ValidationError, ValueError, TypeError):
+        classes_to_try = [
+            jsonschema_rs.validator_cls_for(schema),
+            jsonschema_rs.Draft7Validator,
+            jsonschema_rs.Draft4Validator,
+        ]
+        seen = set()
+        last_error: jsonschema_rs.ValidationError | None = None
+
+        for cls in classes_to_try:
+            if cls in seen:
+                continue
+            seen.add(cls)
+            try:
+                cls(schema, pattern_options=FANCY_REGEX_OPTIONS)
+                return cls
+            except jsonschema_rs.ValidationError as exc:
+                last_error = exc
+                if is_regex_validation_error(exc):
+                    # Keep the class selection from jsonschema-rs even when regex syntax differs.
+                    return cls
+                continue
+
+        assert last_error is not None
+        if last_error.kind.name == "$ref":
+            # Unresolvable $ref — happens for intermediate sub-schemas that contain bundled
+            # internal refs but have lost the bundle storage key during hypothesis-jsonschema's
+            # merging. Fall back to Python; merged() discards the class anyway.
             return _original_get_validator_class(schema)
+        raise last_error
 
     _canonicalise.make_validator = make_validator
     _from_schema.make_validator = make_validator
     _canonicalise._get_validator_class = _get_validator_class
+    setup._is_patched = True  # type: ignore[attr-defined]
