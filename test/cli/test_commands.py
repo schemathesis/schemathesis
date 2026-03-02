@@ -268,7 +268,16 @@ def test_connection_timeout(cli, schema_url, workers, snapshot_cli):
     # When connection timeout is specified in the CLI and the request fails because of it
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
-    assert cli.run(schema_url, "--request-timeout=0.08", f"--workers={workers}", "--phases=fuzzing") == snapshot_cli
+    assert (
+        cli.run(
+            schema_url,
+            "--request-timeout=0.08",
+            f"--workers={workers}",
+            "--phases=fuzzing",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.operations("success")
