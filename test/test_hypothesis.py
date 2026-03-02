@@ -1,6 +1,7 @@
 import datetime
 from base64 import b64decode
 
+import jsonschema_rs
 import pytest
 from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
@@ -50,6 +51,46 @@ def test_canonicalish_keeps_bundle_when_bundled_ref_present():
     }
 
     assert canonicalise.canonicalish(schema) == {"const": 1, BUNDLE_STORAGE_KEY: schema[BUNDLE_STORAGE_KEY]}
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected_module"),
+    [
+        ({"type": "string", "pattern": r"([\u0009-\u00FF]){1,51200}"}, "jsonschema_rs"),
+        ({"type": "string", "pattern": r"[\uD800-\uDBFF]"}, "jsonschema.validators"),
+        ({"type": "array", "items": [{"type": "string"}]}, "jsonschema_rs"),
+    ],
+    ids=["large-quantifier-rust", "surrogate-range-python-fallback", "tuple-items-rust-draft7"],
+)
+def test_make_validator_regex_backend_selection(schema, expected_module):
+    setup()
+
+    validator = canonicalise.make_validator(schema)
+
+    assert validator._validator.__class__.__module__.startswith(expected_module)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": 1},
+        {"type": "object", "properties": []},
+    ],
+    ids=["invalid-type-keyword", "invalid-properties-keyword"],
+)
+def test_get_validator_class_does_not_downgrade_non_regex_schema_errors(schema):
+    setup()
+
+    with pytest.raises(jsonschema_rs.ValidationError):
+        canonicalise._get_validator_class(schema)
+
+
+def test_get_validator_class_falls_back_to_older_drafts_for_tuple_items():
+    setup()
+
+    schema = {"type": "array", "items": [{"type": "string"}]}
+
+    assert canonicalise._get_validator_class(schema) is jsonschema_rs.Draft7Validator
 
 
 @pytest.mark.parametrize("location", sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN}))
