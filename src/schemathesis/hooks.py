@@ -228,7 +228,7 @@ class HookDispatcher:
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
-            hook = _wrap_hook_for_generated_value(hook)
+            hook = _wrap_filter_hook_for_generated_value(hook)
             strategy = strategy.filter(hook)
         for hook in self.get_all_by_name(f"map_{container}"):
             if _should_skip_hook(hook, context):
@@ -298,6 +298,23 @@ def _wrap_hook_for_generated_value(hook: Callable) -> Callable:
         if isinstance(value, GeneratedValue):
             result = hook(value.value)
             return GeneratedValue(value=result, meta=value.meta)
+        return hook(value)
+
+    return wrapper
+
+
+def _wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:
+    """Wrap a filter hook to handle GeneratedValue transparently.
+
+    Like _wrap_hook_for_generated_value but for filter hooks: the boolean result
+    must be returned directly so strategy.filter() can evaluate its truthiness.
+    Re-wrapping in GeneratedValue would make every result truthy and break filtering.
+    """
+    from schemathesis.specs.openapi.negative import GeneratedValue
+
+    def wrapper(value: Any) -> bool:
+        if isinstance(value, GeneratedValue):
+            return hook(value.value)
         return hook(value)
 
     return wrapper
