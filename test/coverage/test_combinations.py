@@ -1949,6 +1949,36 @@ def test_cover_positive_for_type_skips_template_generation_in_negative_mode(ctx_
     assert calls == 0
 
 
+def test_generate_from_schema_uses_cache_and_returns_fresh_copy(ctx_factory, monkeypatch):
+    ctx = ctx_factory(generation_modes=[GenerationMode.NEGATIVE])
+    calls = 0
+
+    def wrapped(self, strategy):
+        nonlocal calls
+        calls += 1
+        return {"cached": True}
+
+    monkeypatch.setattr(CoverageContext, "generate_from", wrapped)
+
+    schema_1 = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "additionalProperties": {"type": "string"},
+    }
+    schema_2 = {
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+        "additionalProperties": {"type": "string"},
+    }
+
+    first = ctx.generate_from_schema(schema_1)
+    first["mutated"] = True
+    second = ctx.generate_from_schema(schema_2)
+
+    assert calls == 1
+    assert second == {"cached": True}
+
+
 def test_items_false_with_prefix_items(pctx):
     schema = {
         "type": "array",

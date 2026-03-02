@@ -31,6 +31,7 @@
 - Replace custom `deepclone` implementation with `jsonschema_rs.canonical.schema.clone`.
 - Speed up the `hypothesis-jsonschema` patch layer by caching repeated merges and skipping identity merges.
 - Avoid template generation in negative-only coverage phase.
+- Cache repeated schema-based value generation in the coverage phase.
 
 ### :wrench: Changed
 
