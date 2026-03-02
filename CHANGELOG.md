@@ -28,7 +28,7 @@
 - Replace `json.dumps(sort_keys=True)` with `jsonschema_rs.canonical.json.to_string` for faster serialization.
 - Patch `hypothesis-jsonschema` to use `jsonschema_rs.canonical.json.to_string` instead of a custom encoder.
 - Cache `can_negate` results during negative test generation.
-- Upgrade to `jsonschema-rs` 0.43.0 and use `validator_cls_for` for draft detection.
+- Upgrade to `jsonschema-rs` 0.44.0 and use `validator_cls_for` for draft detection.
 - Replace custom `deepclone` implementation with `jsonschema_rs.canonical.schema.clone`.
 - Speed up the `hypothesis-jsonschema` patch layer by caching repeated merges and skipping identity merges.
 - Avoid template generation in negative-only coverage phase.
