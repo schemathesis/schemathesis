@@ -1,3 +1,5 @@
+from functools import partial
+
 from jsonschema_rs import Draft202012Validator
 
 from schemathesis.specs.openapi.adapter import (
@@ -41,12 +43,20 @@ examples_container_keyword = "examples"
 
 extract_parameter_schema: ExtractParameterSchema = parameters.extract_parameter_schema_v3
 extract_raw_response_schema: ExtractRawResponseSchema = responses.extract_raw_response_schema_v3
-extract_response_schema: ExtractResponseSchema = responses.extract_response_schema_v3
-prepare_response_media_type_schema: PrepareResponseMediaTypeSchema = responses.prepare_response_media_type_schema
+extract_response_schema: ExtractResponseSchema = partial(
+    responses.extract_response_schema_v3, upgrade_legacy_exclusive_bounds=True
+)
+prepare_response_media_type_schema: PrepareResponseMediaTypeSchema = partial(
+    responses.prepare_response_media_type_schema, upgrade_legacy_exclusive_bounds=True
+)
 get_default_response_media_type: GetDefaultResponseMediaType = responses.get_default_response_media_type_v3
 resolve_response_media_type: ResolveResponseMediaType = responses.resolve_response_media_type_v3
-extract_schema_for_media_type: ExtractSchemaForMediaType = responses.extract_schema_for_media_type_v3
-extract_header_schema: ExtractHeaderSchema = responses.extract_header_schema_v3
+extract_schema_for_media_type: ExtractSchemaForMediaType = partial(
+    responses.extract_schema_for_media_type_v3, upgrade_legacy_exclusive_bounds=True
+)
+extract_header_schema: ExtractHeaderSchema = partial(
+    responses.extract_header_schema_v3, upgrade_legacy_exclusive_bounds=True
+)
 iter_parameters: IterParameters = parameters.iter_parameters_v3
 build_path_parameter: BuildPathParameter = parameters.build_path_parameter_v3_1
 iter_response_examples: IterResponseExamples = responses.iter_response_examples_v3

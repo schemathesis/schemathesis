@@ -284,11 +284,22 @@ def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | 
 
 
 def extract_response_schema_v3(
-    response: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
+    response: Mapping[str, Any],
+    resolver: RefResolver,
+    scope: str,
+    nullable_keyword: str,
+    *,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> Bundle | None:
     schema = extract_raw_response_schema_v3(response)
     if schema is not None:
-        return _prepare_schema(schema, resolver, scope, nullable_keyword)
+        return _prepare_schema(
+            schema,
+            resolver,
+            scope,
+            nullable_keyword,
+            upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        )
     return None
 
 
@@ -304,20 +315,43 @@ def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | 
     return first_schema
 
 
-def _prepare_schema(schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str) -> Bundle:
+def _prepare_schema(
+    schema: JsonSchema,
+    resolver: RefResolver,
+    scope: str,
+    nullable_keyword: str,
+    *,
+    upgrade_legacy_exclusive_bounds: bool = False,
+) -> Bundle:
     bundled = _bundle_in_scope(schema, resolver, scope)
     # Do not clone the schema, as bundling already does it
     converted = to_json_schema(
-        bundled.schema, nullable_keyword, is_response_schema=True, update_quantifiers=False, clone=False
+        bundled.schema,
+        nullable_keyword,
+        is_response_schema=True,
+        update_quantifiers=False,
+        clone=False,
+        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
     )
     return Bundle(schema=converted, name_to_uri=bundled.name_to_uri)
 
 
 def prepare_response_media_type_schema(
-    schema: JsonSchema, resolver: RefResolver, scope: str, nullable_keyword: str
+    schema: JsonSchema,
+    resolver: RefResolver,
+    scope: str,
+    nullable_keyword: str,
+    *,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> Bundle:
     """Prepare schema for a specific media type entry."""
-    return _prepare_schema(schema, resolver, scope, nullable_keyword)
+    return _prepare_schema(
+        schema,
+        resolver,
+        scope,
+        nullable_keyword,
+        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+    )
 
 
 def get_default_response_media_type_v2(response: Mapping[str, Any]) -> str | None:
@@ -388,13 +422,25 @@ def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str 
 
 
 def extract_schema_for_media_type_v3(
-    response: Mapping[str, Any], media_type: str | None, resolver: RefResolver, scope: str, nullable_keyword: str
+    response: Mapping[str, Any],
+    media_type: str | None,
+    resolver: RefResolver,
+    scope: str,
+    nullable_keyword: str,
+    *,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> Bundle | None:
     """Extract schema for specific media type from OpenAPI 3.x response."""
     content = response.get("content")
     if media_type is None or not isinstance(content, dict) or not content:
         # Fall back to old behavior
-        return extract_response_schema_v3(response, resolver, scope, nullable_keyword)
+        return extract_response_schema_v3(
+            response,
+            resolver,
+            scope,
+            nullable_keyword,
+            upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        )
 
     media_type_object = content.get(media_type)
     if not isinstance(media_type_object, dict):
@@ -408,7 +454,13 @@ def extract_schema_for_media_type_v3(
     if schema is None:
         return None
 
-    return prepare_response_media_type_schema(schema, resolver, scope, nullable_keyword)
+    return _prepare_schema(
+        schema,
+        resolver,
+        scope,
+        nullable_keyword,
+        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+    )
 
 
 def _is_sse_media_type(value: str) -> bool:
@@ -513,10 +565,21 @@ def extract_header_schema_v2(
 
 
 def extract_header_schema_v3(
-    header: Mapping[str, Any], resolver: RefResolver, scope: str, nullable_keyword: str
+    header: Mapping[str, Any],
+    resolver: RefResolver,
+    scope: str,
+    nullable_keyword: str,
+    *,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> Bundle:
     schema = header.get("schema", {})
-    return _prepare_schema(schema, resolver, scope, nullable_keyword)
+    return _prepare_schema(
+        schema,
+        resolver,
+        scope,
+        nullable_keyword,
+        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+    )
 
 
 def iter_response_examples_v2(response: Mapping[str, Any], status_code: str) -> Iterator[tuple[str, object]]:
