@@ -89,6 +89,12 @@ def setup() -> None:
     _resolve_result_cache: dict[int, dict[str, Any]] = {}
     _merged_result_cache: OrderedDict[tuple[tuple[Any, ...], tuple[Any, ...]], dict[str, Any] | None] = OrderedDict()
     _merged_result_cache_maxsize = 4096
+    _canonicalish_result_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
+    _canonicalish_result_cache_maxsize = 8192
+    _from_schema_result_cache: OrderedDict[tuple[tuple[Any, ...], int, int], Any] = OrderedDict()
+    _from_schema_result_cache_maxsize = 4096
+    _merged_as_strategies_result_cache: OrderedDict[tuple[tuple[tuple[Any, ...], ...], int, int], Any] = OrderedDict()
+    _merged_as_strategies_result_cache_maxsize = 2048
 
     def _schema_cache_key(schema: Any) -> tuple[Any, ...]:
         if isinstance(schema, dict):
@@ -114,6 +120,42 @@ def setup() -> None:
         _merged_result_cache.move_to_end(key)
         if len(_merged_result_cache) > _merged_result_cache_maxsize:
             _merged_result_cache.popitem(last=False)
+
+    def _canonicalish_cache_get(key: tuple[Any, ...]) -> dict[str, Any] | None:
+        if key in _canonicalish_result_cache:
+            _canonicalish_result_cache.move_to_end(key)
+            return deepclone(_canonicalish_result_cache[key])
+        return None
+
+    def _canonicalish_cache_set(key: tuple[Any, ...], value: dict[str, Any]) -> None:
+        _canonicalish_result_cache[key] = deepclone(value)
+        _canonicalish_result_cache.move_to_end(key)
+        if len(_canonicalish_result_cache) > _canonicalish_result_cache_maxsize:
+            _canonicalish_result_cache.popitem(last=False)
+
+    def _from_schema_cache_get(key: tuple[tuple[Any, ...], int, int]) -> Any | None:
+        if key in _from_schema_result_cache:
+            _from_schema_result_cache.move_to_end(key)
+            return _from_schema_result_cache[key]
+        return None
+
+    def _from_schema_cache_set(key: tuple[tuple[Any, ...], int, int], value: Any) -> None:
+        _from_schema_result_cache[key] = value
+        _from_schema_result_cache.move_to_end(key)
+        if len(_from_schema_result_cache) > _from_schema_result_cache_maxsize:
+            _from_schema_result_cache.popitem(last=False)
+
+    def _merged_as_strategies_cache_get(key: tuple[tuple[tuple[Any, ...], ...], int, int]) -> Any | None:
+        if key in _merged_as_strategies_result_cache:
+            _merged_as_strategies_result_cache.move_to_end(key)
+            return _merged_as_strategies_result_cache[key]
+        return None
+
+    def _merged_as_strategies_cache_set(key: tuple[tuple[tuple[Any, ...], ...], int, int], value: Any) -> None:
+        _merged_as_strategies_result_cache[key] = value
+        _merged_as_strategies_result_cache.move_to_end(key)
+        if len(_merged_as_strategies_result_cache) > _merged_as_strategies_result_cache_maxsize:
+            _merged_as_strategies_result_cache.popitem(last=False)
 
     def _is_trivial_truthy(schema: Any) -> bool:
         return schema is True or schema == {}
@@ -154,6 +196,46 @@ def setup() -> None:
 
         return _original_merged(schemas)
 
+    _original_from_schema = _from_schema.__dict__["__from_schema"]
+    _original_merged_as_strategies = _from_schema.merged_as_strategies
+
+    def _cached_from_schema(schema: Any, *, alphabet: Any, custom_formats: Any) -> Any:
+        try:
+            key = (_schema_cache_key(schema), id(alphabet), id(custom_formats))
+        except (TypeError, ValueError):
+            key = None
+
+        if key is not None:
+            cached = _from_schema_cache_get(key)
+            if cached is not None:
+                return cached
+
+        strategy = _original_from_schema(schema, alphabet=alphabet, custom_formats=custom_formats)
+
+        if key is not None:
+            _from_schema_cache_set(key, strategy)
+
+        return strategy
+
+    def _cached_merged_as_strategies(schemas: Any, *, alphabet: Any, custom_formats: Any) -> Any:
+        try:
+            schema_keys = tuple(_schema_cache_key(schema) for schema in schemas)
+            key = (schema_keys, id(alphabet), id(custom_formats))
+        except (TypeError, ValueError):
+            key = None
+
+        if key is not None:
+            cached = _merged_as_strategies_cache_get(key)
+            if cached is not None:
+                return cached
+
+        strategy = _original_merged_as_strategies(schemas, alphabet=alphabet, custom_formats=custom_formats)
+
+        if key is not None:
+            _merged_as_strategies_cache_set(key, strategy)
+
+        return strategy
+
     def resolve_all_refs(
         schema: Literal[True, False] | dict[str, Any],
         *,
@@ -189,7 +271,10 @@ def setup() -> None:
             resolver.push_scope(url)
             try:
                 result = _merged(
-                    [_resolve_all_refs(s, resolver=resolver), _resolve_all_refs(deepclone(resolved), resolver=resolver)]
+                    [
+                        _resolve_all_refs(s, resolver=resolver),
+                        _resolve_all_refs(deepclone(resolved), resolver=resolver),
+                    ]
                 )
             finally:
                 resolver.pop_scope()
@@ -219,6 +304,8 @@ def setup() -> None:
     _resolve.resolve_all_refs = resolve_all_refs
     _from_schema.deepcopy = deepclone
     _from_schema.get_type = _get_type
+    _from_schema.__dict__["__from_schema"] = _cached_from_schema
+    _from_schema.merged_as_strategies = _cached_merged_as_strategies
     _from_schema.resolve_all_refs = resolve_all_refs
     _canonicalise.get_type = _get_type
     _canonicalise.CacheableSchema = CacheableSchema
@@ -237,8 +324,21 @@ def setup() -> None:
         return False
 
     def _fast_canonicalish(schema: Any) -> dict[str, Any]:
+        try:
+            cache_key = _schema_cache_key(schema)
+        except (TypeError, ValueError):
+            cache_key = None
+
+        if cache_key is not None:
+            cached = _canonicalish_cache_get(cache_key)
+            if cached is not None:
+                return cached
+
         if not isinstance(schema, dict) or BUNDLE_STORAGE_KEY not in schema:
-            return _original_canonicalish(schema)
+            result = _original_canonicalish(schema)
+            if cache_key is not None:
+                _canonicalish_cache_set(cache_key, result)
+            return result
         bundle = schema[BUNDLE_STORAGE_KEY]
         schema_without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
         schema_for_canonicalish = schema if _has_bundle_ref(schema_without_bundle) else schema_without_bundle
@@ -246,6 +346,8 @@ def setup() -> None:
         # Restore x-bundled so downstream $ref resolution can find bundled schemas.
         if isinstance(result, dict) and result and result != {"not": {}}:
             result[BUNDLE_STORAGE_KEY] = bundle
+        if cache_key is not None:
+            _canonicalish_cache_set(cache_key, result)
         return result
 
     _canonicalise.canonicalish = _fast_canonicalish
