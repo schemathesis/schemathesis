@@ -217,6 +217,7 @@ class CoverageContext:
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema_rs.Validator]
     _resolver: RefResolver | None
+    _schema_generation_cache: dict[tuple[Any, ...], Any]
     allow_extra_parameters: bool
 
     __slots__ = (
@@ -229,6 +230,7 @@ class CoverageContext:
         "custom_formats",
         "validator_cls",
         "_resolver",
+        "_schema_generation_cache",
         "allow_extra_parameters",
     )
 
@@ -244,6 +246,7 @@ class CoverageContext:
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema_rs.Validator],
         _resolver: RefResolver | None = None,
+        _schema_generation_cache: dict[tuple[Any, ...], Any] | None = None,
         allow_extra_parameters: bool = True,
     ) -> None:
         self.root_schema = root_schema
@@ -255,6 +258,7 @@ class CoverageContext:
         self.custom_formats = custom_formats
         self.validator_cls = validator_cls
         self._resolver = _resolver
+        self._schema_generation_cache = _schema_generation_cache if _schema_generation_cache is not None else {}
         self.allow_extra_parameters = allow_extra_parameters
 
     @property
@@ -292,6 +296,7 @@ class CoverageContext:
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
             _resolver=self._resolver,
+            _schema_generation_cache=self._schema_generation_cache,
             allow_extra_parameters=self.allow_extra_parameters,
         )
 
@@ -306,6 +311,7 @@ class CoverageContext:
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
             _resolver=self._resolver,
+            _schema_generation_cache=self._schema_generation_cache,
             allow_extra_parameters=self.allow_extra_parameters,
         )
 
@@ -449,8 +455,27 @@ class CoverageContext:
             schema = dict(schema)
             schema[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
 
+        cache_key = _schema_generation_cache_key(schema)
+        cached = self._schema_generation_cache.get(cache_key, NOT_SET)
+        if cached is not NOT_SET:
+            return deepclone(cached) if isinstance(cached, dict | list) else cached
+
         # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
-        return self.generate_from(from_schema(deepclone(schema), custom_formats=self.custom_formats))
+        generated = self.generate_from(from_schema(deepclone(schema), custom_formats=self.custom_formats))
+        self._schema_generation_cache[cache_key] = (
+            deepclone(generated) if isinstance(generated, dict | list) else generated
+        )
+        return generated
+
+
+def _schema_generation_cache_key(schema: JsonSchema) -> tuple[Any, ...]:
+    if isinstance(schema, dict):
+        bundle = schema.get(BUNDLE_STORAGE_KEY)
+        if bundle is not None:
+            without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
+            return ("dict_with_bundle", jsonschema_rs.canonical.json.to_string(without_bundle), id(bundle))
+        return ("dict", jsonschema_rs.canonical.json.to_string(schema))
+    return ("json", jsonschema_rs.canonical.json.to_string(schema))
 
 
 T = TypeVar("T")
