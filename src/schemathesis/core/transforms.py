@@ -3,9 +3,11 @@ from __future__ import annotations
 import string
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from functools import lru_cache
-from typing import Any, TypeVar, overload
+from typing import Any, overload
 
-T = TypeVar("T")
+import jsonschema_rs
+
+deepclone = jsonschema_rs.canonical.schema.clone
 
 
 @lru_cache
@@ -21,55 +23,6 @@ def get_template_fields(template: str) -> frozenset[str]:
         return parameters
     except (ValueError, IndexError):
         return frozenset()
-
-
-@overload
-def deepclone(value: dict) -> dict: ...  # pragma: no cover
-
-
-@overload
-def deepclone(value: list) -> list: ...  # pragma: no cover
-
-
-@overload
-def deepclone(value: T) -> T: ...  # pragma: no cover
-
-
-def deepclone(value: Any) -> Any:
-    """A specialized version of `deepcopy` that copies only `dict` and `list` and does unrolling.
-
-    It is on average 3x faster than `deepcopy` and given the amount of calls, it is an important optimization.
-    """
-    if isinstance(value, dict):
-        return {
-            k1: (
-                {
-                    k2: (
-                        {k3: deepclone(v3) for k3, v3 in v2.items()}
-                        if isinstance(v2, dict)
-                        else [deepclone(v3) for v3 in v2]
-                        if isinstance(v2, list)
-                        else v2
-                    )
-                    for k2, v2 in v1.items()
-                }
-                if isinstance(v1, dict)
-                else [deepclone(v2) for v2 in v1]
-                if isinstance(v1, list)
-                else v1
-            )
-            for k1, v1 in value.items()
-        }
-    if isinstance(value, list):
-        return [
-            {k2: deepclone(v2) for k2, v2 in v1.items()}
-            if isinstance(v1, dict)
-            else [deepclone(v2) for v2 in v1]
-            if isinstance(v1, list)
-            else v1
-            for v1 in value
-        ]
-    return value
 
 
 def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:

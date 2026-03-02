@@ -25,6 +25,7 @@
 - Patch `hypothesis-jsonschema` to use `jsonschema_rs.canonical.json.to_string` instead of a custom encoder.
 - Cache `can_negate` results during negative test generation.
 - Upgrade to `jsonschema-rs` 0.43.0 and use `validator_cls_for` for draft detection.
+- Replace custom `deepclone` implementation with `jsonschema_rs.canonical.schema.clone`.
 
 ### :wrench: Changed
 
