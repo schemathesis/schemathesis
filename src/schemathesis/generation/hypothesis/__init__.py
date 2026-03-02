@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Literal
 
@@ -13,7 +14,8 @@ def setup() -> None:
     from hypothesis.strategies._internal import collections, core
     from hypothesis.vendor import pretty
     from hypothesis_jsonschema import _canonicalise, _encode, _from_schema, _resolve
-    from hypothesis_jsonschema._canonicalise import SCHEMA_KEYS, SCHEMA_OBJECT_KEYS, merged
+    from hypothesis_jsonschema._canonicalise import SCHEMA_KEYS, SCHEMA_OBJECT_KEYS
+    from hypothesis_jsonschema._canonicalise import merged as _original_merged
     from hypothesis_jsonschema._resolve import LocalResolver
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
@@ -85,6 +87,72 @@ def setup() -> None:
     # Cache for fully-resolved schema output, keyed by schema hash.
     # Avoids re-traversing schemas with the same JSON content.
     _resolve_result_cache: dict[int, dict[str, Any]] = {}
+    _merged_result_cache: OrderedDict[tuple[tuple[Any, ...], tuple[Any, ...]], dict[str, Any] | None] = OrderedDict()
+    _merged_result_cache_maxsize = 4096
+
+    def _schema_cache_key(schema: Any) -> tuple[Any, ...]:
+        if isinstance(schema, dict):
+            bundle = schema.get(BUNDLE_STORAGE_KEY)
+            if bundle is not None:
+                without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
+                serialized = jsonschema_rs.canonical.json.to_string(without_bundle)
+                return ("dict_with_bundle", serialized, id(bundle))
+            return ("dict", jsonschema_rs.canonical.json.to_string(schema))
+        return ("json", jsonschema_rs.canonical.json.to_string(schema))
+
+    def _merge_cache_get(key: tuple[tuple[Any, ...], tuple[Any, ...]]) -> dict[str, Any] | None | Literal[False]:
+        if key in _merged_result_cache:
+            _merged_result_cache.move_to_end(key)
+            cached = _merged_result_cache[key]
+            if cached is None:
+                return None
+            return deepclone(cached)
+        return False
+
+    def _merge_cache_set(key: tuple[tuple[Any, ...], tuple[Any, ...]], value: dict[str, Any] | None) -> None:
+        _merged_result_cache[key] = deepclone(value) if isinstance(value, dict) else None
+        _merged_result_cache.move_to_end(key)
+        if len(_merged_result_cache) > _merged_result_cache_maxsize:
+            _merged_result_cache.popitem(last=False)
+
+    def _is_trivial_truthy(schema: Any) -> bool:
+        return schema is True or schema == {}
+
+    def _canonicalish_checked(schema: Any) -> dict[str, Any]:
+        result = _canonicalise.canonicalish(schema)
+        _canonicalise._get_validator_class(result)
+        return result
+
+    def _merged(schemas: list[Any]) -> dict[str, Any] | None:
+        if len(schemas) > 1:
+            filtered = [schema for schema in schemas if not _is_trivial_truthy(schema)]
+            if not filtered:
+                return {}
+            if len(filtered) == 1:
+                return _canonicalish_checked(filtered[0])
+            schemas = filtered
+
+        if len(schemas) == 2:
+            try:
+                cache_key = (_schema_cache_key(schemas[0]), _schema_cache_key(schemas[1]))
+            except (TypeError, ValueError):
+                cache_key = None
+            if cache_key is not None:
+                cached = _merge_cache_get(cache_key)
+                if cached is not False:
+                    return cached
+                reversed_key = (cache_key[1], cache_key[0])
+                cached = _merge_cache_get(reversed_key)
+                if cached is not False:
+                    _merge_cache_set(cache_key, cached)
+                    return cached
+
+            result = _original_merged(schemas)
+            if cache_key is not None:
+                _merge_cache_set(cache_key, result)
+            return result
+
+        return _original_merged(schemas)
 
     def resolve_all_refs(
         schema: Literal[True, False] | dict[str, Any],
@@ -120,11 +188,14 @@ def setup() -> None:
             url, resolved = resolver.resolve(ref)
             resolver.push_scope(url)
             try:
-                result = merged(
+                result = _merged(
                     [_resolve_all_refs(s, resolver=resolver), _resolve_all_refs(deepclone(resolved), resolver=resolver)]
                 )
             finally:
                 resolver.pop_scope()
+            if result is None:
+                msg = f"$ref:{ref!r} had incompatible base schema {s!r}"
+                raise _canonicalise.HypothesisRefResolutionError(msg)
             if schema_hash is not None:
                 _resolve_result_cache[schema_hash] = deepclone(result)
             return result
@@ -180,6 +251,8 @@ def setup() -> None:
     _canonicalise.canonicalish = _fast_canonicalish
     _from_schema.canonicalish = _fast_canonicalish
     _resolve.canonicalish = _fast_canonicalish
+    _canonicalise.merged = _merged
+    _from_schema.merged = _merged
     root_core.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     engine.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
     collections.BUFFER_SIZE = INTERNAL_BUFFER_SIZE
