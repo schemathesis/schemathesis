@@ -291,6 +291,9 @@ class OpenApiComponent(ABC):
             self.raw_schema,
             nullable_keyword=self.adapter.nullable_keyword,
             update_quantifiers=optimize,
+            upgrade_legacy_exclusive_bounds=(
+                self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
+            ),
         )
 
         # Missing the `type` keyword may significantly slowdown data generation, ensure it is set
