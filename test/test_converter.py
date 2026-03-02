@@ -113,6 +113,47 @@ def test_to_jsonschema_recursive(schema, expected):
     assert transform(schema, converter.to_json_schema, nullable_keyword="x-nullable") == expected
 
 
+def test_upgrade_legacy_exclusive_bounds():
+    schema = {
+        "type": "object",
+        "properties": {
+            "value": {
+                "oneOf": [
+                    {"type": "number", "minimum": 0, "exclusiveMinimum": True},
+                    {"type": "number", "maximum": 10, "exclusiveMaximum": False},
+                ]
+            }
+        },
+    }
+
+    result = transform(
+        schema,
+        converter.to_json_schema,
+        nullable_keyword="nullable",
+        upgrade_legacy_exclusive_bounds=True,
+    )
+
+    assert result == {
+        "type": "object",
+        "properties": {
+            "value": {
+                "oneOf": [
+                    {"type": "number", "exclusiveMinimum": 0},
+                    {"type": "number", "maximum": 10},
+                ]
+            }
+        },
+    }
+
+
+def test_does_not_upgrade_legacy_exclusive_bounds_by_default():
+    schema = {"type": "number", "minimum": 0, "exclusiveMinimum": True}
+
+    result = transform(schema, converter.to_json_schema, nullable_keyword="nullable")
+
+    assert result == schema
+
+
 @pytest.mark.parametrize(
     ("schema", "expected"),
     [

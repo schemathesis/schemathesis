@@ -9,6 +9,7 @@
 
 ### :bug: Fixed
 
+- OpenAPI 3.1 schemas using legacy Draft 4 exclusive bounds (`exclusiveMinimum: true`) had the constraint silently ignored, making the affected range untestable.
 - `ValueError: Unsupported type: 'Binary'` crash in the coverage phase when a `oneOf`/`anyOf` schema has a sub-schema with `format: binary` array items.
 - False positive `negative_data_rejection` for `application/xml` bodies in the coverage phase due to type mutations producing wire-identical bytes. [#3525](https://github.com/schemathesis/schemathesis/issues/3525)
 - False positive `negative_data_rejection` in the fuzzing phase for integer/number path parameters when string type mutations serialize to URL-decoded numeric values (e.g., `%2B1` -> `+1`).

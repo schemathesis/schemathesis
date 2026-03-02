@@ -385,6 +385,69 @@ def test_no_unsatisfiable_schemas(data):
     assert canonicalish(mutated_schema) != FALSEY
 
 
+def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "exclusiveMinimum": True,
+                                    }
+                                }
+                            },
+                        }
+                    },
+                },
+            },
+        },
+        version="3.1.0",
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/data"]["GET"]
+    response_def = operation.responses.get("200")
+    assert response_def is not None
+    resolved = response_def.get_schema("application/json")
+    # Without upgrade: Draft 2020-12 ignores bool exclusiveMinimum → schema is just {type: integer, minimum: 1}
+    # With upgrade: {type: integer, exclusiveMinimum: 1} — value must be strictly > 1
+    assert resolved.schema == {"type": "integer", "exclusiveMinimum": 1}
+
+
+def test_openapi_31_legacy_exclusive_bounds_in_negative_generation(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "number", "minimum": 0, "exclusiveMinimum": True}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    schema_dict["openapi"] = "3.1.0"
+
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/data"]["POST"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    test()
+
+
 @pytest.mark.hypothesis_nested
 def test_optional_query_param_negation(ctx):
     # When all query parameters are optional

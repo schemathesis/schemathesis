@@ -16,6 +16,7 @@ def to_json_schema(
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     clone: bool = True,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> dict[str, Any]: ...  # pragma: no cover
 
 
@@ -26,6 +27,7 @@ def to_json_schema(
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     clone: bool = True,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> bool: ...  # pragma: no cover
 
 
@@ -35,6 +37,7 @@ def to_json_schema(
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     clone: bool = True,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> dict[str, Any] | bool:
     if isinstance(schema, bool):
         return schema
@@ -45,6 +48,7 @@ def to_json_schema(
         nullable_keyword=nullable_keyword,
         is_response_schema=is_response_schema,
         update_quantifiers=update_quantifiers,
+        upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
     )
 
 
@@ -54,9 +58,13 @@ def _to_json_schema(
     nullable_keyword: str,
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
+    upgrade_legacy_exclusive_bounds: bool = False,
 ) -> JsonSchema:
     if isinstance(schema, bool):
         return schema
+
+    if upgrade_legacy_exclusive_bounds:
+        _upgrade_legacy_exclusive_bounds(schema)
 
     if schema.get(nullable_keyword):
         del schema[nullable_keyword]
@@ -68,6 +76,7 @@ def _to_json_schema(
     if schema_type == "file":
         schema["type"] = "string"
         schema["format"] = "binary"
+
     # Handle unsupported regex patterns - try translation first, remove if that fails
     pattern = schema.get("pattern")
     if pattern is not None:
@@ -128,6 +137,7 @@ def _to_json_schema(
                 nullable_keyword=nullable_keyword,
                 is_response_schema=is_response_schema,
                 update_quantifiers=update_quantifiers,
+                upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
             )
         elif keyword in IN_ITEM and isinstance(value, list):
             for idx, subschema in enumerate(value):
@@ -136,6 +146,7 @@ def _to_json_schema(
                     nullable_keyword=nullable_keyword,
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
+                    upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                 )
         elif keyword in IN_CHILD and isinstance(value, dict):
             for name, subschema in value.items():
@@ -144,9 +155,28 @@ def _to_json_schema(
                     nullable_keyword=nullable_keyword,
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
+                    upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
                 )
 
     return schema
+
+
+def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:
+    for exclusive_key, bound_key in (("exclusiveMinimum", "minimum"), ("exclusiveMaximum", "maximum")):
+        exclusive = schema.get(exclusive_key)
+        if not isinstance(exclusive, bool):
+            continue
+        if not exclusive:
+            schema.pop(exclusive_key, None)
+            continue
+
+        bound = schema.get(bound_key)
+        if isinstance(bound, bool) or not isinstance(bound, int | float):
+            # `exclusive* = true` without a numeric bound can't be represented in modern drafts.
+            schema.pop(exclusive_key, None)
+            continue
+        schema[exclusive_key] = bound
+        schema.pop(bound_key, None)
 
 
 def ensure_required_properties(schema: dict[str, Any]) -> None:
