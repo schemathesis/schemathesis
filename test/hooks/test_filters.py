@@ -1,7 +1,10 @@
 import pytest
 from hypothesis import given, settings
+from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.generation import GenerationMode
+from schemathesis.specs.openapi.negative import GeneratedValue
 
 
 def register_default(dispatcher):
@@ -141,3 +144,40 @@ def test_filter_combo(schema_url, hook):
         assert case.body == 42
 
     test()
+
+
+def test_filter_body_works_in_negative_mode(ctx):
+    schema = schemathesis.openapi.from_dict(
+        ctx.openapi.build_schema(
+            {
+                "/test": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            }
+        )
+    )
+
+    @schema.hook("before_generate_body")
+    def inject(context, strategy):
+        # Mix GeneratedValue-wrapped bytes (as syntax-level fuzzing does) with normal values
+        return st.one_of(
+            st.just(GeneratedValue(value=b"\xff", meta=None)),
+            st.just(GeneratedValue(value={"key": "value"}, meta=None)),
+        )
+
+    @schema.hook("filter_body")
+    def reject_bytes(context, body):
+        return not isinstance(body, bytes)
+
+    @given(case=schema["/test"]["POST"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=5)
+    def inner(case):
+        assert not isinstance(case.body, bytes)
+
+    inner()

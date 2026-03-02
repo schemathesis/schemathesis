@@ -19,6 +19,7 @@
 - Coverage phase silently replacing path parameter values with `"value"` when a custom format (e.g., `ipv4-network`) generates strings containing `/`. [#3527](https://github.com/schemathesis/schemathesis/issues/3527)
 - Examples phase not escaping path examples containing `/` when some path parameters were generated from schema. [#3533](https://github.com/schemathesis/schemathesis/issues/3533)
 - Unresolvable `$ref`s inside parameter `content` schemas now reported as schema errors at load time instead of crashing at generation time.
+- `filter_body` and other `filter_*` hooks silently not filtering values in negative mode.
 
 ### :rocket: Performance
 
