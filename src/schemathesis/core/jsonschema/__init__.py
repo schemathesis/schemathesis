@@ -1,6 +1,15 @@
 import jsonschema_rs
 
-from .bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX, BundleCache, BundleError, Bundler, bundle, unbundle
+from .bundler import (
+    BUNDLE_STORAGE_KEY,
+    REFERENCE_TO_BUNDLE_PREFIX,
+    BundleCache,
+    BundleError,
+    Bundler,
+    bundle,
+    unbundle,
+    unbundle_path,
+)
 from .keywords import ALL_KEYWORDS
 from .types import get_type
 
@@ -19,4 +28,5 @@ __all__ = [
     "BUNDLE_STORAGE_KEY",
     "get_type",
     "unbundle",
+    "unbundle_path",
 ]

@@ -189,6 +189,28 @@ def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool)
     return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
 
 
+def unbundle_path(path: list, name_to_uri: dict[str, str]) -> list:
+    """Translate bundled path segments back to original reference path segments.
+
+    E.g. ['x-bundled', 'schema1', 'properties', 'host'] with name_to_uri={'schema1': '#/components/schemas/Host'}
+    becomes ['components', 'schemas', 'Host', 'properties', 'host'].
+    """
+    result = []
+    i = 0
+    while i < len(path):
+        if path[i] == BUNDLE_STORAGE_KEY and i + 1 < len(path) and path[i + 1] in name_to_uri:
+            uri = name_to_uri[path[i + 1]]
+            if "#" in uri:
+                fragment = uri.split("#", 1)[1]
+                if fragment.startswith("/"):
+                    result.extend(fragment[1:].split("/"))
+            i += 2
+        else:
+            result.append(path[i])
+            i += 1
+    return result
+
+
 def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str]) -> JsonSchema:
     """Restore original $ref paths in a bundled schema for display purposes."""
     if isinstance(schema, dict):
