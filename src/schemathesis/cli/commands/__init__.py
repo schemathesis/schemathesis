@@ -8,10 +8,10 @@ import click
 
 from schemathesis.cli.commands.data import Data
 from schemathesis.cli.commands.run import run as run_command
-from schemathesis.cli.commands.run.handlers.output import display_header
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.ext.groups import CommandWithGroupedOptions, GroupedOption, StyledGroup, should_use_color
+from schemathesis.cli.output import display_header
 from schemathesis.config import ConfigError, SchemathesisConfig
 from schemathesis.core.errors import HookError, format_exception
 from schemathesis.core.version import SCHEMATHESIS_VERSION

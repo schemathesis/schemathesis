@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import textwrap
 import time
 from collections.abc import Callable, Generator, Iterable
@@ -17,6 +16,14 @@ from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
+from schemathesis.cli.output import (
+    BLOCK_PADDING,
+    LoadingProgressManager,
+    _style,
+    display_header,
+    format_duration,
+    make_console,
+)
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
@@ -33,14 +40,13 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
-    from rich.console import Console, Group
+    from rich.console import Console
     from rich.live import Live
     from rich.progress import Progress, TaskID
     from rich.text import Text
 
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
-IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 
 
@@ -63,20 +69,6 @@ def display_failures(ctx: ExecutionContext) -> None:
     display_section_name("FAILURES")
     for label, failures in ctx.statistic.failures.items():
         display_failures_for_single_test(ctx, label, failures.values())
-
-
-if IO_ENCODING != "utf-8":
-    HEADER_SEPARATOR = "-"
-
-    def _style(text: str, **kwargs: Any) -> str:
-        text = text.encode(IO_ENCODING, errors="replace").decode("utf-8")
-        return click.style(text, **kwargs)
-
-else:
-    HEADER_SEPARATOR = "━"
-
-    def _style(text: str, **kwargs: Any) -> str:
-        return click.style(text, **kwargs)
 
 
 def failure_formatter(block: MessageBlock, content: str) -> str:
@@ -135,14 +127,6 @@ def _display_extras(extras: list[str]) -> None:
         click.echo(_style(f"    {extra}"))
 
 
-def display_header(version: str) -> None:
-    prefix = "v" if version != "dev" else ""
-    header = f"Schemathesis {prefix}{version}"
-    click.echo(_style(header, bold=True))
-    click.echo(_style(HEADER_SEPARATOR * len(header), bold=True))
-    click.echo()
-
-
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 TRUNCATION_PLACEHOLDER = "[...]"
 
@@ -154,115 +138,6 @@ def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
         elif isinstance(entry, GeneratorType):
             for line in entry:
                 click.echo(line)
-
-
-def _default_console() -> Console:
-    from rich.console import Console
-
-    kwargs = {}
-    # For stdout recording in tests
-    if "PYTEST_VERSION" in os.environ:
-        kwargs["width"] = 240
-    return Console(**kwargs)
-
-
-BLOCK_PADDING = (0, 1, 0, 1)
-
-
-@dataclass
-class LoadingProgressManager:
-    console: Console
-    location: str
-    start_time: float
-    progress: Progress
-    progress_task_id: TaskID | None
-    is_interrupted: bool
-
-    __slots__ = ("console", "location", "start_time", "progress", "progress_task_id", "is_interrupted")
-
-    def __init__(self, console: Console, location: str) -> None:
-        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
-        from rich.style import Style
-        from rich.text import Text
-
-        self.console = console
-        self.location = location
-        self.start_time = time.monotonic()
-        progress_message = Text.assemble(
-            ("Loading specification from ", Style(color="white")),
-            (location, Style(color="cyan")),
-        )
-        self.progress = Progress(
-            TextColumn(""),
-            SpinnerColumn("clock"),
-            RenderableColumn(progress_message),
-            console=console,
-            transient=True,
-        )
-        self.progress_task_id = None
-        self.is_interrupted = False
-
-    def start(self) -> None:
-        """Start loading progress display."""
-        self.progress_task_id = self.progress.add_task("Loading", total=None)
-        self.progress.start()
-
-    def stop(self) -> None:
-        """Stop loading progress display."""
-        assert self.progress_task_id is not None
-        self.progress.stop_task(self.progress_task_id)
-        self.progress.stop()
-
-    def interrupt(self) -> None:
-        """Handle interruption during loading."""
-        self.is_interrupted = True
-        self.stop()
-
-    def get_completion_message(self) -> Text:
-        """Generate completion message including duration."""
-        from rich.style import Style
-        from rich.text import Text
-
-        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
-        if self.is_interrupted:
-            return Text.assemble(
-                ("⚡  ", Style(color="yellow")),
-                (f"Loading interrupted after {duration} while loading from ", Style(color="white")),
-                (self.location, Style(color="cyan")),
-            )
-        return Text.assemble(
-            ("✅  ", Style(color="green")),
-            ("Loaded specification from ", Style(color="bright_white")),
-            (self.location, Style(color="cyan")),
-            (f" (in {duration})", Style(color="bright_white")),
-        )
-
-    def get_error_message(self, error: LoaderError) -> Group:
-        from rich.console import Group
-        from rich.style import Style
-        from rich.text import Text
-
-        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
-
-        # Show what was attempted
-        attempted = Text.assemble(
-            ("❌  ", Style(color="red")),
-            ("Failed to load specification from ", Style(color="white")),
-            (self.location, Style(color="cyan")),
-            (f" after {duration}", Style(color="white")),
-        )
-
-        # Show error details
-        error_title = Text("Schema Loading Error", style=Style(color="red", bold=True))
-        error_message = Text(error.message)
-
-        return Group(
-            attempted,
-            Text(),
-            error_title,
-            Text(),
-            error_message,
-        )
 
 
 @dataclass
@@ -809,11 +684,6 @@ class StatefulProgressManager:
         return f"{icon}  {self.title} ({duration_message})", message
 
 
-def format_duration(duration_ms: int) -> str:
-    """Format duration in milliseconds to seconds with 2 decimal places."""
-    return f"{duration_ms / 1000:.2f}s"
-
-
 @dataclass
 class OutputHandler(EventHandler):
     config: ProjectConfig
@@ -830,7 +700,7 @@ class OutputHandler(EventHandler):
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
         default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
     )
-    console: Console = field(default_factory=_default_console)
+    console: Console = field(default_factory=make_console)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.PhaseStarted):
