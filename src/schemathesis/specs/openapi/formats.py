@@ -96,6 +96,36 @@ def header_values(
 HEADER_FORMAT = "_header_value"
 
 
+def duration_values() -> st.SearchStrategy[str]:
+    """Generate RFC 3339 duration values."""
+    from hypothesis import strategies as st
+
+    component = st.integers(min_value=1, max_value=10_000)
+    date_part = st.one_of(
+        component.map(lambda n: f"{n}D"),
+        component.map(lambda n: f"{n}W"),
+        st.builds(lambda years, months, days: f"{years}Y{months}M{days}D", component, component, component),
+    )
+    time_part = st.one_of(
+        component.map(lambda n: f"{n}H"),
+        component.map(lambda n: f"{n}M"),
+        component.map(lambda n: f"{n}S"),
+        st.builds(lambda hours, minutes, seconds: f"{hours}H{minutes}M{seconds}S", component, component, component),
+    )
+    date_time_part = st.builds(
+        lambda days, hours, minutes, seconds: f"{days}DT{hours}H{minutes}M{seconds}S",
+        component,
+        component,
+        component,
+        component,
+    )
+    return st.one_of(
+        date_part.map(lambda part: f"P{part}"),
+        time_part.map(lambda part: f"PT{part}"),
+        date_time_part.map(lambda part: f"P{part}"),
+    )
+
+
 @lru_cache
 def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""
@@ -113,6 +143,7 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     return {
         "binary": st.binary().map(Binary),
         "byte": st.binary().map(lambda x: b64encode(x).decode()),
+        "duration": duration_values(),
         "uuid": st.uuids().map(str),
         # RFC 7230, Section 3.2.6
         "_header_name": st.text(
