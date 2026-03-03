@@ -1,6 +1,7 @@
 MIN_WORKERS = 1
 DEFAULT_WORKERS = MIN_WORKERS
 MAX_WORKERS = 64
+COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 ISSUE_TRACKER_URL = (
     "https://github.com/schemathesis/schemathesis/issues/new?"
     "labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"

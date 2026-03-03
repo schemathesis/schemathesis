@@ -10,7 +10,7 @@ from click.utils import LazyFile
 from schemathesis.checks import CHECKS, load_all_checks
 from schemathesis.cli.commands.run import executor, validation
 from schemathesis.cli.commands.run.filters import with_filters
-from schemathesis.cli.constants import MAX_WORKERS, MIN_WORKERS
+from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
 from schemathesis.cli.ext.options import (
@@ -33,8 +33,6 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.metrics import METRICS, MetricFunction
 
 load_all_checks()
-
-COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
 DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 
