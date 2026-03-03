@@ -29,6 +29,7 @@ nav:
       - guides/stateful-testing.md
       - Hypothesis Strategies: guides/hypothesis-strategies.md
       - guides/targeted.md
+      - Continuous Fuzzing: guides/continuous-fuzzing.md
 
   - Core Concepts:
       - explanations/data-generation.md

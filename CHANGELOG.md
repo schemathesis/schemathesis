@@ -15,6 +15,7 @@
 
 ### :rocket: Added
 
+- `st fuzz` command for continuous API fuzzing.
 - Support filesystem paths for `SCHEMATHESIS_HOOKS`.
 
 ### :memo: Documentation

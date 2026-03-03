@@ -1,0 +1,45 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+ 🚫  Fuzzing (in 0.00s)
+
+     1 test case, 1 error
+
+==================================== ERRORS ====================================
+__________________________________ POST /csv ___________________________________
+Serialization not possible
+
+No supported serializers for media types: text/csv
+Check your schema or add custom serializers: https://schemathesis.readthedocs.io/en/stable/guides/custom-serializers/
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 1
+  Errored: 1
+
+Fuzzing:
+  Stopped: input space exhausted
+  Duration: <1s
+  Test cases: 1
+  Avg throughput: n/a (run too short)
+
+Errors:
+  🚫 Serialization not possible: 1
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

@@ -9,6 +9,7 @@ import re
 import shlex
 import warnings
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from textwrap import dedent
@@ -32,8 +33,11 @@ from werkzeug.test import TestResponse
 
 import schemathesis.cli
 from schemathesis import auths, hooks
+from schemathesis.cli.commands import fuzz as fuzz_command
+from schemathesis.cli.commands import run as run_command
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
 from schemathesis.cli.commands.run.handlers import output
+from schemathesis.cli.ext.groups import GROUPS
 from schemathesis.core import deserialization
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.core.transport import Response
@@ -69,6 +73,10 @@ settings.register_profile("CI", max_examples=2000)
 
 output.SCHEMATHESIS_VERSION = "dev"
 
+BASE_GROUPS = deepcopy(GROUPS)
+BASE_RUN_PARAMS = list(run_command.params)
+BASE_FUZZ_PARAMS = list(fuzz_command.params)
+
 
 @pytest.fixture(autouse=True)
 def reset_hooks():
@@ -77,6 +85,10 @@ def reset_hooks():
     builtin_string_formats = set(STRING_FORMATS.keys())
 
     CUSTOM_HANDLERS.clear()
+    GROUPS.clear()
+    GROUPS.update(deepcopy(BASE_GROUPS))
+    run_command.params[:] = BASE_RUN_PARAMS
+    fuzz_command.params[:] = BASE_FUZZ_PARAMS
     hooks.unregister_all()
     auths.unregister()
     for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
@@ -84,6 +96,10 @@ def reset_hooks():
     media_types.unregister_all()
     yield
     CUSTOM_HANDLERS.clear()
+    GROUPS.clear()
+    GROUPS.update(deepcopy(BASE_GROUPS))
+    run_command.params[:] = BASE_RUN_PARAMS
+    fuzz_command.params[:] = BASE_FUZZ_PARAMS
     hooks.unregister_all()
     auths.unregister()
     for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):

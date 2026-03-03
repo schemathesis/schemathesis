@@ -1,3 +1,4 @@
+
 import pytest
 from _pytest.main import ExitCode
 from flask import Flask, Response, jsonify
@@ -196,7 +197,6 @@ def test_warnings_multiple_types_via_cli(cli, schema_url):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_final_line_counts_all_warning_kinds_in_run(cli, app_runner, ctx, snapshot_cli):
-    # Regression test: the footer "N warnings in Xs" should count warning *kinds*, not just missing_auth operations
     schema = ctx.openapi.build_schema(
         {
             "/auth": {

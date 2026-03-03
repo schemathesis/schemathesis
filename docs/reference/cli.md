@@ -656,10 +656,120 @@ These options control how Schemathesis generates test data for API testing:
     $ st run openapi.yaml --generation-unique-inputs
     ```
 
+## `fuzz`
+
+The `fuzz` command runs continuous, unbounded fuzzing against an API.
+
+```console
+$ st fuzz [OPTIONS] SCHEMA
+```
+
+!!! note "Required Parameter"
+
+    **SCHEMA**: URL pointing to an OpenAPI or GraphQL schema, or a file path (requires `--url`).
+
+For a full usage guide see [Continuous Fuzzing](../guides/continuous-fuzzing.md).
+
+### Basic Options
+
+#### `--max-time SECONDS`
+
+!!! note ""
+
+    **Type**: `Float`
+    **Default**: `null` (unlimited)
+
+    Stop fuzzing after this many seconds. When the limit is reached, the current Hypothesis run completes, any failures are reported, and the process exits. Without this option fuzzing runs until interrupted with Ctrl+C.
+
+    ```console
+    $ st fuzz https://api.example.com/openapi.json --max-time 3600
+    ```
+
+Shared basic options (same semantics as `st run`):
+
+- `-u, --url`
+- `-w, --workers`
+- `--suppress-health-check`
+- `--wait-for-schema`
+- `--warnings`
+
+### API Validation Options
+
+`st fuzz` supports the same API validation flags as `st run`:
+
+- `-c, --checks`
+- `--exclude-checks`
+- `--max-failures`
+- `--continue-on-failure`
+- `--max-response-time`
+
+### Filtering Options
+
+`st fuzz` supports the same filtering flags as `st run`:
+
+- `--include-TYPE VALUE`
+- `--include-TYPE-regex PATTERN`
+- `--exclude-TYPE VALUE`
+- `--exclude-TYPE-regex PATTERN`
+- `--include-by EXPR`
+- `--exclude-by EXPR`
+- `--exclude-deprecated`
+
+Semantics are identical to the `run` command.
+
+### Network Request Options
+
+`st fuzz` supports the same network flags as `st run`:
+
+- `--header`
+- `--auth`
+- `--proxy`
+- `--tls-verify`
+- `--rate-limit`
+- `--max-redirects`
+- `--request-timeout`
+- `--request-cert`
+- `--request-cert-key`
+
+Semantics are identical to the `run` command.
+
+### Output Options
+
+`st fuzz` supports the same output/report flags as `st run`:
+
+- `--report`
+- `--report-dir`
+- `--report-junit-path`
+- `--report-vcr-path`
+- `--report-har-path`
+- `--report-ndjson-path`
+- `--report-preserve-bytes`
+- `--output-sanitize`
+- `--output-truncate`
+
+Semantics are identical to the `run` command.
+
+### Data Generation Options
+
+`st fuzz` supports all `st run` generation flags except `--max-examples`:
+
+- `--mode`
+- `--seed`
+- `--no-shrink`
+- `--generation-deterministic`
+- `--generation-allow-x00`
+- `--generation-codec`
+- `--generation-maximize`
+- `--generation-with-security-parameters`
+- `--generation-graphql-allow-null`
+- `--generation-database`
+- `--generation-unique-inputs`
+
 ## Exit codes
 
 Schemathesis uses predictable exit codes so automation can interpret results:
 
-- `0` — All configured checks passed
-- `1` — At least one check failed or a bug was reported
+- `0` — Fuzzing completed without failures or errors
+- `1` — At least one check failed, a runtime error occurred, or fuzzing stopped due to configured limits
+- `130` — Fuzzing was interrupted by the user (for example, Ctrl+C)
 - `2` — The run was aborted due to configuration or schema errors

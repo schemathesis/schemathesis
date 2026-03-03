@@ -20,7 +20,7 @@ __all__ = [
 
 
 def add_group(name: str, *, index: int | None = None) -> Group:
-    """Add a custom options group to `st run`."""
+    """Add a custom options group to `st run` and `st fuzz`."""
     if index is not None:
         GROUPS[name] = OptionGroup(name=name, order=index)
     else:

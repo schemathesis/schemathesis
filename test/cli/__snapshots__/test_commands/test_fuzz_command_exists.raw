@@ -1,0 +1,135 @@
+Exit code: 0
+---
+Stdout:
+Usage: schemathesis fuzz [OPTIONS] LOCATION
+
+  Run continuous fuzzing against an API schema.
+
+Options:
+  -u, --url URL                  API base URL (required for file-based schemas)
+  --max-time SECONDS             Maximum fuzzing duration in seconds. Fuzzing
+                                 runs indefinitely if not set  [x>0.0]
+  -w, --workers                  Number of concurrent workers for testing. Auto-
+                                 adjusts if 'auto' is specified[auto, 1-64]
+  --suppress-health-check        A comma-separated list of Schemathesis health
+                                 checks to disable [possible values:
+                                 data_too_large, filter_too_much, too_slow,
+                                 large_base_example, all]
+  --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the
+                                 API schema to become available. Disabled by
+                                 default  [x>=1.0]
+  --warnings WARNINGS            Control warning display: 'off' to disable all,
+                                 or comma-separated list of warning types to
+                                 enable
+
+API validation options:
+  -c, --checks                  Comma-separated list of checks to run against
+                                API responses [possible values:
+                                not_a_server_error, status_code_conformance,
+                                content_type_conformance,
+                                response_headers_conformance,
+                                response_schema_conformance,
+                                negative_data_rejection,
+                                positive_data_acceptance,
+                                missing_required_header, unsupported_method,
+                                use_after_free, ensure_resource_availability,
+                                ignored_auth, all]
+  --exclude-checks              Comma-separated list of checks to skip during
+                                testing [possible values: not_a_server_error,
+                                status_code_conformance,
+                                content_type_conformance,
+                                response_headers_conformance,
+                                response_schema_conformance,
+                                negative_data_rejection,
+                                positive_data_acceptance,
+                                missing_required_header, unsupported_method,
+                                use_after_free, ensure_resource_availability,
+                                ignored_auth, all]
+  --max-failures INTEGER RANGE  Terminate the test suite after reaching a
+                                specified number of failures or errors  [x>=1]
+  --continue-on-failure         Continue executing all test cases within a
+                                scenario, even after encountering failures
+  --max-response-time SECONDS   Maximum allowed API response time in seconds
+                                [x>0.0]
+
+Filtering options:
+  Filter operations by path, method, name, tag, or operation-id using:
+
+  --include-TYPE VALUE          Match operations with exact VALUE
+  --include-TYPE-regex PATTERN  Match operations using regular expression
+  --exclude-TYPE VALUE          Exclude operations with exact VALUE
+  --exclude-TYPE-regex PATTERN  Exclude operations using regular expression
+
+  --include-by EXPR     Include using custom expression
+  --exclude-by EXPR     Exclude using custom expression
+  --exclude-deprecated  Skip deprecated operations
+
+Network requests options:
+  -H, --header NAME:VALUE        Add a custom HTTP header to all API requests
+  -a, --auth USER:PASS           Authenticate all API requests with basic
+                                 authentication
+  --proxy URL                    Set the proxy for all network requests
+  --tls-verify TEXT              Path to CA bundle for TLS verification, or
+                                 'false' to disable
+  --rate-limit TEXT              Specify a rate limit for test requests in
+                                 '<limit>/<duration>' format. Example - `100/m`
+                                 for 100 requests per minute
+  --max-redirects INTEGER RANGE  Maximum number of redirects to follow for each
+                                 request  [x>=0]
+  --request-timeout FLOAT RANGE  Timeout limit, in seconds, for each network
+                                 request during tests  [x>0.0]
+  --request-cert PATH            File path of unencrypted client certificate for
+                                 authentication. The certificate can be bundled
+                                 with a private key (e.g. PEM) or the private
+                                 key can be provided with the --request-cert-key
+                                 argument
+  --request-cert-key PATH        Specify the file path of the private key for
+                                 the client certificate
+
+Output options:
+  --report FORMAT                Generate test reports in formats specified as a
+                                 comma-separated list [possible values: junit,
+                                 vcr, har, ndjson]
+  --report-dir DIRECTORY         Directory to store all report files  [default:
+                                 schemathesis-report]
+  --report-junit-path FILENAME   Custom path for JUnit XML report
+  --report-vcr-path FILENAME     Custom path for VCR cassette
+  --report-har-path FILENAME     Custom path for HAR file
+  --report-ndjson-path FILENAME  Custom path for NDJSON events file
+  --report-preserve-bytes        Retain exact byte sequence of payloads in
+                                 cassettes, encoded as base64
+  --output-sanitize BOOLEAN      Enable or disable automatic output sanitization
+                                 to obscure sensitive data
+  --output-truncate BOOLEAN      Truncate schemas and responses in error
+                                 messages
+
+Data generation options:
+  -m, --mode                      Test data generation mode  [default: all]
+                                  [possible values: positive, negative, all]
+  --seed INTEGER                  Random seed for reproducible test runs
+  --no-shrink                     Disable test case shrinking. Makes test
+                                  failures harder to debug but improves
+                                  performance
+  --generation-deterministic      Enables deterministic mode, which eliminates
+                                  random variation between tests
+  --generation-allow-x00 BOOLEAN  Whether to allow the generation of 'NULL'
+                                  bytes within strings
+  --generation-codec TEXT         The codec used for generating strings
+  --generation-maximize METRIC    Guide input generation to values more likely
+                                  to expose bugs via targeted property-based
+                                  testing [possible values: response_time]
+  --generation-with-security-parameters BOOLEAN
+                                  Whether to generate security parameters
+  --generation-graphql-allow-null BOOLEAN
+                                  Whether to use `null` values for optional
+                                  arguments in GraphQL queries
+  --generation-database TEXT      Storage for examples discovered by
+                                  Schemathesis. Use 'none' to disable,
+                                  ':memory:' for temporary storage, or specify a
+                                  file path for persistent storage
+  --generation-unique-inputs      Force the generation of unique test cases
+
+Global options:
+  --no-color     Disable ANSI color escape codes
+  --force-color  Explicitly tells to enable ANSI color escape codes
+  -h, --help     Show this message and exit.

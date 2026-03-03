@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import textwrap
 import time
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from itertools import groupby
 from json.decoder import JSONDecodeError
-from types import GeneratorType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import click
 
@@ -15,12 +14,14 @@ from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailu
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
-from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
     BLOCK_PADDING,
     LoadingProgressManager,
+    _print_lines,
     _style,
+    bold,
     display_header,
+    display_section_name,
     format_duration,
     make_console,
 )
@@ -50,17 +51,6 @@ if TYPE_CHECKING:
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 
 
-def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> None:
-    """Print section name with separators in terminal with the given title nicely centered."""
-    message = f" {title} ".center(get_terminal_width(), separator)
-    kwargs.setdefault("bold", True)
-    click.echo(_style(message, **kwargs))
-
-
-def bold(option: str) -> str:
-    return click.style(option, bold=True)
-
-
 def display_failures(ctx: ExecutionContext) -> None:
     """Display all failures in the test run."""
     if not ctx.statistic.failures:
@@ -69,6 +59,28 @@ def display_failures(ctx: ExecutionContext) -> None:
     display_section_name("FAILURES")
     for label, failures in ctx.statistic.failures.items():
         display_failures_for_single_test(ctx, label, failures.values())
+
+
+def display_errors(errors: set[events.NonFatalError]) -> None:
+    """Display all non-fatal errors in the test run."""
+    if not errors:
+        return
+
+    display_section_name("ERRORS")
+    sorted_errors = sorted(errors, key=lambda record: (record.phase.value, record.label, record.info.title))
+    for label, group_errors in groupby(sorted_errors, key=lambda record: record.label):
+        display_section_name(label, "_", fg="red")
+        grouped = list(group_errors)
+        for idx, error in enumerate(grouped, 1):
+            click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
+            if idx < len(grouped):
+                click.echo()
+    click.echo(
+        _style(
+            f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
+            fg="red",
+        )
+    )
 
 
 def failure_formatter(block: MessageBlock, content: str) -> str:
@@ -129,15 +141,6 @@ def _display_extras(extras: list[str]) -> None:
 
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 TRUNCATION_PLACEHOLDER = "[...]"
-
-
-def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
-    for entry in lines:
-        if isinstance(entry, str):
-            click.echo(entry)
-        elif isinstance(entry, GeneratorType):
-            for line in entry:
-                click.echo(line)
 
 
 @dataclass
@@ -701,21 +704,21 @@ class StatefulProgressManager:
 
 
 @dataclass
-class OutputHandler(EventHandler):
+class BaseOutputHandler(EventHandler):
+    """Shared output infrastructure for both ``st run`` and ``st fuzz``.
+
+    Handles loading display, fatal/non-fatal errors, schema analysis warnings,
+    and all summary display utilities.  Command-specific subclasses override the
+    phase/scenario lifecycle hooks and ``_on_engine_finished``.
+    """
+
     config: ProjectConfig
 
     loading_manager: LoadingProgressManager | None = None
-    probing_manager: ProbingProgressManager | None = None
-    unit_tests_manager: UnitTestProgressManager | None = None
-    stateful_tests_manager: StatefulProgressManager | None = None
-
     statistic: ApiStatistic | None = None
     skip_reasons: list[str] = field(default_factory=list)
     warnings: WarningData = field(default_factory=WarningData)
     errors: set[events.NonFatalError] = field(default_factory=set)
-    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
-        default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
-    )
     console: Console = field(default_factory=make_console)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
@@ -736,7 +739,7 @@ class OutputHandler(EventHandler):
         elif isinstance(event, events.FatalError):
             self._on_fatal_error(ctx, event)
         elif isinstance(event, events.NonFatalError):
-            self.errors.add(event)
+            self._on_non_fatal_error(event)
         elif isinstance(event, LoadingStarted):
             self._on_loading_started(event)
         elif isinstance(event, LoadingFinished):
@@ -746,14 +749,38 @@ class OutputHandler(EventHandler):
         display_header(SCHEMATHESIS_VERSION)
 
     def shutdown(self, ctx: ExecutionContext) -> None:
-        if self.unit_tests_manager is not None:
-            self.unit_tests_manager.stop()
-        if self.stateful_tests_manager is not None:
-            self.stateful_tests_manager.stop()
         if self.loading_manager is not None:
             self.loading_manager.stop()
-        if self.probing_manager is not None:
-            self.probing_manager.stop()
+
+    def _on_non_fatal_error(self, event: events.NonFatalError) -> None:
+        self.errors.add(event)
+
+    def _on_phase_started(self, event: events.PhaseStarted) -> None:
+        pass
+
+    def _on_phase_finished(self, event: events.PhaseFinished) -> None:
+        pass
+
+    def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
+        pass
+
+    def _on_scenario_finished(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+        pass
+
+    def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
+        pass
+
+    def _on_interrupted(self, event: events.Interrupted) -> None:
+        from rich.padding import Padding
+
+        if self.loading_manager is not None:
+            self.loading_manager.interrupt()
+            message = Padding(
+                self.loading_manager.get_completion_message(),
+                BLOCK_PADDING,
+            )
+            self.console.print(message)
+            self.console.print()
 
     def _on_loading_started(self, event: LoadingStarted) -> None:
         self.loading_manager = LoadingProgressManager(console=self.console, location=event.location)
@@ -800,176 +827,6 @@ class OutputHandler(EventHandler):
 
         if ctx.initialization_lines:
             _print_lines(ctx.initialization_lines)
-
-    def _on_phase_started(self, event: events.PhaseStarted) -> None:
-        phase = event.phase
-        if phase.name == PhaseName.PROBING and phase.is_enabled:
-            self._start_probing()
-        elif phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING] and phase.is_enabled:
-            self._start_unit_tests(phase.name)
-        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
-            self._start_stateful_tests(event)
-
-    def _start_probing(self) -> None:
-        self.probing_manager = ProbingProgressManager(console=self.console)
-        self.probing_manager.start()
-
-    def _start_unit_tests(self, phase: PhaseName) -> None:
-        assert self.statistic is not None
-        assert self.unit_tests_manager is None
-        self.unit_tests_manager = UnitTestProgressManager(
-            console=self.console,
-            title=phase.value,
-            total=self.statistic.operations.selected,
-        )
-        self.unit_tests_manager.start()
-
-    def _start_stateful_tests(self, event: events.PhaseStarted) -> None:
-        assert self.statistic is not None
-        assert event.payload is not None
-        # Total number of links - original ones + inferred during tests
-        links_selected = self.statistic.links.selected + event.payload.inferred_links
-        links_total = self.statistic.links.total + event.payload.inferred_links
-        self.stateful_tests_manager = StatefulProgressManager(
-            console=self.console,
-            title="Stateful",
-            links_selected=links_selected,
-            links_inferred=event.payload.inferred_links,
-            links_total=links_total,
-        )
-        self.stateful_tests_manager.start()
-
-    def _on_phase_finished(self, event: events.PhaseFinished) -> None:
-        from rich.padding import Padding
-        from rich.style import Style
-        from rich.table import Table
-        from rich.text import Text
-
-        phase = event.phase
-        self.phases[phase.name] = (event.status, phase.skip_reason)
-
-        if phase.name == PhaseName.PROBING:
-            assert self.probing_manager is not None
-            self.probing_manager.stop()
-            self.probing_manager = None
-
-            if event.status == Status.SUCCESS:
-                assert isinstance(event.payload, Ok)
-                payload = event.payload.ok()
-                self.console.print(
-                    Padding(
-                        Text.assemble(
-                            ("✅  ", Style(color="green")),
-                            ("API capabilities:", Style(color="bright_white")),
-                        ),
-                        BLOCK_PADDING,
-                    )
-                )
-                self.console.print()
-
-                table = Table(
-                    show_header=False,
-                    box=None,
-                    padding=(0, 4),
-                    collapse_padding=True,
-                )
-                table.add_column("Capability", style=Style(color="bright_white", bold=True))
-                table.add_column("Status", style="cyan")
-                for probe_run in payload.probes:
-                    icon, style = {
-                        ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
-                        ProbeOutcome.FAILURE: ("✘", Style(color="red")),
-                        ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
-                    }[probe_run.outcome]
-
-                    table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
-
-                message = Padding(table, BLOCK_PADDING)
-            else:
-                assert event.status == Status.SKIP
-                assert isinstance(event.payload, Ok)
-                message = Padding(
-                    Text.assemble(
-                        ("⏭   ", ""),
-                        ("API probing skipped", Style(color="yellow")),
-                    ),
-                    BLOCK_PADDING,
-                )
-            self.console.print(message)
-            self.console.print()
-        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
-            self.stateful_tests_manager.stop()
-            if event.status == Status.ERROR:
-                title, summary = self.stateful_tests_manager.get_completion_message("🚫")
-            else:
-                title, summary = self.stateful_tests_manager.get_completion_message()
-
-            self.console.print(Padding(Text(title, style="bright_white"), BLOCK_PADDING))
-
-            table = Table(
-                show_header=False,
-                box=None,
-                padding=(0, 4),
-                collapse_padding=True,
-            )
-            table.add_column("Field", style=Style(color="bright_white", bold=True))
-            table.add_column("Value", style="cyan")
-            table.add_row("Scenarios:", f"{self.stateful_tests_manager.scenarios}")
-            message = f"{len(self.stateful_tests_manager.links_covered)} covered / {self.stateful_tests_manager.links_selected} selected / {self.stateful_tests_manager.links_total} total"
-            if self.stateful_tests_manager.links_inferred:
-                message += f" ({self.stateful_tests_manager.links_inferred} inferred)"
-            table.add_row("API Links:", message)
-
-            self.console.print()
-            self.console.print(Padding(table, BLOCK_PADDING))
-            self.console.print()
-            self.console.print(Padding(Text(summary, style="bright_white"), (0, 0, 0, 5)))
-            self.console.print()
-            self.stateful_tests_manager = None
-        elif (
-            phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]
-            and phase.is_enabled
-            and self.unit_tests_manager is not None
-        ):
-            self.unit_tests_manager.stop()
-            if event.status == Status.ERROR:
-                message = self.unit_tests_manager.get_completion_message("🚫")
-            else:
-                message = self.unit_tests_manager.get_completion_message()
-            self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
-            self.console.print()
-            self.unit_tests_manager = None
-
-    def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
-        if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
-            # We should display execution result + percentage in the end. For example:
-            assert event.label is not None
-            assert self.unit_tests_manager is not None
-            self.unit_tests_manager.start_operation(event.label)
-
-    def _on_scenario_finished(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
-        if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
-            assert self.unit_tests_manager is not None
-            if event.label:
-                self.unit_tests_manager.finish_operation(event.label)
-            self.unit_tests_manager.update_progress()
-            self.unit_tests_manager.update_stats(event.status)
-            if event.status == Status.SKIP and event.skip_reason is not None:
-                self.skip_reasons.append(event.skip_reason)
-            self._check_warnings(ctx, event)
-        elif (
-            event.phase == PhaseName.STATEFUL_TESTING
-            and not event.is_final
-            and event.status not in (Status.INTERRUPTED, Status.SKIP, None)
-        ):
-            assert self.stateful_tests_manager is not None
-            links_seen = {
-                case.transition.id
-                for case in event.recorder.cases.values()
-                if case.transition is not None and case.is_transition_applied
-            }
-            self.stateful_tests_manager.update(links_seen, event.status)
-            self._check_stateful_warnings(ctx, event)
 
     def _check_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
         from schemathesis.core.compat import RefResolutionError
@@ -1081,18 +938,6 @@ class OutputHandler(EventHandler):
 
         return record
 
-    def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
-        # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
-        # warnings, then remove them from warnings
-        for key, node in event.recorder.cases.items():
-            if not self.warnings.missing_test_data:
-                break
-            if node.value.operation.label in self.warnings.missing_test_data and key in event.recorder.interactions:
-                response = event.recorder.interactions[key].response
-                if response is not None and response.status_code < 300:
-                    self.warnings.missing_test_data.remove(node.value.operation.label)
-                    continue
-
     def _on_schema_warnings(self, ctx: ExecutionContext, event: events.SchemaAnalysisWarnings) -> None:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
@@ -1118,31 +963,6 @@ class OutputHandler(EventHandler):
                     warning.kind,
                     self._record_unsupported_regex_warning(warning.operation_label, warning.message),
                 )
-
-    def _on_interrupted(self, event: events.Interrupted) -> None:
-        from rich.padding import Padding
-
-        if self.unit_tests_manager is not None:
-            self.unit_tests_manager.interrupt()
-        elif self.stateful_tests_manager is not None:
-            self.stateful_tests_manager.interrupt()
-        elif self.loading_manager is not None:
-            self.loading_manager.interrupt()
-            message = Padding(
-                self.loading_manager.get_completion_message(),
-                BLOCK_PADDING,
-            )
-            self.console.print(message)
-            self.console.print()
-        elif self.probing_manager is not None:
-            self.probing_manager.interrupt()
-            message = Padding(
-                self.probing_manager.get_completion_message(),
-                BLOCK_PADDING,
-            )
-            self.console.print(message)
-            self.console.print()
-            self.probing_manager = None
 
     def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
         from rich.padding import Padding
@@ -1316,55 +1136,6 @@ class OutputHandler(EventHandler):
                 tips=["💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html"],
             )
 
-    def display_stateful_failures(self, ctx: ExecutionContext) -> None:
-        display_section_name("Stateful tests")
-
-        click.echo("\nFailed to extract data from response:")
-
-        grouped: dict[str, list[ExtractionFailure]] = {}
-        for failure in ctx.statistic.extraction_failures:
-            grouped.setdefault(failure.id, []).append(failure)
-
-        for idx, (transition_id, failures) in enumerate(grouped.items(), 1):
-            for failure in failures:
-                click.echo(f"\n    {idx}. Test Case ID: {failure.case_id}\n")
-                click.echo(f"    {transition_id}")
-
-                indent = "        "
-                if failure.error:
-                    if isinstance(failure.error, JSONDecodeError):
-                        click.echo(f"\n{indent}Failed to parse JSON from response")
-                    else:
-                        click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
-                else:
-                    if failure.parameter_name == "body":
-                        description = f"\n{indent}Could not resolve request body via {failure.expression}"
-                    else:
-                        description = f"\n{indent}Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"
-                    prefix = "$response.body"
-                    if failure.expression.startswith(prefix):
-                        description += f"\n{indent}Path `{failure.expression[len(prefix) :]}` not found in response"
-                    click.echo(description)
-
-                click.echo()
-
-                for case, response in reversed(failure.history):
-                    curl = case.as_curl_command(headers=dict(response.request.headers), verify=response.verify)
-                    click.echo(f"{indent}[{response.status_code}] {curl}")
-
-                response = failure.response
-
-                if response.content is None or not response.content:
-                    click.echo(f"\n{indent}<EMPTY>")
-                else:
-                    try:
-                        payload = prepare_response_payload(response.text, config=ctx.config.output)
-                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
-                    except UnicodeDecodeError:
-                        click.echo(f"\n{indent}<BINARY>")
-
-        click.echo()
-
     def display_api_operations(self, ctx: ExecutionContext) -> None:
         assert self.statistic is not None
         click.echo(_style("API Operations:", bold=True))
@@ -1395,61 +1166,6 @@ class OutputHandler(EventHandler):
             for reason in sorted(set(self.skip_reasons)):
                 click.echo(_style(f"    - {reason.rstrip('.')}"))
         click.echo()
-
-    def display_phases(self) -> None:
-        click.echo(_style("Test Phases:", bold=True))
-
-        for phase in PhaseName:
-            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
-                # Internal phases are not part of the test phase summary
-                continue
-            status, skip_reason = self.phases[phase]
-
-            if status == Status.SKIP:
-                click.echo(_style(f"  ⏭  {phase.value}", fg="yellow"), nl=False)
-                if skip_reason:
-                    click.echo(_style(f" ({skip_reason.value})", fg="yellow"))
-                else:
-                    click.echo()
-            elif status == Status.SUCCESS:
-                click.echo(_style(f"  ✅ {phase.value}", fg="green"))
-            elif status == Status.FAILURE:
-                click.echo(_style(f"  ❌ {phase.value}", fg="red"))
-            elif status == Status.ERROR:
-                click.echo(_style(f"  🚫 {phase.value}", fg="red"))
-            elif status == Status.INTERRUPTED:
-                click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
-        click.echo()
-
-    def display_test_cases(self, ctx: ExecutionContext) -> None:
-        if ctx.statistic.total_cases == 0:
-            click.echo(_style("Test cases:", bold=True))
-            click.echo("  No test cases were generated\n")
-            return
-
-        unique_failures = sum(
-            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
-        )
-        click.echo(_style("Test cases:", bold=True))
-
-        parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
-
-        # Don't show pass/fail status if all cases were skipped
-        if ctx.statistic.cases_without_checks == ctx.statistic.total_cases:
-            parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
-        else:
-            if unique_failures > 0:
-                parts.append(
-                    f"{click.style(str(ctx.statistic.cases_with_failures), bold=True)} found "
-                    f"{click.style(str(unique_failures), bold=True)} unique failures"
-                )
-            else:
-                parts.append(f"{click.style(str(ctx.statistic.total_cases), bold=True)} passed")
-
-            if ctx.statistic.cases_without_checks > 0:
-                parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
-
-        click.echo(_style(", ".join(parts) + "\n"))
 
     def display_failures_summary(self, ctx: ExecutionContext) -> None:
         # Collect all unique failures and their counts by title
@@ -1540,28 +1256,409 @@ class OutputHandler(EventHandler):
             click.echo(str(self.config.seed))
         click.echo()
 
+    def _display_errors(self) -> None:
+        display_errors(self.errors)
+
+    def _display_failures(self, ctx: ExecutionContext) -> None:
+        display_failures(ctx)
+
+    def _display_warnings_summary(self) -> None:
+        """Display a brief per-kind warning count inside the SUMMARY section."""
+        click.echo(_style("Warnings:", bold=True))
+
+        if self.warnings.missing_auth:
+            affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
+            suffix = "" if affected == 1 else "s"
+            click.echo(
+                _style(
+                    f"  ⚠️ Missing authentication: {bold(str(affected))} operation{suffix} returned only 401/403 responses",
+                    fg="yellow",
+                )
+            )
+
+        if self.warnings.missing_test_data:
+            count = len(self.warnings.missing_test_data)
+            suffix = "" if count == 1 else "s"
+            click.echo(
+                _style(
+                    f"  ⚠️ Missing valid test data: {bold(str(count))} operation{suffix} repeatedly returned 404 responses",
+                    fg="yellow",
+                )
+            )
+
+        if self.warnings.validation_mismatch:
+            count = len(self.warnings.validation_mismatch)
+            suffix = "" if count == 1 else "s"
+            click.echo(
+                _style(
+                    f"  ⚠️ Schema validation mismatch: {bold(str(count))} operation{suffix} mostly rejected generated data",
+                    fg="yellow",
+                )
+            )
+
+        if self.warnings.missing_deserializer:
+            count = len(self.warnings.missing_deserializer)
+            suffix = "" if count == 1 else "s"
+            click.echo(
+                _style(
+                    f"  ⚠️ Schema validation skipped: {bold(str(count))} operation{suffix} cannot validate responses",
+                    fg="yellow",
+                )
+            )
+
+        if self.warnings.unused_openapi_auth:
+            count = len(self.warnings.unused_openapi_auth)
+            suffix = "" if count == 1 else "s"
+            click.echo(
+                _style(
+                    f"  ⚠️ Unused OpenAPI auth: {bold(str(count))} configured auth scheme{suffix} not used in the schema",
+                    fg="yellow",
+                )
+            )
+
+        if self.warnings.unsupported_regex:
+            count = len(self.warnings.unsupported_regex)
+            suffix = "" if count == 1 else "s"
+            click.echo(
+                _style(
+                    f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had regex patterns removed",
+                    fg="yellow",
+                )
+            )
+
+        click.echo()
+
+
+@dataclass
+class OutputHandler(BaseOutputHandler):
+    """Output handler for ``st run``.
+
+    Extends ``BaseOutputHandler`` with probing, unit-test, and stateful-test
+    progress managers, plus the phase-tracking and full SUMMARY display.
+    """
+
+    probing_manager: ProbingProgressManager | None = None
+    unit_tests_manager: UnitTestProgressManager | None = None
+    stateful_tests_manager: StatefulProgressManager | None = None
+    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
+        default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
+    )
+
+    def shutdown(self, ctx: ExecutionContext) -> None:
+        if self.unit_tests_manager is not None:
+            self.unit_tests_manager.stop()
+        if self.stateful_tests_manager is not None:
+            self.stateful_tests_manager.stop()
+        if self.probing_manager is not None:
+            self.probing_manager.stop()
+        super().shutdown(ctx)
+
+    def _on_phase_started(self, event: events.PhaseStarted) -> None:
+        phase = event.phase
+        if phase.name == PhaseName.PROBING and phase.is_enabled:
+            self._start_probing()
+        elif phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING] and phase.is_enabled:
+            self._start_unit_tests(phase.name)
+        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
+            self._start_stateful_tests(event)
+
+    def _start_probing(self) -> None:
+        self.probing_manager = ProbingProgressManager(console=self.console)
+        self.probing_manager.start()
+
+    def _start_unit_tests(self, phase: PhaseName) -> None:
+        assert self.statistic is not None
+        assert self.unit_tests_manager is None
+        self.unit_tests_manager = UnitTestProgressManager(
+            console=self.console,
+            title=phase.value,
+            total=self.statistic.operations.selected,
+        )
+        self.unit_tests_manager.start()
+
+    def _start_stateful_tests(self, event: events.PhaseStarted) -> None:
+        assert self.statistic is not None
+        assert event.payload is not None
+        links_selected = self.statistic.links.selected + event.payload.inferred_links
+        links_total = self.statistic.links.total + event.payload.inferred_links
+        self.stateful_tests_manager = StatefulProgressManager(
+            console=self.console,
+            title="Stateful",
+            links_selected=links_selected,
+            links_inferred=event.payload.inferred_links,
+            links_total=links_total,
+        )
+        self.stateful_tests_manager.start()
+
+    def _on_phase_finished(self, event: events.PhaseFinished) -> None:
+        from rich.padding import Padding
+        from rich.style import Style
+        from rich.table import Table
+        from rich.text import Text
+
+        phase = event.phase
+        self.phases[phase.name] = (event.status, phase.skip_reason)
+
+        if phase.name == PhaseName.PROBING:
+            assert self.probing_manager is not None
+            self.probing_manager.stop()
+            self.probing_manager = None
+
+            if event.status == Status.SUCCESS:
+                assert isinstance(event.payload, Ok)
+                payload = event.payload.ok()
+                self.console.print(
+                    Padding(
+                        Text.assemble(
+                            ("✅  ", Style(color="green")),
+                            ("API capabilities:", Style(color="bright_white")),
+                        ),
+                        BLOCK_PADDING,
+                    )
+                )
+                self.console.print()
+
+                table = Table(
+                    show_header=False,
+                    box=None,
+                    padding=(0, 4),
+                    collapse_padding=True,
+                )
+                table.add_column("Capability", style=Style(color="bright_white", bold=True))
+                table.add_column("Status", style="cyan")
+                for probe_run in payload.probes:
+                    icon, style = {
+                        ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
+                        ProbeOutcome.FAILURE: ("✘", Style(color="red")),
+                        ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
+                    }[probe_run.outcome]
+
+                    table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
+
+                message = Padding(table, BLOCK_PADDING)
+            else:
+                assert event.status == Status.SKIP
+                assert isinstance(event.payload, Ok)
+                message = Padding(
+                    Text.assemble(
+                        ("⏭   ", ""),
+                        ("API probing skipped", Style(color="yellow")),
+                    ),
+                    BLOCK_PADDING,
+                )
+            self.console.print(message)
+            self.console.print()
+        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
+            self.stateful_tests_manager.stop()
+            if event.status == Status.ERROR:
+                title, summary = self.stateful_tests_manager.get_completion_message("🚫")
+            else:
+                title, summary = self.stateful_tests_manager.get_completion_message()
+
+            self.console.print(Padding(Text(title, style="bright_white"), BLOCK_PADDING))
+
+            table = Table(
+                show_header=False,
+                box=None,
+                padding=(0, 4),
+                collapse_padding=True,
+            )
+            table.add_column("Field", style=Style(color="bright_white", bold=True))
+            table.add_column("Value", style="cyan")
+            table.add_row("Scenarios:", f"{self.stateful_tests_manager.scenarios}")
+            message = f"{len(self.stateful_tests_manager.links_covered)} covered / {self.stateful_tests_manager.links_selected} selected / {self.stateful_tests_manager.links_total} total"
+            if self.stateful_tests_manager.links_inferred:
+                message += f" ({self.stateful_tests_manager.links_inferred} inferred)"
+            table.add_row("API Links:", message)
+
+            self.console.print()
+            self.console.print(Padding(table, BLOCK_PADDING))
+            self.console.print()
+            self.console.print(Padding(Text(summary, style="bright_white"), (0, 0, 0, 5)))
+            self.console.print()
+            self.stateful_tests_manager = None
+        elif (
+            phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]
+            and phase.is_enabled
+            and self.unit_tests_manager is not None
+        ):
+            self.unit_tests_manager.stop()
+            if event.status == Status.ERROR:
+                message = self.unit_tests_manager.get_completion_message("🚫")
+            else:
+                message = self.unit_tests_manager.get_completion_message()
+            self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
+            self.console.print()
+            self.unit_tests_manager = None
+
+    def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
+        if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
+            assert event.label is not None
+            assert self.unit_tests_manager is not None
+            self.unit_tests_manager.start_operation(event.label)
+
+    def _on_scenario_finished(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+        if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
+            assert self.unit_tests_manager is not None
+            if event.label:
+                self.unit_tests_manager.finish_operation(event.label)
+            self.unit_tests_manager.update_progress()
+            self.unit_tests_manager.update_stats(event.status)
+            if event.status == Status.SKIP and event.skip_reason is not None:
+                self.skip_reasons.append(event.skip_reason)
+            self._check_warnings(ctx, event)
+        elif (
+            event.phase == PhaseName.STATEFUL_TESTING
+            and not event.is_final
+            and event.status not in (Status.INTERRUPTED, Status.SKIP, None)
+        ):
+            assert self.stateful_tests_manager is not None
+            links_seen = {
+                case.transition.id
+                for case in event.recorder.cases.values()
+                if case.transition is not None and case.is_transition_applied
+            }
+            self.stateful_tests_manager.update(links_seen, event.status)
+            self._check_stateful_warnings(ctx, event)
+
+    def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+        for key, node in event.recorder.cases.items():
+            if not self.warnings.missing_test_data:
+                break
+            if node.value.operation.label in self.warnings.missing_test_data and key in event.recorder.interactions:
+                response = event.recorder.interactions[key].response
+                if response is not None and response.status_code < 300:
+                    self.warnings.missing_test_data.remove(node.value.operation.label)
+                    continue
+
+    def _on_interrupted(self, event: events.Interrupted) -> None:
+        if self.unit_tests_manager is not None:
+            self.unit_tests_manager.interrupt()
+        elif self.stateful_tests_manager is not None:
+            self.stateful_tests_manager.interrupt()
+        elif self.probing_manager is not None:
+            from rich.padding import Padding
+
+            self.probing_manager.interrupt()
+            message = Padding(
+                self.probing_manager.get_completion_message(),
+                BLOCK_PADDING,
+            )
+            self.console.print(message)
+            self.console.print()
+            self.probing_manager = None
+        else:
+            super()._on_interrupted(event)
+
+    def display_stateful_failures(self, ctx: ExecutionContext) -> None:
+        display_section_name("Stateful tests")
+
+        click.echo("\nFailed to extract data from response:")
+
+        grouped: dict[str, list[ExtractionFailure]] = {}
+        for failure in ctx.statistic.extraction_failures:
+            grouped.setdefault(failure.id, []).append(failure)
+
+        for idx, (transition_id, failures) in enumerate(grouped.items(), 1):
+            for failure in failures:
+                click.echo(f"\n    {idx}. Test Case ID: {failure.case_id}\n")
+                click.echo(f"    {transition_id}")
+
+                indent = "        "
+                if failure.error:
+                    if isinstance(failure.error, JSONDecodeError):
+                        click.echo(f"\n{indent}Failed to parse JSON from response")
+                    else:
+                        click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
+                else:
+                    if failure.parameter_name == "body":
+                        description = f"\n{indent}Could not resolve request body via {failure.expression}"
+                    else:
+                        description = f"\n{indent}Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"
+                    prefix = "$response.body"
+                    if failure.expression.startswith(prefix):
+                        description += f"\n{indent}Path `{failure.expression[len(prefix) :]}` not found in response"
+                    click.echo(description)
+
+                click.echo()
+
+                for case, response in reversed(failure.history):
+                    curl = case.as_curl_command(headers=dict(response.request.headers), verify=response.verify)
+                    click.echo(f"{indent}[{response.status_code}] {curl}")
+
+                response = failure.response
+
+                if response.content is None or not response.content:
+                    click.echo(f"\n{indent}<EMPTY>")
+                else:
+                    try:
+                        payload = prepare_response_payload(response.text, config=ctx.config.output)
+                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
+                    except UnicodeDecodeError:
+                        click.echo(f"\n{indent}<BINARY>")
+
+        click.echo()
+
+    def display_phases(self) -> None:
+        click.echo(_style("Test Phases:", bold=True))
+
+        for phase in PhaseName:
+            if phase in (PhaseName.PROBING, PhaseName.SCHEMA_ANALYSIS):
+                continue
+            status, skip_reason = self.phases[phase]
+
+            if status == Status.SKIP:
+                click.echo(_style(f"  ⏭  {phase.value}", fg="yellow"), nl=False)
+                if skip_reason:
+                    click.echo(_style(f" ({skip_reason.value})", fg="yellow"))
+                else:
+                    click.echo()
+            elif status == Status.SUCCESS:
+                click.echo(_style(f"  ✅ {phase.value}", fg="green"))
+            elif status == Status.FAILURE:
+                click.echo(_style(f"  ❌ {phase.value}", fg="red"))
+            elif status == Status.ERROR:
+                click.echo(_style(f"  🚫 {phase.value}", fg="red"))
+            elif status == Status.INTERRUPTED:
+                click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
+        click.echo()
+
+    def display_test_cases(self, ctx: ExecutionContext) -> None:
+        if ctx.statistic.total_cases == 0:
+            click.echo(_style("Test cases:", bold=True))
+            click.echo("  No test cases were generated\n")
+            return
+
+        unique_failures = sum(
+            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
+        )
+        click.echo(_style("Test cases:", bold=True))
+
+        parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
+
+        if ctx.statistic.cases_without_checks == ctx.statistic.total_cases:
+            parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
+        else:
+            if unique_failures > 0:
+                parts.append(
+                    f"{click.style(str(ctx.statistic.cases_with_failures), bold=True)} found "
+                    f"{click.style(str(unique_failures), bold=True)} unique failures"
+                )
+            else:
+                parts.append(f"{click.style(str(ctx.statistic.total_cases), bold=True)} passed")
+
+            if ctx.statistic.cases_without_checks > 0:
+                parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
+
+        click.echo(_style(", ".join(parts) + "\n"))
+
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         assert self.loading_manager is None
         assert self.probing_manager is None
         assert self.unit_tests_manager is None
         assert self.stateful_tests_manager is None
-        if self.errors:
-            display_section_name("ERRORS")
-            errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label, r.info.title))
-            for label, group_errors in groupby(errors, key=lambda r: r.label):
-                display_section_name(label, "_", fg="red")
-                _errors = list(group_errors)
-                for idx, error in enumerate(_errors, 1):
-                    click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
-                    if idx < len(_errors):
-                        click.echo()
-            click.echo(
-                _style(
-                    f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
-                    fg="red",
-                )
-            )
-        display_failures(ctx)
+        self._display_errors()
+        self._display_failures(ctx)
         if not self.warnings.is_empty:
             self.display_warnings()
         if ctx.statistic.extraction_failures:
@@ -1581,69 +1678,7 @@ class OutputHandler(EventHandler):
             self.display_errors_summary()
 
         if not self.warnings.is_empty:
-            click.echo(_style("Warnings:", bold=True))
-
-            if self.warnings.missing_auth:
-                affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
-                suffix = "" if affected == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Missing authentication: {bold(str(affected))} operation{suffix} returned only 401/403 responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.missing_test_data:
-                count = len(self.warnings.missing_test_data)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Missing valid test data: {bold(str(count))} operation{suffix} repeatedly returned 404 responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.validation_mismatch:
-                count = len(self.warnings.validation_mismatch)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Schema validation mismatch: {bold(str(count))} operation{suffix} mostly rejected generated data",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.missing_deserializer:
-                count = len(self.warnings.missing_deserializer)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Schema validation skipped: {bold(str(count))} operation{suffix} cannot validate responses",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.unused_openapi_auth:
-                count = len(self.warnings.unused_openapi_auth)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Unused OpenAPI auth: {bold(str(count))} configured auth scheme{suffix} not used in the schema",
-                        fg="yellow",
-                    )
-                )
-
-            if self.warnings.unsupported_regex:
-                count = len(self.warnings.unsupported_regex)
-                suffix = "" if count == 1 else "s"
-                click.echo(
-                    _style(
-                        f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had regex patterns removed",
-                        fg="yellow",
-                    )
-                )
-
-            click.echo()
+            self._display_warnings_summary()
 
         if ctx.summary_lines:
             _print_lines(ctx.summary_lines)

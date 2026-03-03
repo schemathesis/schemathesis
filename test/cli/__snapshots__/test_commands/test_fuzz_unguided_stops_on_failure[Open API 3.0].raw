@@ -1,0 +1,55 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+ ❌  Fuzzing (in 0.00s)
+
+     1 test case, 2 unique failures
+
+=================================== FAILURES ===================================
+_________________________________ GET /failure _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+- Undocumented Content-Type
+
+    Received: text/plain; charset=utf-8
+    Documented: application/json
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with:
+
+    curl -X GET http://127.0.0.1/api/failure
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Fuzzing:
+  Stopped: max-failures limit reached (1)
+  Duration: <1s
+  Test cases: 1
+  Avg throughput: n/a (run too short)
+
+Failures:
+  ❌ Server error: 1
+  ❌ Undocumented Content-Type: 1
+
+Seed: 42
+
+============================= 2 failures in 1.00s ==============================

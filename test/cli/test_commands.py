@@ -30,6 +30,38 @@ def test_commands_help(cli, snapshot_cli):
     assert cli.main() == snapshot_cli
 
 
+def test_fuzz_command_exists(cli, snapshot_cli):
+    assert cli.main("fuzz", "--help") == snapshot_cli
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("fuzz",),
+        ("fuzz", "http://127.0.0.1", "--auth=bad"),
+    ],
+)
+def test_fuzz_invalid_args(cli, args, snapshot_cli):
+    assert cli.main(*args) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_fuzz_startup_output(cli, schema_url, snapshot_cli):
+    # --include-method=DELETE selects 0 operations (success is GET), causing immediate exit after startup
+    assert cli.main("fuzz", schema_url, "--workers=1", "--include-method=DELETE") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("failure")
+def test_fuzz_unguided_stops_on_failure(cli, schema_url, snapshot_cli):
+    assert cli.main("fuzz", schema_url, "--workers=1", "--max-failures=1") == snapshot_cli
+
+
+def test_fuzz_loader_error_has_no_aborted_footer(cli, snapshot_cli):
+    assert cli.main("fuzz", "http://127.0.0.1:1/openapi.json") == snapshot_cli
+
+
 def test_run_subprocess(testdir):
     # To verify that CLI entry point is installed properly
     result = testdir.run("schemathesis")

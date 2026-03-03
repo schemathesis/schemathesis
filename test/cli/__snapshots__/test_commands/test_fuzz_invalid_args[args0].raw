@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis fuzz [OPTIONS] LOCATION
+Try 'schemathesis fuzz -h' for help.
+
+Error: Missing argument 'LOCATION'.

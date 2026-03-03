@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Generator
 from dataclasses import dataclass
+from types import GeneratorType
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -33,6 +35,28 @@ else:
 
 
 BLOCK_PADDING = (0, 1, 0, 1)
+
+
+def bold(option: str) -> str:
+    return click.style(option, bold=True)
+
+
+def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> None:
+    """Print section name with separators in terminal with the given title nicely centered."""
+    from schemathesis.cli.core import get_terminal_width
+
+    message = f" {title} ".center(get_terminal_width(), separator)
+    kwargs.setdefault("bold", True)
+    click.echo(_style(message, **kwargs))
+
+
+def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
+    for entry in lines:
+        if isinstance(entry, str):
+            click.echo(entry)
+        elif isinstance(entry, GeneratorType):
+            for line in entry:
+                click.echo(line)
 
 
 def display_header(version: str) -> None:
