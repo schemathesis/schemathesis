@@ -3,6 +3,65 @@ from flask import Flask, jsonify
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
+    # When response validation fails inside a $ref-ed component, the "Schema at" path
+    # should show the original component path (e.g. /components/schemas/Host/properties/host)
+    # not the internal bundled form (e.g. /x-bundled/schema1/properties/host).
+    # See GH-3567
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "Search result",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"host": {"$ref": "#/components/schemas/HostField"}},
+                                        "required": ["host"],
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+        version="3.0.2",
+        components={
+            "schemas": {
+                "HostField": {
+                    "type": "string",
+                }
+            }
+        },
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/search", methods=["GET"])
+    def search():
+        # Return an integer for host instead of a string — always a type error
+        return jsonify({"host": 42}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=response_schema_conformance",
+        "--max-examples=1",
+    )
+    assert "x-bundled" not in result.stdout
+    assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
     # When a response schema has array items with $ref, the bundled ref path like `#/x-bundled/schema1`
     # should not appear in error messages - it should show the original reference path instead
