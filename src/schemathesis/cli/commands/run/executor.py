@@ -92,6 +92,7 @@ def initialize_handlers(
     config: ProjectConfig,
     args: list[str],
     params: dict[str, Any],
+    include_output: bool = True,
 ) -> list[EventHandler]:
     """Create event handlers based on run configuration."""
     handlers: list[EventHandler] = []
@@ -117,7 +118,8 @@ def initialize_handlers(
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))
 
-    handlers.append(OutputHandler(config=config))
+    if include_output:
+        handlers.append(OutputHandler(config=config))
 
     return handlers
 
