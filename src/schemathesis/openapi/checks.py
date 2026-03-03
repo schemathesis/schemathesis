@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
-from schemathesis.core.jsonschema.bundler import unbundle
+from schemathesis.core.jsonschema.bundler import unbundle, unbundle_path
 from schemathesis.core.output import truncate_json
 from schemathesis.core.transforms import resolve_path
 
@@ -158,7 +158,8 @@ class JsonSchemaError(Failure):
         )
         if len(exc.schema_path) > 1:
             schema_title = "Schema at "
-            for segment in exc.schema_path[:-1]:
+            path = unbundle_path(exc.schema_path[:-1], name_to_uri) if name_to_uri else exc.schema_path[:-1]
+            for segment in path:
                 schema_title += f"/{segment}"
         else:
             schema_title = "Schema"

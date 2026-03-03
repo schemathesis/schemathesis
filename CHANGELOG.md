@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for `format: hostname` in OpenAPI 3.0.x during the coverage phase. [#3567](https://github.com/schemathesis/schemathesis/issues/3567)
+- `Schema at` path in failure messages showing internal bundled form (e.g. `/x-bundled/schema1/...`) instead of the original schema path (e.g. `/components/schemas/.../`).
 - Missing positive test data for `format: duration` during the coverage phase.
 
 ## [4.11.0](https://github.com/schemathesis/schemathesis/compare/v4.10.2...v4.11.0) - 2026-03-03
