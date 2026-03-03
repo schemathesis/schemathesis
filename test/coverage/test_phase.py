@@ -9,6 +9,7 @@ import pytest
 from flask import Flask, jsonify, request
 from hypothesis import Phase, settings
 from hypothesis import strategies as st
+from hypothesis.errors import Unsatisfiable
 from requests import Request
 from requests.models import RequestEncodingMixin
 
@@ -16,9 +17,10 @@ import schemathesis
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import MalformedMediaType
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
+from schemathesis.generation import coverage as coverage_generation
 from schemathesis.generation.hypothesis.builder import (
     HypothesisTestConfig,
     HypothesisTestMode,
@@ -207,7 +209,7 @@ def run_negative_test(operation, test, **kwargs):
     return run_test(operation, test, [GenerationMode.NEGATIVE], **kwargs)
 
 
-def collect_coverage_cases(ctx, body_schema, positive=False):
+def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
     """Build schema, run test, and return coverage phase cases.
 
     Always validates that:
@@ -220,11 +222,12 @@ def collect_coverage_cases(ctx, body_schema, positive=False):
             "required": True,
             "content": {"application/json": {"schema": body_schema}},
         },
+        version=version,
     )
     loaded = schemathesis.openapi.from_dict(schema)
     operation = loaded["/foo"]["post"]
-
-    validator = jsonschema_rs.Draft202012Validator(body_schema)
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    validator = validator_cls(body_schema, validate_formats=True)
     cases = []
 
     def collect(case):
@@ -236,6 +239,7 @@ def collect_coverage_cases(ctx, body_schema, positive=False):
                     f"Positive case produced invalid body.\n"
                     f"Body: {case.body}\n"
                     f"Schema: {body_schema}\n"
+                    f"Validator: {validator_cls.__name__}\n"
                     f"Errors: {[e.message for e in errors]}"
                 )
             if not positive and is_valid:
@@ -243,6 +247,7 @@ def collect_coverage_cases(ctx, body_schema, positive=False):
                     f"Negative case produced valid body (should be invalid).\n"
                     f"Body: {case.body}\n"
                     f"Schema: {body_schema}\n"
+                    f"Validator: {validator_cls.__name__}\n"
                     f"Scenario: {case.meta.phase.data.scenario}"
                 )
             cases.append(case)
@@ -3206,3 +3211,82 @@ def test_query_method_excluded_from_unexpected_when_defined(ctx):
     run_negative_test(operation, test)
 
     assert "QUERY" not in methods
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_hostname_format_generation_and_validation_consistent(ctx, version):
+    # See GH-3567: generated values should be validated with the same draft semantics.
+    body_schema = {"type": "string", "format": "hostname"}
+    assert collect_coverage_cases(ctx, body_schema, positive=True, version=version)
+    assert collect_coverage_cases(ctx, body_schema, positive=False, version=version)
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_duration_format_generates_required_body_positive_cases(ctx, version):
+    # Duration format should not eliminate all positive body values.
+    body_schema = {"type": "string", "format": "duration"}
+    assert collect_coverage_cases(ctx, body_schema, positive=True, version=version)
+
+
+@pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
+def test_duration_format_generates_required_query_positive_cases(ctx, version):
+    # Required query parameters should not be omitted for duration format.
+    schema = build_schema(
+        ctx,
+        parameters=[
+            {
+                "name": "duration",
+                "in": "query",
+                "required": True,
+                "schema": {"type": "string", "format": "duration"},
+            }
+        ],
+        version=version,
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    operation = loaded["/foo"]["post"]
+    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    validator = validator_cls({"type": "string", "format": "duration"}, validate_formats=True)
+    cases = []
+
+    def test(case):
+        if case.meta.phase.name != TestPhase.COVERAGE:
+            return
+        value = case.query.get("duration") if case.query else None
+        assert value is not None
+        assert validator.is_valid(value)
+        cases.append(case)
+
+    run_positive_test(operation, test)
+
+    assert cases
+
+
+@pytest.mark.parametrize(
+    ("validator_cls", "should_generate"),
+    [
+        (jsonschema_rs.Draft4Validator, False),
+        (jsonschema_rs.Draft202012Validator, True),
+    ],
+)
+def test_hostname_negative_format_respects_validator_draft(monkeypatch, validator_cls, should_generate):
+    # `XN--9krT00a` is valid in Draft 4 but invalid in Draft 2020-12.
+    monkeypatch.setattr(coverage_generation, "from_schema", lambda *_args, **_kwargs: st.just("XN--9krT00a"))
+    ctx = coverage_generation.CoverageContext(
+        root_schema={"type": "string", "format": "hostname"},
+        location=ParameterLocation.QUERY,
+        media_type=None,
+        generation_modes=[GenerationMode.NEGATIVE],
+        is_required=True,
+        custom_formats={},
+        validator_cls=validator_cls,
+    )
+
+    generator = coverage_generation._negative_format(ctx, {"type": "string", "format": "hostname"}, "hostname")
+
+    if should_generate:
+        value = next(generator)
+        assert value.value == "XN--9krT00a"
+    else:
+        with pytest.raises(Unsatisfiable):
+            next(generator)

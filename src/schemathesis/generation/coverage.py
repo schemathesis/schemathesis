@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import re
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -74,21 +73,20 @@ VALIDATED_FORMATS = frozenset(
     }
 )
 
-_FORMAT_VALIDATORS: dict[str, jsonschema_rs.Draft202012Validator] = {}
+_FORMAT_VALIDATORS: dict[tuple[str, type], jsonschema_rs.Validator] = {}
 
 
-def _get_format_validator(format: str) -> jsonschema_rs.Draft202012Validator:
+def _get_format_validator(format: str, validator_cls: type[jsonschema_rs.Validator]) -> jsonschema_rs.Validator:
     """Get or create a cached validator for checking a specific format."""
-    if format not in _FORMAT_VALIDATORS:
-        _FORMAT_VALIDATORS[format] = jsonschema_rs.Draft202012Validator(
-            {"type": "string", "format": format}, validate_formats=True
-        )
-    return _FORMAT_VALIDATORS[format]
+    key = (format, validator_cls)
+    if key not in _FORMAT_VALIDATORS:
+        _FORMAT_VALIDATORS[key] = validator_cls({"type": "string", "format": format}, validate_formats=True)
+    return _FORMAT_VALIDATORS[key]
 
 
-def conforms_to_format(value: Any, format: str) -> bool:
+def conforms_to_format(value: Any, format: str, validator_cls: type[jsonschema_rs.Validator]) -> bool:
     """Check if a value conforms to a JSON Schema format."""
-    return _get_format_validator(format).is_valid(value)
+    return _get_format_validator(format, validator_cls).is_valid(value)
 
 
 def _remove_examples(schema: dict[str, Any]) -> dict[str, Any]:
@@ -159,6 +157,10 @@ def _generate_additional_property_key(existing_keys: set[str]) -> str:
         counter += 1
         key = f"{ADDITIONAL_PROPERTY_KEY_BASE}{counter}"
     return key
+
+
+def _supports_format_generation(format: str, custom_formats: dict[str, st.SearchStrategy]) -> bool:
+    return format in BUILT_IN_STRING_FORMATS or format in custom_formats
 
 
 @dataclass
@@ -461,7 +463,17 @@ class CoverageContext:
             return deepclone(cached) if isinstance(cached, dict | list) else cached
 
         # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
-        generated = self.generate_from(from_schema(deepclone(schema), custom_formats=self.custom_formats))
+        strategy = from_schema(deepclone(schema), custom_formats=self.custom_formats)
+        # Keep generation consistent with the validator draft semantics used by this operation.
+        # This avoids producing positive values that the validator for the same schema would reject.
+        if (
+            isinstance(schema, dict)
+            and (fmt := schema.get("format")) in VALIDATED_FORMATS
+            and _supports_format_generation(fmt, self.custom_formats)
+        ):
+            fmt_validator = _get_format_validator(fmt, self.validator_cls)
+            strategy = strategy.filter(lambda v, fv=fmt_validator: not isinstance(v, str) or fv.is_valid(v))
+        generated = self.generate_from(strategy)
         self._schema_generation_cache[cache_key] = (
             deepclone(generated) if isinstance(generated, dict | list) else generated
         )
@@ -1625,14 +1637,6 @@ def _negative_required(
         )
 
 
-def _is_invalid_hostname(v: Any) -> bool:
-    return v == "" or not conforms_to_format(v, "hostname")
-
-
-def _is_invalid_format(v: Any, format: str) -> bool:
-    return not conforms_to_format(v, format)
-
-
 def _negative_format(
     ctx: CoverageContext, schema: JsonSchemaObject, format: str
 ) -> Generator[GeneratedValue, None, None]:
@@ -1649,10 +1653,13 @@ def _negative_format(
         # Empty path parameters are invalid
         without_format["minLength"] = 1
     strategy = from_schema(without_format)
+    # Use the schema's actual validator class to determine format conformance, avoiding
+    # false positives from mismatched draft semantics (e.g. Draft 4 vs Draft 2020-12).
+    vc = ctx.validator_cls
     if format == "hostname":
-        strategy = strategy.filter(_is_invalid_hostname)
+        strategy = strategy.filter(lambda v, vc=vc: v == "" or not conforms_to_format(v, "hostname", vc))
     else:
-        strategy = strategy.filter(functools.partial(_is_invalid_format, format=format))
+        strategy = strategy.filter(lambda v, f=format, vc=vc: not conforms_to_format(v, f, vc))
     yield NegativeValue(
         ctx.generate_from(strategy),
         scenario=CoverageScenario.INVALID_FORMAT,
