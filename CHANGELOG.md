@@ -2,6 +2,11 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.11.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for `format: hostname` in OpenAPI 3.0.x during the coverage phase. [#3567](https://github.com/schemathesis/schemathesis/issues/3567)
+- Missing positive test data for `format: duration` during the coverage phase.
+
 ## [4.11.0](https://github.com/schemathesis/schemathesis/compare/v4.10.2...v4.11.0) - 2026-03-03
 
 ### :rocket: Added
