@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
@@ -744,8 +745,40 @@ class OpenApiSchema(BaseSchema):
                         name_to_uri=resolved.name_to_uri,
                     )
                 )
+            except ValueError as exc:
+                # jsonschema_rs raises ValueError for lone Unicode surrogate characters
+                # (e.g. \uDCF3), which are not valid JSON per RFC 8259 even though
+                # Python's json.loads accepts them. Treat as malformed JSON.
+                doc = response.content.decode("latin-1")
+                position, lineno, colno = _find_surrogate_location(doc)
+                failures.append(
+                    MalformedJson(
+                        operation=operation.label,
+                        validation_message=str(exc),
+                        document=doc,
+                        position=position,
+                        lineno=lineno,
+                        colno=colno,
+                        message=f"Response contains invalid JSON (lone Unicode surrogate characters are not valid per RFC 8259):\n\n  {exc}",
+                    )
+                )
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
+
+
+_SURROGATE_ESCAPE_RE = re.compile(r"\\u[Dd][89a-fA-F][0-9a-fA-F]{2}")
+
+
+def _find_surrogate_location(doc: str) -> tuple[int, int, int]:
+    """Return (position, lineno, colno) of the first lone surrogate escape in a JSON document."""
+    match = _SURROGATE_ESCAPE_RE.search(doc)
+    if match is None:
+        return 0, 1, 1
+    pos = match.start()
+    text_before = doc[:pos]
+    lineno = text_before.count("\n") + 1
+    colno = pos - text_before.rfind("\n")
+    return pos, lineno, colno
 
 
 def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
