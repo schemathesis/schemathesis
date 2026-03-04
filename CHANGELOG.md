@@ -2,6 +2,14 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.11.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Support filesystem paths for `SCHEMATHESIS_HOOKS`.
+
+### :memo: Documentation
+
+- "Triaging Failures" guide.
+
 ### :bug: Fixed
 
 - Internal `ValueError` when validating a response containing lone Unicode surrogate characters (e.g. `\uDCF3`); now reported as a `JSON deserialization error` since lone surrogates are invalid JSON per RFC 8259.

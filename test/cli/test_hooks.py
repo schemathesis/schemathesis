@@ -69,6 +69,35 @@ def before_init_operation(context, operation):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
+def test_hooks_file_path(ctx, cli, schema_url, tmp_path):
+    # When SCHEMATHESIS_HOOKS points to an absolute file path
+    hooks_file = tmp_path / "my_hooks.py"
+    hooks_file.write_text("""
+import schemathesis
+@schemathesis.hook
+def before_call(context, case, **kwargs):
+    1 / 0
+""")
+    result = cli.main("run", schema_url, env={"SCHEMATHESIS_HOOKS": str(hooks_file)})
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert "division by zero" in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_hooks_file_path_unloadable(cli, schema_url, tmp_path):
+    # When SCHEMATHESIS_HOOKS points to a file path with an unknown extension
+    # that Python cannot determine a loader for (spec is None)
+    hooks_file = tmp_path / "my_hooks.xyz"
+    hooks_file.write_text("# hooks")
+    result = cli.main("run", schema_url, env={"SCHEMATHESIS_HOOKS": str(hooks_file)})
+    assert result.exit_code == 1, result.stdout
+    assert "Unable to load Schemathesis extension hooks" in result.stdout
+    assert "Cannot load hooks from:" in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_filter_case_rejects_all(ctx, cli, schema_url, snapshot_cli):
     # When the `filter_case` hook rejects all generated test cases
