@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import Any
 from urllib.parse import unquote
 
@@ -13,20 +13,26 @@ __all__ = [
 ]
 
 
-def is_valid_path(parameters: dict[str, object]) -> bool:
+def is_valid_path(parameters: dict[str, object], allow_encoded_slash_for: Collection[str] | None = None) -> bool:
     """Empty strings ("") are excluded from path by urllib3.
 
     A path containing to "/" or "%2F" will lead to ambiguous path resolution in
     many frameworks and libraries, such behaviour have been observed in both
     WSGI and ASGI applications.
 
-    In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
-    Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
+    In this case one variable in the path template will be empty, which will lead to 404 in most cases.
+    Because of it this case doesn't bring much value and might lead to false positive Schemathesis results.
+
+    `allow_encoded_slash_for` lets callers allow `%2F` for selected parameter names while
+    preserving strict defaults for all other path parameters.
     """
-    return not any(is_invalid_path_parameter(value) for value in parameters.values())
+    allow = allow_encoded_slash_for or ()
+    return not any(
+        is_invalid_path_parameter(value, allow_encoded_slash=name in allow) for name, value in parameters.items()
+    )
 
 
-def is_invalid_path_parameter(value: Any) -> bool:
+def is_invalid_path_parameter(value: Any, *, allow_encoded_slash: bool = False) -> bool:
     if value in ("/", ""):
         return True
     if contains_unicode_surrogate_pair(value):
@@ -36,20 +42,25 @@ def is_invalid_path_parameter(value: Any) -> bool:
     # For non-strings (dicts, lists), their str() is what appears in the URL
     str_value = value if isinstance(value, str) else str(value)
 
-    # `%2F` is decoded by many HTTP stacks before routing, effectively turning it into `/`.
-    # Reject such values to avoid ambiguous path resolution.
-    if (
-        (isinstance(value, str) and "/" in unquote(str_value))
-        or "/" in str_value
-        or "}" in str_value
-        or "{" in str_value
-    ):
+    if "/" in str_value or "}" in str_value or "{" in str_value:
         return True
 
-    # Avoid situations when the path parameter contains only NULL bytes.
-    # Many webservers remove such bytes and as the result, the test can target a different API operation
-    if isinstance(value, str) and len(value) == value.count("\x00"):
-        return True
+    if isinstance(value, str):
+        decoded_value = unquote(str_value)
+        # `%2F` is decoded by many HTTP stacks before routing, effectively turning it into `/`.
+        # Allow it only when the caller explicitly opts in for this parameter.
+        if not allow_encoded_slash and "/" in decoded_value:
+            return True
+        # Curly braces are structural characters in path templates.
+        # Reject their quoted forms (e.g. `%7B` / `%7D`) as well.
+        if "}" in decoded_value or "{" in decoded_value:
+            return True
+
+        # Avoid situations when the path parameter contains only NULL bytes.
+        # Many webservers remove such bytes and as the result, the test can target a different API operation.
+        # Check decoded values as well to catch quoted forms like `%00`.
+        if len(decoded_value) == decoded_value.count("\x00"):
+            return True
 
     return False
 
