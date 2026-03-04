@@ -1,11 +1,11 @@
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import jsonschema_rs
 import pytest
 import requests
 from flask import Flask, jsonify
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, given, seed, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
@@ -866,7 +866,53 @@ def test_path_parameters_never_contain_slash():
     @settings(deadline=None, max_examples=250, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         for value in case.path_parameters.values():
-            assert "/" not in str(value)
+            assert "/" not in unquote(str(value))
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_examples():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "0.1.0"},
+            "paths": {
+                "/api/groups/{id}": {
+                    "get": {
+                        "parameters": [
+                            {
+                                "name": "id",
+                                "in": "path",
+                                "required": True,
+                                "schema": {
+                                    # Explicit slash intent for positive generation
+                                    "example": "foo/bar",
+                                    "anyOf": [
+                                        {
+                                            "type": "string",
+                                            "examples": ["bqf7a2d9gbgud9a0jgfgt1ie"],
+                                            "pattern": "^[a-zA-Z0-9\\-]+$",
+                                        },
+                                        {"enum": ["valid-id-1", "valid-id-2"]},
+                                    ],
+                                },
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                },
+            },
+        }
+    )
+    operation = schema["/api/groups/{id}"]["GET"]
+
+    @seed(8)
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(deadline=None, max_examples=80, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        for value in case.path_parameters.values():
+            assert "/" not in unquote(str(value))
 
     test()
 

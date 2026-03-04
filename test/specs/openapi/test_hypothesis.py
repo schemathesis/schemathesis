@@ -4,11 +4,13 @@ import jsonschema_rs
 import pytest
 from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
+from hypothesis.errors import FailedHealthCheck, Unsatisfiable
 from jsonschema_rs import Draft4Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation import GenerationMode
 from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
@@ -495,6 +497,154 @@ def test_unregister_string_format_valid():
 def test_unregister_string_format_invalid():
     with pytest.raises(ValueError, match="Unknown Open API format: unknown"):
         formats.unregister_string_format("unknown")
+
+
+@pytest.mark.hypothesis_nested
+def test_custom_format_path_value_with_slash_is_accepted_when_explicit(ctx):
+    # See GH-3571
+    format_name = "ip-network-explicit-gh3571"
+    schemathesis.openapi.format(format_name, st.sampled_from(["192.168.1.0/24"]))
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/blocks/{block}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "block",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": format_name},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/blocks/{block}"]["GET"]
+
+    @given(case=operation.as_strategy())
+    @settings(max_examples=1, deadline=None)
+    def inner(case):
+        assert case.path_parameters["block"] == "192.168.1.0%2F24"
+
+    inner()
+
+
+@pytest.mark.hypothesis_nested
+def test_path_example_without_slash_does_not_allow_encoded_slash(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/blocks/{block}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "block",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "^[0-9]+/[0-9]+$"},
+                            "example": "foo",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/blocks/{block}"]["GET"]
+    strategy = _hypothesis.get_parameters_strategy(
+        operation,
+        GenerationMode.POSITIVE,
+        ParameterLocation.PATH,
+        GenerationConfig(),
+        mix_examples=False,
+    )
+
+    @given(value=strategy)
+    @settings(max_examples=1, deadline=None)
+    def inner(value):
+        pass
+
+    with pytest.raises((FailedHealthCheck, Unsatisfiable)):
+        inner()
+
+
+@pytest.mark.hypothesis_nested
+def test_path_example_with_slash_allows_encoded_slash(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/blocks/{block}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "block",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "^[0-9]+/[0-9]+$"},
+                            "example": "192.168.1.0/24",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/blocks/{block}"]["GET"]
+    strategy = _hypothesis.get_parameters_strategy(
+        operation,
+        GenerationMode.POSITIVE,
+        ParameterLocation.PATH,
+        GenerationConfig(),
+        mix_examples=False,
+    )
+
+    @given(value=strategy)
+    @settings(max_examples=10, deadline=None)
+    def inner(value):
+        assert "%2F" in value["block"]
+
+    inner()
+
+
+@pytest.mark.hypothesis_nested
+def test_path_parameters_encoded_braces_are_filtered(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/blocks/{block}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "block",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "^[{}]$"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/blocks/{block}"]["GET"]
+    strategy = _hypothesis.get_parameters_strategy(
+        operation,
+        GenerationMode.POSITIVE,
+        ParameterLocation.PATH,
+        GenerationConfig(),
+        mix_examples=False,
+    )
+
+    @given(value=strategy)
+    @settings(max_examples=1, deadline=None)
+    def inner(value):
+        pass
+
+    with pytest.raises((FailedHealthCheck, Unsatisfiable)):
+        inner()
 
 
 def test_custom_format_with_bytes(testdir):
