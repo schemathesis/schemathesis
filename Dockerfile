@@ -106,7 +106,8 @@ RUN addgroup --gid 1000 -S schemathesis && \
 
 COPY --chown=1000:1000 pyproject.toml README.md src ./
 
-RUN chown -R 1000:1000 /app
+RUN touch /app/hooks.py && \
+    chown -R 1000:1000 /app
 
 USER schemathesis
 
@@ -116,5 +117,6 @@ ENV VIRTUAL_ENV=/opt/venv
 
 ENV PYTHON_GIL=0
 ENV SCHEMATHESIS_DOCKER_IMAGE=3.14t-alpine
+ENV SCHEMATHESIS_HOOKS=/app/hooks.py
 
 ENTRYPOINT ["schemathesis"]

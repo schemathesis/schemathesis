@@ -17,6 +17,10 @@
 - `Schema at` path in failure messages showing internal bundled form (e.g. `/x-bundled/schema1/...`) instead of the original schema path (e.g. `/components/schemas/.../`).
 - Missing positive test data for `format: duration` during the coverage phase.
 
+### :wrench: Changed
+
+- Set `SCHEMATHESIS_HOOKS` to `/app/hooks.py` in Docker images with a stub hooks file to simplify the UX.
+
 ## [4.11.0](https://github.com/schemathesis/schemathesis/compare/v4.10.2...v4.11.0) - 2026-03-03
 
 ### :rocket: Added
