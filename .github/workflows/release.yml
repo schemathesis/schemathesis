@@ -129,8 +129,8 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/schemathesis/schemathesis:buildcache${{ matrix.tag-suffix }}
+          cache-to: type=registry,ref=ghcr.io/schemathesis/schemathesis:buildcache${{ matrix.tag-suffix }},mode=max
 
   release_package:
     name: Build and publish package to pypi.org
