@@ -9,6 +9,7 @@
 ### :memo: Documentation
 
 - "Triaging Failures" guide.
+- "Docker" guide.
 
 ### :bug: Fixed
 

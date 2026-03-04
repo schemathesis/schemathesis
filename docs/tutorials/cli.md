@@ -212,5 +212,6 @@ uvx schemathesis --config-file path/to/config.toml run http://...
 **Continue learning:**
 
 - **[Triaging Failures](../guides/triage.md)** — when your API has many failures, a systematic workflow for working through them
+- **[Using Schemathesis with Docker](../guides/docker.md)** — run without installing Python, with hooks and coverage support
 - **[CLI Reference](../reference/cli.md)** - All available CLI options
 - **[Configuration Reference](../reference/configuration.md)** - Complete configuration reference

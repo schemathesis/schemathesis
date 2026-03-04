@@ -16,8 +16,11 @@ Validate API responses against your schema in existing test suites without using
 
 ## Integration
 
-### [CI/CD Integration](cicd.md)  
+### [CI/CD Integration](cicd.md)
 Integrate Schemathesis into automated testing pipelines. Includes GitHub Actions, GitLab CI configurations, and reporting best practices.
+
+### [Using Schemathesis with Docker](docker.md)
+Run Schemathesis without installing Python — covers file schemas, hooks, reports, and TraceCov coverage.
 
 ### [Testing Python Web Applications](python-apps.md)
 Test Flask, FastAPI, and other Python web apps directly without network overhead.
