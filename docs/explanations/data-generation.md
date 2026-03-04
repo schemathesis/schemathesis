@@ -1,6 +1,6 @@
 # Understanding Data Generation
 
-This document explains how Schemathesis generates test data for your API, from raw schemas to complete HTTP requests. Understanding this process helps you write better extensions, troubleshoot unexpected behavior, and optimize your testing process.
+This document explains how Schemathesis generates test data for your API, from raw schemas to complete HTTP requests.
 
 ## The Generation Hierarchy
 
@@ -15,8 +15,6 @@ hypothesis-graphql           → Schema-aware generation for GraphQL
 Schemathesis                 → Complete API testing workflow
 ```
 
-**How it works:**
-
 1. **Hypothesis** provides the foundation—strategies for generating strings, integers, objects, etc.
 2. **hypothesis-jsonschema** and **hypothesis-graphql** translate your API schemas into Hypothesis strategies
 3. **Schemathesis** orchestrates the entire process: parsing schemas, generating all request components, sending requests, and validating responses
@@ -25,13 +23,10 @@ This layered approach means Schemathesis inherits Hypothesis's features (like au
 
 ## Testing Phases
 
-Schemathesis generates test cases through multiple phases, each targeting different aspects of API testing.
-
 ### Examples Phase
 
 Uses `example` and `examples` from your schema, filling missing parts with generated data.
 
-**Example:**
 ```yaml
 # Schema
 parameters:
@@ -48,7 +43,6 @@ parameters:
 
 Aims to exhaustively cover boundary values for every constraint defined in the schema.
 
-**Example:**
 ```yaml
 # Schema: {"type": "string", "minLength": 2, "maxLength": 10}
 
@@ -59,7 +53,6 @@ Aims to exhaustively cover boundary values for every constraint defined in the s
 
 Generates random data based on the schema constraints.
 
-**Example:**
 ```yaml
 # Schema: {"type": "integer", "minimum": 0, "maximum": 100}
 
@@ -71,7 +64,6 @@ Generates random data based on the schema constraints.
 
 Runs when OpenAPI schemas define links between operations. Creates sequences where response data feeds into subsequent requests.
 
-**Example:**
 ```yaml
 # Schema with links: POST /users → GET /users/{id}
 
@@ -80,7 +72,18 @@ Runs when OpenAPI schemas define links between operations. Creates sequences whe
 
 ## Generation Modes
 
-Schemathesis can generate two fundamentally different types of test data:
+**By default, both positive and negative testing are enabled** — you don't need any extra flags.
+
+| Mode | Generates |
+|------|-----------|
+| `all` *(default)* | Valid and invalid data |
+| `positive` | Only valid data |
+| `negative` | Only invalid data |
+
+```bash
+schemathesis run https://api.example.com/openapi.json
+schemathesis run --mode=negative https://api.example.com/openapi.json
+```
 
 ### Positive Testing
 
@@ -103,10 +106,6 @@ Generates data that **should be rejected** by your API — deliberately invalid 
 !!! tip "How it works"
     Schemathesis mutates your schema to produce invalid data.
 
-```bash
-schemathesis run --mode=negative https://api.example.com/openapi.json
-```
-
 ### GraphQL Negative Testing
 
 Negative testing works for GraphQL by generating queries with:
@@ -122,11 +121,8 @@ Negative testing works for GraphQL by generating queries with:
 
 The final step transforms generated objects into actual HTTP requests based on your API's media types.
 
-**Media type support:**
-
 Schemathesis supports many common media types out of the box, including JSON, XML (with OpenAPI XML annotations), form data, plain text, and others. For unsupported media types, you can add custom serializers.
 
-**Example:**
 ```python
 # Generated Python object
 {"user_id": 123, "name": "test"}
@@ -135,7 +131,7 @@ Schemathesis supports many common media types out of the box, including JSON, XM
 # For application/xml -> <data><user_id>123</user_id><name>test</name></data>
 ```
 
-If Schemathesis can't serialize data for a media type, those test cases are skipped. This keeps your test runs focused on actually testable scenarios.
+If Schemathesis can't serialize data for a media type, those test cases are skipped.
 
 ## Shrinking and Failure Handling
 
