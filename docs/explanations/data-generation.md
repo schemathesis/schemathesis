@@ -15,6 +15,8 @@ hypothesis-graphql           → Schema-aware generation for GraphQL
 Schemathesis                 → Complete API testing workflow
 ```
 
+Each layer adds a specific capability:
+
 1. **Hypothesis** provides the foundation—strategies for generating strings, integers, objects, etc.
 2. **hypothesis-jsonschema** and **hypothesis-graphql** translate your API schemas into Hypothesis strategies
 3. **Schemathesis** orchestrates the entire process: parsing schemas, generating all request components, sending requests, and validating responses
