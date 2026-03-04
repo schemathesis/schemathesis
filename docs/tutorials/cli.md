@@ -69,9 +69,7 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
       http://127.0.0.1:8080/bookings
     ```
 
-Empty `room_type` causes a 500 error because the pricing logic can't handle unexpected values.
-
-Run the provided `curl` command to reproduce this failure.
+Run the provided `curl` command to reproduce this failure. When you do, read the response body — it shows the server error in detail. Notice that Hypothesis has already reduced the input to the simplest case that still triggers the failure: `room_type: ""` is all it takes. That's your starting point for diagnosis. Look up `room_type` in the schema: it accepts any string with no constraints. Your code assumes only specific room types are submitted, but the schema never enforces that.
 
 ## Reporting
 
@@ -88,6 +86,8 @@ This creates a `junit.xml` file in the `schemathesis-report` directory containin
 
 - Test case details and execution times
 - Failure descriptions with reproduction steps
+
+Import it into any JUnit-compatible reporting tool to track failures over time — see [CI/CD Integration](../guides/cicd.md) for ready-made pipeline examples.
 
 You can customize the output location using `--report-junit-path` or change the report directory with `--report-dir`. Other available formats include VCR cassettes (`--report vcr`) and HAR files (`--report har`) for detailed HTTP traffic analysis.
 

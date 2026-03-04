@@ -70,5 +70,6 @@ Runs scale with schema size and server performance. For thorough release testing
 
 **Reference guides:**
 
+- **[CI/CD Integration](guides/cicd.md)** – export results as JUnit XML, HAR, or VCR cassettes
 - **[CLI Reference](reference/cli.md)** – full list of options and checks
 - **[Configuration Reference](reference/configuration.md)** – how to keep settings in `schemathesis.toml`
