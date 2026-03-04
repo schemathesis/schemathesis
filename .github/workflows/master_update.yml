@@ -16,8 +16,10 @@ jobs:
         include:
           - dockerfile: Dockerfile
             tag: "latest"
+            tag-suffix: ""
           - dockerfile: Dockerfile.trixie
             tag: "latest-trixie"
+            tag-suffix: "-trixie"
 
     steps:
       - uses: actions/checkout@v6
@@ -51,5 +53,5 @@ jobs:
           tags: |
             schemathesis/schemathesis:${{ matrix.tag }}
             ghcr.io/schemathesis/schemathesis:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/schemathesis/schemathesis:buildcache${{ matrix.tag-suffix }}
+          cache-to: type=registry,ref=ghcr.io/schemathesis/schemathesis:buildcache${{ matrix.tag-suffix }},mode=max
