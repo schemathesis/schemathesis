@@ -50,4 +50,3 @@ docker run \
 ```
 
 `junit.xml` will appear in `./schemathesis-report/` on your host. See [CI/CD Integration](cicd.md) for how to consume this in GitHub Actions or GitLab CI.
-
