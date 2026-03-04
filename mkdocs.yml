@@ -17,6 +17,7 @@ nav:
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md
+      - Docker: guides/docker.md
       - guides/coverage.md
       - guides/python-apps.md
       - guides/custom-media-types.md

@@ -72,5 +72,6 @@ Runs scale with schema size and server performance. For thorough release testing
 
 - **[Triaging Failures](guides/triage.md)** – systematic workflow when your first run produces many failures
 - **[CI/CD Integration](guides/cicd.md)** – export results as JUnit XML, HAR, or VCR cassettes
+- **[Using Schemathesis with Docker](guides/docker.md)** — run without installing Python
 - **[CLI Reference](reference/cli.md)** – full list of options and checks
 - **[Configuration Reference](reference/configuration.md)** – how to keep settings in `schemathesis.toml`
