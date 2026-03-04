@@ -23,6 +23,7 @@
 - `Schema at` path in failure messages showing internal bundled form (e.g. `/x-bundled/schema1/...`) instead of the original schema path (e.g. `/components/schemas/.../`).
 - Missing positive test data for `format: duration` during the coverage phase.
 - Path generation now keeps explicit user-provided slash values (custom string formats, examples, and overrides) while still rejecting implicit and negative slash mutations to prevent misrouting. [#3571](https://github.com/schemathesis/schemathesis/issues/3571)
+- Warning count in the final summary line now reflects the number of distinct warning kinds shown, not just `missing_auth` operations.
 
 ### :wrench: Changed
 

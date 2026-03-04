@@ -1,5 +1,20 @@
 import pytest
 from _pytest.main import ExitCode
+from flask import Flask, Response, jsonify
+
+
+def _serve_schema(app_runner, schema: dict, routes):
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def get_schema():  # type: ignore[no-untyped-def]
+        return jsonify(schema)
+
+    for method, path, handler in routes:
+        app.add_url_rule(path, f"{method}_{path}", handler, methods=[method])
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
 
 
 @pytest.mark.openapi_version("3.0")
@@ -176,3 +191,36 @@ def test_warnings_multiple_types_via_cli(cli, schema_url):
     # Then warnings can still be triggered for specified types
     # (This just validates the flag is parsed correctly - actual warnings depend on test conditions)
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_final_line_counts_all_warning_kinds_in_run(cli, app_runner, ctx, snapshot_cli):
+    # Regression test: the footer "N warnings in Xs" should count warning *kinds*, not just missing_auth operations
+    schema = ctx.openapi.build_schema(
+        {
+            "/auth": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    }
+                }
+            },
+            "/missing": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    }
+                }
+            },
+        }
+    )
+
+    def auth():  # type: ignore[no-untyped-def]
+        return Response(status=401)
+
+    def missing():  # type: ignore[no-untyped-def]
+        return Response(status=404)
+
+    schema_url = _serve_schema(app_runner, schema, [("GET", "/auth", auth), ("GET", "/missing", missing)])
+    assert cli.run(schema_url, "--checks=not_a_server_error", "--max-examples=1") == snapshot_cli

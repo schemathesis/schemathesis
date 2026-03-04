@@ -244,6 +244,22 @@ class WarningData:
             or self.unsupported_regex
         )
 
+    @property
+    def kind_count(self) -> int:
+        """Count distinct warning kinds currently recorded."""
+        return sum(
+            1
+            for warnings in (
+                self.missing_auth,
+                self.missing_test_data,
+                self.validation_mismatch,
+                self.missing_deserializer,
+                self.unused_openapi_auth,
+                self.unsupported_regex,
+            )
+            if warnings
+        )
+
 
 @dataclass
 class OperationProgress:
@@ -1482,10 +1498,10 @@ class OutputHandler(EventHandler):
             suffix = "s" if len(self.errors) > 1 else ""
             parts.append(f"{len(self.errors)} error{suffix}")
 
-        total_warnings = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
-        if total_warnings:
-            suffix = "s" if total_warnings > 1 else ""
-            parts.append(f"{total_warnings} warning{suffix}")
+        warning_kinds = self.warnings.kind_count
+        if warning_kinds:
+            suffix = "s" if warning_kinds > 1 else ""
+            parts.append(f"{warning_kinds} warning{suffix}")
 
         if parts:
             message = f"{', '.join(parts)} in {event.running_time:.2f}s"
