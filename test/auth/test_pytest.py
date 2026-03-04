@@ -469,6 +469,74 @@ def test_api_with_overrides(case):
     result.assert_outcomes(passed=1)
 
 
+def test_openapi_basic_auth_applied_via_wsgi(testdir):
+    # See GH-3575
+    # When [auth.openapi.BasicAuth] is configured and the app uses WSGI transport,
+    # the auth should be applied (sent as Authorization header).
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.openapi.BasicAuth]
+username = "testuser"
+password = "testpass"
+""",
+    )
+    testdir.makepyfile(
+        """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+from flask import Flask, request as flask_request
+
+app = Flask(__name__)
+
+@app.route("/protected")
+def protected():
+    auth = flask_request.authorization
+    if not auth or auth.username != "testuser" or auth.password != "testpass":
+        return {"error": "Unauthorized"}, 401
+    return {"message": "OK"}
+
+@app.route("/openapi.json")
+def openapi_spec():
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/protected": {
+                "get": {
+                    "security": [{"BasicAuth": []}],
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "401": {"description": "Unauthorized"}
+                    }
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "BasicAuth": {"type": "http", "scheme": "basic"}
+            }
+        }
+    }
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    response = case.call()
+    assert response.status_code == 200, f"Expected 200 but got {response.status_code} - auth was not applied"
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
 def test_unused_openapi_auth_warning_in_pytest_mode(testdir):
     # See GH-3575
     # When a user configures [auth.openapi.WRONG_SCHEME] but WRONG_SCHEME doesn't exist
