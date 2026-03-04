@@ -1,3 +1,5 @@
+import xml.etree.ElementTree as ET
+
 import pytest
 from _pytest.main import ExitCode
 from flask import Flask, jsonify, request
@@ -209,6 +211,71 @@ def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, app_ru
             float(value)
             return "", 200
         except ValueError:
+            return "", 400
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=negative_data_rejection",
+            "--mode=negative",
+            "--phases=fuzzing",
+            "--max-examples=200",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, app_runner, cli, snapshot_cli):
+    # Type mutations for XML body string fields serialize all non-string values to their string
+    # representations via _escape_xml (False -> "False", 0 -> "0", None -> "").
+    # These are indistinguishable from valid strings at the wire level, so no false positive
+    # should be reported when the API correctly accepts the request.
+    # See GH-3525
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/negotiations/negotiation": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "payment_amount": {"type": "string"},
+                                        "payment_method_id": {"type": "string"},
+                                    },
+                                    "required": ["payment_amount", "payment_method_id"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/api/negotiations/negotiation", methods=["POST"])
+    def negotiation():
+        # Accept only valid XML objects with both required string fields present.
+        # Note: XML strips type info - boolean False becomes "False", integer 0 becomes "0",
+        # so we validate structure (required fields present) not value types.
+        try:
+            root = ET.fromstring(request.data)
+            if root.find("payment_amount") is None or root.find("payment_method_id") is None:
+                return "", 400
+            return "", 201
+        except ET.ParseError:
             return "", 400
 
     port = app_runner.run_flask_app(app)

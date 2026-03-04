@@ -15,6 +15,7 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, unbundle
 from schemathesis.core.jsonschema.types import JsonSchemaObject
+from schemathesis.core.media_types import is_xml
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 
@@ -282,11 +283,20 @@ def change_type(
     # includes all possible values as those parameters will be stringified before sending,
     # therefore it can't be negated.
     old_types = get_type(schema)
-    if "string" in old_types and (ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location):
-        return MutationResult.FAILURE, None
-    # For binary format in body, type: string accepts any bytes data (no effective constraint).
-    # Similar to stringified params, we can't generate truly invalid data with just type mutations.
-    if "string" in old_types and is_binary_format(schema) and ctx.location == ParameterLocation.BODY:
+    # For string types, type mutations are meaningless when the wire format stringifies all values:
+    # - path/query/header/cookie: parameters are always serialized as strings
+    # - XML body: _escape_xml() converts any value to its string representation
+    #   (False -> "False", 0 -> "0", None -> "")
+    # - binary/byte body: accepts any bytes (no effective type constraint)
+    if "string" in old_types and (
+        ctx.location.is_in_header
+        or ctx.is_path_location
+        or ctx.is_query_location
+        or (
+            ctx.location == ParameterLocation.BODY
+            and (is_binary_format(schema) or (ctx.media_type is not None and is_xml(ctx.media_type)))
+        )
+    ):
         return MutationResult.FAILURE, None
     candidates = _get_type_candidates_with_weights(ctx, schema, draw)
     if not candidates:
