@@ -238,9 +238,10 @@ def _flush_sse_event(
 ) -> ServerSentEvent | None:
     if not current_data_lines:
         return None
+    event_type = current_event.get("event") or "message"
     event: ServerSentEvent = {
         "data": "\n".join(current_data_lines),
-        "event": current_event.get("event", "message"),
+        "event": event_type,
     }
     if "id" in current_event:
         event["id"] = current_event["id"]
