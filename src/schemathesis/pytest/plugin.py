@@ -45,6 +45,7 @@ from schemathesis.generation.hypothesis.reporting import (
     ignore_hypothesis_output,
 )
 from schemathesis.pytest.control_flow import fail_on_no_matches
+from schemathesis.pytest.warnings import emit_openapi_auth_warnings
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
@@ -249,6 +250,7 @@ class SchemathesisCase(PyCollector):
     def collect(self) -> list[Function]:  # type: ignore[return]
         """Generate different test items for all API operations available in the given schema."""
         try:
+            emit_openapi_auth_warnings(self.schema)
             items = [item for operation in self.schema.get_all_operations() for item in self._gen_items(operation)]
             if not items:
                 fail_on_no_matches(self.nodeid)

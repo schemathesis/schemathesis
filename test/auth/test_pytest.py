@@ -467,3 +467,56 @@ def test_api_with_overrides(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_unused_openapi_auth_warning_in_pytest_mode(testdir):
+    # See GH-3575
+    # When a user configures [auth.openapi.WRONG_SCHEME] but WRONG_SCHEME doesn't exist
+    # in the schema's securitySchemes, a warning should be emitted.
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.openapi.WRONG_MISSING_AUTH]
+username = "testuser"
+password = "testpass"
+""",
+    )
+    testdir.makepyfile(
+        """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+
+raw_schema = {
+    "openapi": "3.0.0",
+    "info": {"title": "Test API", "version": "1.0.0"},
+    "paths": {
+        "/protected": {
+            "get": {
+                "security": [{"BasicAuth": []}],
+                "responses": {"200": {"description": "OK"}}
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "BasicAuth": {"type": "http", "scheme": "basic"}
+        }
+    }
+}
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict(raw_schema)
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    pass
+"""
+    )
+    result = testdir.runpytest("-W", "always")
+    # The unused OpenAPI auth scheme warning should be emitted
+    result.stdout.re_match_lines([r".*WRONG_MISSING_AUTH.*"])
