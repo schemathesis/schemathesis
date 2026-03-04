@@ -27,6 +27,7 @@ from schemathesis.generation.hypothesis.given import (
     validate_given_args,
 )
 from schemathesis.pytest.control_flow import fail_on_no_matches
+from schemathesis.pytest.warnings import emit_openapi_auth_warnings
 from schemathesis.schemas import BaseSchema
 
 if TYPE_CHECKING:
@@ -213,6 +214,7 @@ class LazySchema:
                     test_function=test_func,
                     filter_set=self.filter_set,
                 )
+                emit_openapi_auth_warnings(schema)
                 # Check if test function is a method and inject self from request.instance
                 sig = signature(test_func)
                 if "self" in sig.parameters and request.instance is not None:
