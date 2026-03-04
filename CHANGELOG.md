@@ -20,6 +20,7 @@
 - False positive `negative_data_rejection` for `format: hostname` in OpenAPI 3.0.x during the coverage phase. [#3567](https://github.com/schemathesis/schemathesis/issues/3567)
 - `Schema at` path in failure messages showing internal bundled form (e.g. `/x-bundled/schema1/...`) instead of the original schema path (e.g. `/components/schemas/.../`).
 - Missing positive test data for `format: duration` during the coverage phase.
+- Path generation now keeps explicit user-provided slash values (custom string formats, examples, and overrides) while still rejecting implicit and negative slash mutations to prevent misrouting. [#3571](https://github.com/schemathesis/schemathesis/issues/3571)
 
 ### :wrench: Changed
 

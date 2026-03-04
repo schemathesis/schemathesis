@@ -63,9 +63,31 @@ def test_invalid_query_fails_with_requests(invalid_params):
         req.prepare()
 
 
-@pytest.mark.parametrize("value", ["/", "%2F", "%2f", "foo%2Fbar", "\udc9b"])
+@pytest.mark.parametrize(
+    "value", ["/", "%2F", "%2f", "foo%2Fbar", "{", "}", "%7B", "%7D", "\x00", "%00", "%00%00", "\udc9b"]
+)
 def test_filter_path_parameters(value):
     assert not is_valid_path({"foo": value})
+
+
+@pytest.mark.parametrize(
+    ("params", "allow_encoded_slash_for", "expected"),
+    [
+        ({"block": "192.168.1.0%2F24"}, None, False),
+        ({"block": "192.168.1.0%2F24"}, {"block"}, True),
+        ({"block": "192.168.1.0/24"}, {"block"}, False),
+        ({"block": "%00"}, {"block"}, False),
+    ],
+    ids=[
+        "encoded-slash-rejected-by-default",
+        "encoded-slash-allowed-for-explicit",
+        "raw-slash-rejected-when-explicit",
+        "encoded-nul-rejected-when-explicit",
+    ],
+)
+def test_filter_path_parameters_with_explicit(params, allow_encoded_slash_for, expected):
+    kwargs = {"allow_encoded_slash_for": allow_encoded_slash_for} if allow_encoded_slash_for is not None else {}
+    assert is_valid_path(params, **kwargs) == expected
 
 
 @pytest.mark.parametrize(

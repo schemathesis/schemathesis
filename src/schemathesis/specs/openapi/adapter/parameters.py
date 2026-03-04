@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from itertools import chain
 from random import Random
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import unquote
 
 import jsonschema_rs
 
@@ -25,7 +26,7 @@ from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
-from schemathesis.specs.openapi.formats import HEADER_FORMAT
+from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -128,6 +129,25 @@ def _schema_has_integer_properties(schema: JsonSchemaObject) -> bool:
         if isinstance(prop_schema, dict) and prop_schema.get("type") == "integer":
             return True
     return False
+
+
+def _has_explicit_slash_example(examples: Sequence[object]) -> bool:
+    for example in examples:
+        if isinstance(example, str) and "/" in unquote(example):
+            return True
+    return False
+
+
+def _get_explicit_intent_path_names(*, parameters: Sequence[OpenApiParameter]) -> frozenset[str]:
+    """Collect path parameter names where encoded slash is explicitly allowed."""
+    explicit: set[str] = set()
+    for parameter in parameters:
+        if _has_explicit_slash_example(parameter.examples):
+            explicit.add(parameter.name)
+        schema = parameter.optimized_schema
+        if isinstance(schema, dict) and schema.get("format") in STRING_FORMATS:
+            explicit.add(parameter.name)
+    return frozenset(explicit)
 
 
 def _bias_path_integers_to_positive(params: dict[str, Any], random: Random) -> dict[str, Any]:
@@ -973,6 +993,14 @@ class OpenApiParameterSet(ParameterSet):
         from schemathesis.specs.openapi.negative import GeneratedValue
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
+        def _quote_all_safe(value: dict[str, Any]) -> dict[str, Any]:
+            """Quote path parameter values, preserving invalid inputs for later filtering."""
+            quoted = dict(value)
+            try:
+                return quote_all(quoted)
+            except UnicodeEncodeError:
+                return value
+
         # Get schema with exclusions
         schema: JsonSchema = self.get_schema_with_exclusions(exclude)
 
@@ -1033,6 +1061,10 @@ class OpenApiParameterSet(ParameterSet):
             ):
                 strategy = build_positive_biased_path_strategy(strategy)
 
+            explicit_intent_path_names: frozenset[str] = frozenset()
+            if self.location == ParameterLocation.PATH:
+                explicit_intent_path_names = _get_explicit_intent_path_names(parameters=self.items)
+
             serialize = operation.get_parameter_serializer(self.location)
             if serialize is not None:
                 if is_negative:
@@ -1041,20 +1073,6 @@ class OpenApiParameterSet(ParameterSet):
                 else:
                     strategy = strategy.map(serialize)
 
-            filter_func = {
-                ParameterLocation.PATH: is_valid_path,
-                ParameterLocation.HEADER: is_valid_header,
-                ParameterLocation.COOKIE: is_valid_header,
-                ParameterLocation.QUERY: is_valid_query,
-            }[self.location]
-            # Headers with special format do not need filtration
-            if not (self.location.is_in_header and _can_skip_header_filter(schema)):
-                if is_negative:
-                    # Apply filter only to the value part of GeneratedValue
-                    strategy = strategy.filter(lambda x: filter_func(x.value))
-                else:
-                    strategy = strategy.filter(filter_func)
-
             # Path & query parameters will be cast to string anyway, but having their JSON equivalents for
             # `True` / `False` / `None` improves chances of them passing validation in apps
             # that expect boolean / null types
@@ -1062,15 +1080,34 @@ class OpenApiParameterSet(ParameterSet):
             if self.location == ParameterLocation.PATH:
                 if is_negative:
                     strategy = strategy.map(
-                        lambda x: GeneratedValue(quote_all(jsonify_python_specific_types(x.value)), x.meta)
+                        lambda x: GeneratedValue(_quote_all_safe(jsonify_python_specific_types(x.value)), x.meta)
                     )
+                    # Keep strict anti-misrouting defaults for negative generation.
+                    # Explicit %2F allowances apply only to positive data.
+                    strategy = strategy.filter(lambda x: is_valid_path(x.value))
                 else:
-                    strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
+                    strategy = strategy.map(_quote_all_safe).map(jsonify_python_specific_types)
+                    strategy = strategy.filter(
+                        lambda x, allow=explicit_intent_path_names: is_valid_path(x, allow_encoded_slash_for=allow)
+                    )
             elif self.location == ParameterLocation.QUERY:
+                query_filter = is_valid_query
+                if is_negative:
+                    strategy = strategy.filter(lambda x: query_filter(x.value))
+                else:
+                    strategy = strategy.filter(query_filter)
                 if is_negative:
                     strategy = strategy.map(lambda x: GeneratedValue(jsonify_python_specific_types(x.value), x.meta))
                 else:
                     strategy = strategy.map(jsonify_python_specific_types)
+            else:
+                header_filter = is_valid_header
+                # Headers with special format do not need filtration
+                if not (self.location.is_in_header and _can_skip_header_filter(schema)):
+                    if is_negative:
+                        strategy = strategy.filter(lambda x: header_filter(x.value))
+                    else:
+                        strategy = strategy.filter(header_filter)
 
         # Apply hybrid approach when captured variants are available
         if captured_variants and usage_tracker is not None:
