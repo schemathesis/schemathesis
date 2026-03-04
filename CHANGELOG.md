@@ -13,7 +13,8 @@
 
 ### :bug: Fixed
 
-- Ignore invalid `retry` field values in Server-Sent Events parsing.
+- Server-Sent Events: Ignore invalid `retry` field values.
+- Server-Sent Events: Treat empty `event` fields as `message`.
 - `[auth.openapi.*]` HTTP Basic authentication now correctly applied when using WSGI or ASGI apps in pytest mode. [#3575](https://github.com/schemathesis/schemathesis/issues/3575)
 - Misconfigured `[auth.openapi.*]` scheme names (e.g. typos) now emit a `UserWarning` in pytest mode, matching the existing CLI behavior. [#3575](https://github.com/schemathesis/schemathesis/issues/3575)
 - False positive `negative_data_rejection` for `application/xml` body string fields in the fuzzing phase due to type mutations producing wire-identical strings (e.g. `False` -> `"False"`). [#3525](https://github.com/schemathesis/schemathesis/issues/3525)

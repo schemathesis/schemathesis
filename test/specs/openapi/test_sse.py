@@ -1273,6 +1273,11 @@ def test_sse_pytest_plugin():
             id="last-event-id-carry-over",
         ),
         pytest.param(
+            b"event:\ndata: hello\n\n",
+            [{"event": "message", "data": "hello"}],
+            id="empty-event-field-defaults-to-message",
+        ),
+        pytest.param(
             b"id: 1\nretry: 3000\n\n",
             [],
             id="metadata-only-block",
