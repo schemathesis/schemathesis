@@ -1263,6 +1263,11 @@ def test_sse_pytest_plugin():
             id="retry-field",
         ),
         pytest.param(
+            b"retry: not-a-number\ndata: {}\n\n",
+            [{"event": "message", "data": "{}"}],
+            id="invalid-retry-field-ignored",
+        ),
+        pytest.param(
             b'id: 1\n\ndata: {"x": 1}\n\n',
             [{"event": "message", "id": "1", "data": '{"x": 1}'}],
             id="last-event-id-carry-over",
