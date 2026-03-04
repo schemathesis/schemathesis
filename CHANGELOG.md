@@ -13,6 +13,7 @@
 
 ### :bug: Fixed
 
+- Misconfigured `[auth.openapi.*]` scheme names (e.g. typos) now emit a `UserWarning` in pytest mode, matching the existing CLI behavior. [#3575](https://github.com/schemathesis/schemathesis/issues/3575)
 - False positive `negative_data_rejection` for `application/xml` body string fields in the fuzzing phase due to type mutations producing wire-identical strings (e.g. `False` -> `"False"`). [#3525](https://github.com/schemathesis/schemathesis/issues/3525)
 - Internal `ValueError` when validating a response containing lone Unicode surrogate characters (e.g. `\uDCF3`); now reported as a `JSON deserialization error` since lone surrogates are invalid JSON per RFC 8259.
 - False positive `negative_data_rejection` for `format: hostname` in OpenAPI 3.0.x during the coverage phase. [#3567](https://github.com/schemathesis/schemathesis/issues/3567)
