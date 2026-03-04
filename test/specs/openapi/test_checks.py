@@ -4,7 +4,7 @@ import yaml
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config._checks import ChecksConfig
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import Failure, MalformedJson
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -816,3 +816,42 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
             response,
             case,
         )
+
+
+def test_response_schema_conformance_with_surrogate_chars_in_response(response_factory, ctx):
+    # The JSON escape \uDCF3 is a lone low surrogate; Python's json.loads accepts it and
+    # produces a Python str containing the lone surrogate '\udcf3'. jsonschema_rs then
+    # raises ValueError  when it tries to UTF-8-encode that string.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"type": "string"}}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["GET"]
+    case = operation.Case()
+    response = response_factory.requests(content=b'"\\udcf3"')
+    response = Response.from_requests(response, True)
+
+    with pytest.raises(MalformedJson) as exc_info:
+        response_schema_conformance(
+            CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None),
+            response,
+            case,
+        )
+    failure = exc_info.value
+    # document should be the raw JSON text
+    assert failure.document == '"\\udcf3"'
+    # \udcf3 starts at index 1 in the document
+    assert failure.position == 1
+    assert failure.lineno == 1
+    assert failure.colno == 2
