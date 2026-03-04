@@ -56,9 +56,9 @@ class HttpBasicAuthProvider:
         return self.username, self.password
 
     def set(self, case: Case, data: tuple[str, str], __: AuthContext) -> None:
-        import requests.auth
+        from requests.auth import _basic_auth_str
 
-        case._auth = requests.auth.HTTPBasicAuth(*data)
+        case.headers["Authorization"] = _basic_auth_str(*data)
 
 
 @dataclass
