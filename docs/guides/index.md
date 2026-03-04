@@ -2,6 +2,9 @@
 
 ## Getting Started
 
+### [Triaging Failures](triage.md)
+Work through a large number of failures systematically — from easy batch fixes to individual investigation.
+
 ### [Optimizing for Maximum Bug Detection](config-optimization.md)
 Configure Schemathesis for thorough testing when preparing for production releases or conducting security assessments.
 
