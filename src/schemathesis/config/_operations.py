@@ -170,7 +170,7 @@ class OperationsConfig(DiffBase):
 
     def filter_set_with(self, include: FilterSet, exclude: FilterSet | None = None) -> FilterSet:
         if not self.operations and exclude is None:
-            return include
+            return include.clone()
         operations = list(self.operations)
 
         final = FilterSet()

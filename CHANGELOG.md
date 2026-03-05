@@ -26,6 +26,7 @@
 - Warning count in the final summary line now reflects the number of distinct warning kinds shown, not just `missing_auth` operations.
 - False positive `use_after_free` when the server reuses freed resource IDs and a re-created resource is accessed in the same scenario. [#3582](https://github.com/schemathesis/schemathesis/issues/3582)
 - Correctly resolve `$ref` inside `oneOf`/`anyOf` sub-schemas during the coverage phase. [#3584](https://github.com/schemathesis/schemathesis/issues/3584)
+- `pytest.from_fixture().exclude()` (and `.include()`) intermittently failing with "does not match any API operations" on repeated runs when no `[[operations]]` are configured in `schemathesis.toml`. [#3572](https://github.com/schemathesis/schemathesis/issues/3572)
 
 ### :wrench: Changed
 

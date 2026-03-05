@@ -3,10 +3,11 @@ from pathlib import Path
 import pytest
 
 from schemathesis.config import ConfigError, SchemathesisConfig
-from schemathesis.config._operations import OperationConfig
+from schemathesis.config._operations import OperationConfig, OperationsConfig
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import HookError
+from schemathesis.filters import FilterSet
 
 CONFIGS_DIR = Path(__file__).parent / "configs"
 
@@ -107,3 +108,14 @@ def test_project_config_path_delegates_to_parent(tmp_path):
 def test_project_config_path_none_without_parent():
     project_config = ProjectConfig()
     assert project_config.config_path is None
+
+
+def test_filter_set_with_returns_copy_when_no_operations():
+    # See GH-3572.
+    # filter_set_with() must return a copy when there are no `[[operations]]` configured.
+    # This avoids mutations that can corrupt the execution flow on subsequent runs
+    ops = OperationsConfig()
+    original = FilterSet()
+    original.exclude(path="/admin")
+
+    assert ops.filter_set_with(include=original) is not original
