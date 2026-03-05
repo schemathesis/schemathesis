@@ -24,6 +24,7 @@
 - Missing positive test data for `format: duration` during the coverage phase.
 - Path generation now keeps explicit user-provided slash values (custom string formats, examples, and overrides) while still rejecting implicit and negative slash mutations to prevent misrouting. [#3571](https://github.com/schemathesis/schemathesis/issues/3571)
 - Warning count in the final summary line now reflects the number of distinct warning kinds shown, not just `missing_auth` operations.
+- False positive `use_after_free` when the server reuses freed resource IDs and a re-created resource is accessed in the same scenario. [#3582](https://github.com/schemathesis/schemathesis/issues/3582)
 
 ### :wrench: Changed
 

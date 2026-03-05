@@ -40,6 +40,8 @@ class AppConfig:
     return_plain_text: Literal[False] | str | bytes = False
     # For missing body parameter test
     omit_required_field: bool = False
+    # Server reuses deleted IDs for new resources
+    reuse_deleted_ids: bool = False
 
 
 @pytest.fixture
@@ -220,6 +222,7 @@ def app_factory(ctx):
     next_user_id = 1
     last_modified = "2021-01-01T00:00:00Z"
     users = {0: {"id": 0, "name": "John Doe", "last_modified": last_modified}}
+    freed_ids: list[int] = []
 
     @app.route("/openapi.json", methods=["GET"])
     def get_spec():
@@ -271,15 +274,19 @@ def app_factory(ctx):
             return jsonify({"error": "Error - rare"}), 500
 
         nonlocal next_user_id
-        new_user = {"id": next_user_id, "name": name, "last_modified": last_modified}
+        if config.reuse_deleted_ids and freed_ids:
+            new_id = freed_ids.pop(0)
+        else:
+            new_id = next_user_id
+            next_user_id += 1
+        new_user = {"id": new_id, "name": name, "last_modified": last_modified}
         if config.duplicate_operation_links:
             new_user["manager_id"] = 0
         if config.return_plain_text is not False:
-            new_user["id"] = next_user_id = 192
+            new_user["id"] = new_id = next_user_id = 192
         if not config.ensure_resource_availability:
             # Do not always save the user
-            users[next_user_id] = new_user
-        next_user_id += 1
+            users[new_id] = new_user
 
         if config.omit_required_field:
             # Return response without required 'id' field
@@ -315,6 +322,8 @@ def app_factory(ctx):
                     del users[user_id]
             else:
                 del users[user_id]
+            if config.reuse_deleted_ids:
+                freed_ids.append(user_id)
             return jsonify({"message": "User deleted successfully"}), 204
         return jsonify({"error": "User not found"}), 404
 
@@ -372,8 +381,10 @@ def app_factory(ctx):
         no_reliable_transitions: bool = False,
         return_plain_text: Literal[False] | str | bytes = False,
         omit_required_field: bool = False,
+        reuse_deleted_ids: bool = False,
     ):
         config.use_after_free = use_after_free
+        config.reuse_deleted_ids = reuse_deleted_ids
         config.ensure_resource_availability = ensure_resource_availability
         config.auth_token = auth_token
         config.ignored_auth = ignored_auth

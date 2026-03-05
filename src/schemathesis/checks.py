@@ -76,6 +76,10 @@ class CheckContext:
         if self._recorder is not None:
             yield from self._recorder.find_related(case_id=case_id)
 
+    def _find_all_cases(self) -> Iterator[Case]:
+        if self._recorder is not None:
+            yield from self._recorder.find_all_cases()
+
     def _find_response(self, *, case_id: str) -> Response | None:
         if self._recorder is not None:
             return self._recorder.find_response(case_id=case_id)
