@@ -669,6 +669,49 @@ def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameter
     return False
 
 
+# Methods that cannot re-create a resource — reading, modifying-in-place, or removing.
+# Only POST and PUT (and custom verbs not in this set) are considered potential re-creation methods.
+_NON_CREATION_METHODS = frozenset(("get", "head", "options", "query", "delete", "patch"))
+
+
+def _resource_recreated_after_delete(
+    ctx: CheckContext,
+    *,
+    delete_case_id: str,
+    current_case_id: str,
+    delete_path: ResourcePath,
+) -> bool:
+    """Return True if a resource was re-created after the DELETE and before the current case.
+
+    Scans all recorded cases in execution order (across every branch and every root
+    transition in the scenario).  Any successful creation whose path is a prefix of
+    the DELETE path that occurs *between* the DELETE step and the current step means
+    the resource may have been re-created — for example via a circular link
+    (DELETE -> POST) or via a second root POST that reuses a freed resource ID.
+    """
+    found_delete = False
+    for case in ctx._find_all_cases():
+        if case.id == delete_case_id:
+            found_delete = True
+            continue
+        if not found_delete:
+            continue
+        if case.id == current_case_id:
+            return False
+        resp = ctx._find_response(case_id=case.id)
+        if (
+            case.operation.method.lower() not in _NON_CREATION_METHODS
+            and resp is not None
+            and 200 <= resp.status_code < 300
+            and _is_prefix_operation(
+                ResourcePath(case.path, case.path_parameters or {}),
+                delete_path,
+            )
+        ):
+            return True
+    return False
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -690,10 +733,19 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
             and parent_response is not None
             and 200 <= parent_response.status_code < 300
         ):
+            delete_path = ResourcePath(related_case.path, related_case.path_parameters or {})
             if _is_prefix_operation(
-                ResourcePath(related_case.path, related_case.path_parameters or {}),
+                delete_path,
                 ResourcePath(case.path, case.path_parameters or {}),
             ):
+                recreated = _resource_recreated_after_delete(
+                    ctx,
+                    delete_case_id=related_case.id,
+                    current_case_id=case.id,
+                    delete_path=delete_path,
+                )
+                if recreated:
+                    continue
                 free = f"{related_case.operation.method.upper()} {prepare_path(related_case.path, related_case.path_parameters)}"
                 usage = f"{case.operation.method.upper()} {prepare_path(case.path, case.path_parameters)}"
                 reason = http.client.responses.get(response.status_code, "Unknown")

@@ -297,6 +297,25 @@ def test_find_use_after_free(engine_factory):
     assert result.events[-1].status == Status.FAILURE
 
 
+def test_no_false_positive_use_after_free_when_id_reused(engine_factory):
+    # When a server reuses resource IDs after deletion, the stateful engine can produce a scenario tree like:
+    #
+    #   POST /users -> id=1 (root)
+    #   └── DELETE /users/1 -> 204
+    #       └── POST /users -> id=1 again  (circular link: DELETE -> POST)
+    #           └── GET /users/1 -> 200   <-- current case being checked
+    #
+    # The resource was re-created with the same id between the DELETE and the GET; this is NOT a use-after-free.
+    engine = engine_factory(
+        app_kwargs={"circular_links": True, "reuse_deleted_ids": True},
+        checks=[use_after_free],
+        max_examples=60,
+    )
+    result = collect_result(engine)
+    assert len(result.failures) == 0
+    assert result.events[-1].status == Status.SUCCESS
+
+
 @pytest.mark.usefixtures("restore_checks")
 def test_failed_health_check(engine_factory):
     @schemathesis.check
