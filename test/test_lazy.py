@@ -885,6 +885,140 @@ def test_api(case):
     assert "GET /products" in result.stdout.str()
 
 
+_NO_MATCHES_PREAMBLE = """
+import pytest
+import schemathesis
+from hypothesis import settings, Phase
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {
+            "/users": {"get": {"responses": {"200": {"description": "OK"}}}},
+            "/admin": {"get": {"responses": {"200": {"description": "OK"}}}},
+        }
+    })
+"""
+
+
+def test_no_false_no_matches_on_repeated_runs_with_config(testdir):
+    # When a schemathesis.toml disables one operation, repeated runs must NOT fail with
+    # "does not match any API operations" for the remaining enabled operations.
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[[operations]]
+include-name = "GET /admin"
+enabled = false
+""",
+    )
+    testdir.makepyfile(
+        _NO_MATCHES_PREAMBLE
+        + """
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    pass
+"""
+    )
+
+    testdir.runpytest("--tb=short")  # populate caches
+    result = testdir.runpytest("--tb=short")
+    assert "does not match any API operations" not in result.stdout.str()
+    result.assert_outcomes(passed=1)
+
+
+def test_no_false_no_matches_with_multiple_lazy_schema_tests(testdir):
+    # When multiple test functions share the same lazy schema instance and a config disables
+    # one operation, all test functions must still find the remaining enabled operations.
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[[operations]]
+include-name = "GET /admin"
+enabled = false
+""",
+    )
+    testdir.makepyfile(
+        _NO_MATCHES_PREAMBLE
+        + """
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api_first(case):
+    pass
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api_second(case):
+    pass
+"""
+    )
+
+    result = testdir.runpytest("--tb=short")
+    assert "does not match any API operations" not in result.stdout.str()
+    result.assert_outcomes(passed=2)
+
+
+def test_no_false_no_matches_on_repeated_runs_with_exclude(testdir):
+    # See GH-3572: from_fixture().exclude() without [[operations]] config must not produce
+    # "does not match any API operations" on repeated runs.
+    testdir.makepyfile(
+        _NO_MATCHES_PREAMBLE
+        + """
+lazy_schema = schemathesis.pytest.from_fixture("api_schema").exclude(path="/admin")
+
+@lazy_schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    pass
+"""
+    )
+
+    testdir.runpytest("--tb=short")  # populate caches
+    result = testdir.runpytest("--tb=short")
+    assert "does not match any API operations" not in result.stdout.str()
+    result.assert_outcomes(passed=1)
+
+
+def test_config_disabled_all_operations_with_from_fixture(testdir):
+    # When a schemathesis.toml disables the ONLY available operation, from_fixture must
+    # correctly report "does not match any API operations".
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[[operations]]
+include-name = "GET /users"
+enabled = false
+""",
+    )
+    testdir.makepyfile("""
+import pytest
+import schemathesis
+
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_dict({
+        "openapi": "3.0.0",
+        "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+    })
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.parametrize()
+def test_api(case):
+    pass
+""")
+
+    result = testdir.runpytest("--tb=short")
+    assert "does not match any API operations" in result.stdout.str()
+    result.assert_outcomes(failed=1)
+
+
 @pytest.mark.usefixtures("reload_profile")
 def test_hypothesis_settings_database_from_profile_lazy(testdir):
     # When a hypothesis profile with a custom database is loaded
