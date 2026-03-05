@@ -292,7 +292,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
     if with_multiple_of is None and multiple_of is not None:
         pytest.skip("This test is not applicable for multiple_of=None")
     if multiple_of is not None:
-        schema["multipleOf"] = multiple_of
+        schema = {**schema, "multipleOf": multiple_of}
         values = with_multiple_of
     covered = [value.value for value in _positive_number(ctx, schema)]
     assert_unique(covered)
@@ -2129,25 +2129,26 @@ def test_merge_with_parent_context_merges_required_lists(pctx):
     assert all("type" in v and "name" in v for v in covered if isinstance(v, dict))
 
 
-def test_merge_with_parent_context_merges_properties_dicts(pctx):
-    # Parent has `properties` AND sub has `properties` - they get merged.
+def test_inline_sub_with_own_properties_is_self_contained(pctx):
+    # An inline anyOf sub with its own `properties` is treated as a complete type,
+    # just like a $ref to the same schema — parent properties are NOT injected into
+    # the sub-schema generation path.
     schema = {
         "type": "object",
         "properties": {
-            "type": {"type": "string"},
-            "name": {"type": "string"},
+            "parent_field": {"type": "string"},
         },
         "anyOf": [
             {
                 "properties": {"id": {"type": "integer"}},
-                "required": ["name"],
             },
         ],
     }
     covered = cover_schema(pctx, schema)
     assert_conform(covered, schema)
-    # The merged sub has access to parent's properties + sub's "id" property
-    assert any("id" in v for v in covered if isinstance(v, dict))
+    # Sub is self-contained: generates {"id": 0} without parent_field injected.
+    # Parent's own property path generates the other values independently.
+    assert covered == [{"id": 0}, {}, {"parent_field": ""}, {}]
 
 
 def test_with_effective_required_break_when_no_extra_fields(pctx):
@@ -2169,3 +2170,132 @@ def test_with_effective_required_break_when_no_extra_fields(pctx):
     assert_conform(covered, schema)
     # All positive values must include "name" (always required by parent)
     assert all("name" in v for v in covered if isinstance(v, dict))
+
+
+def test_no_property_nesting_with_ref_oneof():
+    # See GH-3584
+    # Generated values for a schema with oneOf $ref sub-schemas
+    # must not produce nested objects like {config: {config: {...}}}.
+    schema = {
+        "type": "object",
+        "properties": {
+            "config": {
+                "oneOf": [
+                    {"$ref": "#/x-bundled/schema1"},
+                    {"$ref": "#/x-bundled/schema2"},
+                ],
+            },
+        },
+        "required": ["config"],
+        "x-bundled": {
+            "schema1": {
+                "type": "object",
+                "properties": {"value": {"type": "integer"}},
+                "required": ["value"],
+            },
+            "schema2": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            },
+        },
+    }
+    ctx = CoverageContext(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        media_type=None,
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats=get_default_format_strategies(),
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    covered = cover_schema(ctx, schema)
+    assert_conform(covered, schema)
+    # Each oneOf branch generates its own type; no config key inside config values
+    assert covered == [
+        {"config": {"name": ""}},
+        {"config": {"value": 0}},
+    ]
+
+
+def test_ref_with_sibling_keywords_does_not_inherit_parent_properties():
+    schema = {
+        "type": "object",
+        "properties": {
+            "config": {
+                "oneOf": [
+                    {
+                        "$ref": "#/x-bundled/schema1",
+                        "description": "line config variant",
+                    }
+                ],
+            },
+            "extra": {"type": "string"},
+        },
+        "required": ["config"],
+        "x-bundled": {
+            "schema1": {
+                "type": "object",
+                "properties": {"value": {"type": "integer"}},
+                "required": ["value"],
+            },
+        },
+    }
+    ctx = CoverageContext(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        media_type=None,
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats=get_default_format_strategies(),
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    covered = cover_schema(ctx, schema)
+    assert_conform(covered, schema)
+    # Sibling keywords on $ref (description) don't affect resolution — schema1 generated directly
+    # Parent properties (extra) appear at the outer object level, not injected inside config
+    assert covered == [
+        {"config": {"value": 0}, "extra": ""},
+        {"config": {"value": 0}},
+    ]
+
+
+def test_ref_to_additive_schema_inherits_parent_properties():
+    # A $ref sub-schema that resolves to a schema with NO properties of its own
+    # (additive constraint only) SHOULD still inherit parent properties so the
+    # generator knows the field definitions for required fields.
+    # anyOf has two branches so parent-generated {"name": ""} satisfies the first branch.
+    schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "id": {"type": "integer"},
+        },
+        "required": ["name"],
+        "anyOf": [
+            {"required": ["name"]},
+            {"$ref": "#/x-bundled/extra_required"},
+        ],
+        "x-bundled": {
+            "extra_required": {"required": ["id"]},
+        },
+    }
+    ctx = CoverageContext(
+        root_schema=schema,
+        location=ParameterLocation.BODY,
+        media_type=None,
+        generation_modes=[GenerationMode.POSITIVE],
+        is_required=True,
+        custom_formats=get_default_format_strategies(),
+        validator_cls=jsonschema_rs.Draft4Validator,
+    )
+    covered = cover_schema(ctx, schema)
+    assert_conform(covered, schema)
+    # Additive $ref (no properties) merges parent context — both name and id appear
+    assert covered == [
+        {"name": "", "id": 0},
+        {"name": ""},
+        {"name": "", "id": 0},
+        {"id": 0, "name": ""},
+        {"name": ""},
+    ]
