@@ -566,6 +566,20 @@ def _with_effective_required(schema: JsonSchemaObject) -> JsonSchemaObject:
     return schema
 
 
+def _resolve_sub_schema(ctx: CoverageContext, sub: JsonSchema) -> JsonSchema:
+    """Resolve a $ref sub-schema to its concrete content before merging."""
+    if not isinstance(sub, dict) or "$ref" not in sub:
+        return sub
+    try:
+        resolved = ctx.resolve_ref(sub["$ref"])
+        if isinstance(resolved, dict):
+            return {**resolved, **{k: v for k, v in sub.items() if k != "$ref"}}
+        return resolved
+    except RefResolutionError:
+        # Schemas are bundled, so this should not happen in practice
+        return sub
+
+
 def _merge_with_parent_context(parent: JsonSchemaObject, sub: JsonSchema) -> JsonSchema:
     if not isinstance(sub, dict):
         return sub
@@ -608,7 +622,15 @@ def _cover_positive_for_type(
             sub_schemas = schema.get(key)
             if sub_schemas is not None:
                 for sub_schema in sub_schemas:
-                    yield from cover_schema_iter(ctx, _merge_with_parent_context(schema, sub_schema))
+                    effective = _resolve_sub_schema(ctx, sub_schema)
+                    if isinstance(effective, dict) and "properties" in effective:
+                        # See GH-3584
+                        # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties
+                        yield from cover_schema_iter(ctx, effective)
+                    else:
+                        # See GH-3520
+                        # Additive constraint — merge parent context so sub-schema knows field definitions
+                        yield from cover_schema_iter(ctx, _merge_with_parent_context(schema, effective))
         all_of = schema.get("allOf")
         if all_of is not None:
             if len(all_of) == 1:
