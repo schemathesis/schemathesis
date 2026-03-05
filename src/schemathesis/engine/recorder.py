@@ -129,6 +129,11 @@ class ScenarioRecorder:
             yield root_node.value
         yield from traverse(root_id)
 
+    def find_all_cases(self) -> Iterator[Case]:
+        """Iterate over all recorded cases in execution order."""
+        for node in self.cases.values():
+            yield node.value
+
     def find_response(self, *, case_id: str) -> Response | None:
         """Retrieve the API response for a given test case, if available."""
         interaction = self.interactions.get(case_id)
