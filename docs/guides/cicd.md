@@ -38,9 +38,9 @@ jobs:
       - uses: schemathesis/action@v2
         with:
           schema: 'http://localhost:8080/openapi.json'
-          args: >-
-            --header "Authorization: Bearer ${{ secrets.API_TOKEN }}"
-            --report junit
+          args: --report junit
+        env:
+          API_TOKEN: ${{ secrets.API_TOKEN }}
           
       - name: Upload test results
         uses: actions/upload-artifact@v7
