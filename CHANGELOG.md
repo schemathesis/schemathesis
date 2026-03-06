@@ -5,6 +5,9 @@
 ### :rocket: Added
 
 - `positive_data_acceptance` failures now include a hint when Hypothesis-generated extra properties are the likely cause of rejection, suggesting `additionalProperties: false`. [#3583](https://github.com/schemathesis/schemathesis/issues/3583)
+### :bug: Fixed
+
+- `ensure_resource_availability` no longer fires a false positive when a successful DELETE on the same resource ID exists in a different root's subtree. [#3588](https://github.com/schemathesis/schemathesis/issues/3588)
 
 ## [4.11.1](https://github.com/schemathesis/schemathesis/compare/v4.11.0...v4.11.1) - 2026-03-05
 

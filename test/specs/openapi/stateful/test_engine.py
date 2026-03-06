@@ -4,15 +4,22 @@ from dataclasses import dataclass
 import hypothesis
 import hypothesis.errors
 import pytest
+import requests
 from flask import Flask, jsonify, request
 
 import schemathesis
-from schemathesis.checks import not_a_server_error
+import schemathesis.openapi
+from schemathesis.checks import CheckContext, not_a_server_error
+from schemathesis.config import ChecksConfig
+from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
+from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.case import Case
 from schemathesis.specs.openapi.checks import (
+    ensure_resource_availability,
     ignored_auth,
     response_schema_conformance,
     use_after_free,
@@ -309,6 +316,26 @@ def test_no_false_positive_use_after_free_when_id_reused(engine_factory):
     engine = engine_factory(
         app_kwargs={"circular_links": True, "reuse_deleted_ids": True},
         checks=[use_after_free],
+        max_examples=60,
+    )
+    result = collect_result(engine)
+    assert len(result.failures) == 0
+    assert result.events[-1].status == Status.SUCCESS
+
+
+def test_no_false_positive_ensure_resource_availability_when_id_reused(engine_factory):
+    # When a server reuses resource IDs after deletion, the stateful engine can produce a scenario tree like:
+    #
+    #   POST /users -> id=1 (root)
+    #   DELETE /users/1 -> 204
+    #   POST /users -> id=1 again  (circular link: DELETE -> POST)
+    #   DELETE /users/1 -> 204 (resource deleted again)
+    #   GET /users/1 -> 404  <-- current case being checked
+    #
+    # The resource was re-created and then re-deleted; this is NOT a resource-not-available issue.
+    engine = engine_factory(
+        app_kwargs={"circular_links": True, "reuse_deleted_ids": True},
+        checks=[ensure_resource_availability],
         max_examples=60,
     )
     result = collect_result(engine)
@@ -838,3 +865,90 @@ def test_no_reliable_transitions(engine_factory):
     engine = engine_factory(app_kwargs={"no_reliable_transitions": True}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
+
+
+def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
+    # When a DELETE in one root's subtree deletes a resource that was re-created by a different
+    # root, ensure_resource_availability must not be triggered for operations from that second root.
+    #
+    # Recorder state:
+    #   Root A  POST /users -> 201         [parent=None]
+    #     DELETE /users/1 -> 204           [parent=A]   <- in A's subtree
+    #   Root B  POST /users -> 201         [parent=None, separate root, same id reused]
+    #     GET /users/1 -> 404              [parent=B]   <- 404 because the DELETE above ran after B created id=1
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+            "/users/{userId}": {
+                "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+                "get": {
+                    "operationId": "getUser",
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+                },
+                "delete": {
+                    "operationId": "deleteUser",
+                    "responses": {"204": {"description": "Deleted"}},
+                },
+            },
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    post_op = schema["/users"]["POST"]
+    get_op = schema["/users/{userId}"]["GET"]
+    delete_op = schema["/users/{userId}"]["DELETE"]
+
+    def make_http_response(method, url, status_code):
+        req = requests.Request(method, url).prepare()
+        return Response(
+            status_code=status_code,
+            headers={},
+            content=b"",
+            request=req,
+            elapsed=0.0,
+            verify=False,
+        )
+
+    recorder = ScenarioRecorder(label="test")
+
+    root_a = Case(post_op, "POST", "/users")
+    recorder.record_case(parent_id=None, case=root_a, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=root_a.id, response=make_http_response("POST", "http://localhost/users", 201))
+
+    delete_a = Case(delete_op, "DELETE", "/users/{userId}", path_parameters={"userId": 1})
+    recorder.record_case(parent_id=root_a.id, case=delete_a, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=delete_a.id, response=make_http_response("DELETE", "http://localhost/users/1", 204)
+    )
+
+    root_b = Case(post_op, "POST", "/users")
+    recorder.record_case(parent_id=None, case=root_b, transition=None, is_transition_applied=False)
+    recorder.record_response(case_id=root_b.id, response=make_http_response("POST", "http://localhost/users", 201))
+
+    # GET /users/1 from root B — returns 404 because the DELETE in A's subtree ran after B was created
+    get_b = Case(get_op, "GET", "/users/{userId}", path_parameters={"userId": 1})
+    recorder.record_case(parent_id=root_b.id, case=get_b, transition=None, is_transition_applied=False)
+    response_404 = make_http_response("GET", "http://localhost/users/1", 404)
+    recorder.record_response(case_id=get_b.id, response=response_404)
+
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+
+    # Should not raise — the DELETE that explains the 404 is in A's subtree.
+    assert ensure_resource_availability(check_ctx, response_404, get_b) is None
