@@ -1259,8 +1259,13 @@ def test_sse_pytest_plugin():
         ),
         pytest.param(
             b"retry: 3000\ndata: {}\n\n",
-            [{"event": "message", "retry": "3000", "data": "{}"}],
+            [{"event": "message", "retry": 3000, "data": "{}"}],
             id="retry-field",
+        ),
+        pytest.param(
+            b"retry: 0\ndata: {}\n\n",
+            [{"event": "message", "retry": 0, "data": "{}"}],
+            id="retry-zero",
         ),
         pytest.param(
             b"retry: not-a-number\ndata: {}\n\n",
@@ -1331,6 +1336,20 @@ def test_sse_pytest_plugin():
 )
 def test_parse_sse_events(content, expected):
     assert _parse_sse_events(content) == expected
+
+
+def test_sse_retry_field_validates_as_integer():
+    item_schema = {
+        "type": "object",
+        "properties": {
+            "data": {"type": "string"},
+            "retry": {"type": "integer", "minimum": 0},
+        },
+        "required": ["data"],
+    }
+    case, response = _call_sse(_sse_schema(item_schema), "retry: 3000\ndata: hello\n\n")
+    # Should not raise — retry:3000 is a valid integer
+    case.operation.schema.validate_response(case.operation, response, case=case)
 
 
 def test_deserialize_sse_uses_utf8_ignoring_response_encoding():
