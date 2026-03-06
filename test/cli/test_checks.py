@@ -1084,3 +1084,71 @@ def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, app_
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_positive_data_acceptance_additional_properties_hint(ctx, app_runner, cli, snapshot_cli):
+    # When Hypothesis adds extra properties to a schema without `additionalProperties: false`,
+    # the failure message should include a hint explaining the likely cause.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/session": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "zones": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "maxItems": 4,
+                                            "items": {"type": "integer", "minimum": 0, "maximum": 4},
+                                            "uniqueItems": True,
+                                        }
+                                    },
+                                    "required": ["zones"],
+                                    # No `additionalProperties: false` — Hypothesis will add extra keys
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "422": {"description": "Unprocessable Entity"},
+                    },
+                }
+            }
+        }
+    )
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/session", methods=["POST"])
+    def session():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "Expected object"}), 422
+        # Reject if any key beyond `zones` is present
+        if set(data.keys()) - {"zones"}:
+            return jsonify({"error": "Unexpected fields"}), 422
+        return jsonify({"ok": True}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=positive_data_acceptance",
+            "--phases=fuzzing",
+            "--max-examples=50",
+            "--seed=1",
+        )
+        == snapshot_cli
+    )

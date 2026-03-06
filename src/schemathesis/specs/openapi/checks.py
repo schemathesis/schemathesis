@@ -524,6 +524,46 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     return None
 
 
+def _additional_properties_hint(case: Case) -> str | None:
+    """Return a hint if extra body properties are the likely cause of server rejection."""
+    if not isinstance(case.body, dict):
+        return None
+
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+    if not isinstance(case.operation.schema, OpenApiSchema):
+        return None
+
+    validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
+
+    for alternative in case.operation.body:
+        if alternative.media_type != case.media_type:
+            continue
+        raw = alternative.raw_schema
+        if not isinstance(raw, dict) or raw.get("additionalProperties") is False:
+            return None
+
+        extra = set(case.body.keys()) - set(raw.get("properties", {}).keys())
+        if not extra:
+            return None
+
+        stripped = {k: v for k, v in case.body.items() if k not in extra}
+        if not validator_cls(alternative.optimized_schema).is_valid(stripped):
+            return None
+
+        count = len(extra)
+        examples = ", ".join(f"`{k}`" for k in sorted(extra)[:3])
+        if count > 3:
+            examples += f" and {count - 3} more"
+        noun = "property" if count == 1 else "properties"
+        return (
+            f"\nHint: The request body contains {count} additional {noun} not defined in the schema "
+            f"({examples}). The server likely rejects unexpected fields. "
+            "Add `additionalProperties: false` to your schema to prevent this."
+        )
+    return None
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -536,9 +576,13 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
     allowed_statuses = expand_status_codes(config.expected_statuses or [])
 
     if meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
+        message = f"Valid data should have been accepted\nExpected: {', '.join(config.expected_statuses)}"
+        hint = _additional_properties_hint(case)
+        if hint:
+            message += hint
         raise RejectedPositiveData(
             operation=case.operation.label,
-            message=f"Valid data should have been accepted\nExpected: {', '.join(config.expected_statuses)}",
+            message=message,
             status_code=response.status_code,
             allowed_statuses=config.expected_statuses,
         )

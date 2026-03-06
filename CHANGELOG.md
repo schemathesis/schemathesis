@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.11.1...HEAD) - TBD
 
+### :rocket: Added
+
+- `positive_data_acceptance` failures now include a hint when Hypothesis-generated extra properties are the likely cause of rejection, suggesting `additionalProperties: false`. [#3583](https://github.com/schemathesis/schemathesis/issues/3583)
+
 ## [4.11.1](https://github.com/schemathesis/schemathesis/compare/v4.11.0...v4.11.1) - 2026-03-05
 
 ### :rocket: Added
