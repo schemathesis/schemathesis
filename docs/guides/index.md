@@ -20,7 +20,10 @@ Validate API responses against your schema in existing test suites without using
 Integrate Schemathesis into automated testing pipelines. Includes GitHub Actions, GitLab CI configurations, and reporting best practices.
 
 ### [Using Schemathesis with Docker](docker.md)
-Run Schemathesis without installing Python — covers file schemas, hooks, reports, and TraceCov coverage.
+Run Schemathesis without installing Python — covers file schemas, hooks, and reports.
+
+### [Schema Coverage](coverage.md)
+Measure schema-level API coverage down to individual keywords using TraceCov.
 
 ### [Testing Python Web Applications](python-apps.md)
 Test Flask, FastAPI, and other Python web apps directly without network overhead.

@@ -81,7 +81,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     **Type**: `Boolean or None`  
     **Default**: `null`  
 
-    Use color in CLI output. Schemathesis auto-detects color support by default Set `true` to force color, `false` to disable.
+    Use color in CLI output. Schemathesis auto-detects color support by default. Set `true` to force color, `false` to disable.
 
     ```toml
     color = false

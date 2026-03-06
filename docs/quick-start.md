@@ -32,7 +32,7 @@ _____________________ POST /improper-input-type-handling _____________________
 Reproduce with:
 
     curl -X POST -H 'Content-Type: application/json' \
-      -d '{"number": "\n\udbcd." }' 
+      -d '{"number": "\n\udbcd." }' \
       https://example.schemathesis.io/improper-input-type-handling
 ```
 

@@ -250,6 +250,7 @@ schemathesis.auth.set_from_requests(
     HttpNtlmAuth("domain\\username", "password")
 )
 ```
+
 ## Setup
 
 Custom authentication classes use the same setup as other extensions:

@@ -13,7 +13,7 @@ nav:
   - How-To Guides:
       - guides/index.md
       - Triaging Failures: guides/triage.md
-      - Config Optimization: guides/config-optimization.md
+      - Optimizing for Maximum Bug Detection: guides/config-optimization.md
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md
