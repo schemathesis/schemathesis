@@ -14,6 +14,15 @@ from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transport import Response
 
+# Python 3.12 renamed several HTTP phrases per RFC 9110. Use the new names
+# consistently across all Python versions so snapshots don't vary by version.
+_RFC9110_PHRASES: dict[int, str] = {
+    413: "Content Too Large",
+    414: "URI Too Long",
+    416: "Range Not Satisfiable",
+    422: "Unprocessable Content",
+}
+
 
 class Severity(Enum):
     # For server errors, security issues like ignored auth
@@ -323,7 +332,9 @@ def format_failures(
 
     # Response status
     if isinstance(response, Response):
-        reason = http.client.responses.get(response.status_code, "Unknown")
+        reason = _RFC9110_PHRASES.get(response.status_code) or http.client.responses.get(
+            response.status_code, "Unknown"
+        )
         output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
         # Response payload
         if response.content is None or not response.content:
