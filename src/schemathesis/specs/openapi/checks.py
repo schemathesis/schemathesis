@@ -845,8 +845,9 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if not overrides_all_parameters:
         return None
 
-    # Look for any successful DELETE operations on this resource
-    for related_case in ctx._find_related(case_id=case.id):
+    # Look for any successful DELETE operations on this resource across all recorded cases,
+    # not just the current root's subtree.
+    for related_case in ctx._find_all_cases():
         related_response = ctx._find_response(case_id=related_case.id)
         if (
             related_case.operation.method.upper() == "DELETE"
