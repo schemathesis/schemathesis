@@ -146,12 +146,19 @@ PROBES = (NullByteInHeader,)
 
 def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     """Send the probe to the application."""
-    from requests import PreparedRequest, Request, RequestException
+    from requests import PreparedRequest, Request, RequestException, Session
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
+    session = Session()
+    session.headers = {}
+    tls_verify = ctx.config.tls_verify_for(operation=None)
+    if tls_verify is not None:
+        session.verify = tls_verify
+    proxy = ctx.config.proxy_for(operation=None)
+    if proxy is not None:
+        session.proxies["all"] = proxy
     try:
-        session = ctx.get_session()
         request = probe.prepare_request(session, Request(), ctx.schema)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
@@ -168,5 +175,7 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
         # Consider any network errors as a failed probe
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
         return ProbeRun(probe, ProbeOutcome.FAILURE, req, None, exc)
+    finally:
+        session.close()
     result_type = probe.analyze_response(response)
     return ProbeRun(probe, result_type, request, response)

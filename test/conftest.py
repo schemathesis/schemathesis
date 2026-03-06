@@ -1077,6 +1077,14 @@ def testdir(testdir):
         pytest_plugins = {pytest_plugins}
         def pytest_configure(config):
             config.HYPOTHESIS_CASES = 0
+            config.addinivalue_line(
+                "filterwarnings",
+                "ignore:Unclosed <MemoryObject.*:ResourceWarning",
+            )
+            config.addinivalue_line(
+                "filterwarnings",
+                "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
+            )
         def pytest_unconfigure(config):
             print(f"Hypothesis calls: {{config.HYPOTHESIS_CASES}}")
         """

@@ -20,6 +20,7 @@ def integer_id(query):
 
 @pytest.fixture(params=["default-direct", "default-named", "generate-direct", "generate-named"])
 def global_hook(request):
+    before = dict(schemathesis.hooks.GLOBAL_HOOK_DISPATCHER._hooks)
     if request.param == "default-direct":
 
         @schemathesis.hook
@@ -44,6 +45,9 @@ def global_hook(request):
         def hook(context, strategy):
             return strategy.filter(integer_id)
 
+    yield
+    schemathesis.hooks.GLOBAL_HOOK_DISPATCHER._hooks = before
+
 
 @pytest.fixture
 def dispatcher():
@@ -66,28 +70,29 @@ def test_global_query_hook(wsgi_app_schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("create_user")
-def test_case_hook(wsgi_app_schema):
-    dispatcher = HookDispatcher(scope=HookScope.TEST)
+def test_case_hook(wsgi_app_schema, ctx):
+    with ctx.restore_hooks():
+        dispatcher = HookDispatcher(scope=HookScope.TEST)
 
-    @dispatcher.hook
-    def map_case(context, case):
-        case.body["extra"] = 42
-        return case
+        @dispatcher.hook
+        def map_case(context, case):
+            case.body["extra"] = 42
+            return case
 
-    @schemathesis.hook
-    def map_case(context, case):  # noqa: F811
-        case.body["first_name"] = case.body["last_name"]
-        return case
+        @schemathesis.hook
+        def map_case(context, case):  # noqa: F811
+            case.body["first_name"] = case.body["last_name"]
+            return case
 
-    strategy = wsgi_app_schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
+        strategy = wsgi_app_schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
 
-    @given(case=strategy)
-    @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
-    def test(case):
-        assert case.body["first_name"] == case.body["last_name"]
-        assert case.body["extra"] == 42
+        @given(case=strategy)
+        @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
+        def test(case):
+            assert case.body["first_name"] == case.body["last_name"]
+            assert case.body["extra"] == 42
 
-    test()
+        test()
 
 
 @pytest.mark.hypothesis_nested

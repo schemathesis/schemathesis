@@ -125,7 +125,7 @@ def create_app(
 
     @app.route("/api/slow", methods=["GET"])
     def slow():
-        sleep(0.1)
+        sleep(0.5)
         return jsonify({"success": True})
 
     @app.route("/api/path_variable/<key>", methods=["GET"])

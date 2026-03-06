@@ -139,7 +139,7 @@ async def failure(request: web.Request) -> web.Response:
 
 
 async def slow(request: web.Request) -> web.Response:
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.5)
     return web.json_response({"success": True})
 
 
