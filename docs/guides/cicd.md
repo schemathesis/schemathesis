@@ -30,7 +30,7 @@ jobs:
   api-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Start services
         run: docker compose up -d
@@ -43,7 +43,7 @@ jobs:
             --report junit
           
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: schemathesis-results
