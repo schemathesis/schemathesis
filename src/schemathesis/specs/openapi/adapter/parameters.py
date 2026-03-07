@@ -432,6 +432,7 @@ class OpenApiBody(OpenApiComponent):
         "_positive_strategy_cache",
         "_negative_strategy_cache",
         "_is_negatable",
+        "_validator",
     )
 
     @classmethod
@@ -477,6 +478,14 @@ class OpenApiBody(OpenApiComponent):
         self._positive_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
         self._negative_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
         self._is_negatable: bool | NotSet = NOT_SET
+        self._validator: jsonschema_rs.Validator | NotSet = NOT_SET
+
+    def get_validator(self) -> jsonschema_rs.Validator:
+        """Get or build a cached JSON Schema validator for this body's schema."""
+        if self._validator is NOT_SET:
+            self._validator = self.adapter.jsonschema_validator_cls(self.unoptimized_schema, validate_formats=True)
+        assert not isinstance(self._validator, NotSet)
+        return self._validator
 
     @property
     def is_negatable(self) -> bool:
@@ -903,7 +912,7 @@ class OpenApiParameterSet(ParameterSet):
     items: list[OpenApiParameter]
     location: ParameterLocation
 
-    __slots__ = ("items", "location", "_schema", "_schema_cache", "_strategy_cache")
+    __slots__ = ("items", "location", "_schema", "_schema_cache", "_strategy_cache", "_validator")
 
     def __init__(self, location: ParameterLocation, items: list[OpenApiParameter] | None = None) -> None:
         self.location = location
@@ -911,6 +920,7 @@ class OpenApiParameterSet(ParameterSet):
         self._schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
         self._strategy_cache: dict[tuple[frozenset[str], GenerationMode], st.SearchStrategy] = {}
+        self._validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
     @property
     def schema(self) -> dict[str, Any]:
@@ -918,6 +928,13 @@ class OpenApiParameterSet(ParameterSet):
             self._schema = parameters_to_json_schema(self.items, self.location)
         assert not isinstance(self._schema, NotSet)
         return self._schema
+
+    def get_validator(self, adapter: SpecificationAdapter) -> jsonschema_rs.Validator:
+        """Get or build a cached JSON Schema validator for this parameter set's schema."""
+        if self._validator is NOT_SET:
+            self._validator = adapter.jsonschema_validator_cls(self.schema, validate_formats=True)
+        assert not isinstance(self._validator, NotSet)
+        return self._validator
 
     @property
     def name_to_uri(self) -> dict[str, str]:

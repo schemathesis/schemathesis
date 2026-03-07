@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.11.2...HEAD) - TBD
 
+### :rocket: Added
+
+- `APIOperation.validate_request` and `is_valid_request` for validating requests against the OpenAPI schema definition.
+
 ## [4.11.2](https://github.com/schemathesis/schemathesis/compare/v4.11.1...v4.11.2) - 2026-03-06
 
 ### :rocket: Added

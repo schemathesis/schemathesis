@@ -12,7 +12,6 @@ When a `Location` header points to `/users/123`, the inference:
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -24,6 +23,7 @@ from werkzeug.routing import Map, MapAdapter, Rule
 from schemathesis.core.adapter import ResponsesContainer
 from schemathesis.core.transforms import encode_pointer
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
+from schemathesis.specs.openapi.utils import openapi_path_to_werkzeug
 
 if TYPE_CHECKING:
     from schemathesis.engine.observations import LocationHeaderEntry
@@ -104,7 +104,7 @@ class LinkInferencer:
             operations.append(operation)
 
             # Replace `{parameter}` with `<parameter>` as angle brackets are used for parameters in werkzeug
-            path = re.sub(r"\{([^}]+)\}", r"<\1>", path)
+            path = openapi_path_to_werkzeug(path)
             rules.append(Rule(path, endpoint=operation, methods=[method.upper()]))
 
         return cls(

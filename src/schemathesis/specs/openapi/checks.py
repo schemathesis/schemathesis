@@ -13,7 +13,7 @@ import jsonschema_rs
 
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
-from schemathesis.core import media_types, string_to_boolean
+from schemathesis.core import media_types
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type
 from schemathesis.core.parameters import ParameterLocation
@@ -34,7 +34,7 @@ from schemathesis.openapi.checks import (
     UnsupportedMethodResponse,
     UseAfterFree,
 )
-from schemathesis.specs.openapi.utils import expand_status_code, expand_status_codes
+from schemathesis.specs.openapi.utils import coerce_parameter_value, expand_status_code, expand_status_codes
 from schemathesis.transport.prepare import prepare_path
 
 if TYPE_CHECKING:
@@ -189,7 +189,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         values = response.headers.get(name.lower())
         if values is not None:
             value = values[0]
-            coerced = _coerce_header_value(value, header.schema)
+            coerced = coerce_parameter_value(value, header.schema)
             try:
                 header.validator.validate(coerced)
             except jsonschema_rs.ValidationError as exc:
@@ -212,28 +212,6 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         errors.append(MissingHeaders(operation=case.operation.label, message=message, missing_headers=missing_headers))
 
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
-
-
-def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | float | None | bool:
-    schema_type = schema.get("type")
-
-    if schema_type == "string":
-        return value
-    if schema_type == "integer":
-        try:
-            return int(value)
-        except ValueError:
-            return value
-    if schema_type == "number":
-        try:
-            return float(value)
-        except ValueError:
-            return value
-    if schema_type == "null" and value.lower() == "null":
-        return None
-    if schema_type == "boolean":
-        return string_to_boolean(value)
-    return value
 
 
 @schemathesis.check
@@ -534,8 +512,6 @@ def _additional_properties_hint(case: Case) -> str | None:
     if not isinstance(case.operation.schema, OpenApiSchema):
         return None
 
-    validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
-
     for alternative in case.operation.body:
         if alternative.media_type != case.media_type:
             continue
@@ -548,7 +524,7 @@ def _additional_properties_hint(case: Case) -> str | None:
             return None
 
         stripped = {k: v for k, v in case.body.items() if k not in extra}
-        if not validator_cls(alternative.optimized_schema).is_valid(stripped):
+        if not alternative.get_validator().is_valid(stripped):
             return None
 
         count = len(extra)

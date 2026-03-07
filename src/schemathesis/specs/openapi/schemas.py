@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
@@ -15,7 +16,7 @@ import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
@@ -30,6 +31,7 @@ from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import BundleCache
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.core.request import ParsedRequest
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import get_template_fields
 from schemathesis.core.transport import Response
@@ -764,6 +766,100 @@ class OpenApiSchema(BaseSchema):
                 )
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
+
+    def validate_request(
+        self,
+        operation: APIOperation,
+        request: ParsedRequest,
+    ) -> None:
+        __tracebackhide__ = True
+        from werkzeug.exceptions import MethodNotAllowed as _WerkzeugMethodNotAllowed
+        from werkzeug.exceptions import NotFound as _WerkzeugNotFound
+        from werkzeug.routing import Map as _WerkzeugMap
+        from werkzeug.routing import Rule as _WerkzeugRule
+
+        from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
+        from schemathesis.specs.openapi.utils import coerce_parameter_value, openapi_path_to_werkzeug
+
+        failures: list[Failure] = []
+
+        try:
+            _adapter = _WerkzeugMap([_WerkzeugRule(openapi_path_to_werkzeug(operation.path), endpoint=None)]).bind("")
+            _, path_params_raw = _adapter.match(request.path, method=request.method)
+        except (_WerkzeugNotFound, _WerkzeugMethodNotAllowed):
+            path_params_raw = {}
+
+        headers_raw: dict[str, list[str]] = {}
+        for k, v in request.headers.items():
+            for param in operation.headers:
+                if param.name.lower() == k.lower():
+                    headers_raw[param.name] = [v]
+                    break
+            else:
+                headers_raw[k] = [v]
+
+        location_data: list[tuple[Any, dict]] = [
+            (operation.query, request.query),
+            (operation.headers, headers_raw),
+            (operation.cookies, {k: [v] for k, v in request.cookies.items()}),
+            (operation.path_parameters, {k: [v] for k, v in path_params_raw.items()}),
+        ]
+
+        for param_set, raw_dict in location_data:
+            if not isinstance(param_set, OpenApiParameterSet) or not param_set.items:
+                continue
+
+            coerced: dict[str, Any] = {}
+            for name, values in raw_dict.items():
+                if isinstance(values, list) and not values:
+                    continue  # parameter absent — don't validate
+                value = values[0] if isinstance(values, list) else values
+                param = param_set.get(name)
+                if param is not None:
+                    coerced[name] = coerce_parameter_value(value, param.unoptimized_schema)
+                else:
+                    coerced[name] = value
+
+            try:
+                param_set.get_validator(self.adapter).validate(coerced)
+            except jsonschema_rs.ValidationError as exc:
+                failures.append(
+                    JsonSchemaError.from_exception(
+                        title="Request violates schema",
+                        operation=operation.label,
+                        exc=exc,
+                        root_schema=param_set.schema,
+                        config=self.config.output,
+                        name_to_uri=param_set.name_to_uri,
+                    )
+                )
+
+        if request.body and request.content_type and media_types.is_json(request.content_type):
+            for body_param in operation.body:
+                if isinstance(body_param, OpenApiBody) and media_types.matches(
+                    body_param.media_type, request.content_type
+                ):
+                    try:
+                        body_data = json.loads(request.body)
+                    except json.JSONDecodeError:
+                        pass
+                    else:
+                        try:
+                            body_param.get_validator().validate(body_data)
+                        except jsonschema_rs.ValidationError as exc:
+                            failures.append(
+                                JsonSchemaError.from_exception(
+                                    title="Request body violates schema",
+                                    operation=operation.label,
+                                    exc=exc,
+                                    root_schema=body_param.unoptimized_schema,
+                                    config=self.config.output,
+                                    name_to_uri=body_param.name_to_uri,
+                                )
+                            )
+                    break
+
+        _maybe_raise_one_or_more(failures)
 
 
 _SURROGATE_ESCAPE_RE = re.compile(r"\\u[Dd][89a-fA-F][0-9a-fA-F]{2}")

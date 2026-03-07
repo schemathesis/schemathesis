@@ -18,6 +18,8 @@ from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
+from schemathesis.core.failures import FailureGroup
+from schemathesis.core.request import ParsedRequest
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -464,6 +466,10 @@ class BaseSchema(Mapping):
     ) -> bool | None:
         raise NotImplementedError
 
+    def validate_request(self, operation: APIOperation, request: ParsedRequest) -> None:
+        """Validate a request against the schema. Raises on failure."""
+        raise NotImplementedError
+
     def as_strategy(
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
@@ -803,7 +809,41 @@ class APIOperation(Generic[P, R, S]):
         try:
             self.validate_response(response)
             return True
-        except AssertionError:
+        except (AssertionError, FailureGroup):
+            return False
+
+    def validate_request(
+        self,
+        request: Any,
+    ) -> None:
+        """Validate a request against the API schema.
+
+        Args:
+            request: The HTTP request to validate. Can be a `requests.PreparedRequest`,
+                `httpx.Request`, `werkzeug.Request`, or `django.http.HttpRequest`.
+
+        Raises:
+            FailureGroup: If the request does not conform to the schema.
+
+        """
+        __tracebackhide__ = True
+        self.schema.validate_request(self, ParsedRequest.from_any(request))
+
+    def is_valid_request(self, request: Any) -> bool:
+        """Check if the provided request is valid against the API schema.
+
+        Args:
+            request: The HTTP request to validate. Can be a `requests.PreparedRequest`,
+                `httpx.Request`, `werkzeug.Request`, or `django.http.HttpRequest`.
+
+        Returns:
+            `True` if request is valid, `False` otherwise.
+
+        """
+        try:
+            self.validate_request(request)
+            return True
+        except (AssertionError, FailureGroup):
             return False
 
     def Case(

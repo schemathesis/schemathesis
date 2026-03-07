@@ -18,12 +18,12 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
-    _coerce_header_value,
     content_type_conformance,
     response_headers_conformance,
     response_schema_conformance,
     status_code_conformance,
 )
+from schemathesis.specs.openapi.utils import coerce_parameter_value as _coerce_header_value
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
