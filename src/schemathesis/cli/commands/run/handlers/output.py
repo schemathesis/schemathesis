@@ -32,9 +32,9 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
-from schemathesis.engine.phases import PhaseName, PhaseSkipReason
-from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
+from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run.probes import ProbeOutcome
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
@@ -48,6 +48,20 @@ if TYPE_CHECKING:
     from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
+
+
+def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: str = "🕛") -> str:
+    if is_interrupted:
+        return "⚡"
+    if stats[Status.ERROR] > 0:
+        return "🚫"
+    if stats[Status.FAILURE] > 0:
+        return "❌"
+    if stats[Status.SUCCESS] > 0:
+        return "✅"
+    if stats[Status.SKIP] > 0:
+        return "⏭ "
+    return default
 
 
 def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> None:
@@ -473,19 +487,7 @@ class UnitTestProgressManager:
             self.live.stop()
 
     def _get_status_icon(self, default_icon: str = "🕛") -> str:
-        if self.is_interrupted:
-            icon = "⚡"
-        elif self.stats[Status.ERROR] > 0:
-            icon = "🚫"
-        elif self.stats[Status.FAILURE] > 0:
-            icon = "❌"
-        elif self.stats[Status.SUCCESS] > 0:
-            icon = "✅"
-        elif self.stats[Status.SKIP] > 0:
-            icon = "⏭ "
-        else:
-            icon = default_icon
-        return icon
+        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default=default_icon)
 
     def get_completion_message(self, default_icon: str = "🕛") -> str:
         """Complete the phase and return status message."""
@@ -666,19 +668,7 @@ class StatefulProgressManager:
         self.stats_progress.update(self.stats_task_id, description=self._get_stats_message())
 
     def _get_status_icon(self, default_icon: str = "🕛") -> str:
-        if self.is_interrupted:
-            icon = "⚡"
-        elif self.stats[Status.ERROR] > 0:
-            icon = "🚫"
-        elif self.stats[Status.FAILURE] > 0:
-            icon = "❌"
-        elif self.stats[Status.SUCCESS] > 0:
-            icon = "✅"
-        elif self.stats[Status.SKIP] > 0:
-            icon = "⏭ "
-        else:
-            icon = default_icon
-        return icon
+        return get_status_icon(self.stats, is_interrupted=self.is_interrupted, default=default_icon)
 
     def interrupt(self) -> None:
         """Handle interruption."""

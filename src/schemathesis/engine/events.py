@@ -4,17 +4,17 @@ import time
 import uuid
 from collections.abc import Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.engine.errors import EngineErrorInfo
-from schemathesis.engine.phases import Phase, PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run import Phase, PhaseName
 
 if TYPE_CHECKING:
-    from schemathesis.engine import Status
-    from schemathesis.engine.phases.probes import ProbePayload
+    from schemathesis.engine import Status, StopReason
+    from schemathesis.engine.run.probes import ProbePayload
 
 EventGenerator = Generator["EngineEvent", None, None]
 
@@ -33,11 +33,14 @@ class EngineEvent:
 class EngineStarted(EngineEvent):
     """Start of an engine."""
 
-    __slots__ = ("id", "timestamp")
+    payload: Any | None
 
-    def __init__(self) -> None:
+    __slots__ = ("id", "timestamp", "payload")
+
+    def __init__(self, *, payload: Any | None = None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
+        self.payload = payload
 
 
 @dataclass
@@ -269,17 +272,18 @@ class FatalError(EngineEvent):
 
 @dataclass
 class EngineFinished(EngineEvent):
-    """The final event of the run.
-
-    No more events after this point.
-    """
+    """The final event of the run. No more events after this point."""
 
     is_terminal = True
     running_time: float
+    stop_reason: StopReason
+    payload: Any | None
 
-    __slots__ = ("id", "timestamp", "running_time")
+    __slots__ = ("id", "timestamp", "running_time", "stop_reason", "payload")
 
-    def __init__(self, *, running_time: float) -> None:
+    def __init__(self, *, running_time: float, stop_reason: StopReason, payload: Any | None = None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.running_time = running_time
+        self.stop_reason = stop_reason
+        self.payload = payload

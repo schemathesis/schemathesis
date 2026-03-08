@@ -27,8 +27,8 @@ from schemathesis.engine.errors import (
     clear_hypothesis_notes,
     is_unrecoverable_network_error,
 )
-from schemathesis.engine.phases import PhaseName
-from schemathesis.engine.phases.stateful.context import StatefulContext
+from schemathesis.engine.run import PhaseName
+from schemathesis.engine.run.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.case import Case

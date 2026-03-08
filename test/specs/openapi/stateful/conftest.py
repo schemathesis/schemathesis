@@ -12,7 +12,7 @@ from flask import Flask, abort, jsonify, request
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.phases import Phase, PhaseName, stateful
+from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.generation.modes import GenerationMode
 
 

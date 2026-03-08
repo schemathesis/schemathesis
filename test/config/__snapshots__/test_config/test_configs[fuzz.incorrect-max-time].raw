@@ -1,0 +1,4 @@
+Error in [fuzz] section:
+  Type error:
+
+  - 'max-time' -> Must be an integer, but got str: one hour

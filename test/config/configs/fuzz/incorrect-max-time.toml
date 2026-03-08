@@ -1,0 +1,2 @@
+[fuzz]
+max-time = "one hour"

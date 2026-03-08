@@ -4,8 +4,8 @@ from queue import Queue
 import pytest
 
 import schemathesis
-from schemathesis.engine.phases.unit._layered_scheduler import LayeredScheduler
-from schemathesis.engine.phases.unit._ordering import compute_operation_layers
+from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+from schemathesis.engine.run.unit._ordering import compute_operation_layers
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 
 

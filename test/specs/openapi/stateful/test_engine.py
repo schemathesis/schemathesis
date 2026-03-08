@@ -14,8 +14,8 @@ from schemathesis.config import ChecksConfig
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.phases import Phase, PhaseName, stateful
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.specs.openapi.checks import (
@@ -123,7 +123,7 @@ def test_stop_outside_of_state_machine_execution(engine_factory, mocker, stop_ev
         app_kwargs={"independent_500": True},
     )
     mocker.patch(
-        "schemathesis.engine.phases.stateful._executor.StatefulContext.mark_as_seen_in_run",
+        "schemathesis.engine.run.stateful._executor.StatefulContext.mark_as_seen_in_run",
         side_effect=lambda *_, **__: stop_event.set(),
     )
     result = collect_result(engine)

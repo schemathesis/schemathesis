@@ -7,7 +7,7 @@ from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine.context import EngineContext
-from schemathesis.engine.phases import probes
+from schemathesis.engine.run import probes
 
 
 @pytest.fixture
@@ -85,5 +85,5 @@ def test_detect_null_byte_skipped(ctx):
 
 
 def test_ctrl_c(cli, mocker, openapi3_schema_url, snapshot_cli):
-    mocker.patch("schemathesis.engine.phases.probes.send", side_effect=KeyboardInterrupt)
+    mocker.patch("schemathesis.engine.run.probes.send", side_effect=KeyboardInterrupt)
     assert cli.run(openapi3_schema_url) == snapshot_cli

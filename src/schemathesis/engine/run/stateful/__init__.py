@@ -5,7 +5,7 @@ import threading
 from typing import TYPE_CHECKING
 
 from schemathesis.engine import Status, events
-from schemathesis.engine.phases import Phase, PhaseName, PhaseSkipReason
+from schemathesis.engine.run import Phase, PhaseName, PhaseSkipReason
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 
 if TYPE_CHECKING:
@@ -15,7 +15,7 @@ EVENT_QUEUE_TIMEOUT = 0.01
 
 
 def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
-    from schemathesis.engine.phases.stateful._executor import execute_state_machine_loop
+    from schemathesis.engine.run.stateful._executor import execute_state_machine_loop
 
     try:
         state_machine = engine.schema.as_state_machine()

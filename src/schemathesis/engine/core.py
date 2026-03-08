@@ -6,13 +6,13 @@ from dataclasses import dataclass
 from schemathesis import auths
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError
-from schemathesis.engine import Status, events, phases
+from schemathesis.engine import Status, events, run
 from schemathesis.engine.observations import Observations
 from schemathesis.schemas import BaseSchema
 
 from .context import EngineContext
 from .events import EventGenerator, StatefulPhasePayload
-from .phases import Phase, PhaseName, PhaseSkipReason
+from .run import Phase, PhaseName, PhaseSkipReason
 
 
 @dataclass
@@ -146,7 +146,7 @@ class ExecutionPlan:
                     continue
                 yield events.PhaseStarted(phase=phase, payload=payload)
                 if phase.should_execute(engine):
-                    yield from phases.execute(engine, phase)
+                    yield from run.execute(engine, phase)
                 else:
                     if engine.has_reached_the_failure_limit:
                         phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
@@ -163,7 +163,7 @@ class ExecutionPlan:
 
     def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
-        yield events.EngineFinished(running_time=ctx.running_time)
+        yield events.EngineFinished(running_time=ctx.running_time, stop_reason=ctx.stop_reason)
 
     def _adapt_execution(self, engine: EngineContext, phase: Phase) -> StatefulPhasePayload | None:
         if engine.has_reached_the_failure_limit:

@@ -15,9 +15,9 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.config import SchemathesisWarning
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.phases import PhaseName
+from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.recorder import Request
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.specs.openapi.checks import (
@@ -1009,6 +1009,23 @@ def test_stop_event_stream_immediately(event_stream):
     assert isinstance(next(event_stream), events.EngineStarted)
     assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
+
+
+def test_stop_event_stream_has_stop_reason_interrupted(event_stream):
+    # When the engine is stopped externally
+    assert isinstance(next(event_stream), events.EngineStarted)
+    event_stream.stop()
+    finished = next(event_stream)
+    assert isinstance(finished, events.EngineFinished)
+    # Then the stop reason is reflected in the final event
+    assert finished.stop_reason == StopReason.INTERRUPTED
+
+
+def test_engine_finished_stop_reason_completed(real_app_schema):
+    # When the engine runs to completion
+    stream = EventStream(real_app_schema).execute()
+    # Then the finished event reports completed
+    assert stream.finished.stop_reason == StopReason.COMPLETED
 
 
 def test_stop_event_stream_after_second_event(event_stream):

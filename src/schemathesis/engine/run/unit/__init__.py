@@ -29,11 +29,11 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
-from schemathesis.engine.phases import PhaseName, PhaseSkipReason
-from schemathesis.engine.phases.unit._layered_scheduler import LayeredScheduler
-from schemathesis.engine.phases.unit._ordering import compute_operation_layers
-from schemathesis.engine.phases.unit._pool import DefaultScheduler, WorkerPool
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run import PhaseName, PhaseSkipReason
+from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+from schemathesis.engine.run.unit._ordering import compute_operation_layers
+from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -41,7 +41,7 @@ from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
-    from schemathesis.engine.phases import Phase
+    from schemathesis.engine.run import Phase
     from schemathesis.schemas import APIOperation
 
 WORKER_TIMEOUT = 0.1
@@ -189,7 +189,7 @@ def worker_task(
 ) -> None:
     from hypothesis.errors import HypothesisWarning
 
-    from schemathesis.engine.phases.unit._executor import run_test, test_func
+    from schemathesis.engine.run.unit._executor import run_test, test_func
     from schemathesis.generation.hypothesis.builder import create_test
 
     def on_error(error: Exception, *, method: str | None = None, path: str | None = None) -> None:

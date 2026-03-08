@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
-    from schemathesis.engine.phases import Phase
+    from schemathesis.engine.run import Phase
     from schemathesis.schemas import BaseSchema
 
 
