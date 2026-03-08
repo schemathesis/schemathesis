@@ -10,7 +10,7 @@ from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.checks import CheckFunction
-from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
+from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
 from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
     phases=[hypothesis.Phase.generate],
     deadline=None,
-    stateful_step_count=DEFAULT_STATEFUL_STEP_COUNT,
+    stateful_step_count=DEFAULT_MAX_SCENARIO_STEPS,
     suppress_health_check=list(hypothesis.HealthCheck),
 )
 
