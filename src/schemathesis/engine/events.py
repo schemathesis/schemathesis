@@ -106,12 +106,14 @@ class SchemaAnalysisWarnings(PhaseEvent):
 
 @dataclass
 class TestEvent(EngineEvent):
-    phase: PhaseName
+    pass
 
 
 @dataclass
 class SuiteStarted(TestEvent):
     """Before executing a set of scenarios."""
+
+    phase: PhaseName
 
     __slots__ = ("id", "timestamp", "phase")
 
@@ -125,6 +127,7 @@ class SuiteStarted(TestEvent):
 class SuiteFinished(TestEvent):
     """After executing a set of test scenarios."""
 
+    phase: PhaseName
     status: Status
 
     __slots__ = ("id", "timestamp", "phase", "status")
@@ -145,6 +148,8 @@ class ScenarioEvent(TestEvent):
 class ScenarioStarted(ScenarioEvent):
     """Before executing a grouped set of test steps."""
 
+    phase: PhaseName
+
     __slots__ = ("id", "timestamp", "phase", "suite_id", "label")
 
     def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, label: str | None) -> None:
@@ -159,6 +164,7 @@ class ScenarioStarted(ScenarioEvent):
 class ScenarioFinished(ScenarioEvent):
     """After executing a grouped set of test steps."""
 
+    phase: PhaseName
     status: Status
     recorder: ScenarioRecorder
     elapsed_time: float

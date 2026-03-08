@@ -7,7 +7,7 @@ from typing import Any
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
+from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 
 DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace", "query"}
 
@@ -281,7 +281,7 @@ class StatefulPhaseConfig(DiffBase):
         inference: InferenceConfig | None = None,
     ) -> None:
         self.enabled = enabled
-        self.max_steps = max_steps or DEFAULT_STATEFUL_STEP_COUNT
+        self.max_steps = max_steps or DEFAULT_MAX_SCENARIO_STEPS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
         self.inference = inference or InferenceConfig()

@@ -50,13 +50,14 @@ class EngineContext:
         observations: Observations | None = None,
     ) -> None:
         self.schema = schema
+        self.start_time = time.monotonic()
         self.control = ExecutionControl(
             stop_event=stop_event,
             max_failures=schema.config.max_failures,
             max_time=schema.config.fuzz.max_time,
+            start_time=self.start_time,
         )
         self.outcome_cache = {}
-        self.start_time = time.monotonic()
         self.observations = observations
         self._thread_local = threading.local()
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
@@ -75,13 +76,12 @@ class EngineContext:
 
     @property
     def has_reached_time_limit(self) -> bool:
-        max_time = self.control.max_time
-        return max_time is not None and self.running_time >= max_time
+        return self.control.has_reached_time_limit
 
     @property
     def has_to_stop(self) -> bool:
         """Check if execution should stop."""
-        return self.control.is_stopped or self.has_reached_time_limit
+        return self.control.is_stopped
 
     @property
     def is_interrupted(self) -> bool:
@@ -93,15 +93,7 @@ class EngineContext:
 
     @property
     def stop_reason(self) -> StopReason:
-        from schemathesis.engine import StopReason
-
-        if self.has_reached_time_limit:
-            return StopReason.MAX_TIME
-        if self.control.has_reached_the_failure_limit:
-            return StopReason.FAILURE_LIMIT
-        if self.control.is_interrupted:
-            return StopReason.INTERRUPTED
-        return StopReason.COMPLETED
+        return self.control.stop_reason
 
     def record_observations(self, recorder: ScenarioRecorder) -> None:
         """Add new observations from a scenario."""

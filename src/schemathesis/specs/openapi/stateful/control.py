@@ -4,8 +4,8 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.generation.stateful.state_machine import DEFAULT_STATEFUL_STEP_COUNT
 
 if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
@@ -28,7 +28,7 @@ def _get_max_operations_per_source(transitions: ApiTransitions) -> int:
         return MAX_OPERATIONS_PER_SOURCE_CAP
 
     # Total steps divided by number of sources, but never below the cap
-    return max(MAX_OPERATIONS_PER_SOURCE_CAP, DEFAULT_STATEFUL_STEP_COUNT // sources)
+    return max(MAX_OPERATIONS_PER_SOURCE_CAP, DEFAULT_MAX_SCENARIO_STEPS // sources)
 
 
 @dataclass

@@ -488,6 +488,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "max-steps": {
+          "type": "integer",
+          "minimum": 1
+        },
         "max-time": {
           "type": "integer",
           "minimum": 1

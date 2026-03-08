@@ -615,6 +615,7 @@ def test_max_failures(real_app_schema):
     assert stream.failures_count <= 2
     errors = stream.find_all(events.NonFatalError)
     assert stream.failures_count + len(errors) == 2
+    assert stream.finished.stop_reason == StopReason.FAILURE_LIMIT
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
@@ -1026,6 +1027,26 @@ def test_engine_finished_stop_reason_completed(real_app_schema):
     stream = EventStream(real_app_schema).execute()
     # Then the finished event reports completed
     assert stream.finished.stop_reason == StopReason.COMPLETED
+
+
+@pytest.mark.operations("success", "failure")
+def test_engine_finished_stop_reason_max_time(real_app_schema, mocker):
+    # When max_time is configured and monotonic time crosses the limit during execution
+    current = 0.0
+
+    def monotonic() -> float:
+        nonlocal current
+        value = current
+        current += 0.6
+        return value
+
+    mocker.patch("schemathesis.engine.context.time.monotonic", side_effect=monotonic)
+    mocker.patch("schemathesis.engine.control.time.monotonic", side_effect=monotonic)
+
+    real_app_schema.config.fuzz.max_time = 1
+    stream = EventStream(real_app_schema, phases=[PhaseName.FUZZING], max_examples=20).execute()
+    # Then the run is stopped by the time limit
+    assert stream.finished.stop_reason == StopReason.MAX_TIME
 
 
 def test_stop_event_stream_after_second_event(event_stream):
