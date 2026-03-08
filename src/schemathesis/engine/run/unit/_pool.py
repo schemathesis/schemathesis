@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Result
-from schemathesis.engine.phases import PhaseName
+from schemathesis.engine.run import PhaseName
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
-    from schemathesis.engine.phases.unit._layered_scheduler import LayeredScheduler
+    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 

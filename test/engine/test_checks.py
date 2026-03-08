@@ -13,8 +13,8 @@ from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
-from schemathesis.engine.phases.unit._executor import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run.unit._executor import validate_response
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (

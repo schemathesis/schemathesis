@@ -16,8 +16,8 @@ from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
-from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Interaction
+from schemathesis.engine.run import PhaseName
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))

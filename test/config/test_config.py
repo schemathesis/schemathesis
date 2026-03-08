@@ -22,7 +22,7 @@ def get_all_config_files(*subdirectories: str) -> dict[str, Path]:
     return result
 
 
-ALL_CONFIGS = get_all_config_files("common", "report", "parameters", "operations")
+ALL_CONFIGS = get_all_config_files("common", "report", "parameters", "operations", "fuzz")
 
 
 @pytest.mark.parametrize(
@@ -47,7 +47,7 @@ def test_warnings_for_without_operations():
 
 
 def test_project_key_config_sync():
-    ignored_in_operations_config = {"operations", "hooks", "workers", "base_url"}
+    ignored_in_operations_config = {"operations", "hooks", "workers", "base_url", "fuzz"}
     for key in ProjectConfig.__slots__:
         if key.startswith("_"):
             continue

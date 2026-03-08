@@ -69,6 +69,9 @@
     "phases": {
       "$ref": "#/$defs/PhasesConfig"
     },
+    "fuzz": {
+      "$ref": "#/$defs/FuzzConfig"
+    },
     "auth": {
       "$ref": "#/$defs/AuthConfig"
     },
@@ -481,6 +484,16 @@
         }
       }
     },
+    "FuzzConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max-time": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "GenerationConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -616,6 +629,9 @@
         },
         "phases": {
           "$ref": "#/$defs/PhasesConfig"
+        },
+        "fuzz": {
+          "$ref": "#/$defs/FuzzConfig"
         },
         "auth": {
           "$ref": "#/$defs/AuthConfig"

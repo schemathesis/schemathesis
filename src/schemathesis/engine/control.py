@@ -12,20 +12,28 @@ class ExecutionControl:
 
     stop_event: threading.Event
     max_failures: int | None
+    max_time: int | None
     _failures_counter: int
     has_reached_the_failure_limit: bool
 
-    __slots__ = ("stop_event", "max_failures", "_failures_counter", "has_reached_the_failure_limit")
+    __slots__ = (
+        "stop_event",
+        "max_failures",
+        "max_time",
+        "_failures_counter",
+        "has_reached_the_failure_limit",
+    )
 
-    def __init__(self, stop_event: threading.Event, max_failures: int | None) -> None:
+    def __init__(self, stop_event: threading.Event, max_failures: int | None, max_time: int | None = None) -> None:
         self.stop_event = stop_event
         self.max_failures = max_failures
+        self.max_time = max_time
         self._failures_counter = 0
         self.has_reached_the_failure_limit = False
 
     @property
     def is_stopped(self) -> bool:
-        """Check if execution should stop."""
+        """Check if execution should stop (failure limit or manual interrupt only)."""
         return self.is_interrupted or self.has_reached_the_failure_limit
 
     @property

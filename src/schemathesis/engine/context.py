@@ -15,6 +15,7 @@ from schemathesis.schemas import APIOperation, BaseSchema
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.engine import StopReason
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.resources import ExtraDataSource
 
@@ -49,7 +50,11 @@ class EngineContext:
         observations: Observations | None = None,
     ) -> None:
         self.schema = schema
-        self.control = ExecutionControl(stop_event=stop_event, max_failures=schema.config.max_failures)
+        self.control = ExecutionControl(
+            stop_event=stop_event,
+            max_failures=schema.config.max_failures,
+            max_time=schema.config.fuzz.max_time,
+        )
         self.outcome_cache = {}
         self.start_time = time.monotonic()
         self.observations = observations
@@ -69,9 +74,14 @@ class EngineContext:
         return time.monotonic() - self.start_time
 
     @property
+    def has_reached_time_limit(self) -> bool:
+        max_time = self.control.max_time
+        return max_time is not None and self.running_time >= max_time
+
+    @property
     def has_to_stop(self) -> bool:
         """Check if execution should stop."""
-        return self.control.is_stopped
+        return self.control.is_stopped or self.has_reached_time_limit
 
     @property
     def is_interrupted(self) -> bool:
@@ -80,6 +90,18 @@ class EngineContext:
     @property
     def has_reached_the_failure_limit(self) -> bool:
         return self.control.has_reached_the_failure_limit
+
+    @property
+    def stop_reason(self) -> StopReason:
+        from schemathesis.engine import StopReason
+
+        if self.has_reached_time_limit:
+            return StopReason.MAX_TIME
+        if self.control.has_reached_the_failure_limit:
+            return StopReason.FAILURE_LIMIT
+        if self.control.is_interrupted:
+            return StopReason.INTERRUPTED
+        return StopReason.COMPLETED
 
     def record_observations(self, recorder: ScenarioRecorder) -> None:
         """Add new observations from a scenario."""

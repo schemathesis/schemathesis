@@ -9,6 +9,7 @@ from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
+from schemathesis.config._fuzz import FuzzConfig
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._operations import OperationConfig, OperationsConfig
@@ -63,6 +64,7 @@ class ProjectConfig(DiffBase):
     auth: AuthConfig
     checks: ChecksConfig
     phases: PhasesConfig
+    fuzz: FuzzConfig
     generation: GenerationConfig
     operations: OperationsConfig
 
@@ -86,6 +88,7 @@ class ProjectConfig(DiffBase):
         "auth",
         "checks",
         "phases",
+        "fuzz",
         "generation",
         "operations",
     )
@@ -111,6 +114,7 @@ class ProjectConfig(DiffBase):
         auth: AuthConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
+        fuzz: FuzzConfig | None = None,
         generation: GenerationConfig | None = None,
         operations: OperationsConfig | None = None,
     ) -> None:
@@ -145,6 +149,7 @@ class ProjectConfig(DiffBase):
         self.auth = auth or AuthConfig()
         self.checks = checks or ChecksConfig()
         self.phases = phases or PhasesConfig()
+        self.fuzz = fuzz or FuzzConfig()
         self.generation = generation or GenerationConfig()
         self.operations = operations or OperationsConfig()
 
@@ -170,6 +175,7 @@ class ProjectConfig(DiffBase):
             warnings=WarningsConfig.from_value(data.get("warnings")),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {})),
+            fuzz=FuzzConfig.from_dict(data.get("fuzz", {})),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             operations=OperationsConfig(
                 operations=[OperationConfig.from_dict(operation) for operation in data.get("operations", [])]

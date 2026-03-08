@@ -22,6 +22,15 @@ class Status(str, Enum):
 _STATUS_ORDER = {Status.SUCCESS: 0, Status.FAILURE: 1, Status.ERROR: 2, Status.INTERRUPTED: 3, Status.SKIP: 4}
 
 
+class StopReason(str, Enum):
+    """Why the engine stopped."""
+
+    COMPLETED = "completed"
+    INTERRUPTED = "interrupted"
+    FAILURE_LIMIT = "failure_limit"
+    MAX_TIME = "max_time"
+
+
 def from_schema(schema: BaseSchema) -> Engine:
     from .core import Engine
 

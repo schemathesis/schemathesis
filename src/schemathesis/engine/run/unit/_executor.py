@@ -44,8 +44,8 @@ from schemathesis.engine.errors import (
     deduplicate_errors,
     is_unrecoverable_network_error,
 )
-from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.run import PhaseName
 from schemathesis.generation import metrics, overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (

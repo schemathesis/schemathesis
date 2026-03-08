@@ -16,7 +16,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
-from schemathesis.engine.phases import PhaseName
+from schemathesis.engine.run import PhaseName
 from schemathesis.specs.openapi.checks import AuthKind, IgnoredAuth, _contains_auth, ignored_auth, remove_auth
 from schemathesis.transport.requests import RequestsTransport
 from test.utils import EventStream
