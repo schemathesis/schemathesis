@@ -468,6 +468,47 @@ def _has_unverifiable_mutations(case: Case) -> bool:
     return False
 
 
+def _non_body_negative_values_match_schema(case: Case) -> bool:
+    """Check if all negative non-body parameter values are still valid against their original schema."""
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+    meta = case.meta
+    if meta is None or not isinstance(case.operation.schema, OpenApiSchema):
+        return False
+
+    # If body is also negative, this guard does not apply.
+    body_component = meta.components.get(ParameterLocation.BODY)
+    if body_component is not None and body_component.mode.is_negative:
+        return False
+
+    has_negative = False
+
+    for location in (
+        ParameterLocation.PATH,
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+    ):
+        component = meta.components.get(location)
+        if component is None or not component.mode.is_negative:
+            continue
+
+        value = getattr(case, location.container_name)
+        if value is None:
+            continue
+
+        has_negative = True
+        container = getattr(case.operation, location.container_name)
+        if not container:
+            continue
+        v = dict(value) if location == ParameterLocation.HEADER else value
+        if not container.get_strict_validator().is_valid(v):
+            # At least one parameter is invalid
+            return False
+
+    return has_negative
+
+
 @schemathesis.check
 @requires_openapi_schema
 @skips_on_unexpected_http_status
@@ -487,6 +528,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not _single_element_array_becomes_valid_after_serialization(case)
         and not _path_string_type_mutation_becomes_valid_after_serialization(case)
         and not _has_unverifiable_mutations(case)
+        and not _non_body_negative_values_match_schema(case)
     ):
         extra_info = ""
         phase = meta.phase
