@@ -967,13 +967,12 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
     ids=["binary", "string", "array"],
 )
 def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, field_name, field_schema, content_type):
-    app = Flask(__name__)
     schema_def = {
         "type": "object",
         "properties": {field_name: field_schema},
         "required": [field_name],
     }
-    spec = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/upload": {
                 "post": {
@@ -991,10 +990,6 @@ def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, fie
             }
         }
     )
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(spec)
 
     @app.route("/upload", methods=["POST"])
     def upload():
@@ -1154,7 +1149,7 @@ def test_headers_passed_to_schema_loading(cli, ctx, app_runner):
     # GH-3440: Headers should be passed to schema loading request
     schema = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
-    app = Flask(__name__)
+    app = Flask("schemathesis_test")
     schema_requests = []
 
     @app.route("/openapi.json")
@@ -2022,7 +2017,7 @@ def test_parameter_overrides(cli, schema_url, verify_overrides):
         ),
     ),
 )
-def test_max_redirects(cli, app_runner, snapshot_cli, args, config):
+def test_max_redirects(cli, ctx, app_runner, snapshot_cli, args, config):
     raw_schema = {
         "openapi": "3.0.0",
         "info": {"title": "Redirect Test", "version": "1.0.0"},
@@ -2040,11 +2035,7 @@ def test_max_redirects(cli, app_runner, snapshot_cli, args, config):
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/redirect", methods=["GET"])
     def redirect_endpoint():
@@ -2291,8 +2282,6 @@ class EventCounter(cli.EventHandler):
     ],
 )
 def test_operation_ordering(ctx, cli, app_runner, ordering_mode, expected):
-    app = Flask(__name__)
-
     spec = ctx.openapi.build_schema(
         {
             "/users/{id}": {
@@ -2345,6 +2334,7 @@ def test_operation_ordering(ctx, cli, app_runner, ordering_mode, expected):
         },
         version="3.0.0",
     )
+    app = Flask("schemathesis_test")
 
     @app.route("/openapi.json")
     def openapi_spec():

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 import pytest
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
@@ -3094,7 +3094,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
         },
         "required": ["id", "name", "price"],
     }
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/products": {
                 "post": {
@@ -3163,13 +3163,8 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
         }
     )
 
-    app = Flask(__name__)
     products = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/products", methods=["POST"])
     def create_product():
@@ -3255,7 +3250,7 @@ def test_schema_inference_discovers_state_corruption(cli, app_runner, snapshot_c
 def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_with_others(
     cli, app_runner, snapshot_cli, ctx
 ):
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/sessions": {
                 "post": {
@@ -3331,12 +3326,7 @@ def test_stateful_discovers_bug_with_no_body_producer_with_explicit_links_mixed_
         }
     )
 
-    app = Flask(__name__)
     sessions = {}
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/sessions", methods=["POST"])
     def create_session():
@@ -3377,7 +3367,7 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
         "required": ["id", "customer_id", "total"],
     }
 
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/customers": {
                 "post": {
@@ -3424,14 +3414,9 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
         }
     )
 
-    app = Flask(__name__)
     customers = {}
     next_customer_id = 1
     next_order_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/customers", methods=["POST"])
     def create_customer():
@@ -3498,7 +3483,7 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
         "required": ["id", "customer_id", "total"],
     }
 
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/customers": {
                 "post": {
@@ -3545,14 +3530,9 @@ def test_stateful_discovers_invalid_resource_id_bug(cli, app_runner, snapshot_cl
         }
     )
 
-    app = Flask(__name__)
     customers = {}
     next_customer_id = 1
     next_order_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/customers", methods=["POST"])
     def create_customer():
@@ -3623,7 +3603,7 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
         "required": ["id", "name", "price"],
     }
 
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/products": {
                 "post": {
@@ -3674,13 +3654,8 @@ def test_schema_inference_link_extraction_fails_due_to_producer_missing_id(cli, 
         }
     )
 
-    app = Flask(__name__)
     products = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/products", methods=["POST"])
     def create_product():
@@ -3734,7 +3709,7 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
         "required": ["id", "customer_id", "total"],
     }
 
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/customers": {
                 "post": {
@@ -3781,14 +3756,9 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
         }
     )
 
-    app = Flask(__name__)
     customers = {}
     next_customer_id = 1
     next_order_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/customers", methods=["POST"])
     def create_customer():
@@ -3845,7 +3815,7 @@ def test_stateful_discovers_requestbody_dependency_bug_producer_missing_field(cl
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_schemathesis_stateful_finds_checksum_match_bug(cli, app_runner, snapshot_cli):
+def test_schemathesis_stateful_finds_checksum_match_bug(ctx, cli, app_runner, snapshot_cli):
     openapi = {
         "openapi": "3.0.0",
         "info": {"title": "Minimal Blog", "version": "1.0.0"},
@@ -3914,17 +3884,13 @@ def test_schemathesis_stateful_finds_checksum_match_bug(cli, app_runner, snapsho
         },
     }
 
-    app = Flask(__name__)
+    app = ctx.openapi.make_flask_app_from_schema(openapi)
     posts = {}
     next_id = 1
 
     def make_checksum():
         # deterministic simple checksum for stable snapshots
         return "fixed-checksum"
-
-    @app.route("/openapi.json")
-    def get_openapi():
-        return jsonify(openapi)
 
     @app.route("/posts", methods=["POST"])
     def create_post():
@@ -3979,7 +3945,7 @@ def test_stateful_bug_when_link_always_used(cli, app_runner, snapshot_cli, ctx):
         "required": ["id", "name"],
     }
 
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
@@ -4038,13 +4004,8 @@ def test_stateful_bug_when_link_always_used(cli, app_runner, snapshot_cli, ctx):
         }
     )
 
-    app = Flask(__name__)
     items = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/items", methods=["POST"])
     def create_item():
@@ -4579,7 +4540,7 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapsh
                 result[key] = None if value == "None" else value
         return result
 
-    schema = ctx.openapi.build_schema(
+    app, schema = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
@@ -4670,13 +4631,8 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapsh
         }
     )
 
-    app = Flask(__name__)
     users = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():

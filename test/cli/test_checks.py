@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 from _pytest.main import ExitCode
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -51,7 +51,7 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cli):
+def test_negative_data_rejection_displays_all_cases(ctx, app_runner, cli, snapshot_cli):
     raw_schema = {
         "openapi": "3.0.0",
         "paths": {
@@ -96,11 +96,7 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
             }
         },
     }
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/test", methods=["GET"])
     def test_endpoint():
@@ -131,29 +127,16 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
 def test_negative_data_rejection_path_parameter_type_mutation(ctx, app_runner, cli, snapshot_cli):
     # String value for an integer path parameter serializes to the same URL as the integer.
     # E.g., string "7" becomes /api/run/7 - indistinguishable from integer 7.
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/run/{id}": {
                 "post": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "integer"},
-                        }
-                    ],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "Success"}},
                 }
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/run/<path:id>", methods=["POST"])
     def run_endpoint(id):
@@ -182,29 +165,16 @@ def test_negative_data_rejection_path_parameter_type_mutation(ctx, app_runner, c
 def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, app_runner, cli, snapshot_cli):
     # Like the integer variant, string mutations for a float path parameter can decode to valid floats.
     # E.g., "+1.5" becomes /api/rate/%2B1.5 - URL-decoded to "+1.5" which float() accepts.
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/rate/{value}": {
                 "get": {
-                    "parameters": [
-                        {
-                            "name": "value",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "number"},
-                        }
-                    ],
+                    "parameters": [{"name": "value", "in": "path", "required": True, "schema": {"type": "number"}}],
                     "responses": {"200": {"description": "Success"}},
                 }
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/rate/<path:value>", methods=["GET"])
     def rate(value):
@@ -232,7 +202,7 @@ def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(
     # See GH-3603
     # UUID path param with an explicit lowercase pattern — when the fuzzing phase injects
     # a captured valid UUID, the positive value must NOT trigger a failure
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/tasks": {
                 "post": {
@@ -291,13 +261,7 @@ def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(
             },
         }
     )
-
-    app = Flask(__name__)
     tasks = {}
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/tasks", methods=["POST"])
     def create_task():
@@ -335,7 +299,7 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, app
     # These are indistinguishable from valid strings at the wire level, so no false positive
     # should be reported when the API correctly accepts the request.
     # See GH-3525
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/negotiations/negotiation": {
                 "post": {
@@ -359,12 +323,6 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, app
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/negotiations/negotiation", methods=["POST"])
     def negotiation():
@@ -395,7 +353,7 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, app
 
 def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_runner, cli, snapshot_cli):
     # See GH-2913
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/api/example/v1/page": {
                 "get": {
@@ -430,12 +388,6 @@ def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_run
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/example/v1/page", methods=["GET"])
     def get_page():
@@ -484,7 +436,7 @@ def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_run
 )
 def test_optional_auth_should_not_trigger_ignored_auth_check(ctx, app_runner, cli, snapshot_cli, version, kwargs):
     # See GH-3052
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/": {
                 "get": {
@@ -499,11 +451,6 @@ def test_optional_auth_should_not_trigger_ignored_auth_check(ctx, app_runner, cl
         version=version,
         **kwargs,
     )
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/", methods=["GET"])
     def data_endpoint():
@@ -533,7 +480,7 @@ def test_optional_auth_should_not_trigger_ignored_auth_check(ctx, app_runner, cl
     ],
 )
 def test_optional_auth_should_not_trigger_missing_required_header(ctx, app_runner, cli, snapshot_cli, version, kwargs):
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/": {
                 "get": {
@@ -548,11 +495,6 @@ def test_optional_auth_should_not_trigger_missing_required_header(ctx, app_runne
         version=version,
         **kwargs,
     )
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/", methods=["GET"])
     def data_endpoint():
@@ -563,7 +505,7 @@ def test_optional_auth_should_not_trigger_missing_required_header(ctx, app_runne
     assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "-c missing_required_header") == snapshot_cli
 
 
-def test_format_parameter_csv_response(app_runner, cli, snapshot_cli):
+def test_format_parameter_csv_response(ctx, app_runner, cli, snapshot_cli):
     raw_schema = {
         "openapi": "3.0.0",
         "paths": {
@@ -591,11 +533,7 @@ def test_format_parameter_csv_response(app_runner, cli, snapshot_cli):
             }
         },
     }
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/data", methods=["GET"])
     def data_endpoint():
@@ -685,106 +623,103 @@ def test_not_a_server_error(cli, snapshot_cli, openapi3_schema_url):
 
 
 @pytest.fixture
-def app():
-    app = Flask(__name__)
+def app(ctx):
+    _schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test API", "version": "0.1.0"},
+        "paths": {
+            "/organizations/": {
+                "post": {
+                    "operationId": "organizations:create",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                                    }
+                                }
+                            },
+                            "links": {
+                                "delete": {
+                                    "operationId": "organizations:delete",
+                                    "parameters": {
+                                        "organization_id": "$response.body#/id",
+                                    },
+                                },
+                                "create_project": {
+                                    "operationId": "organizations:projects:create",
+                                    "parameters": {
+                                        "organization_id": "$response.body#/id",
+                                    },
+                                },
+                            },
+                        }
+                    },
+                }
+            },
+            "/organizations/{organization_id}/": {
+                "delete": {
+                    "operationId": "organizations:delete",
+                    "parameters": [
+                        {
+                            "name": "organization_id",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer"},
+                        }
+                    ],
+                    "responses": {
+                        "204": {"description": "No Content"},
+                        "404": {"description": "Not Found"},
+                    },
+                }
+            },
+            "/organizations/{organization_id}/projects/": {
+                "post": {
+                    "operationId": "organizations:projects:create",
+                    "parameters": [
+                        {"name": "organization_id", "in": "path", "required": True, "schema": {"type": "integer"}}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {"description": "Created"},
+                        "404": {"description": "Not Found"},
+                        "422": {"description": "Unprocessable Content"},
+                    },
+                }
+            },
+        },
+    }
+    app = ctx.openapi.make_flask_app_from_schema(_schema)
 
     organizations = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def openapi():
-        return {
-            "openapi": "3.1.0",
-            "info": {"title": "Test API", "version": "0.1.0"},
-            "paths": {
-                "/organizations/": {
-                    "post": {
-                        "operationId": "organizations:create",
-                        "requestBody": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"name": {"type": "string"}},
-                                        "required": ["name"],
-                                    }
-                                }
-                            },
-                            "required": True,
-                        },
-                        "responses": {
-                            "201": {
-                                "description": "Created",
-                                "content": {
-                                    "application/json": {
-                                        "schema": {
-                                            "type": "object",
-                                            "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
-                                        }
-                                    }
-                                },
-                                "links": {
-                                    "delete": {
-                                        "operationId": "organizations:delete",
-                                        "parameters": {
-                                            "organization_id": "$response.body#/id",
-                                        },
-                                    },
-                                    "create_project": {
-                                        "operationId": "organizations:projects:create",
-                                        "parameters": {
-                                            "organization_id": "$response.body#/id",
-                                        },
-                                    },
-                                },
-                            }
-                        },
-                    }
-                },
-                "/organizations/{organization_id}/": {
-                    "delete": {
-                        "operationId": "organizations:delete",
-                        "parameters": [
-                            {
-                                "name": "organization_id",
-                                "in": "path",
-                                "required": True,
-                                "schema": {"type": "integer"},
-                            }
-                        ],
-                        "responses": {
-                            "204": {"description": "No Content"},
-                            "404": {"description": "Not Found"},
-                        },
-                    }
-                },
-                "/organizations/{organization_id}/projects/": {
-                    "post": {
-                        "operationId": "organizations:projects:create",
-                        "parameters": [
-                            {"name": "organization_id", "in": "path", "required": True, "schema": {"type": "integer"}}
-                        ],
-                        "requestBody": {
-                            "content": {
-                                "application/json": {
-                                    "schema": {
-                                        "type": "object",
-                                        "properties": {"name": {"type": "string"}},
-                                        "required": ["name"],
-                                    }
-                                }
-                            },
-                            "required": True,
-                        },
-                        "responses": {
-                            "201": {"description": "Created"},
-                            "404": {"description": "Not Found"},
-                            "422": {"description": "Unprocessable Content"},
-                        },
-                    }
-                },
-            },
-        }
 
     @app.route("/organizations/", methods=["POST"])
     def create_organization():
@@ -922,7 +857,7 @@ def test_use_after_free_does_not_trigger_on_error(app_runner, cli, snapshot_cli,
     )
 
 
-def test_negative_data_rejection_array_min_items_zero_no_false_positive(app_runner, cli, snapshot_cli):
+def test_negative_data_rejection_array_min_items_zero_no_false_positive(ctx, app_runner, cli, snapshot_cli):
     # See GH-3056
     raw_schema = {
         "openapi": "3.1.1",
@@ -988,11 +923,7 @@ def test_negative_data_rejection_array_min_items_zero_no_false_positive(app_runn
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/no-param", methods=["GET"])
     def no_param():
@@ -1023,7 +954,7 @@ def test_negative_data_rejection_array_min_items_zero_no_false_positive(app_runn
 
 def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, app_runner, cli, snapshot_cli):
     # Empty string in form data should not be treated as None/null for required string fields
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/suggest": {
                 "post": {
@@ -1053,12 +984,6 @@ def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, app_
         }
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
-
     @app.route("/suggest", methods=["POST"])
     def suggest():
         text = request.form.get("text")
@@ -1082,7 +1007,7 @@ def test_negative_data_rejection_form_data_empty_string_false_positive(ctx, app_
 
 def test_negative_data_rejection_fuzzing_phase_metadata(ctx, app_runner, cli):
     # Use a simple schema with single property to avoid multiple mutation conflicts
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
@@ -1103,12 +1028,6 @@ def test_negative_data_rejection_fuzzing_phase_metadata(ctx, app_runner, cli):
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():
@@ -1146,7 +1065,7 @@ def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, app_
     # When requestBody.required=true but inner schema allows empty object,
     # coverage generates {} which serializes to no body content for form-urlencoded.
     # This should NOT trigger a false positive "API rejected schema-compliant request".
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/my-method": {
                 "post": {
@@ -1162,12 +1081,6 @@ def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, app_
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/my-method", methods=["POST"])
     def my_method():
@@ -1191,7 +1104,7 @@ def test_positive_data_acceptance_required_form_body_no_false_positive(ctx, app_
 def test_positive_data_acceptance_additional_properties_hint(ctx, app_runner, cli, snapshot_cli):
     # When Hypothesis adds extra properties to a schema without `additionalProperties: false`,
     # the failure message should include a hint explaining the likely cause.
-    raw_schema = ctx.openapi.build_schema(
+    app, raw_schema = ctx.openapi.make_flask_app(
         {
             "/session": {
                 "post": {
@@ -1224,12 +1137,6 @@ def test_positive_data_acceptance_additional_properties_hint(ctx, app_runner, cl
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/session", methods=["POST"])
     def session():

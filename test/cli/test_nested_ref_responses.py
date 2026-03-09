@@ -1,5 +1,5 @@
 import pytest
-from flask import Flask, jsonify
+from flask import jsonify
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -8,7 +8,7 @@ def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
     # should show the original component path (e.g. /components/schemas/Host/properties/host)
     # not the internal bundled form (e.g. /x-bundled/schema1/properties/host).
     # See GH-3567
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/search": {
                 "get": {
@@ -39,12 +39,6 @@ def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
         },
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
-
     @app.route("/search", methods=["GET"])
     def search():
         # Return an integer for host instead of a string — always a type error
@@ -65,7 +59,7 @@ def test_bundled_ref_schema_path_display(ctx, app_runner, cli, snapshot_cli):
 def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
     # When a response schema has array items with $ref, the bundled ref path like `#/x-bundled/schema1`
     # should not appear in error messages - it should show the original reference path instead
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "get": {
@@ -100,12 +94,6 @@ def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
         },
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
-
     @app.route("/items", methods=["GET"])
     def get_items():
         # Returns a string instead of array - triggers type mismatch error
@@ -128,7 +116,7 @@ def test_bundled_ref_in_error_message(ctx, app_runner, cli, snapshot_cli):
 def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
     # Response 200 -> #/definitions/UserResponse -> actual response with schema
     # Without fix: nested $ref won't be resolved, schema validation won't work
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {"/users": {"get": {"responses": {"200": {"$ref": "#/definitions/UserResponse"}}}}},
         version="2.0",
         definitions={
@@ -143,12 +131,6 @@ def test_nested_ref_in_response_definition(ctx, app_runner, cli, snapshot_cli):
             },
         },
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/users", methods=["GET"])
     def get_users():
@@ -173,7 +155,7 @@ def test_bundled_ref_in_negative_testing_description(ctx, app_runner, cli, snaps
     # When a request body schema has $ref with multiple definitions, the negative testing (fuzzing)
     # phase may negate the $ref constraint. The error description should show the original reference
     # path (e.g., `#/components/schemas/Item`) instead of the internal bundled path (e.g., `#/x-bundled/schema1`).
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
@@ -214,12 +196,6 @@ def test_bundled_ref_in_negative_testing_description(ctx, app_runner, cli, snaps
             }
         },
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/items", methods=["POST"])
     def create_item():

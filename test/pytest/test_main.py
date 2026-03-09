@@ -1550,7 +1550,6 @@ def test(case):
 def test_urlencoded_type_mutations_should_not_cause_false_positives(testdir):
     testdir.makepyfile(
         test_case="""
-from flask import Flask, jsonify
 import schemathesis
 from hypothesis import settings
 
@@ -1581,17 +1580,7 @@ raw_schema = {
     }
 }
 
-app = Flask(__name__)
-
-@app.route("/openapi.json")
-def schema():
-    return jsonify(raw_schema)
-
-@app.route("/success", methods=["POST"])
-def success():
-    return jsonify({"success": True})
-
-schema_obj = schemathesis.openapi.from_wsgi("/openapi.json", app)
+schema_obj = schemathesis.openapi.from_dict(raw_schema)
 
 @schema_obj.parametrize()
 @settings(max_examples=20)

@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 import yaml
+from flask import Flask, jsonify
 
 from schemathesis.checks import CHECKS
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
@@ -45,6 +46,23 @@ class OpenApiContext:
     ) -> dict[str, Any]:
         schema = self.build_schema(paths, version=version, **kwargs)
         return self.parent.makefile(schema, format=format, filename=filename)
+
+    def make_flask_app(
+        self, paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: dict[str, Any]
+    ) -> tuple[Flask, dict[str, Any]]:
+        """Create a Flask app with /openapi.json pre-registered. Returns (app, schema)."""
+        schema = self.build_schema(paths, version=version, **kwargs)
+        return self.make_flask_app_from_schema(schema), schema
+
+    def make_flask_app_from_schema(self, schema: dict[str, Any]) -> Flask:
+        """Create a Flask app with /openapi.json pre-registered from an already-built schema dict."""
+        app = Flask(__name__)
+
+        @app.route("/openapi.json")
+        def openapi_spec() -> Any:
+            return jsonify(schema)
+
+        return app
 
 
 @dataclass

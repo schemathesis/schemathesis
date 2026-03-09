@@ -5,7 +5,7 @@ from xml.etree import ElementTree
 import pytest
 import yaml
 from _pytest.main import ExitCode
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 
 from test.utils import flaky
 
@@ -260,7 +260,7 @@ def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=3, min_passes=1)
-def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_runner, snapshot_cli):
+def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, app_runner, snapshot_cli):
     openapi = {
         "openapi": "3.0.0",
         "info": {"title": "Minimal API", "version": "1.0.0"},
@@ -348,14 +348,10 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(cli, app_run
     }
 
     # Minimal Flask app that stores products internally but returns a response that omits `id`.
-    app = Flask(__name__)
+    app = ctx.openapi.make_flask_app_from_schema(openapi)
     products = {}
     next_id = 1
     next_order_id = 1
-
-    @app.route("/openapi.json")
-    def get_openapi():
-        return jsonify(openapi)
 
     @app.route("/products", methods=["POST"])
     def create_product():
@@ -484,7 +480,7 @@ def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snap
         "required": ["sessions"],
     }
 
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/sessions": {
                 "post": {
@@ -514,13 +510,8 @@ def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snap
         }
     )
 
-    app = Flask(__name__)
     sessions = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/sessions", methods=["POST"])
     def create_session():
@@ -549,7 +540,7 @@ def test_stateful_link_coverage_with_no_parameters_or_body(cli, app_runner, snap
 
 def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
     # GH-3394: Links with nested $refs should be fully resolved
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/foo": {
                 "get": {
@@ -592,12 +583,7 @@ def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
         },
     )
 
-    app = Flask(__name__)
     next_id = 1
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/foo", methods=["GET"])
     def get_foo():
@@ -626,7 +612,7 @@ def test_nested_link_refs(cli, app_runner, snapshot_cli, ctx):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("phase", ["stateful", "fuzzing"])
 def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot_cli, phase):
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
@@ -718,13 +704,8 @@ def test_nested_path_shared_parameter_propagation(cli, app_runner, ctx, snapshot
         },
     )
 
-    app = Flask(__name__)
     users = {}
     posts = {}
-
-    @app.route("/openapi.json")
-    def get_spec():
-        return jsonify(schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():
