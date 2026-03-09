@@ -444,10 +444,10 @@ class OpenApiSchema(BaseSchema):
             schema=self,
             responses=responses,
             security=security,
-            path_parameters=OpenApiParameterSet(ParameterLocation.PATH),
-            query=OpenApiParameterSet(ParameterLocation.QUERY),
-            headers=OpenApiParameterSet(ParameterLocation.HEADER),
-            cookies=OpenApiParameterSet(ParameterLocation.COOKIE),
+            path_parameters=OpenApiParameterSet(ParameterLocation.PATH, adapter=self.adapter),
+            query=OpenApiParameterSet(ParameterLocation.QUERY, adapter=self.adapter),
+            headers=OpenApiParameterSet(ParameterLocation.HEADER, adapter=self.adapter),
+            cookies=OpenApiParameterSet(ParameterLocation.COOKIE, adapter=self.adapter),
         )
         for parameter in parameters:
             operation.add_parameter(parameter)

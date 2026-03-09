@@ -240,8 +240,17 @@ def openapi_cases(
         else:
             reject()
 
+    # If no container carries mutation metadata, then we didn't apply any mutations, and the test case is effectively positive
+    effective_generation_mode = generation_mode
+    if generation_mode.is_negative and not any(
+        container.generator == GenerationMode.NEGATIVE and container.meta is not None
+        for container in [query_, cookies_, headers_, path_parameters_, body_]
+        if container.is_generated
+    ):
+        effective_generation_mode = GenerationMode.POSITIVE
+
     # Extract mutation metadata from negated values and create phase-appropriate data
-    if generation_mode.is_negative:
+    if effective_generation_mode.is_negative:
         negated_container = None
         for container in [query_, cookies_, headers_, path_parameters_, body_]:
             if container.generator == GenerationMode.NEGATIVE and container.meta is not None:
@@ -342,7 +351,7 @@ def openapi_cases(
         _meta=CaseMetadata(
             generation=GenerationInfo(
                 time=time.monotonic() - start,
-                mode=generation_mode,
+                mode=effective_generation_mode,
             ),
             phase=PhaseInfo(name=phase, data=phase_data),
             components={

@@ -1,3 +1,4 @@
+import uuid
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -224,6 +225,106 @@ def test_negative_data_rejection_path_parameter_number_type_mutation(ctx, app_ru
             "--max-examples=200",
         )
         == snapshot_cli
+    )
+
+
+def test_negative_data_rejection_uuid_path_param_with_pattern_no_false_positive(ctx, app_runner, cli):
+    # See GH-3603
+    # UUID path param with an explicit lowercase pattern — when the fuzzing phase injects
+    # a captured valid UUID, the positive value must NOT trigger a failure
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/tasks": {
+                "post": {
+                    "operationId": "createTask",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["title"],
+                                    "properties": {"title": {"type": "string", "minLength": 1}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["id", "title"],
+                                        "properties": {
+                                            "id": {"type": "string", "format": "uuid"},
+                                            "title": {"type": "string"},
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/api/tasks/{taskId}": {
+                "get": {
+                    "operationId": "getTask",
+                    "parameters": [
+                        {
+                            "name": "taskId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                            },
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    app = Flask(__name__)
+    tasks = {}
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/api/tasks", methods=["POST"])
+    def create_task():
+        body = request.json
+        if not isinstance(body, dict):
+            return jsonify({"error": "body must be an object"}), 400
+        title = body.get("title")
+        if not isinstance(title, str) or not title:
+            return jsonify({"error": "title must be a non-empty string"}), 400
+        task_id = str(uuid.uuid4())
+        task = {"id": task_id, "title": title}
+        tasks[task_id] = task
+        return jsonify(task), 201
+
+    @app.route("/api/tasks/<task_id>", methods=["GET"])
+    def get_task(task_id):
+        return jsonify(tasks[task_id]) if task_id in tasks else ("", 404)
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=stateful,fuzzing",
+        "--max-examples=200",
+        exit_code=ExitCode.OK,
     )
 
 

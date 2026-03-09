@@ -180,7 +180,9 @@ def test_get_examples(location, swagger_20):
         param_set = cls([parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)])
     else:
         param_set = cls(
-            location, [parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)]
+            location,
+            [parameter_cls.from_definition(definition=definition, adapter=v2, name_to_uri={}, **kwargs)],
+            adapter=v2,
         )
     operation = make_operation(
         swagger_20,
@@ -231,6 +233,7 @@ def test_no_body_in_get(swagger_20):
                     adapter=v2,
                 )
             ],
+            adapter=v2,
         ),
     )
     strategies = operation.get_strategies_from_examples()
@@ -258,6 +261,7 @@ def test_custom_strategies(swagger_20):
                     adapter=v2,
                 )
             ],
+            adapter=v2,
         ),
     )
     result = operation.as_strategy().example()
@@ -443,6 +447,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         headers=OpenApiParameterSet(
             ParameterLocation.HEADER,
             [OpenApiParameter.from_definition(definition=definition, name_to_uri={}, adapter=v2)],
+            adapter=v2,
         ),
     )
 
