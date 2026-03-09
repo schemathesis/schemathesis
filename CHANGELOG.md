@@ -94,6 +94,7 @@
 ### :rocket: Added
 
 - Docker images now ship with [TraceCov](https://docs.tracecov.sh) pre-installed and enabled by default, providing schema coverage reports out of the box.
+- Stateful testing learns which API link transitions produce useful inputs and reduces 4xx responses over time.
 
 ### :bug: Fixed
 

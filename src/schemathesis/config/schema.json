@@ -484,6 +484,9 @@
         },
         "checks": {
           "$ref": "#/$defs/ChecksConfig"
+        },
+        "pruning": {
+          "type": "boolean"
         }
       }
     },
