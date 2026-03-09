@@ -21,6 +21,7 @@ import graphql
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, consumes, multiple, precondition, rule
 
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful.state_machine import BASE_EXPLORATION_RATE
@@ -268,7 +269,7 @@ def _make_consumer_rule(
             case,
             rule_name=rule_name,
             parent_id=parent_id,
-            applied_parameters=list(bundle_args.keys()),
+            applied_parameters=[(ParameterLocation.BODY, name) for name in bundle_args],
         )
 
     def _consumer_precondition(
@@ -339,7 +340,7 @@ def _make_lifecycle_rule(
             case,
             rule_name=rule_name,
             parent_id=parent_id,
-            applied_parameters=list(bundle_args.keys()),
+            applied_parameters=[(ParameterLocation.BODY, name) for name in bundle_args],
         )
         if track_deletion:
             # Track the deleted id's origin so use-after-delete probes can stitch parentage.

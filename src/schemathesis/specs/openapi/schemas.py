@@ -43,6 +43,7 @@ from schemathesis.core.spec import CoverageCapabilities
 from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transforms import get_template_fields
 from schemathesis.core.transport import Response, restful_method_priority
+from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
@@ -247,11 +248,20 @@ class OpenApiSchema(BaseSchema):
                 meta.generation.mode = GenerationMode.NEGATIVE
 
     @override
-    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
+    def as_state_machine(self) -> type[APIStateMachine]:
+        return self._build_state_machine(error_feedback=None, link_calibration=None)
+
+    @override
+    def _build_state_machine(
+        self,
+        *,
+        error_feedback: ErrorFeedbackStore | None,
+        link_calibration: LinkCalibrationState | None,
+    ) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
             self.analysis.inject_links()
-        return create_state_machine(self, error_feedback=error_feedback)
+        return create_state_machine(self, error_feedback=error_feedback, link_calibration=link_calibration)
 
     @override
     def get_unit_scheduler(

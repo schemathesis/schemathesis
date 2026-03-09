@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import platform
+import sys
 from dataclasses import asdict
 from unittest.mock import ANY
 
 import pytest
 from fastapi import FastAPI
-from py import sys
 
 import schemathesis
 from schemathesis.checks import not_a_server_error

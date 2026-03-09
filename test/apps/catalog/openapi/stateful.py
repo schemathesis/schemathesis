@@ -26,6 +26,11 @@ class StatefulConfig:
     return_plain_text: Literal[False] | str | bytes = False
     omit_required_field: bool = False
     reuse_deleted_ids: bool = False
+    # Link-calibration attribution scenarios; each flag forces a specific 4xx shape on user-detail routes.
+    parser_blames_unrelated: bool = False
+    wrong_link_parser_attributed: bool = False
+    wrong_link_type_mismatch: bool = False
+    wrong_link_to_missing_id: bool = False
 
 
 @dataclass
@@ -219,8 +224,22 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
     last_modified = "2021-01-01T00:00:00Z"
     config = store.config
 
+    # Counts user-detail hits so tests can prove the link target was actually exercised.
+    target_request_count = {"count": 0}
+    app.config["target_request_count"] = target_request_count
+
+    @app.before_request
+    def _count_user_detail_requests() -> None:
+        rule = request.url_rule
+        if rule is not None and rule.rule.startswith("/users/<"):
+            target_request_count["count"] += 1
+
     @app.route("/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
+        if config.parser_blames_unrelated:
+            return jsonify({"errors": [{"field": "X-Tenant-Id", "defaultMessage": "must not be blank"}]}), 400
+        if config.wrong_link_parser_attributed:
+            return jsonify({"userId": ["This field must be a UUID."]}), 422
         if config.slowdown:
             time.sleep(config.slowdown)
         user = store.users.get(user_id)
@@ -230,6 +249,15 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
             if config.omit_required_field:
                 return jsonify({"name": user["name"], "last_modified": user["last_modified"]})
             return jsonify(user)
+        return jsonify({"error": "User not found"}), 404
+
+    @app.route("/users/<user_id>", methods=["GET", "PATCH", "DELETE"])
+    def get_user_string(user_id):
+        # Fallback for non-integer userId values that wrong-link rewrites push into the URL.
+        if config.wrong_link_parser_attributed:
+            return jsonify({"userId": ["This field must be a UUID."]}), 422
+        if config.wrong_link_type_mismatch:
+            return jsonify({"error": "userId must be integer"}), 400
         return jsonify({"error": "User not found"}), 404
 
     @app.route("/users", methods=["GET"])
@@ -271,6 +299,9 @@ def _register_handlers(app: Flask, store: UserStore) -> None:
         new_user = {"id": new_id, "name": name, "last_modified": last_modified}
         if config.duplicate_operation_links:
             new_user["manager_id"] = 0
+        if config.wrong_link_to_missing_id:
+            # Integer that never resolves to a user; the wrong-link rewrite feeds it into DELETE's path.
+            new_user["manager_id"] = 99999
         if config.return_plain_text is not False:
             new_user["id"] = new_id = 192
             store.next_user_id = 192

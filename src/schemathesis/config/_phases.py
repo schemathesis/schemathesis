@@ -313,8 +313,9 @@ class StatefulPhaseConfig(DiffBase):
     checks: ChecksConfig
     max_steps: int
     inference: InferenceConfig
+    link_calibration: bool
 
-    __slots__ = ("enabled", "generation", "checks", "max_steps", "inference", "_is_default")
+    __slots__ = ("enabled", "generation", "checks", "max_steps", "inference", "link_calibration", "_is_default")
 
     def __init__(
         self,
@@ -324,13 +325,22 @@ class StatefulPhaseConfig(DiffBase):
         checks: ChecksConfig | None = None,
         max_steps: int | None = None,
         inference: InferenceConfig | None = None,
+        link_calibration: bool = True,
     ) -> None:
         self.enabled = enabled
         self.max_steps = max_steps or DEFAULT_MAX_SCENARIO_STEPS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
         self.inference = inference or InferenceConfig()
-        self._is_default = enabled and generation is None and checks is None and max_steps is None and inference is None
+        self.link_calibration = link_calibration
+        self._is_default = (
+            enabled
+            and generation is None
+            and checks is None
+            and max_steps is None
+            and inference is None
+            and link_calibration
+        )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> StatefulPhaseConfig:
@@ -340,6 +350,7 @@ class StatefulPhaseConfig(DiffBase):
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             inference=InferenceConfig.from_dict(data.get("inference", {})),
+            link_calibration=data.get("link-calibration", True),
         )
 
 

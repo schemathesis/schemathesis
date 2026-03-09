@@ -11,9 +11,11 @@ from hypothesis.stateful import Bundle, Rule, precondition, rule
 from schemathesis.checks import CheckFunction
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
+from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
+from schemathesis.engine.link_calibration import DEFAULT_USE_PROBABILITY, LinkCalibrationState
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -149,7 +151,10 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
 
 
 def create_state_machine(
-    schema: OpenApiSchema, *, error_feedback: ErrorFeedbackStore | None = None
+    schema: OpenApiSchema,
+    *,
+    error_feedback: ErrorFeedbackStore | None = None,
+    link_calibration: LinkCalibrationState | None = None,
 ) -> type[APIStateMachine]:
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
@@ -218,6 +223,7 @@ def create_state_machine(
                                     link=link,
                                     modes=config.modes,
                                     error_feedback=error_feedback,
+                                    link_calibration=link_calibration,
                                 )
                             ),
                         )
@@ -309,6 +315,7 @@ def into_step_input(
     link: OpenApiLink,
     modes: list[GenerationMode],
     error_feedback: ErrorFeedbackStore | None = None,
+    link_calibration: LinkCalibrationState | None = None,
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
     """A single transition between API operations."""
 
@@ -324,16 +331,22 @@ def into_step_input(
             transition = link.extract(output)
 
             overrides: dict[str, Any] = {}
-            applied_parameters = []
+            applied_parameters: list[tuple[ParameterLocation, str | None]] = []
+            if link_calibration is not None:
+                use_p = link_calibration.use_probability(transition.id)
+                calibrated = link_calibration.is_calibrated(transition.id)
+            else:
+                use_p = DEFAULT_USE_PROBABILITY
+                calibrated = False
             for container, data in transition.parameters.items():
                 overrides[container] = {}
+                location = CONTAINER_TO_LOCATION[container]
 
                 for name, extracted in data.items():
                     # Skip if extraction failed or returned unusable value
                     if not isinstance(extracted.value, Ok) or extracted.value.ok() in (None, UNRESOLVABLE):
                         continue
 
-                    param_key = f"{container}.{name}"
                     value = extracted.value.ok()
                     # Wildcard expressions yield multiple candidates. Pick via the
                     # `use_true_random` instance so the per-step pick stays out of
@@ -343,24 +356,24 @@ def into_step_input(
                     if isinstance(value, MultiMatch):
                         value = random.choice(value.values)
 
-                    # Calculate exploration rate based on parameter characteristics
-                    exploration_rate = BASE_EXPLORATION_RATE
-
-                    # Path parameters are critical for routing - use link values more often
-                    if container == "path_parameters":
-                        exploration_rate *= 0.5
-
-                    # Required parameters should follow links more often, optional ones explored more
-                    # Path params are always required, so they get both multipliers
-                    if extracted.is_required:
-                        exploration_rate *= 0.5
+                    if calibrated:
+                        p = use_p
                     else:
-                        # Explore optional parameters more to avoid only testing link-provided values
-                        exploration_rate *= 3.0
+                        # No data yet: use per-parameter heuristics.
+                        # Path parameters are critical for routing; required parameters
+                        # should follow links more; optional params get more exploration.
+                        exploration_rate = BASE_EXPLORATION_RATE
+                        if container == "path_parameters":
+                            exploration_rate *= 0.5
+                        if extracted.is_required:
+                            exploration_rate *= 0.5
+                        else:
+                            exploration_rate *= 3.0
+                        p = 1.0 - exploration_rate
 
-                    if biased_coin(1 - exploration_rate):
+                    if biased_coin(p):
                         overrides[container][name] = value
-                        applied_parameters.append(param_key)
+                        applied_parameters.append((location, name))
 
             # Get the extracted body value
             if (
@@ -373,12 +386,12 @@ def into_step_input(
                 request_body = NOT_SET
 
             # Link suppose to replace the entire extracted body
-            if request_body is not NOT_SET and not link.merge_body and biased_coin(1 - BASE_EXPLORATION_RATE):
+            if request_body is not NOT_SET and not link.merge_body and biased_coin(use_p):
                 overrides["body"] = request_body
                 if isinstance(overrides["body"], dict):
-                    applied_parameters.extend(f"body.{field}" for field in overrides["body"])
+                    applied_parameters.extend((ParameterLocation.BODY, field) for field in overrides["body"])
                 else:
-                    applied_parameters.append("body")
+                    applied_parameters.append((ParameterLocation.BODY, None))
 
             cases = st.one_of(
                 [
@@ -400,9 +413,9 @@ def into_step_input(
                         if field_value is UNRESOLVABLE:
                             continue
 
-                        if biased_coin(1 - BASE_EXPLORATION_RATE):
+                        if biased_coin(use_p):
                             selected_fields[field_name] = field_value
-                            applied_parameters.append(f"body.{field_name}")
+                            applied_parameters.append((ParameterLocation.BODY, field_name))
 
                     if selected_fields:
                         if isinstance(case.body, dict):
@@ -410,9 +423,9 @@ def into_step_input(
                         else:
                             # Can't merge into non-dict, replace entirely
                             case.body = selected_fields
-                elif biased_coin(1 - BASE_EXPLORATION_RATE):
+                elif biased_coin(use_p):
                     case.body = request_body
-                    applied_parameters.append("body")
+                    applied_parameters.append((ParameterLocation.BODY, None))
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)
 
         return inner(output=_output)

@@ -10,6 +10,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.health import HealthState
+from schemathesis.engine.link_calibration import LinkCalibrationState
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
@@ -32,12 +33,14 @@ class EngineContext:
     outcome_cache: dict[int, BaseException | None]
     start_time: float
     observations: Observations | None
+    link_calibration: LinkCalibrationState | None
 
     __slots__ = (
         "schema",
         "control",
         "outcome_cache",
         "health",
+        "link_calibration",
         "start_time",
         "observations",
         "_thread_local",
@@ -68,6 +71,7 @@ class EngineContext:
         )
         self.outcome_cache = {}
         self.health = HealthState()
+        self.link_calibration = LinkCalibrationState() if schema.config.phases.stateful.link_calibration else None
         self.observations = observations
         self._thread_local = threading.local()
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}

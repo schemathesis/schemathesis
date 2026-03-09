@@ -117,9 +117,7 @@ class ApiSchema(Protocol):
 
     def revalidate_case_metadata(self, case: Case) -> None: ...  # pragma: no cover
 
-    def as_state_machine(
-        self, *, error_feedback: ErrorFeedbackStore | None = None
-    ) -> type[APIStateMachine]: ...  # pragma: no cover
+    def as_state_machine(self) -> type[APIStateMachine]: ...  # pragma: no cover
 
     def create_extra_data_source(self) -> ExtraDataSource | None: ...  # pragma: no cover
 

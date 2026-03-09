@@ -493,6 +493,9 @@
         },
         "checks": {
           "$ref": "#/$defs/ChecksConfig"
+        },
+        "link-calibration": {
+          "type": "boolean"
         }
       }
     },

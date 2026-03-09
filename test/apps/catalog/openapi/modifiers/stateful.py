@@ -16,8 +16,7 @@ class UseAfterFree:
 
     def apply(self, app: Flask, store: UserStore) -> None:
         store.config.use_after_free = True
-        # Pin name minLength to 10 so every POST-then-DELETE-then-GET reliably
-        # leaves a stale resource (handler only deletes users with name length < 10).
+        # Force names long enough that POST-then-DELETE-then-GET always leaves a stale resource.
         spec = app.config["schema"]
         spec["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 10
 
@@ -320,3 +319,52 @@ class SlowOperations:
             seconds = latencies.get((request.method, rule.rule))
             if seconds:
                 time.sleep(seconds)
+
+
+@dataclass(slots=True)
+class ParserBlamesUnrelated:
+    # Correct link; server returns 400 blaming an unrelated header (X-Tenant-Id).
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        store.config.parser_blames_unrelated = True
+
+
+@dataclass(slots=True)
+class WrongLinkToMissingId:
+    # Link extracts `manager_id` (never resolves to a user); DELETE returns plain 404.
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        store.config.wrong_link_to_missing_id = True
+        spec = app.config["schema"]
+        spec["components"]["schemas"]["User"]["properties"]["manager_id"] = {"type": "integer"}
+        spec["paths"]["/users"]["post"]["responses"]["201"]["links"]["DeleteUser"]["parameters"]["userId"] = (
+            "$response.body#/manager_id"
+        )
+
+
+@dataclass(slots=True)
+class WrongLinkTypeMismatch:
+    # Link feeds a string `name` into the integer userId slot; server returns 400 with an unattributable body.
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        store.config.wrong_link_type_mismatch = True
+        spec = app.config["schema"]
+        spec["paths"]["/users"]["post"]["responses"]["201"]["links"]["DeleteUser"]["parameters"]["userId"] = (
+            "$response.body#/name"
+        )
+
+
+@dataclass(slots=True)
+class WrongLinkParserAttributed:
+    # Link feeds a string `name` into userId; server returns 422 with a DRF-style body blaming `userId`.
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        store.config.wrong_link_parser_attributed = True
+        spec = app.config["schema"]
+        spec["paths"]["/users"]["post"]["responses"]["201"]["links"]["DeleteUser"]["parameters"]["userId"] = (
+            "$response.body#/name"
+        )

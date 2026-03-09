@@ -18,7 +18,9 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     from schemathesis.engine.run.stateful._executor import execute_state_machine_loop
 
     try:
-        state_machine = engine.schema.as_state_machine(error_feedback=engine.error_feedback)
+        state_machine = engine.schema._build_state_machine(
+            error_feedback=engine.error_feedback, link_calibration=engine.link_calibration
+        )
     except Exception as exc:
         yield events.NonFatalError(error=exc, phase=phase.name, label=STATEFUL_TESTS_LABEL, related_to_operation=False)
         yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
