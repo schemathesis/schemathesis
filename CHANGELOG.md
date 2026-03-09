@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.5...HEAD) - TBD
 
+### :rocket: Added
+
+- Stateful tests damp reuse of extracted values from unreliable API links.
+
 ## [4.18.5](https://github.com/schemathesis/schemathesis/compare/v4.18.4...v4.18.5) - 2026-05-13
 
 ### :wrench: Changed

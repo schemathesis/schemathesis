@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
@@ -426,13 +427,22 @@ class BaseSchema(Mapping):
     ) -> SearchStrategy:
         raise NotImplementedError
 
-    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
+    def as_state_machine(self) -> type[APIStateMachine]:
         """Create a state machine class for stateful testing of linked API operations.
 
         Returns:
             APIStateMachine subclass configured for this schema.
 
         """
+        raise NotImplementedError
+
+    def _build_state_machine(
+        self,
+        *,
+        error_feedback: ErrorFeedbackStore | None,
+        link_calibration: LinkCalibrationState | None,
+    ) -> type[APIStateMachine]:
+        """Engine-internal variant of `as_state_machine` that wires per-run state."""
         raise NotImplementedError
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:

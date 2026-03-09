@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.spec import ApiSchema
     from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.link_calibration import LinkCalibrationState
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
@@ -168,11 +169,21 @@ class GraphQLSchema(BaseSchema):
         return False
 
     @override
-    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
-        # `error_feedback` is OpenAPI-specific; `hypothesis-graphql` strategies have no hook to consume it.
+    def as_state_machine(self) -> type[APIStateMachine]:
         from schemathesis.specs.graphql.stateful import create_state_machine
 
         return create_state_machine(self)
+
+    @override
+    def _build_state_machine(
+        self,
+        *,
+        error_feedback: ErrorFeedbackStore | None,
+        link_calibration: LinkCalibrationState | None,
+    ) -> type[APIStateMachine]:
+        # `error_feedback` and `link_calibration` are OpenAPI-specific; GraphQL strategies
+        # and stateful transitions don't consume either signal.
+        return self.as_state_machine()
 
     @override
     def apply_stateful_inference(self, ctx: EngineContext) -> int:

@@ -7460,12 +7460,7 @@ def _drive_collector(
     )
     store = ErrorFeedbackStore()
     for _ in range(times):
-        record_response(
-            store=store,
-            operation=case.operation,
-            case=case,
-            response=response,
-        )
+        record_response(store=store, operation=case.operation, case=case, response=response)
     return store, case
 
 

@@ -612,6 +612,20 @@ These settings can only be applied at the project level.
     algorithms = []
     ```
 
+#### `phases.stateful.link-calibration`
+
+!!! note ""
+
+    **Type**: `Boolean`  
+    **Default**: `true`  
+
+    Adapts how often Schemathesis reuses link-extracted values for child operations during the **stateful** phase. When a link's extracted values keep producing 4xx responses, the engine generates fresh values for those parameters instead. Link selection is unaffected.
+
+    ```toml
+    [phases.stateful]
+    link-calibration = false
+    ```
+
 #### `phases.<phase>.checks`
 
 !!! note "" 

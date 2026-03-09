@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from hypothesis.stateful import Bundle, RuleBasedStateMachine
 
 from schemathesis.core.errors import NoProducers
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
@@ -82,7 +83,7 @@ class GraphQLStateMachine(APIStateMachine):
         *,
         rule_name: str,
         parent_id: str | None,
-        applied_parameters: list[str] | None,
+        applied_parameters: list[tuple[ParameterLocation, str | None]] | None,
     ) -> StepOutput:
         __tracebackhide__ = True
         if parent_id is not None:

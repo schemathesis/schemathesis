@@ -3,7 +3,7 @@ from __future__ import annotations  # noqa: I001
 import queue
 import time
 import unittest
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from warnings import catch_warnings
 
 import hypothesis
@@ -15,7 +15,7 @@ from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
-from schemathesis.core.error_feedback.collector import record_response
+from schemathesis.core.error_feedback.collector import parse_observations
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
@@ -43,6 +43,10 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
+from schemathesis.specs.openapi.stateful.link_calibration import record_link_outcome
+
+if TYPE_CHECKING:
+    from schemathesis.core.error_feedback.store import Observation
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -90,6 +94,7 @@ def execute_state_machine_loop(
             self.control.supervisor = engine.supervisor
 
         def setup(self) -> None:
+            self._current_input: StepInput | None = None
             scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
@@ -112,6 +117,9 @@ def execute_state_machine_loop(
             return super().before_call(case)
 
         def step(self, input: StepInput) -> StepOutput | None:
+            # _current_input is set here and consumed once in validate_response(), then cleared.
+            # validate_response() is called at most once per step by the Hypothesis state machine.
+            self._current_input = input
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
             if engine.has_to_stop:
@@ -190,15 +198,24 @@ def execute_state_machine_loop(
             self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
         ) -> None:
             ctx.collect_metric(case, response)
+            current_input = self._current_input
+            self._current_input = None
+
+            # Parse 4xx body once — reused by calibration and error-feedback.
+            observations: tuple[Observation, ...] = ()
+            if engine.error_feedback is not None or engine.link_calibration is not None:
+                observations = parse_observations(case.operation, case, response)
+
+            # Record this step's outcome against the link's score.
+            if current_input is not None and engine.link_calibration is not None:
+                record_link_outcome(engine.link_calibration, response, observations, current_input, self.recorder)
             ctx.current_response = response
 
             if engine.error_feedback is not None:
-                record_response(
-                    store=engine.error_feedback,
-                    operation=case.operation,
-                    case=case,
-                    response=response,
-                )
+                # Field-level observations steer subsequent positive-mode generation.
+                for observation in observations:
+                    engine.error_feedback.record(observation)
+                # Schema-level cross-cutting observations (e.g. auth retries).
                 case.operation.schema.record_runtime_observations(
                     store=engine.error_feedback,
                     recorder=self.recorder,
@@ -250,6 +267,9 @@ def execute_state_machine_loop(
     seed = engine.config.seed
 
     while True:
+        # Promote observations from the previous run into the stable read state.
+        if engine.link_calibration is not None:
+            engine.link_calibration.begin_iteration()
         # This loop is running until no new failures are found in a single iteration
         if engine.error_feedback is not None:
             engine.error_feedback.checkpoint()

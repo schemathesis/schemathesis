@@ -15,6 +15,7 @@ from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
 from schemathesis.core.marks import Mark
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -49,10 +50,10 @@ class StepInput:
 
     case: Case
     transition: Transition | None  # None for initial steps
-    # What parameters were actually applied
-    # Data extraction failures can prevent it, as well as transitions can be skipped in some cases
-    # to improve discovery of bugs triggered by non-stateful inputs during stateful testing
-    applied_parameters: list[str]
+    # Provenance of each value the link successfully substituted: (location, parameter name).
+    # `name=None` means the whole body was replaced. Empty list = extraction failed or the
+    # transition was deliberately skipped to widen coverage of non-stateful inputs.
+    applied_parameters: list[tuple[ParameterLocation, str | None]]
 
     __slots__ = ("case", "transition", "applied_parameters")
 

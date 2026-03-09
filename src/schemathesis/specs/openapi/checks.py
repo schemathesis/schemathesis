@@ -1189,8 +1189,8 @@ def resource_was_deleted(recorder: ScenarioRecorder, case: Case) -> bool:
     """Return True if a successful DELETE in the scenario covers this case's resource path.
 
     A DELETE path is considered to cover the current case when it is a prefix of the current
-    path with matching parameter values. Used to suppress false positives where a prior step
-    deleted the resource.
+    path with matching parameter values. Used to suppress false positives in checks and in
+    link-calibration observations where a prior step deleted the resource.
     """
     case_path = ResourcePath(case.path, case.path_parameters or {})
     for prior_case in recorder.find_all_cases():
