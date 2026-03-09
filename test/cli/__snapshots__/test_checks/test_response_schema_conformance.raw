@@ -59,7 +59,7 @@ Warnings:
   ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
 
 Test cases:
-  N generated, N passed, N skipped
+  N generated, N passed
 
 Seed: 42
 
