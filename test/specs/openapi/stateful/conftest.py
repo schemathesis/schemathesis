@@ -7,7 +7,7 @@ from typing import Literal
 
 import hypothesis
 import pytest
-from flask import Flask, abort, jsonify, request
+from flask import abort, jsonify, request
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
@@ -215,7 +215,7 @@ def app_factory(ctx):
         },
     )
 
-    app = Flask(__name__)
+    app = ctx.openapi.make_flask_app_from_schema(schema)
     config = AppConfig()
     app.config["schema"] = schema
 
@@ -223,10 +223,6 @@ def app_factory(ctx):
     last_modified = "2021-01-01T00:00:00Z"
     users = {0: {"id": 0, "name": "John Doe", "last_modified": last_modified}}
     freed_ids: list[int] = []
-
-    @app.route("/openapi.json", methods=["GET"])
-    def get_spec():
-        return jsonify(schema)
 
     @app.route("/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
@@ -340,7 +336,7 @@ def app_factory(ctx):
 
     @app.before_request
     def check_auth():
-        if config.ignored_auth or config.auth_token is None or request.endpoint == get_spec.__name__:
+        if config.ignored_auth or config.auth_token is None or request.endpoint == "openapi_spec":
             # Allow all requests if auth is ignored or no token is set + to schema
             return
 

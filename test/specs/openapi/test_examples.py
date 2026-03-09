@@ -1839,7 +1839,7 @@ def test_find_in_responses(ctx, response, expected):
         {
             "/items/{itemId}/": {
                 "get": {
-                    "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
                     "responses": {"200": response},
                 }
             }
@@ -1892,7 +1892,7 @@ def test_find_in_responses_only_in_2xx(ctx):
         {
             "/items/{id}/": {
                 "get": {
-                    "parameters": [{"name": "id", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
                     "responses": {
                         "400": content(
                             {
@@ -2044,7 +2044,7 @@ def test_config_override_with_examples(ctx, cli, snapshot_cli, openapi3_base_url
             "/{primary}/subs/{secondary}": {
                 "put": {
                     "parameters": [
-                        {"name": "primary", "in": "path", "schema": {"type": "string"}, "required": True},
+                        {"name": "primary", "in": "path", "required": True, "schema": {"type": "string"}},
                         {
                             "name": "secondary",
                             "in": "path",

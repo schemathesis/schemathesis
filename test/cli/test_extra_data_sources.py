@@ -1,7 +1,7 @@
 import uuid
 
 import pytest
-from flask import Flask, abort, jsonify, request
+from flask import abort, jsonify, request
 
 
 @pytest.mark.openapi_version("3.0")
@@ -12,7 +12,7 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, ap
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
         "required": ["id", "name"],
     }
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
@@ -55,14 +55,8 @@ def test_extra_data_sources_records_from_mixed_success_failure_scenarios(cli, ap
             },
         }
     )
-
-    app = Flask(__name__)
     items = {}
     post_count = [0]
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/items", methods=["POST"])
     def create_item():
@@ -115,7 +109,7 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
         "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
         "required": ["id", "name"],
     }
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
@@ -158,13 +152,7 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
             },
         }
     )
-
-    app = Flask(__name__)
     items = {}
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/items", methods=["POST"])
     def create_item():
@@ -215,7 +203,7 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, ctx):
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/projects": {
                 "post": {
@@ -295,14 +283,8 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
             },
         }
     )
-
-    app = Flask(__name__)
     projects = {}
     tasks = {}
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/projects", methods=["POST"])
     def create_project():
@@ -356,7 +338,7 @@ def test_extra_data_sources_with_response_examples_prepopulation(
     cli, app_runner, snapshot_cli, ctx, extra_data_enabled
 ):
     known_user_id = "seeded-user-abc-123"
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
@@ -420,14 +402,8 @@ def test_extra_data_sources_with_response_examples_prepopulation(
             },
         }
     )
-
-    app = Flask(__name__)
     # Simulating a pre-seeded database with a known user
     seeded_users = {known_user_id: {"id": known_user_id, "name": "Seeded User"}}
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():
@@ -470,7 +446,7 @@ def test_extra_data_sources_with_response_examples_prepopulation(
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, snapshot_cli, ctx):
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
@@ -533,13 +509,7 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, sn
             },
         }
     )
-
-    app = Flask(__name__)
     users = {}
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():

@@ -502,14 +502,7 @@ def test_case_insensitive_headers(ctx):
         {
             "/data": {
                 "post": {
-                    "parameters": [
-                        {
-                            "name": "X-id",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        }
-                    ],
+                    "parameters": [{"name": "X-id", "in": "header", "required": True, "schema": {"type": "string"}}],
                     "responses": {"200": {"description": "OK"}},
                 },
             },
@@ -536,18 +529,8 @@ def test_iter_parameters(ctx):
             "/data": {
                 "post": {
                     "parameters": [
-                        {
-                            "name": "X-id",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        },
-                        {
-                            "name": "q",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        },
+                        {"name": "X-id", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "q", "in": "query", "required": True, "schema": {"type": "string"}},
                     ],
                     "responses": {"200": {"description": "OK"}},
                 },
@@ -678,16 +661,8 @@ def test_get_parameter(ctx, name, location, exists):
             "/data/": {
                 "get": {
                     "parameters": [
-                        {
-                            "name": name,
-                            "in": location,
-                            "required": True,
-                            "schema": {"type": "string"},
-                        }
-                        for name, location in (
-                            ("X-Key", "header"),
-                            ("key", "query"),
-                        )
+                        {"name": "X-Key", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
                     ],
                     "requestBody": {
                         "required": True,

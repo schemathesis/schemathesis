@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, unquote
 
 import jsonschema_rs
 import pytest
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 from hypothesis import Phase, settings
 from hypothesis import strategies as st
 from hypothesis.errors import Unsatisfiable
@@ -2710,11 +2710,7 @@ def test_binary_format_should_not_generate_empty_string_as_invalid(ctx, app_runn
         }
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/files/<path:filename>", methods=["PUT"])
     def upload_file(filename):

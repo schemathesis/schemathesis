@@ -1,5 +1,5 @@
 import pytest
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 
 AUTH_CONFIGS = {
     "ApiKeyHeader": {"api_key": "valid-key"},
@@ -11,9 +11,7 @@ AUTH_CONFIGS = {
 
 
 def create_auth_test_app(ctx):
-    app = Flask(__name__)
-
-    spec = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/api-key-header": {
                 "get": {
@@ -83,10 +81,6 @@ def create_auth_test_app(ctx):
             }
         },
     )
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(spec)
 
     @app.route("/api-key-header")
     def api_key_header():
@@ -260,9 +254,7 @@ def test_unused_openapi_auth_warnings(cli, auth_app_port, snapshot_cli, invalid_
 
 
 def test_openapi_v2_swagger(ctx, cli, app_runner, snapshot_cli):
-    app = Flask(__name__)
-
-    spec = ctx.openapi.build_schema(
+    app, spec = ctx.openapi.make_flask_app(
         {
             "/api-key": {
                 "get": {
@@ -348,9 +340,7 @@ def test_cli_auth_precedence_over_openapi(cli, auth_app_port, snapshot_cli):
 
 
 def test_global_security_overridden_by_operation(ctx, cli, app_runner, snapshot_cli):
-    app = Flask(__name__)
-
-    spec = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/operation-override": {
                 "get": {
@@ -368,10 +358,6 @@ def test_global_security_overridden_by_operation(ctx, cli, app_runner, snapshot_
         },
         security=[{"GlobalAuth": []}],  # Global default
     )
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(spec)
 
     @app.route("/operation-override")
     def operation_override():
@@ -422,33 +408,29 @@ def test_partial_scheme_configuration(cli, auth_app_port, snapshot_cli):
     )
 
 
-def test_no_security_requirements(cli, app_runner, snapshot_cli):
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(
-            {
-                "openapi": "3.0.0",
-                "info": {"title": "No Security API", "version": "1.0.0"},
-                "servers": [{"url": "/"}],
-                "components": {
-                    "securitySchemes": {
-                        "ApiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
-                    }
-                },
-                # No global security
-                "paths": {
-                    "/public": {
-                        "get": {
-                            "operationId": "public_endpoint",
-                            # No security requirement
-                            "responses": {"200": {"description": "OK"}},
-                        }
-                    },
-                },
+def test_no_security_requirements(ctx, cli, app_runner, snapshot_cli):
+    raw_schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "No Security API", "version": "1.0.0"},
+        "servers": [{"url": "/"}],
+        "components": {
+            "securitySchemes": {
+                "ApiKeyAuth": {"type": "apiKey", "name": "X-API-Key", "in": "header"},
             }
-        )
+        },
+        # No global security
+        "paths": {
+            "/public": {
+                "get": {
+                    "operationId": "public_endpoint",
+                    # No security requirement
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    }
+
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/public")
     def public_endpoint():
@@ -476,9 +458,7 @@ def test_no_security_requirements(cli, app_runner, snapshot_cli):
 
 
 def test_multiple_or_requirements_first_match(ctx, cli, app_runner, snapshot_cli):
-    app = Flask(__name__)
-
-    spec = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/multi-or": {
                 "get": {
@@ -500,10 +480,6 @@ def test_multiple_or_requirements_first_match(ctx, cli, app_runner, snapshot_cli
             }
         },
     )
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(spec)
 
     @app.route("/multi-or")
     def multi_or():
@@ -538,9 +514,7 @@ def test_multiple_or_requirements_first_match(ctx, cli, app_runner, snapshot_cli
 
 
 def test_auth_with_invalid_scheme_in_schema(ctx, cli, app_runner, snapshot_cli):
-    app = Flask(__name__)
-
-    spec = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/protected": {
                 "get": {
@@ -567,10 +541,6 @@ def test_auth_with_invalid_scheme_in_schema(ctx, cli, app_runner, snapshot_cli):
         security=[{"OAuth2": ["read"]}],
     )
 
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(spec)
-
     @app.route("/protected")
     def protected():
         return jsonify({"error": "unauthorized"}), 401
@@ -590,9 +560,7 @@ def test_auth_with_invalid_scheme_in_schema(ctx, cli, app_runner, snapshot_cli):
 
 
 def test_referenced_security_scheme(ctx, cli, app_runner, snapshot_cli):
-    app = Flask(__name__)
-
-    spec = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/api-key": {
                 "get": {
@@ -608,10 +576,6 @@ def test_referenced_security_scheme(ctx, cli, app_runner, snapshot_cli):
             }
         },
     )
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(spec)
 
     @app.route("/api-key")
     def api_key():

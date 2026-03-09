@@ -3,7 +3,7 @@ import platform
 
 import pytest
 from _pytest.main import ExitCode
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 
 
 @pytest.fixture
@@ -197,13 +197,7 @@ def test_binary_body_base64(cli, schema_url, ndjson_path):
 
 
 def test_enum_serialization(cli, ctx, app_runner, ndjson_path):
-    schema = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/users")
     def users():
@@ -239,7 +233,7 @@ def test_enum_serialization(cli, ctx, app_runner, ndjson_path):
 
 
 def test_form_data_string_body(cli, ctx, app_runner, ndjson_path):
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/submit": {
                 "post": {
@@ -260,12 +254,6 @@ def test_form_data_string_body(cli, ctx, app_runner, ndjson_path):
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
 
     @app.route("/submit", methods=["POST"])
     def submit():
@@ -299,13 +287,7 @@ def test_form_data_string_body(cli, ctx, app_runner, ndjson_path):
 
 
 def test_sanitization_disabled(cli, ctx, app_runner, ndjson_path):
-    schema = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
     @app.route("/users")
     def users():
@@ -331,7 +313,7 @@ def test_sanitization_disabled(cli, ctx, app_runner, ndjson_path):
 
 def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
     # Link expression references non-existent field to trigger Err serialization
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/users": {
                 "post": {
@@ -371,12 +353,6 @@ def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
         }
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
-
     @app.route("/users", methods=["POST"])
     def create_user():
         return jsonify({"id": 1}), 201
@@ -406,7 +382,7 @@ def test_stateful_with_extraction_failure(cli, ctx, app_runner, ndjson_path):
 
 def test_unresolvable_extraction_serialized(cli, ctx, app_runner, ndjson_path):
     # Link references an array index that will be empty, triggering $unresolvable
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/tags": {
                 "get": {
@@ -441,12 +417,6 @@ def test_unresolvable_extraction_serialized(cli, ctx, app_runner, ndjson_path):
             },
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
 
     @app.route("/tags")
     def list_tags():

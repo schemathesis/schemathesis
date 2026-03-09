@@ -2,7 +2,7 @@ import json
 
 import pytest
 from _pytest.main import ExitCode
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -14,7 +14,7 @@ def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
     #
     # The coverage phase generates format-specific negative cases via _negative_format,
     # which incorrectly claims values don't match the 'password' format.
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/": {
                 "post": {
@@ -34,12 +34,6 @@ def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/", methods=["POST"])
     def root():
@@ -69,7 +63,7 @@ def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
 
 
 def test_negative_metadata_required_property(ctx, app_runner, cli):
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
@@ -94,12 +88,6 @@ def test_negative_metadata_required_property(ctx, app_runner, cli):
         }
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
-
     @app.route("/items", methods=["POST"])
     def create_item():
         return jsonify({"result": "ok"}), 200
@@ -121,7 +109,7 @@ def test_negative_metadata_required_property(ctx, app_runner, cli):
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, cli, snapshot_cli):
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/some-string-endpoint": {
                 "put": {
@@ -134,12 +122,6 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, 
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/some-string-endpoint", methods=["PUT"])
     def string_endpoint():
@@ -162,7 +144,7 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapshot_cli):
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/endpoint": {
                 "put": {
@@ -178,12 +160,6 @@ def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapsh
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/endpoint", methods=["PUT"])
     def endpoint():
@@ -215,7 +191,7 @@ def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapsh
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_removed_auth_parameter_not_reapplied(ctx, app_runner, cli, snapshot_cli, auth_config):
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/ping": {
                 "post": {
@@ -233,12 +209,6 @@ def test_removed_auth_parameter_not_reapplied(ctx, app_runner, cli, snapshot_cli
             }
         },
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/ping", methods=["POST"])
     def ping():

@@ -519,7 +519,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         {
             "/items/{itemId}/": {
                 "get": {
-                    "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
                     "responses": {
                         "200": {
                             "description": "",
@@ -1099,7 +1099,7 @@ def test_malformed_path_template(ctx, path, expected):
 @pytest.mark.parametrize(
     ("parameters", "expected"),
     [
-        ([{"in": "query", "name": "key", "required": True, "schema": {"type": "integer"}}], Status.SUCCESS),
+        ([{"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}}], Status.SUCCESS),
         ([], Status.SKIP),
     ],
 )

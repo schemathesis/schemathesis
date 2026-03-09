@@ -18,15 +18,15 @@ def test_restful_heuristic_ordering(ctx):
             },
             "/users/{id}": {
                 "get": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "patch": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
@@ -88,7 +88,7 @@ def test_layered_scheduler_multiple_layers(ctx):
             "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
             "/users/{id}": {
                 "get": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
@@ -125,21 +125,21 @@ def test_layered_scheduler_multi_worker_coordination(ctx):
         {
             "/users/{id}": {
                 "get": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
             "/products/{id}": {
                 "get": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
@@ -250,17 +250,17 @@ def test_dependency_layers_restful_order_within_layer(ctx):
             },
             "/users/{userId}": {
                 "get": {
-                    "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "string"}}],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
             "/items/{itemId}": {
                 "get": {
-                    "parameters": [{"in": "path", "name": "itemId", "required": True, "schema": {"type": "string"}}],
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
@@ -304,7 +304,7 @@ def test_dependency_layers_with_links(ctx):
             "/users/{id}": {
                 "get": {
                     "operationId": "getUser",
-                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
@@ -345,7 +345,7 @@ def _make_operation(op_id, path, method="get", param="id", links=None, request_b
         },
     }
     if "{" in path:
-        op["parameters"] = [{"in": "path", "name": param, "required": True, "schema": {"type": "string"}}]
+        op["parameters"] = [{"name": param, "in": "path", "required": True, "schema": {"type": "string"}}]
     if request_body_schema:
         op["requestBody"] = {"content": {"application/json": {"schema": request_body_schema}}}
     if links:

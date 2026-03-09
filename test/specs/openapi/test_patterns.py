@@ -2,7 +2,7 @@ import re
 import sys
 
 import pytest
-from flask import Flask, jsonify
+from flask import jsonify
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
@@ -237,7 +237,7 @@ def is_valid_regex(pattern: str) -> bool:
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, app_runner, snapshot_cli):
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/owners": {
                 "get": {
@@ -295,12 +295,6 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, ap
         },
     )
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
-
     @app.route("/owners")
     def list_owners():
         return jsonify([{"id": 1, "firstName": "John", "lastName": "Doe"}])
@@ -322,7 +316,7 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, ap
     )
 
 
-def test_response_schema_is_not_mutated(cli, app_runner, snapshot_cli):
+def test_response_schema_is_not_mutated(cli, ctx, app_runner, snapshot_cli):
     # See GH-2749
     raw_schema = {
         "openapi": "3.0.3",
@@ -373,11 +367,7 @@ def test_response_schema_is_not_mutated(cli, app_runner, snapshot_cli):
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi_spec():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/container", methods=["POST"])
     def create_container():
@@ -395,7 +385,7 @@ def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, app_runner, snap
     # Pattern from amazonaws.com/cleanrooms schema - surrogate code points are invalid in regex
     invalid_pattern = "([\\u0020-\\uD7FF\\uE000-\\uFFFD\\uD800\\uDBFF-\\uDC00\\uDFFF\\t\\r\\n]){0,255}"
 
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/test": {
                 "get": {
@@ -411,12 +401,6 @@ def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, app_runner, snap
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
 
     @app.route("/test")
     def test_endpoint():
@@ -439,7 +423,7 @@ def test_unicode_surrogate_pattern_in_request_body(cli, ctx, app_runner, snapsho
     # Surrogate code point range - invalid in regex engine
     invalid_pattern = "[\\uD800-\\uDBFF]"
 
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/test": {
                 "post": {
@@ -461,12 +445,6 @@ def test_unicode_surrogate_pattern_in_request_body(cli, ctx, app_runner, snapsho
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def openapi():
-        return jsonify(schema)
 
     @app.route("/test", methods=["POST"])
     def test_endpoint():

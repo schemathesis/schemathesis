@@ -488,7 +488,7 @@ def test_missing_required_header_default_accepts_401(ctx, cli, openapi3_base_url
             "/basic": {
                 "get": {
                     "parameters": [
-                        {"name": "X-API-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-API-Token", "in": "header", "required": True, "schema": {"type": "string"}}
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -586,7 +586,7 @@ def test_missing_required_header_default_statuses(ctx, response_factory, status_
             "/test": {
                 "get": {
                     "parameters": [
-                        {"name": "X-API-Token", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-API-Token", "in": "header", "required": True, "schema": {"type": "string"}}
                     ],
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -716,14 +716,7 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
         {
             "/api/run/{id}": {
                 "post": {
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "integer"},
-                        }
-                    ],
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
                     "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
                 }
             }
@@ -768,18 +761,8 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
             "/api/run/{id}": {
                 "post": {
                     "parameters": [
-                        {
-                            "name": "id",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "integer"},
-                        },
-                        {
-                            "name": "key",
-                            "in": "query",
-                            "required": False,
-                            "schema": {"type": "integer"},
-                        },
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "key", "in": "query", "required": False, "schema": {"type": "integer"}},
                     ],
                     "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
                 }

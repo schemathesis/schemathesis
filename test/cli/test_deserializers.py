@@ -1,5 +1,5 @@
 import pytest
-from flask import Flask, Response, jsonify
+from flask import Response
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -28,11 +28,7 @@ def test_custom_deserializer_successful(ctx, app_runner, cli, snapshot_cli):
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/data", methods=["GET"])
     def get_data():
@@ -82,11 +78,7 @@ def test_custom_deserializer_with_exception(ctx, app_runner, cli, snapshot_cli):
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/data", methods=["GET"])
     def get_data():
@@ -111,7 +103,7 @@ def deserialize_custom(ctx, response):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unsupported_media_type_silent_skip(app_runner, cli, snapshot_cli):
+def test_unsupported_media_type_silent_skip(ctx, app_runner, cli, snapshot_cli):
     raw_schema = {
         "openapi": "3.0.0",
         "paths": {
@@ -128,11 +120,7 @@ def test_unsupported_media_type_silent_skip(app_runner, cli, snapshot_cli):
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/image", methods=["GET"])
     def get_image():
@@ -170,11 +158,7 @@ def test_custom_deserializer_schema_mismatch(ctx, app_runner, cli, snapshot_cli)
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/data", methods=["GET"])
     def get_data():
@@ -226,11 +210,7 @@ def test_multiple_deserializers_for_same_type(ctx, app_runner, cli, snapshot_cli
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/data", methods=["GET"])
     def get_data():
@@ -291,11 +271,7 @@ def test_deserializer_with_wildcard_media_type(ctx, app_runner, cli, snapshot_cl
         },
     }
 
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
+    app = ctx.openapi.make_flask_app_from_schema(raw_schema)
 
     @app.route("/data1", methods=["GET"])
     def get_data1():

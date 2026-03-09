@@ -669,7 +669,7 @@ def test_negative_changing_to_positive(app_runner):
         },
     }
 
-    app = Flask(__name__)
+    app = Flask("schemathesis_test")
 
     CUSTOMERS = {}
     NEXT_ID = 1
@@ -737,7 +737,7 @@ def test_explicit_auth_header_does_not_trigger_negative_data_rejection(app_runne
         "components": {"securitySchemes": {"HTTPBearer": {"type": "http"}}},
     }
 
-    app = Flask(__name__)
+    app = Flask("schemathesis_test")
 
     def check_auth():
         auth_header = request.headers.get("Authorization")

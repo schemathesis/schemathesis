@@ -1,14 +1,10 @@
 import pytest
 from _pytest.main import ExitCode
-from flask import Flask, Response, jsonify
+from flask import Response
 
 
-def _serve_schema(app_runner, schema: dict, routes):
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def get_schema():  # type: ignore[no-untyped-def]
-        return jsonify(schema)
+def _serve_schema(ctx, app_runner, schema: dict, routes):
+    app = ctx.openapi.make_flask_app_from_schema(schema)
 
     for method, path, handler in routes:
         app.add_url_rule(path, f"{method}_{path}", handler, methods=[method])
@@ -222,5 +218,5 @@ def test_final_line_counts_all_warning_kinds_in_run(cli, app_runner, ctx, snapsh
     def missing():  # type: ignore[no-untyped-def]
         return Response(status=404)
 
-    schema_url = _serve_schema(app_runner, schema, [("GET", "/auth", auth), ("GET", "/missing", missing)])
+    schema_url = _serve_schema(ctx, app_runner, schema, [("GET", "/auth", auth), ("GET", "/missing", missing)])
     assert cli.run(schema_url, "--checks=not_a_server_error", "--max-examples=1") == snapshot_cli

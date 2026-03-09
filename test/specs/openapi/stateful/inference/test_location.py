@@ -1,5 +1,5 @@
 import pytest
-from flask import Flask, jsonify, request
+from flask import jsonify, request
 
 import schemathesis
 from schemathesis.engine.observations import LocationHeaderEntry
@@ -651,14 +651,10 @@ def user_api_schema(ctx):
 
 
 @pytest.fixture
-def user_api_app(user_api_schema):
-    app = Flask(__name__)
+def user_api_app(ctx, user_api_schema):
+    app = ctx.openapi.make_flask_app_from_schema(user_api_schema)
     users = {}
     next_id = 1
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(user_api_schema)
 
     @app.route("/users", methods=["POST"])
     def create_user():
@@ -764,7 +760,7 @@ def test_inference_disabled_via_config(cli, app_runner, snapshot_cli, user_api_a
 
 
 def test_location_points_to_nonexistent_endpoint(cli, app_runner, snapshot_cli, ctx):
-    schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
                 "post": {
@@ -775,12 +771,6 @@ def test_location_points_to_nonexistent_endpoint(cli, app_runner, snapshot_cli, 
             # Note: No /items/{itemId} endpoint defined
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def get_schema():
-        return jsonify(schema)
 
     @app.route("/items", methods=["POST"])
     def create_item():

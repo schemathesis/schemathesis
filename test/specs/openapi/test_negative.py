@@ -4,7 +4,7 @@ from urllib.parse import unquote, urlparse
 import jsonschema_rs
 import pytest
 import requests
-from flask import Flask, jsonify
+from flask import jsonify
 from hypothesis import HealthCheck, given, seed, settings
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
@@ -607,7 +607,7 @@ def test_non_default_styles(ctx, location, schema, style, explode):
 
 @pytest.mark.snapshot
 def test_bundled_references(ctx, app_runner, cli, snapshot_cli):
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/api/groups/migrations": {
                 "post": {
@@ -633,12 +633,6 @@ def test_bundled_references(ctx, app_runner, cli, snapshot_cli):
             }
         },
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/api/groups/migrations", methods=["POST"])
     def create_migration():
@@ -919,7 +913,7 @@ def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_exampl
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_integer_path_parameter_no_false_positive(ctx, app_runner, cli, snapshot_cli):
-    raw_schema = ctx.openapi.build_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/device/audio/sources/{idx}": {
                 "delete": {
@@ -944,12 +938,6 @@ def test_integer_path_parameter_no_false_positive(ctx, app_runner, cli, snapshot
             }
         }
     )
-
-    app = Flask(__name__)
-
-    @app.route("/openapi.json")
-    def schema():
-        return jsonify(raw_schema)
 
     @app.route("/device/audio/sources/<idx>", methods=["DELETE"])
     def delete_source(idx):
