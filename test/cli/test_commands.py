@@ -18,6 +18,7 @@ from _pytest.main import ExitCode
 from flask import Flask, jsonify, redirect, request, url_for
 from urllib3.exceptions import ProtocolError
 
+import schemathesis
 from schemathesis.core.shell import ShellType
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
@@ -264,20 +265,26 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
 
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_connection_timeout(cli, schema_url, workers, snapshot_cli):
+def test_connection_timeout(ctx, cli, schema_url, workers, snapshot_cli):
     # When connection timeout is specified in the CLI and the request fails because of it
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
-    assert (
-        cli.run(
-            schema_url,
-            "--request-timeout=0.08",
-            f"--workers={workers}",
-            "--phases=fuzzing",
-            "--checks=not_a_server_error",
+    with ctx.restore_checks():
+
+        @schemathesis.check
+        def noop(ctx, response, case):
+            pass
+
+        assert (
+            cli.run(
+                schema_url,
+                "--request-timeout=0.08",
+                f"--workers={workers}",
+                "--phases=fuzzing",
+                "--checks=noop",
+            )
+            == snapshot_cli
         )
-        == snapshot_cli
-    )
 
 
 @pytest.mark.operations("success")
