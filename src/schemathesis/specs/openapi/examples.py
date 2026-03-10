@@ -311,23 +311,32 @@ def _expand_subschemas(
             yield subschema, expanded_path
 
 
+def _unpack_example_object(example: dict[str, Any], schema: OpenApiSchema) -> Generator[Any, None, None]:
+    """Extract the value from a single OAS3 Example Object."""
+    if "$ref" in example:
+        _, example = schema.resolver.resolve(example["$ref"])
+    if "value" in example:
+        yield example["value"]
+    elif "externalValue" in example:
+        with suppress(requests.RequestException):
+            # Report a warning if not available?
+            yield load_external_example(example["externalValue"])
+    elif example:
+        yield example
+
+
 def extract_inner_examples(examples: dict[str, Any] | list, schema: OpenApiSchema) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
     if isinstance(examples, dict):
         for example in examples.values():
             if isinstance(example, dict):
-                if "$ref" in example:
-                    _, example = schema.resolver.resolve(example["$ref"])
-                if "value" in example:
-                    yield example["value"]
-                elif "externalValue" in example:
-                    with suppress(requests.RequestException):
-                        # Report a warning if not available?
-                        yield load_external_example(example["externalValue"])
-                elif example:
-                    yield example
+                yield from _unpack_example_object(example, schema)
     elif isinstance(examples, list):
-        yield from examples
+        for example in examples:
+            if isinstance(example, dict):
+                yield from _unpack_example_object(example, schema)
+            else:
+                yield example
 
 
 @lru_cache

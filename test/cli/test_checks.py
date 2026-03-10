@@ -1160,3 +1160,82 @@ def test_positive_data_acceptance_additional_properties_hint(ctx, app_runner, cl
         )
         == snapshot_cli
     )
+
+
+def test_positive_data_acceptance_body_list_examples_verbatim(ctx, app_runner, cli):
+    app, raw_schema = ctx.openapi.make_flask_app(
+        {
+            "/api/payments": {
+                "post": {
+                    "operationId": "getPayments",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/PaymentsRequest"},
+                                # OAS3 Examples Object should be a dict, but some schemas use a list here.
+                                # Each element is an OAS3-style Example Object with a "value" key.
+                                "examples": [
+                                    {
+                                        "value": {
+                                            "request": {
+                                                "payment": {"SupplierAccount": "5411707635"},
+                                                "audit": {"requestedSystem": "a22c6ad7"},
+                                            }
+                                        }
+                                    }
+                                ],
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "PaymentsRequest": {
+                    "type": "object",
+                    "properties": {
+                        "request": {
+                            "type": "object",
+                            "properties": {
+                                "payment": {"type": "object"},
+                                "audit": {"type": "object"},
+                            },
+                            "required": ["payment", "audit"],
+                        }
+                    },
+                    "required": ["request"],
+                }
+            }
+        },
+    )
+
+    @app.route("/api/payments", methods=["POST"])
+    def payments_list_examples():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or "request" not in body:
+            return (
+                jsonify(
+                    {
+                        "Message": "Parameter 'request' is not found within the request content body.",
+                        "ExceptionType": "Boom",
+                    }
+                ),
+                400,
+            )
+        return jsonify({"result": "ok"}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=positive_data_acceptance",
+        "--phases=examples",
+        exit_code=ExitCode.OK,
+    )
