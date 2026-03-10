@@ -38,6 +38,8 @@ docker run \
 
 See [Extending Schemathesis](extending.md) for the full list of available hooks.
 
+tracecov is pre-installed and active by default — the built-in `hooks.py` enables schema coverage tracking automatically. See [Schema Coverage — Docker](coverage.md#docker) for details, opt-out, and custom hooks patterns.
+
 ## Reports
 
 Mount a directory to retrieve generated report files on the host:

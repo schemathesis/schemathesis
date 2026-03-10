@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.11.2...HEAD) - TBD
 
+### :rocket: Added
+
+- Docker images now ship with [TraceCov](https://docs.tracecov.sh) pre-installed and enabled by default, providing schema coverage reports out of the box.
+
 ### :bug: Fixed
 
 - False negative `missing_required_header` during the coverage phase when negative mode was active - the base test case used an invalid body, preventing header validation from being reached.

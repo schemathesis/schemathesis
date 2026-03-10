@@ -86,6 +86,9 @@ COPY src ./src
 
 RUN /opt/venv/bin/pip install --no-cache-dir --no-deps --force-reinstall ./
 
+RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/venv/bin/pip install --no-cache-dir tracecov==0.16.3
+
 RUN find /opt/venv -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete && \
     find /opt/venv -type d -name __pycache__ -delete
 
@@ -106,7 +109,7 @@ RUN addgroup --gid 1000 -S schemathesis && \
 
 COPY --chown=1000:1000 pyproject.toml README.md src ./
 
-RUN touch /app/hooks.py && \
+RUN printf 'import os\nif os.environ.get("SCHEMATHESIS_COVERAGE", "true").lower() != "false":\n    import tracecov\n    tracecov.schemathesis.install()\n' > /app/hooks.py && \
     chown -R 1000:1000 /app
 
 USER schemathesis
@@ -116,6 +119,7 @@ ENV LD_LIBRARY_PATH="/opt/python/lib"
 ENV VIRTUAL_ENV=/opt/venv
 
 ENV PYTHON_GIL=0
+ENV SCHEMATHESIS_COVERAGE=true
 ENV SCHEMATHESIS_DOCKER_IMAGE=3.14t-alpine
 ENV SCHEMATHESIS_HOOKS=/app/hooks.py
 

@@ -54,3 +54,43 @@ Colors indicate coverage status:
 </div>
 
 For more details, see the [TraceCov documentation](https://docs.tracecov.sh).
+
+## Docker
+
+The official Schemathesis Docker image has tracecov pre-installed and enabled by default. The coverage report is written to `/app/schema-coverage.html` inside the container. Mount a host directory and override the path to retrieve it:
+
+```bash
+docker run \
+  -v ./reports:/app/reports \
+  -e SCHEMATHESIS_COVERAGE_REPORT_HTML_PATH=/app/reports/schema-coverage.html \
+  ghcr.io/schemathesis/schemathesis:stable \
+  run -w auto https://api.example.com/openapi.json
+```
+
+### Opt out
+
+Set `SCHEMATHESIS_COVERAGE=false` to disable coverage tracking entirely:
+
+```bash
+docker run -e SCHEMATHESIS_COVERAGE=false \
+  ghcr.io/schemathesis/schemathesis:stable \
+  run -w auto https://api.example.com/openapi.json
+```
+
+### Custom hooks
+
+When you mount your own `hooks.py` at `/app/hooks.py`, it replaces the built-in stub. Add the tracecov activation lines at the top to keep coverage enabled:
+
+```python
+import tracecov
+tracecov.schemathesis.install()
+
+# your hooks below
+import schemathesis
+
+@schemathesis.hook
+def before_generate_query(context, strategy):
+    ...
+```
+
+Or set `SCHEMATHESIS_COVERAGE=false` to skip tracecov without touching your hooks file.
