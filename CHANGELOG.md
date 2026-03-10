@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False negative `missing_required_header` during the coverage phase when negative mode was active - the base test case used an invalid body, preventing header validation from being reached.
 - False positive `negative_data_rejection` for path parameters with `format: uuid` and a `pattern` constraint in the fuzzing phase captured valid resource IDs are used. [#3603](https://github.com/schemathesis/schemathesis/issues/3603)
 - False positive `positive_data_acceptance` when `requestBody` contains list-style OAS3 Example Objects - the inner `value` was not extracted, sending `{"value": ...}` as the body.
 

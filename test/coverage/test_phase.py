@@ -48,30 +48,34 @@ POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": "5", "q2": "000"}, "body": {"j-prop": 0}},
 ]
 NEGATIVE_CASES = [
-    {"query": {"q1": ANY}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ["null", "null"], "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": "", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": "false", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0000"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": ANY}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null,null"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "false"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": ANY}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "6", "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "{}", "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null,null", "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "", "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null", "h2": Pattern("-?[0-9]+")}, "body": 0},
-    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "false", "h2": Pattern("-?[0-9]+")}, "body": 0},
+    {"query": {"q1": ANY}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {
+        "query": {"q1": ["null", "null"], "q2": "0"},
+        "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")},
+        "body": {"j-prop": 0},
+    },
+    {"query": {"q1": "", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": "false", "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "0000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": ANY}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null,null"}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "null"}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": "false"}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": ANY}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "6", "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "{}", "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null,null", "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "", "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "null", "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": "false", "h2": Pattern("-?[0-9]+")}, "body": {"j-prop": 0}},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": {}},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": [None, None]},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY, "h2": Pattern("-?[0-9]+")}, "body": False},
@@ -233,6 +237,7 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
     def collect(case):
         if case.meta.phase.name == TestPhase.COVERAGE:
             is_valid = validator.is_valid(case.body)
+            body_is_target = case.meta.phase.data.parameter_location == ParameterLocation.BODY
             if positive and not is_valid:
                 errors = list(validator.iter_errors(case.body))
                 pytest.fail(
@@ -242,7 +247,7 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
                     f"Validator: {validator_cls.__name__}\n"
                     f"Errors: {[e.message for e in errors]}"
                 )
-            if not positive and is_valid:
+            if not positive and body_is_target and is_valid:
                 pytest.fail(
                     f"Negative case produced valid body (should be invalid).\n"
                     f"Body: {case.body}\n"
@@ -3286,3 +3291,63 @@ def test_hostname_negative_format_respects_validator_draft(monkeypatch, validato
     else:
         with pytest.raises(Unsatisfiable):
             next(generator)
+
+
+def test_missing_required_header_case_uses_invalid_template_body(ctx):
+    # In NEGATIVE-only mode the template body is set from the first negative mutation
+    # (e.g. `0`). MISSING_PARAMETER test cases inherit that invalid body, so a server
+    # that validates body before header returns 422 and header validation is never reached
+    # - a false negative for missing_required_header.
+    body_schema = {
+        "oneOf": [
+            {"type": "null"},
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+            },
+        ]
+    }
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-Required-Header",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/test"]["post"]
+    validator = operation.schema.adapter.jsonschema_validator_cls(body_schema, validate_formats=False)
+
+    missing_header_cases = [
+        case
+        for case in _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+        if case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
+        and case.meta.phase.data.parameter == "X-Required-Header"
+    ]
+
+    assert missing_header_cases, "Expected at least one MISSING_PARAMETER case for X-Required-Header"
+    # Template body must be valid so the server reaches header validation, not body rejection.
+    assert all(validator.is_valid(case.body) for case in missing_header_cases), (
+        f"Missing-header cases must have a valid body, got: {[case.body for case in missing_header_cases]}"
+    )
