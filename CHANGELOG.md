@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for path parameters with `format: uuid` and a `pattern` constraint in the fuzzing phase captured valid resource IDs are used. [#3603](https://github.com/schemathesis/schemathesis/issues/3603)
+- False positive `positive_data_acceptance` when `requestBody` contains list-style OAS3 Example Objects - the inner `value` was not extracted, sending `{"value": ...}` as the body.
 
 ## [4.11.2](https://github.com/schemathesis/schemathesis/compare/v4.11.1...v4.11.2) - 2026-03-06
 
