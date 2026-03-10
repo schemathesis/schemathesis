@@ -1239,3 +1239,10 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, app_runner, c
         "--phases=examples",
         exit_code=ExitCode.OK,
     )
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=positive_data_acceptance",
+        "--phases=fuzzing",
+        "--max-examples=50",
+        exit_code=ExitCode.OK,
+    )
