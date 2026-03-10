@@ -784,7 +784,32 @@ def _iter_coverage_cases(
             elapsed = instant.elapsed
             if "body" not in template:
                 template_time += elapsed
-                template.set_body(value, body.media_type)
+                if value.generation_mode == GenerationMode.POSITIVE:
+                    template.set_body(value, body.media_type)
+                else:
+                    # The template must be a valid positive baseline so that
+                    # parameter-mutation cases (e.g. missing required header) only
+                    # invalidate the one thing being tested.  If the first body value is
+                    # a negative mutation (NEGATIVE-only mode), generate a positive value
+                    # separately and prefer it for the template.
+                    pos_gen = coverage.cover_schema_iter(
+                        coverage.CoverageContext(
+                            root_schema=schema,
+                            location=ParameterLocation.BODY,
+                            media_type=media_type,
+                            generation_modes=[GenerationMode.POSITIVE],
+                            is_required=body.is_required,
+                            custom_formats=custom_formats,
+                            validator_cls=validator_cls,
+                            allow_extra_parameters=generation_config.allow_extra_parameters,
+                        ),
+                        schema,
+                    )
+                    first_positive = next(pos_gen, NOT_SET)
+                    template.set_body(
+                        value if isinstance(first_positive, NotSet) else first_positive,
+                        body.media_type,
+                    )
             data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
                 **data.kwargs,

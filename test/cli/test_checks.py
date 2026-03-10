@@ -1246,3 +1246,75 @@ def test_positive_data_acceptance_body_list_examples_verbatim(ctx, app_runner, c
         "--max-examples=50",
         exit_code=ExitCode.OK,
     )
+
+
+def test_missing_required_header_body_first_server_no_false_negative(ctx, app_runner, cli):
+    # Server validates body before header. With a valid template body the missing-header case
+    # reaches header validation (400), so the check correctly passes — no false negative.
+    app = ctx.openapi.make_flask_app_from_schema(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+            "paths": {
+                "/items/{kind}": {
+                    "post": {
+                        "parameters": [
+                            {
+                                "name": "kind",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string", "enum": ["Foo", "Bar"]},
+                            },
+                            {
+                                "name": "X-Required-Header",
+                                "in": "header",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            },
+                        ],
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "oneOf": [
+                                            {"type": "null"},
+                                            {
+                                                "type": "object",
+                                                "properties": {"value": {"type": "string"}},
+                                                "required": ["value"],
+                                            },
+                                        ]
+                                    }
+                                }
+                            }
+                        },
+                        "responses": {
+                            "200": {"description": "OK"},
+                            "400": {"description": "Missing or invalid header"},
+                            "422": {"description": "Invalid JSON body"},
+                        },
+                    }
+                }
+            },
+        }
+    )
+
+    @app.route("/items/<kind>", methods=["POST"])
+    def items(kind):
+        body = request.get_json(silent=True, force=True)
+        # Server validates body before header (common in framework middleware)
+        if body is None:
+            return jsonify({"error": "body must not be null"}), 422
+        header = request.headers.get("X-Required-Header")
+        if not header:
+            return jsonify({"error": "missing required header"}), 400
+        return jsonify({"ok": True}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=missing_required_header",
+        "--phases=coverage",
+        exit_code=ExitCode.OK,
+    )
