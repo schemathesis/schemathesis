@@ -29,26 +29,27 @@ on: [push, pull_request]
 jobs:
   api-test:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Start services
         run: docker compose up -d
-        
-      - uses: schemathesis/action@v2
+
+      - uses: schemathesis/action@v3
         with:
           schema: 'http://localhost:8080/openapi.json'
-          args: --report junit
-        env:
-          API_TOKEN: ${{ secrets.API_TOKEN }}
-          
+          authorization: 'Bearer ${{ secrets.API_TOKEN }}'
+          args: '--report junit'
+
       - name: Upload test results
         uses: actions/upload-artifact@v7
         if: always()
         with:
           name: schemathesis-results
           path: schemathesis-report/
-          
+
       - name: Cleanup
         if: always()
         run: docker compose down
