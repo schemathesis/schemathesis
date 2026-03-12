@@ -55,6 +55,28 @@ Colors indicate coverage status:
 
 For more details, see the [TraceCov documentation](https://docs.tracecov.sh).
 
+## Improving Coverage
+
+Schemathesis automatically targets schema constraints through its coverage phase, generating boundary values, pattern-matching strings, enum values, and more. For constraints that remain partially covered (yellow), add explicit examples to your schema. Schemathesis uses `example` (single value) and `examples` (map of example objects) as test cases:
+
+```yaml
+/users/{id}:
+  get:
+    parameters:
+      - name: id
+        in: path
+        schema:
+          type: integer
+          minimum: 1
+        examples:
+          existing:
+            value: 42
+          boundary:
+            value: 1
+```
+
+For cases where neither the coverage phase nor explicit examples are sufficient, [hooks](../reference/hooks.md) let you control generation directly - filtering values, mapping them to specific shapes, or replacing a strategy entirely.
+
 ## Docker
 
 The official Schemathesis Docker image has tracecov pre-installed and enabled by default. The coverage report is written to `/app/schema-coverage.html` inside the container. Mount a host directory and override the path to retrieve it:
