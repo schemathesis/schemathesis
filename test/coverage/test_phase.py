@@ -16,7 +16,7 @@ from requests.models import RequestEncodingMixin
 import schemathesis
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
-from schemathesis.core.errors import MalformedMediaType
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
@@ -2507,7 +2507,7 @@ def test_malformed_content_type(ctx):
             return
         assert_requests_call(case)
 
-    with pytest.raises(MalformedMediaType):
+    with pytest.raises(InvalidSchema):
         run_test(operation, test)
 
 

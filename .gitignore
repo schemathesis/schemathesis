@@ -218,3 +218,4 @@ venv.bak/
 
 reports/
 .benchmarks/
+.worktrees/

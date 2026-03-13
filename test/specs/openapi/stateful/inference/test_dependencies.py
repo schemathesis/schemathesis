@@ -1668,7 +1668,7 @@ def snapshot_json(snapshot):
             },
             id="subresource-in-array-items",
         ),
-        # Prefix matching: parameter "group_slug" → inferred "Group" not found →
+        # Prefix matching: parameter "group_slug" -> inferred "Group" not found
         # but "GroupSummary" starts with "Group" and has "slug" field
         # Like Mealie's /api/explore/groups/{group_slug}/... endpoints
         pytest.param(

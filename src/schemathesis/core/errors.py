@@ -114,6 +114,16 @@ class InvalidSchema(SchemathesisError):
         return InvalidSchema(message)
 
     @classmethod
+    def from_malformed_media_type(
+        cls, exc: MalformedMediaType, media_type: str, path: str | None = None, method: str | None = None
+    ) -> InvalidSchema:
+        return cls(
+            message=f"{exc}\n\nLocation:\n    requestBody -> content -> {media_type}",
+            path=path,
+            method=method,
+        )
+
+    @classmethod
     def from_jsonschema_error(
         cls,
         error: ValidationError,

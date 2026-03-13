@@ -15,7 +15,12 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, MalformedMediaType, SerializationNotPossible
+from schemathesis.core.errors import (
+    SERIALIZERS_SUGGESTION_MESSAGE,
+    InvalidSchema,
+    MalformedMediaType,
+    SerializationNotPossible,
+)
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import prepare_urlencoded
@@ -173,9 +178,14 @@ def openapi_cases(
             )
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
             # Parameter may have a wildcard media type. In this case, choose any supported one
-            possible_media_types = sorted(
-                operation.schema.transport.get_matching_media_types(parameter.media_type), key=lambda x: x[0]
-            )
+            try:
+                possible_media_types = sorted(
+                    operation.schema.transport.get_matching_media_types(parameter.media_type), key=lambda x: x[0]
+                )
+            except MalformedMediaType as exc:
+                raise InvalidSchema.from_malformed_media_type(
+                    exc, parameter.media_type, path=operation.path, method=operation.method
+                ) from exc
             if not possible_media_types:
                 all_media_types = operation.get_request_payload_content_types()
                 if all(

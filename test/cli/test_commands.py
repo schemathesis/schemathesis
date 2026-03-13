@@ -1034,6 +1034,25 @@ def test_no_schema_in_media_type(ctx, cli, base_url, snapshot_cli):
     )
 
 
+@pytest.mark.filterwarnings("error")
+@pytest.mark.openapi_version("3.0")
+def test_malformed_media_type_in_request_body(ctx, cli, base_url, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application.json": {"schema": {"type": "object"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert cli.run(str(schema_path), f"--url={base_url}", "--max-examples=1") == snapshot_cli
+
+
 def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {

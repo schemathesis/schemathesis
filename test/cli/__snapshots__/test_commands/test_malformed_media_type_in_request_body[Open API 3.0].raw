@@ -16,18 +16,26 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- 🚫  Examples (in 0.00s)
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ 🚫  Coverage (in 0.00s)
+
+     🚫 1 error
+
+ 🚫  Fuzzing (in 0.00s)
 
      🚫 1 error
 
 ==================================== ERRORS ====================================
-__________________________________ POST /test __________________________________
+__________________________________ POST /data __________________________________
 Schema Error
 
-Malformed media type: `invalid`
+Malformed media type: `application.json`
 
 Location:
-    requestBody -> content -> invalid
+    requestBody -> content -> application.json
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -35,19 +43,20 @@ Need more help?
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Errored: 1
 
 Test Phases:
-  🚫 Examples
-  ⏭  Coverage (disabled)
-  ⏭  Fuzzing (disabled)
-  ⏭  Stateful (disabled)
+  ⏭  Examples
+  🚫 Coverage
+  🚫 Fuzzing
+  ⏭  Stateful (not applicable)
 
 Errors:
   🚫 Schema Error: 1
 
 Test cases:
-  N generated, N passed, N skipped
+  No test cases were generated
 
 Seed: 42
 

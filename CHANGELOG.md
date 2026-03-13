@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.12.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Malformed request body media types (e.g. `application.json` instead of `application/json`) now report a clean "Schema Error" with the location in the schema instead of a raw Python traceback. [#3615](https://github.com/schemathesis/schemathesis/issues/3615)
+
 ## [4.12.0](https://github.com/schemathesis/schemathesis/compare/v4.11.2...v4.12.0) - 2026-03-11
 
 ### :rocket: Added
@@ -875,8 +879,8 @@
 - Dramatically improved performance and memory usage. For the coverage phase expect order of magnitude improvements that scale with schema complexity.
 
 Examples:
-  - PetStore API: **12s → 1.5s** (8x faster)
-  - Complex endpoint schema with nested objects and 40+ fields: **330s → 4.5s** (73x faster)
+  - PetStore API: **12s -> 1.5s** (8x faster)
+  - Complex endpoint schema with nested objects and 40+ fields: **330s -> 4.5s** (73x faster)
 
 These improvements come from removing unnecessary memory allocations in unnecessary pretty-printing operations in Hypothesis.
 
