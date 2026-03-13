@@ -415,7 +415,7 @@ def test_openapi_31_legacy_exclusive_bounds_in_response_schema(ctx):
     response_def = operation.responses.get("200")
     assert response_def is not None
     resolved = response_def.get_schema("application/json")
-    # Without upgrade: Draft 2020-12 ignores bool exclusiveMinimum → schema is just {type: integer, minimum: 1}
+    # Without upgrade: Draft 2020-12 ignores bool exclusiveMinimum -> schema is just {type: integer, minimum: 1}
     # With upgrade: {type: integer, exclusiveMinimum: 1} — value must be strictly > 1
     assert resolved.schema == {"type": "integer", "exclusiveMinimum": 1}
 

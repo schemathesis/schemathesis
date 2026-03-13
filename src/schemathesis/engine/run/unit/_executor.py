@@ -148,9 +148,6 @@ def run_test(
     except UnexpectedError:
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
         status = Status.ERROR
-        for idx, err in enumerate(errors):
-            if isinstance(err, MalformedMediaType):
-                errors[idx] = InvalidSchema(str(err))
     except hypothesis.errors.Flaky as exc:
         if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
             status = Status.ERROR
@@ -172,6 +169,8 @@ def run_test(
         for sub_exc in exc.exceptions:
             if is_regex_validation_error(sub_exc):
                 yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(sub_exc))
+            elif isinstance(sub_exc, InvalidSchema):
+                yield non_fatal_error(sub_exc)
             else:
                 code_sample = state.get_code_sample_for(sub_exc)
                 if code_sample is not None:
@@ -412,6 +411,10 @@ def cached_test_func(f: Callable) -> Callable:
         except (KeyboardInterrupt, Failure):
             raise
         except Exception as exc:
+            if isinstance(exc, MalformedMediaType) and case.media_type is not None:
+                exc = InvalidSchema.from_malformed_media_type(
+                    exc, case.media_type, path=case.operation.path, method=case.operation.method
+                )
             if isinstance(
                 exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
             ) and is_unrecoverable_network_error(exc):

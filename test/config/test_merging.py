@@ -40,7 +40,7 @@ from schemathesis.config import (
             ],
             ChecksConfig(not_a_server_error=NotAServerErrorConfig(enabled=False, expected_statuses=[200, 201])),
         ),
-        # Multi-level configuration hierarchy (override → project → defaults)
+        # Multi-level configuration hierarchy (override -> project -> defaults)
         (
             [
                 # Override

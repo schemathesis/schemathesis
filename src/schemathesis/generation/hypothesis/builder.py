@@ -759,8 +759,10 @@ def _iter_coverage_cases(
                     schema["examples"] = examples
             try:
                 media_type = media_types.parse(body.media_type)
-            except MalformedMediaType:
-                media_type = None
+            except MalformedMediaType as exc:
+                raise InvalidSchema.from_malformed_media_type(
+                    exc, body.media_type, path=operation.path, method=operation.method
+                ) from exc
             gen = coverage.cover_schema_iter(
                 coverage.CoverageContext(
                     root_schema=schema,
