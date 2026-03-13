@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from schemathesis.core import Specification
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.resources import ExtraDataSource
+    from schemathesis.specs.openapi.stateful.pruning import PruningState
 
 
 @lru_cache
@@ -434,7 +435,7 @@ class BaseSchema(Mapping):
     ) -> SearchStrategy:
         raise NotImplementedError
 
-    def as_state_machine(self) -> type[APIStateMachine]:
+    def as_state_machine(self, pruning: PruningState | None = None) -> type[APIStateMachine]:
         """Create a state machine class for stateful testing of linked API operations.
 
         Returns:

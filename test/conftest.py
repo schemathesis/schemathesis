@@ -343,25 +343,18 @@ class CliSnapshotConfig:
         if not self.replace:
             return data
         if self.replace_test_cases:
-            data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated, N skipped", data)
-            # Cases with failures and skips
+            # All-skipped case
+            data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated", data)
+            # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
             data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures, (\d+) skipped",
-                "Test cases:\n  N generated, N found N unique failures, N skipped",
-                data,
-            )
-            # Cases with passed and skips
-            data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) passed, (\d+) skipped",
-                "Test cases:\n  N generated, N passed, N skipped",
-                data,
-            )
-            # Only passed cases
-            data = re.sub(r"Test cases:\n  (\d+) generated, (\d+) passed", "Test cases:\n  N generated, N passed", data)
-            # Cases with failures but no skips
-            data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures",
+                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ skipped)?",
                 "Test cases:\n  N generated, N found N unique failures",
+                data,
+            )
+            # Cases with passed (skip count optional)
+            data = re.sub(
+                r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ skipped)?",
+                "Test cases:\n  N generated, N passed",
                 data,
             )
         if self.replace_server_host:
