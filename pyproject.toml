@@ -98,6 +98,7 @@ truncation_limit_chars = 0
 testpaths = "tests"
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 filterwarnings = [
+    "error::pytest.PytestUnraisableExceptionWarning",
     # anyio streams not closed during aiohttp test server teardown (flaky on Python 3.13+)
     "ignore:Unclosed <MemoryObject.*:ResourceWarning",
     "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
