@@ -72,9 +72,13 @@ def response_size(ctx: schemathesis.MetricContext) -> float:
     return float(len(ctx.response.content))
 ```
 
+Schemathesis loads the module via `SCHEMATHESIS_HOOKS` at startup. The `@schemathesis.metric` decorator registers the function when the module is imported.
+
 After defining and registering your metric, invoke Schemathesis with:
 
-```bash
-export SCHEMATHESIS_METRICS=metrics
+```console
+export SCHEMATHESIS_HOOKS=metrics
 st run openapi.yaml --generation-maximize response_size
 ```
+
+In pytest, place the metric in `conftest.py` — Schemathesis loads it automatically, no environment variable needed.

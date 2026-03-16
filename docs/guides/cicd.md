@@ -55,6 +55,8 @@ jobs:
         run: docker compose down
 ```
 
+The JUnit report is written to `schemathesis-report/junit-<timestamp>.xml` by default. The `upload-artifact` step above uploads the entire `schemathesis-report/` directory, which captures this file regardless of the timestamp in its name.
+
 ## GitLab CI
 
 Use the official Docker image for consistent environments.
@@ -76,14 +78,14 @@ api-tests:
     API_TOKEN: "your-secret-token"
   script:
     - >
-      schemathesis run http://api:8080/openapi.json 
+      schemathesis run http://api:8080/openapi.json
       --header "Authorization: Bearer $API_TOKEN"
       --wait-for-schema 60
       --report junit
   artifacts:
     when: always
     reports:
-      junit: schemathesis-report/junit.xml
+      junit: schemathesis-report/junit-*.xml
     paths:
       - schemathesis-report/
 ```
@@ -109,5 +111,11 @@ Then run with just:
 ```bash
 schemathesis run http://localhost:8080/openapi.json
 ```
+
+| Exit code | Meaning |
+|-----------|---------|
+| `0` | All checks passed |
+| `1` | At least one check failed or bug reported |
+| `2` | Run aborted due to config or schema error |
 
 See the [CLI reference](../reference/cli.md#exit-codes) for the complete list of exit codes.

@@ -236,6 +236,39 @@ class AdminAuth:
 
 **Available filters:** `path`, `method`, `name`, `tag`, `operation_id` (add `_regex` for regex matching)
 
+## Applying Different Auth to Different Operations
+
+When different operations require different credentials, use multiple `[[operations]]` blocks in `schemathesis.toml`:
+
+```toml
+# schemathesis.toml
+
+# Default: API key for most operations
+headers = { X-API-Key = "${API_KEY}" }
+
+# Admin token for the user management endpoint
+[[operations]]
+include-name = "POST /admin/users"
+headers = { Authorization = "Bearer ${ADMIN_TOKEN}" }
+
+# Override API key for item listing
+[[operations]]
+include-name = "GET /items"
+headers = { X-API-Key = "${ITEMS_API_KEY}" }
+```
+
+```bash
+export API_KEY="default-api-key"
+export ADMIN_TOKEN="admin-secret-token"
+export ITEMS_API_KEY="items-api-key"
+schemathesis run http://localhost:8000/openapi.json
+```
+
+Headers from a matching `[[operations]]` block are merged with the global `headers`. Matching keys override the global value, and any keys not mentioned in the operation block are still inherited.
+
+!!! note
+    `auth.openapi.*` schemes are only supported at the global level, not inside `[[operations]]`. Use `headers` for per-operation credential overrides.
+
 ## Advanced: Third-Party Authentication
 
 For specialized authentication protocols not covered by custom auth classes, use third-party `requests.auth` implementations:
@@ -331,6 +364,19 @@ def test_with_session(case):
 
 !!! tip ""
     Custom auth classes support the same advanced features as CLI (refresh intervals, cache keys, selective application) with identical syntax.
+
+## Verifying That Auth Is Applied
+
+By default, Schemathesis sanitizes sensitive values in test output and reproduction commands. To see the actual `Authorization` or `X-API-Key` headers in output, disable sanitization:
+
+```bash
+schemathesis run http://localhost:8000/openapi.json \
+  --header "Authorization: Bearer your-token" \
+  --output-sanitize false
+```
+
+!!! note
+    If you see the `Authorization` header missing or modified on some requests, this is intentional. Schemathesis removes or alters auth on certain security-testing operations to check whether your API correctly rejects unauthenticated requests. See [Why is Schemathesis skipping my Authorization header?](../faq.md#why-is-schemathesis-skipping-my-authorization-header) in the FAQ.
 
 ## What's Next
 

@@ -144,15 +144,6 @@ paths:
 
 Here the single capturing group extracts the identifier from `/orders/42` and passes it to the `getOrder` call.
 
-### Checklist when links do not work
-
-If `schemathesis run` still reports `Missing Open API links`:
-
-1. Review the stateful phase summary (`API Links: ...`) to see how many links were discovered or filtered out.
-2. Fix any extraction errors Schemathesis reports (invalid expressions, missing parameters) and rerun.
-3. Confirm the producer response contains the referenced field or header—for regex extraction, test the pattern manually.
-4. Check endpoint filters (`--include-*`, `--exclude-*`) so both producer and consumer operations stay in scope.
-
 ## Per-Run Setup with pytest Fixtures
 
 For expensive setup that should happen once per test execution (database creation, external services), extend the test class:
@@ -301,3 +292,13 @@ Stateful testing is enabled by default - `schemathesis run http://localhost:8000
 If no links are available, Schemathesis skips the stateful phase in a default run. When you run only the stateful phase (`--phases=stateful`) and no links exist, it reports `Missing Open API links`. Provide the necessary links or disable the phase explicitly.
 
 Disabling earlier phases via `--phases` keeps dependency analysis active, but Schemathesis cannot learn additional links from observed `Location` headers. Manual links remain fully supported either way.
+
+## Troubleshooting
+
+If `schemathesis run` still reports `Missing Open API links`:
+
+1. Review the stateful phase summary (`API Links: ...`) to see how many links were discovered or filtered out.
+2. Fix any extraction errors Schemathesis reports (invalid expressions, missing parameters) and rerun.
+3. Confirm the producer response contains the referenced field or header—for regex extraction, test the pattern manually.
+4. Check endpoint filters (`--include-*`, `--exclude-*`) so both producer and consumer operations stay in scope.
+5. Check which discovery path should apply: explicit OpenAPI links must be defined under the response status code your API actually returns; automatic dependency analysis can infer links from response schemas and downstream operation inputs without any `Location` header; runtime `Location`-header inference is an additional CLI-only source of links.

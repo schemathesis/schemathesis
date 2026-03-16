@@ -18,6 +18,8 @@ Test a sample API using [uv](https://docs.astral.sh/uv/){target=_blank}:
 uvx schemathesis run https://example.schemathesis.io/openapi.json
 ```
 
+`uvx` is from the uv package manager and runs Schemathesis in an isolated environment without a permanent install. Replace `uvx schemathesis` with `schemathesis` or `st` if you have it installed directly.
+
 Example output:
 
 ```
@@ -43,6 +45,8 @@ Reproduce with:
     uvx schemathesis run https://your-api.com/openapi.json \
       --header 'Authorization: Bearer your-token'
     ```
+
+    For token refresh, per-operation auth, or dynamic credentials, see [Authentication](guides/auth.md).
 
 === "Local development"
     ```bash
