@@ -73,6 +73,8 @@ def filter_query(ctx, query):
     return query and query.get("user_id") != "admin"
 ```
 
+When multiple hooks of the same type are registered, they run in the order they were registered. For `filter_*` hooks, the case is discarded if any hook returns `False` — later hooks are not called. For `map_*` hooks, each receives the output of the previous.
+
 ### Using real database values
 
 **Problem:** Your API validates IDs against a database, but Schemathesis generates random values that don't exist.

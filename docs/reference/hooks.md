@@ -77,4 +77,8 @@ Apply hooks selectively using filters.
 | `operation_id_regex` | `str` | `"(get|list)_user"` | operationId pattern match |
 
 !!! note
-    Filters are not available for `before_process_path`, `before_load_schema`, and `after_load_schema` hooks. 
+    Filters are not available for `before_process_path`, `before_load_schema`, and `after_load_schema` hooks.
+
+## Execution Order
+
+When multiple hooks of the same type are registered, they execute in registration order. For `filter_*` hooks, the case is discarded as soon as any hook returns `False` — subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.
