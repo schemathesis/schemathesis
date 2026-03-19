@@ -86,7 +86,7 @@ def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
             return decorator
 
         hook.filter_set = filter_set  # type: ignore[attr-defined]
-        init_filter_set(register)
+        filter_set = init_filter_set(register)
         return dispatcher.register_hook_with_name(hook, hook.__name__)
 
     def init_filter_set(target: Callable) -> FilterSet:
