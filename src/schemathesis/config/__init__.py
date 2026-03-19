@@ -7,7 +7,12 @@ from os import PathLike
 from pathlib import Path
 from random import Random
 
-from schemathesis.config._auth import ApiKeyAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
+from schemathesis.config._auth import (
+    ApiKeyAuthConfig,
+    DynamicTokenAuthConfig,
+    HttpBasicAuthConfig,
+    HttpBearerAuthConfig,
+)
 from schemathesis.config._checks import (
     CheckConfig,
     ChecksConfig,
@@ -70,6 +75,7 @@ __all__ = [
     "SchemathesisWarning",
     "WarningsConfig",
     "ApiKeyAuthConfig",
+    "DynamicTokenAuthConfig",
     "HttpBasicAuthConfig",
     "HttpBearerAuthConfig",
 ]

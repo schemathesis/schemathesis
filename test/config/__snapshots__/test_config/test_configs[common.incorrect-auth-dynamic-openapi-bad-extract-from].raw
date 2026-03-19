@@ -1,0 +1,6 @@
+Error in [auth.dynamic.openapi.ApiKey] section:
+  Invalid value:
+
+  - 'extract_from' -> 'cookie' is not a valid value.
+
+Valid values are: 'body', 'header'.

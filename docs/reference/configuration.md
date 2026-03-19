@@ -683,6 +683,62 @@ These settings can only be applied at the project level.
     !!! note
         CLI flags (`--auth`, `--header`) always take precedence over OpenAPI config. You cannot mix `[auth.basic]` and `[auth.openapi.*]` in the same config file.
 
+#### `auth.dynamic.openapi.<scheme>`
+
+!!! note ""
+
+    **Type:** `Object`
+    **Default:** `null`
+
+    Fetches an authentication token from an endpoint at test time and applies it to requests matching `<scheme>`. The `<scheme>` name must match a `securityScheme` from your OpenAPI spec. Schemathesis reads the parameter name and location from the schema's security definition. The token is cached for the test run.
+
+    **HTTP Bearer — token from response body:**
+
+    ```toml
+    [auth.dynamic.openapi.BearerAuth]
+    path = "/auth/token"
+    extract_selector = "/access_token"
+    ```
+
+    **HTTP Bearer — with credentials in the request payload:**
+
+    ```toml
+    [auth.dynamic.openapi.BearerAuth]
+    path = "/auth/token"
+    payload = { username = "${USERNAME}", password = "${PASSWORD}" }
+    extract_selector = "/access_token"
+    ```
+
+    **HTTP Bearer — token from a response header:**
+
+    ```toml
+    [auth.dynamic.openapi.BearerAuth]
+    path = "/auth/token"
+    extract_from = "header"
+    extract_selector = "X-Auth-Token"
+    ```
+
+    **API Key:**
+
+    ```toml
+    [auth.dynamic.openapi.ApiKeyAuth]
+    path = "/auth/token"
+    extract_selector = "/access_token"
+    ```
+
+    | Field | Default | Description |
+    |-------|---------|-------------|
+    | `path` | required | Path on the API host, must start with `/` |
+    | `method` | `"post"` | HTTP method for the token fetch request |
+    | `payload` | `{}` | JSON body sent with the fetch request; supports `${ENV_VAR}` substitution |
+    | `extract_from` | `"body"` | Source of the token: `"body"` or `"header"` |
+    | `extract_selector` | required | [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) when `extract_from = "body"`, or header name when `extract_from = "header"` |
+
+    Supported for `http/bearer` and `apiKey` scheme types in OpenAPI 2.0 and 3.x.
+
+    !!! note
+        `auth.dynamic.openapi.*` and `auth.openapi.*` schemes cannot share the same name in the same config.
+
 ### Checks
 
 #### `checks.enabled`

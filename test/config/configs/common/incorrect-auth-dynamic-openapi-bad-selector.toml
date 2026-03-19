@@ -1,0 +1,5 @@
+# extract_selector for body extraction must be a JSON Pointer (start with /)
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_from = "body"
+extract_selector = "access_token"

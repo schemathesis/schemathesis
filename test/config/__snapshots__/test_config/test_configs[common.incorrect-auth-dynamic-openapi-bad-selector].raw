@@ -1,0 +1,1 @@
+Dynamic auth `extract_selector` must start with '/' when extract_from='body': 'access_token'

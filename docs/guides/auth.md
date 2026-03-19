@@ -77,11 +77,54 @@ Each config block name must match a `securityScheme` name from your OpenAPI spec
 
 1. **Programmatic auth** - Explicit `@schemathesis.auth()` decorators
 2. **CLI flags** - `--auth` and `--header` (always override config)
-3. **OpenAPI-aware config** - `[auth.openapi.*]` (targets specific security schemes)
+3. **OpenAPI-aware config** - `[auth.openapi.*]` and `[auth.dynamic.openapi.*]` (target specific security schemes)
 4. **Global auth** - Fallback authentication
 
 !!! note
     You cannot mix `[auth.basic]` and `[auth.openapi.*]` in the same config file. Choose one authentication strategy.
+
+## Declarative Dynamic Authentication
+
+Declare the token fetch endpoint in `schemathesis.toml` and Schemathesis handles the rest. For a `BearerAuth` scheme in your OpenAPI spec and a `/auth/token` endpoint returning `{"access_token": "..."}`:
+
+```toml
+# schemathesis.toml
+[auth.dynamic.openapi.BearerAuth]
+path = "/auth/token"
+extract_selector = "/access_token"
+```
+
+Schemathesis POSTs to `/auth/token`, extracts the token using a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901), and applies it to every request requiring `BearerAuth`. The token is cached for the test run.
+
+To send credentials with the request:
+
+```toml
+[auth.dynamic.openapi.BearerAuth]
+path = "/auth/token"
+payload = { username = "${USERNAME}", password = "${PASSWORD}" }
+extract_selector = "/access_token"
+```
+
+If the token is in a response header instead of the body:
+
+```toml
+[auth.dynamic.openapi.BearerAuth]
+path = "/auth/token"
+extract_from = "header"
+extract_selector = "X-Auth-Token"
+```
+
+Works the same way for `apiKey` schemes — Schemathesis reads the parameter name and location from the schema's `securitySchemes`.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `path` | required | Path on the API host (must start with `/`) |
+| `method` | `"post"` | HTTP method for the fetch request |
+| `payload` | `{}` | JSON body sent with the fetch request; supports `${ENV_VAR}` substitution |
+| `extract_from` | `"body"` | Where to find the token: `"body"` or `"header"` |
+| `extract_selector` | required | JSON Pointer (body) or header name |
+
+For token refresh or scope-based caching, use a [Python auth class](#dynamic-token-authentication) instead.
 
 ## Dynamic Token Authentication
 

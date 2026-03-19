@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(dynamic=OpenAPIDynamicAuthConfig(schemes={'ApiKey': DynamicTokenAuthConfig(path='/api/token', method='get', extract_from='header', extract_selector='X-Auth-Token')})))))

@@ -1,0 +1,4 @@
+# Valid dynamic bearer auth
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"

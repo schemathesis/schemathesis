@@ -4,10 +4,16 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import ApiKeyAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
+from schemathesis.config import ApiKeyAuthConfig, DynamicTokenAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
+from schemathesis.config._error import ConfigError
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
-from schemathesis.specs.openapi.auths import ApiKeyAuthProvider, HttpBasicAuthProvider, HttpBearerAuthProvider
+from schemathesis.specs.openapi.auths import (
+    ApiKeyAuthProvider,
+    DynamicTokenAuthProvider,
+    HttpBasicAuthProvider,
+    HttpBearerAuthProvider,
+)
 
 if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthProvider
@@ -67,7 +73,9 @@ class OpenApiSecurity:
         return self._resolved_definitions
 
     def auth_provider_for(
-        self, scheme: str, config: ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig
+        self,
+        scheme: str,
+        config: ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig | DynamicTokenAuthConfig,
     ) -> AuthProvider:
         """Get or build an auth provider for the given scheme (cached per scheme).
 
@@ -85,7 +93,9 @@ class OpenApiSecurity:
         self,
         case: Case,
         context: AuthContext,
-        configured_schemes: Mapping[str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig],
+        configured_schemes: Mapping[
+            str, ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig | DynamicTokenAuthConfig
+        ],
     ) -> bool:
         """Apply OpenAPI-aware authentication to a test case.
 
@@ -285,7 +295,7 @@ def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: RefReso
 
 
 def build_auth_provider(
-    config: ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig,
+    config: ApiKeyAuthConfig | HttpBasicAuthConfig | HttpBearerAuthConfig | DynamicTokenAuthConfig,
     scheme: Mapping[str, Any],
 ) -> AuthProvider:
     """Build an auth provider from config and OpenAPI scheme definition.
@@ -308,6 +318,35 @@ def build_auth_provider(
 
     elif isinstance(config, HttpBearerAuthConfig):
         return HttpBearerAuthProvider(bearer=config.bearer)
+
+    elif isinstance(config, DynamicTokenAuthConfig):
+        scheme_type = scheme.get("type")
+        applier: HttpBearerAuthProvider | ApiKeyAuthProvider
+        if scheme_type == "http":
+            if scheme.get("scheme", "").lower() == "bearer":
+                applier = HttpBearerAuthProvider(bearer="")
+            else:
+                raise ConfigError(
+                    f"Dynamic token fetch is not supported for http/{scheme.get('scheme')} schemes. "
+                    "Use bearer or apiKey schemes, or the programmatic AuthProvider API."
+                )
+        elif scheme_type == "apiKey":
+            applier = ApiKeyAuthProvider(value="", name=scheme["name"], location=scheme["in"])
+        else:
+            raise ConfigError(f"Dynamic token fetch is not supported for scheme type {scheme_type!r}.")
+        # Deferred to avoid circular import: schemathesis.auths imports from openapi internals
+        from schemathesis.auths import CachingAuthProvider
+
+        return CachingAuthProvider(
+            DynamicTokenAuthProvider(
+                path=config.path,
+                method=config.method,
+                payload=config.payload,
+                extract_from=config.extract_from,
+                extract_selector=config.extract_selector,
+                _applier=applier,
+            )
+        )
 
     # Should never reach here due to JSON Schema validation
     raise TypeError(f"Unknown auth config type: {type(config)}")  # pragma: no cover

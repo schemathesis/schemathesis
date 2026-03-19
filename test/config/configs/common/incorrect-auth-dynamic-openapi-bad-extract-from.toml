@@ -1,0 +1,5 @@
+# extract_from must be "body" or "header"
+[auth.dynamic.openapi.ApiKey]
+path = "/api/auth"
+extract_from = "cookie"
+extract_selector = "token"

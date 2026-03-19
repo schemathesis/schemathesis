@@ -4,6 +4,10 @@
 
 ## [4.12.2](https://github.com/schemathesis/schemathesis/compare/v4.12.1...v4.12.2) - 2026-03-19
 
+### :rocket: Added
+
+- `[auth.dynamic.openapi.<scheme>]` config block for token fetch authentication — declare a fetch endpoint, extraction path, and optional payload in `schemathesis.toml` without writing Python code. Supports `http/bearer` and `apiKey` schemes. [#3620](https://github.com/schemathesis/schemathesis/issues/3620)
+
 ### :bug: Fixed
 
 - False positive `positive_data_acceptance` in the coverage phase for path parameters with `minLength` greater than 1.

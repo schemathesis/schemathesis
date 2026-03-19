@@ -193,6 +193,17 @@
             ]
           },
           "minProperties": 1
+        },
+        "dynamic": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "openapi": {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/DynamicTokenAuthConfig" },
+              "minProperties": 1
+            }
+          }
         }
       }
     },
@@ -263,6 +274,19 @@
           "type": "string",
           "description": "Bearer token (supports ${VAR} environment variable interpolation)"
         }
+      }
+    },
+    "DynamicTokenAuthConfig": {
+      "type": "object",
+      "description": "Dynamic token fetch authentication configuration",
+      "additionalProperties": false,
+      "required": ["path", "extract_selector"],
+      "properties": {
+        "path":             { "type": "string" },
+        "method":           { "type": "string", "pattern": "(?i)(?:GET|POST|PUT|PATCH|DELETE)", "default": "post" },
+        "payload":          { "type": "object", "additionalProperties": { "type": "string" } },
+        "extract_from":     { "type": "string", "enum": ["body", "header"], "default": "body" },
+        "extract_selector": { "type": "string" }
       }
     },
     "ChecksConfig": {

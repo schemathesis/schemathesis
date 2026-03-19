@@ -1,0 +1,7 @@
+# basic auth and dynamic openapi auth are mutually exclusive
+[auth]
+basic = { username = "user", password = "pass" }
+
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"

@@ -1,0 +1,4 @@
+# path must start with /
+[auth.dynamic.openapi.BearerAuth]
+path = "api/auth"
+extract_selector = "/access_token"
