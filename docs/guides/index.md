@@ -9,7 +9,7 @@ Work through a large number of failures systematically — from easy batch fixes
 Configure Schemathesis for thorough testing when preparing for production releases or conducting security assessments.
 
 ### [Authentication](auth.md)
-Set up authentication for APIs that require credentials. Covers static tokens, dynamic JWT refresh, and endpoint-specific auth strategies.
+Set up authentication for APIs that require credentials. Covers static tokens, config-based token fetch, dynamic refresh, and endpoint-specific auth strategies.
 
 ### [Adding Schema Validation to Existing Tests](schema-conformance.md)
 Validate API responses against your schema in existing test suites without using Schemathesis for data generation.

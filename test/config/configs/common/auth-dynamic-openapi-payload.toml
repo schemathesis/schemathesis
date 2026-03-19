@@ -1,0 +1,5 @@
+# Valid dynamic auth with env-var payload
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+payload = { username = "${TEST_STRING_1}", password = "${TEST_STRING_2}" }
+extract_selector = "/access_token"

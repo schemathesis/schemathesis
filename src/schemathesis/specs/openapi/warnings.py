@@ -111,7 +111,7 @@ def detect_unused_openapi_auth(schema: OpenApiSchema) -> list[UnusedOpenAPIAuthW
     """Detect configured OpenAPI auth schemes that don't exist in the schema."""
     warnings: list[UnusedOpenAPIAuthWarning] = []
 
-    configured_schemes = schema.config.auth.openapi.schemes
+    configured_schemes = schema.config.auth.all_openapi_schemes
     if not configured_schemes:
         return warnings
 

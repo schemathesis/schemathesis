@@ -114,10 +114,10 @@ class OpenApiSchema(BaseSchema):
 
         Returns True if authentication was applied, False otherwise.
         """
-        configured_schemes = self.config.auth.openapi.schemes
-        if not configured_schemes:
+        all_schemes = self.config.auth.all_openapi_schemes
+        if not all_schemes:
             return False
-        return self.security.apply_auth(case, context, configured_schemes)
+        return self.security.apply_auth(case, context, all_schemes)
 
     def create_extra_data_source(self) -> ExtraDataSource | None:
         """Create an extra data source for augmenting test generation with real data.

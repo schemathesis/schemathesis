@@ -1,0 +1,7 @@
+# Same scheme name in both static and dynamic auth
+[auth.openapi.BearerAuth]
+bearer = "static-token"
+
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"

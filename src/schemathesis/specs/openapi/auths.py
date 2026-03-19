@@ -5,6 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import requests
+
+from schemathesis.core.errors import AuthenticationError
+from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
+from schemathesis.schemas import get_full_path
+
 if TYPE_CHECKING:
     from schemathesis.auths import AuthContext
     from schemathesis.generation.case import Case
@@ -80,3 +86,76 @@ class HttpBearerAuthProvider:
     def set(self, case: Case, data: str, __: AuthContext) -> None:
         """Apply bearer token to Authorization header."""
         case.headers["Authorization"] = f"Bearer {data}"
+
+
+@dataclass
+class DynamicTokenAuthProvider:
+    """Auth provider that fetches a token from an endpoint at test time."""
+
+    path: str
+    method: str
+    payload: dict[str, str] | None
+    extract_from: str
+    extract_selector: str
+    _applier: HttpBearerAuthProvider | ApiKeyAuthProvider
+
+    __slots__ = ("path", "method", "payload", "extract_from", "extract_selector", "_applier")
+
+    def get(self, case: Case, ctx: AuthContext) -> str:
+        url = get_full_path(ctx.operation.schema.get_base_url() + "/", self.path)
+        try:
+            response = requests.request(
+                self.method,
+                url,
+                json=self.payload,
+                timeout=10,
+            )
+        except requests.exceptions.RequestException as exc:
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"Connection to auth endpoint failed: {exc}",
+            ) from exc
+        try:
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as exc:
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"Auth endpoint returned {response.status_code}: {response.text!r}",
+            ) from exc
+        if self.extract_from == "body":
+            try:
+                body = response.json()
+            except ValueError as exc:
+                raise AuthenticationError(
+                    "DynamicTokenAuthProvider",
+                    "get",
+                    f"Auth endpoint returned non-JSON body: {response.text!r}",
+                ) from exc
+            raw = resolve_pointer(body, self.extract_selector)
+            if raw is UNRESOLVABLE:
+                raise AuthenticationError(
+                    "DynamicTokenAuthProvider",
+                    "get",
+                    f"JSON Pointer {self.extract_selector!r} not found in auth response body: {body!r}",
+                )
+            if not isinstance(raw, str):
+                raise AuthenticationError(
+                    "DynamicTokenAuthProvider",
+                    "get",
+                    f"Expected a string at {self.extract_selector!r}, got {type(raw).__name__}: {raw!r}",
+                )
+            return raw
+        result = response.headers.get(self.extract_selector)
+        if result is None:
+            present = list(response.headers.keys())
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"Header {self.extract_selector!r} not found in auth response. Present headers: {present!r}",
+            )
+        return result
+
+    def set(self, case: Case, data: str, ctx: AuthContext) -> None:
+        self._applier.set(case, data, ctx)
