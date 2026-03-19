@@ -102,6 +102,9 @@ filterwarnings = [
     # anyio streams not closed during aiohttp test server teardown (flaky on Python 3.13+)
     "ignore:Unclosed <MemoryObject.*:ResourceWarning",
     "ignore:.*Unclosed <MemoryObject.*:pytest.PytestUnraisableExceptionWarning",
+    # urllib3/http.client response finalizer raises ValueError on Python 3.14t free-threading GC
+    "ignore:Exception ignored while finalizing file <urllib3.response.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored while finalizing file <http.client.HTTPResponse.*:pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.coverage.run]
