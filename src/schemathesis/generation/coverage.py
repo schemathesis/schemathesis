@@ -1118,7 +1118,8 @@ def _ensure_valid_path_parameter_schema(schema: JsonSchemaObject) -> JsonSchemaO
     # The implementation below sneaks into `not` to avoid clashing with existing `pattern` keyword
     not_ = _get_not_schema(schema)
     not_["pattern"] = r"[/{}]"
-    return {**schema, "minLength": 1, "not": not_}
+    min_length = max(schema.get("minLength", 0), 1)
+    return {**schema, "minLength": min_length, "not": not_}
 
 
 def _ensure_valid_headers_schema(schema: JsonSchemaObject) -> JsonSchemaObject:
