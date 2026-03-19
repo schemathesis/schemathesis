@@ -4,6 +4,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.generation import GenerationMode
+from schemathesis.hooks import HookContext, _should_skip_hook
 from schemathesis.specs.openapi.negative import GeneratedValue
 
 
@@ -181,3 +182,73 @@ def test_filter_body_works_in_negative_mode(ctx):
         assert not isinstance(case.body, bytes)
 
     inner()
+
+
+def _build_operation(ctx, operation_id, path):
+    op = {"operationId": operation_id, "responses": {"200": {"description": "OK"}}}
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema({path: {"post": op}}))
+    return schema[path]["POST"]
+
+
+# Each hook registered with a different apply_to filter must receive its own filter_set
+def test_multiple_apply_to_have_distinct_filters(ctx):
+    with ctx.restore_hooks():
+
+        @schemathesis.hook.apply_to(operation_id="operationA")
+        def before_call(context, case, **kwargs):
+            pass
+
+        hook_a = before_call
+
+        @schemathesis.hook.apply_to(operation_id="operationB")
+        def before_call(context, case, **kwargs):  # noqa: F811
+            pass
+
+        hook_b = before_call
+
+        assert hook_a.filter_set is not hook_b.filter_set
+
+        ctx_a = HookContext(operation=_build_operation(ctx, "operationA", "/a"))
+        ctx_b = HookContext(operation=_build_operation(ctx, "operationB", "/b"))
+        ctx_other = HookContext(operation=_build_operation(ctx, "operationC", "/c"))
+
+        # hook_a should run for operationA only
+        assert not _should_skip_hook(hook_a, ctx_a)
+        assert _should_skip_hook(hook_a, ctx_b)
+        assert _should_skip_hook(hook_a, ctx_other)
+
+        # hook_b should run for operationB only
+        assert _should_skip_hook(hook_b, ctx_a)
+        assert not _should_skip_hook(hook_b, ctx_b)
+        assert _should_skip_hook(hook_b, ctx_other)
+
+
+# Mixing apply_to and skip_for across multiple hooks must keep filters independent
+def test_multiple_apply_to_with_skip_for(ctx):
+    with ctx.restore_hooks():
+
+        @schemathesis.hook.apply_to(operation_id="opInclude")
+        def before_call(context, case, **kwargs):
+            pass
+
+        hook_include = before_call
+
+        @schemathesis.hook.skip_for(operation_id="opExclude")
+        def before_call(context, case, **kwargs):  # noqa: F811
+            pass
+
+        hook_exclude = before_call
+
+        ctx_include = HookContext(operation=_build_operation(ctx, "opInclude", "/include"))
+        ctx_exclude = HookContext(operation=_build_operation(ctx, "opExclude", "/exclude"))
+        ctx_other = HookContext(operation=_build_operation(ctx, "opOther", "/other"))
+
+        # hook_include: runs only for opInclude
+        assert not _should_skip_hook(hook_include, ctx_include)
+        assert _should_skip_hook(hook_include, ctx_exclude)
+        assert _should_skip_hook(hook_include, ctx_other)
+
+        # hook_exclude: runs for everything EXCEPT opExclude
+        assert not _should_skip_hook(hook_exclude, ctx_include)
+        assert _should_skip_hook(hook_exclude, ctx_exclude)
+        assert not _should_skip_hook(hook_exclude, ctx_other)
