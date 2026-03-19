@@ -4,7 +4,7 @@
 
 ### :bug: Fixed
 
-- False positive `positive_data_acceptance` in the coverage phase for path parameters with `minLength` greater than 1 — `_ensure_valid_path_parameter_schema` unconditionally set `minLength` to 1, overwriting stricter schema constraints.
+- False positive `positive_data_acceptance` in the coverage phase for path parameters with `minLength` greater than 1.
 
 ## [4.12.1](https://github.com/schemathesis/schemathesis/compare/v4.12.0...v4.12.1) - 2026-03-14
 
