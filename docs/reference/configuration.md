@@ -687,12 +687,12 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `Object`
-    **Default:** `null`
+    **Type:** `Object`  
+    **Default:** `null`  
 
     Fetches an authentication token from an endpoint at test time and applies it to requests matching `<scheme>`. The `<scheme>` name must match a `securityScheme` from your OpenAPI spec. Schemathesis reads the parameter name and location from the schema's security definition. The token is cached for the test run.
 
-    **HTTP Bearer — token from response body:**
+    **HTTP Bearer - token from response body:**
 
     ```toml
     [auth.dynamic.openapi.BearerAuth]
@@ -700,7 +700,7 @@ These settings can only be applied at the project level.
     extract_selector = "/access_token"
     ```
 
-    **HTTP Bearer — with credentials in the request payload:**
+    **HTTP Bearer - with credentials in the request payload:**
 
     ```toml
     [auth.dynamic.openapi.BearerAuth]
@@ -709,7 +709,7 @@ These settings can only be applied at the project level.
     extract_selector = "/access_token"
     ```
 
-    **HTTP Bearer — token from a response header:**
+    **HTTP Bearer - token from a response header:**
 
     ```toml
     [auth.dynamic.openapi.BearerAuth]

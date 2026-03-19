@@ -2,15 +2,15 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.12.2...HEAD) - TBD
 
+### :rocket: Added
+
+- `[auth.dynamic.openapi.<scheme>]` config block for token fetch authentication that allows for dynamic authentication without writing Python code. [#3620](https://github.com/schemathesis/schemathesis/issues/3620)
+
 ### :bug: Fixed
 
 - `apply_to` / `skip_for` filter sets not updated between hook registrations, causing hooks registered after the first to silently receive the wrong filter set.
 
 ## [4.12.2](https://github.com/schemathesis/schemathesis/compare/v4.12.1...v4.12.2) - 2026-03-19
-
-### :rocket: Added
-
-- `[auth.dynamic.openapi.<scheme>]` config block for token fetch authentication — declare a fetch endpoint, extraction path, and optional payload in `schemathesis.toml` without writing Python code. Supports `http/bearer` and `apiKey` schemes. [#3620](https://github.com/schemathesis/schemathesis/issues/3620)
 
 ### :bug: Fixed
 
