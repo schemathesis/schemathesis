@@ -1379,6 +1379,31 @@ def test_path_parameter_as_string_non_empty(ctx):
     )
 
 
+def test_path_parameter_preserves_min_length(ctx):
+    schema = build_schema(
+        ctx,
+        [
+            {
+                "name": "uid",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string", "minLength": 5, "maxLength": 64, "pattern": "^[0-9.]*$"},
+            },
+        ],
+        path="/foo/{uid}",
+    )
+    assert_positive_coverage(
+        schema,
+        [
+            {"path_parameters": {"uid": "0" * 63}},
+            {"path_parameters": {"uid": "0" * 64}},
+            {"path_parameters": {"uid": "0" * 6}},
+            {"path_parameters": {"uid": "0" * 5}},
+        ],
+        path=("/foo/{uid}", "post"),
+    )
+
+
 def test_incorrect_headers_with_loose_schema(ctx):
     schema = build_schema(
         ctx,
