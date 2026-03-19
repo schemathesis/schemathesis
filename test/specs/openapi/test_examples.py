@@ -11,16 +11,20 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
+from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
+from schemathesis.resources.repository import ResourceRepository
 from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.examples import (
     BodyExample,
     ParameterExample,
+    _get_pool_combos,
     extract_from_schemas,
     extract_inner_examples,
     extract_top_level,
     find_matching_in_responses,
     produce_combinations,
 )
+from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import assert_requests_call
 
@@ -2578,3 +2582,64 @@ def test_allof_with_nested_refs_to_same_target():
     operation = schema["/test"]["POST"]
     # Should not raise RecursionError
     assert list(extract_from_schemas(operation)) == []
+
+
+def test_get_pool_combos_merges_multiple_locations(ctx):
+    # Pool variants from different locations must be merged into each combo, not interleaved.
+    path_resource = "Item"
+    query_resource = "Tenant"
+    producer_label = "POST /items"
+    consumer_label = "GET /items/{itemId}"
+
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name=path_resource,
+                operation=producer_label,
+                status_code="201",
+                pointer="",
+                cardinality=Cardinality.ONE,
+            ),
+            ResourceDescriptor(
+                resource_name=query_resource,
+                operation=producer_label,
+                status_code="201",
+                pointer="",
+                cardinality=Cardinality.ONE,
+            ),
+        ]
+    )
+    repository.record_response(operation=producer_label, status_code=201, payload={"itemId": "abc", "tenantId": "x"})
+    repository.record_response(operation=producer_label, status_code=201, payload={"itemId": "def", "tenantId": "x"})
+
+    requirements = {
+        (consumer_label, ParameterLocation.PATH, "itemId"): ParameterRequirement(
+            resource_name=path_resource, resource_field="itemId"
+        ),
+        (consumer_label, ParameterLocation.QUERY, "tenantId"): ParameterRequirement(
+            resource_name=query_resource, resource_field="tenantId"
+        ),
+    }
+    extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
+
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}},
+                        {"name": "tenantId", "in": "query", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items/{itemId}"]["GET"]
+
+    assert _get_pool_combos(operation, extra_data_source) == [
+        {"path_parameters": {"itemId": "abc"}, "query": {"tenantId": "x"}},
+        {"path_parameters": {"itemId": "def"}, "query": {"tenantId": "x"}},
+    ]

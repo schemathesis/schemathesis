@@ -326,12 +326,13 @@ def run_test(
     # to understand if some generated data is always rejected
     phases_config = ctx.config.phases_for(operation=operation)
     fuzzing_config = phases_config.fuzzing
-    # Record responses from ALL phases (examples, coverage, fuzzing) when fuzzing uses extra data sources.
-    # This creates a feedback loop: earlier phases discover valid IDs/tokens, fuzzing reuses them to test
-    # dependent operations. For example, POST /users creates user IDs that GET /users/{id} can reference.
-    extra_data_source = (
-        ctx.extra_data_source if fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled else None
+    # Record responses when the pool is active for this run.
+    # Fuzzing uses extra data sources when explicitly configured; examples phase always uses
+    # the pool when the schema has dependency links.
+    should_record = (fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled) or (
+        phases_config.examples.enabled and ctx.extra_data_source is not None
     )
+    extra_data_source = ctx.extra_data_source if should_record else None
     if extra_data_source is not None:
         for case_id, interaction in recorder.interactions.items():
             response = interaction.response

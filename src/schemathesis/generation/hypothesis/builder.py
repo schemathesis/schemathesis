@@ -315,7 +315,11 @@ def generate_example_cases(
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     try:
         result: list[Case] = [
-            examples.generate_one(strategy) for strategy in operation.get_strategies_from_examples(**kwargs)
+            examples.generate_one(strategy)
+            for strategy in operation.get_strategies_from_examples(
+                fill_missing_from_pool=fill_missing,
+                **kwargs,
+            )
         ]
     except (
         InvalidSchema,
