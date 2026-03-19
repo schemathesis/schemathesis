@@ -1,3 +1,17 @@
+import click
+
+
+def test_base_url_not_truncated_on_narrow_terminal(ctx, cli):
+    schema_path = ctx.openapi.write_schema({})
+    long_url = "https://internal.staging.example.com/api/v3/internal/prefix/of/something-very-long"
+    result = cli.run(
+        str(schema_path),
+        f"--url={long_url}",
+        env={"PYTEST_VERSION": None, "COLUMNS": "80"},
+    )
+    assert long_url in "".join(click.unstyle(result.output).split())
+
+
 def test_cli_displays_config_path(ctx, cli, openapi3_base_url, snapshot_cli):
     # Create schema file
     schema_path = ctx.openapi.write_schema(

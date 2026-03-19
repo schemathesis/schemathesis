@@ -775,7 +775,7 @@ class OutputHandler(EventHandler):
             collapse_padding=True,
         )
         table.add_column("Field", style=Style(color="bright_white", bold=True))
-        table.add_column("Value", style="cyan")
+        table.add_column("Value", style="cyan", overflow="fold")
 
         table.add_row("Base URL:", event.base_url)
         table.add_row("Specification:", event.specification.name)

@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - `apply_to` / `skip_for` filter sets not updated between hook registrations, causing hooks registered after the first to silently receive the wrong filter set.
+- Base URL truncated with an ellipsis in the startup summary on narrow terminals (e.g. CI environments). [#3618](https://github.com/schemathesis/schemathesis/issues/3618)
 
 ## [4.12.2](https://github.com/schemathesis/schemathesis/compare/v4.12.1...v4.12.2) - 2026-03-19
 
