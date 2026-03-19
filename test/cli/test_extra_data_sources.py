@@ -443,6 +443,120 @@ def test_extra_data_sources_with_response_examples_prepopulation(
     )
 
 
+_POST_ITEMS_SCHEMA = {
+    "operationId": "createItem",
+    "requestBody": {
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "required": ["name"],
+                },
+                "examples": {"valid": {"value": {"name": "test-item"}}},
+            }
+        },
+        "required": True,
+    },
+    "responses": {
+        "201": {
+            "description": "Created",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                        "required": ["id", "name"],
+                    }
+                }
+            },
+            "links": {
+                "GetItemById": {
+                    "operationId": "getItem",
+                    "parameters": {"id": "$response.body#/id"},
+                }
+            },
+        }
+    },
+}
+
+
+def _run_items_app(ctx, app_runner, get_params):
+    """GET /items/{id} triggers a 500 only when called with a real UUID from POST."""
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {"post": _POST_ITEMS_SCHEMA},
+            "/items/{id}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": get_params,
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    items = {}
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        data = request.get_json() or {}
+        item_id = uuid.uuid4().hex
+        items[item_id] = {"id": item_id, "name": data.get("name", "item")}
+        return jsonify(items[item_id]), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        if item_id not in items:
+            return "", 404
+        abort(500)  # reachable only with a real UUID from POST
+
+    return app_runner.run_flask_app(app)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_examples_phase_merges_pool_with_schema_examples(cli, app_runner, snapshot_cli, ctx):
+    # `filter` has a schema example (keeps the phase active), `id` has none.
+    # Pool supplies the real `id` from POST, exposing the bug.
+    get_params = [
+        {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+        {"name": "filter", "in": "query", "schema": {"type": "string", "example": "active"}},
+    ]
+    port = _run_items_app(ctx, app_runner, get_params)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=examples",
+            "-c not_a_server_error",
+            "--mode=positive",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_examples_phase_uses_pool_as_fill_missing_source(cli, app_runner, snapshot_cli, ctx):
+    # No schema examples - GET would be skipped without fill-missing.
+    # With fill-missing=true, pool supplies the real `id` and exposes the bug.
+    get_params = [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}]
+    port = _run_items_app(ctx, app_runner, get_params)
+
+    config = {"phases": {"examples": {"fill-missing": True}}}
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=examples",
+            "-c not_a_server_error",
+            "--mode=positive",
+            config=config,
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, snapshot_cli, ctx):

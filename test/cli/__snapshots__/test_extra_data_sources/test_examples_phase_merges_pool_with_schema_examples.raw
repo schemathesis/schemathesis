@@ -1,0 +1,61 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Examples (in 0.00s)
+
+     ✅ 1 passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+_______________________________ GET /items/{id} ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>500 Internal Server Error</title>
+    <h1>Internal Server Error</h1>
+    <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ❌ Examples
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Server error: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

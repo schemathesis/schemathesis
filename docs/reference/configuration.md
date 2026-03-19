@@ -531,7 +531,7 @@ These settings can only be applied at the project level.
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enable generation of random examples for API operations that do not have explicit examples.
+    Enable example generation for API operations with no explicit schema examples. When captured response data is available (e.g., an ID returned by `POST /items`), it is used instead of random generation.
 
     ```toml
     [phases.examples]

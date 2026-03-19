@@ -7,6 +7,7 @@ from functools import lru_cache
 from itertools import cycle, islice
 from typing import TYPE_CHECKING, Any, cast, overload
 
+import jsonschema_rs
 import requests
 from hypothesis_jsonschema import from_schema
 
@@ -14,6 +15,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.case import Case
@@ -31,6 +33,7 @@ from .formats import STRING_FORMATS
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
+    from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 
@@ -72,10 +75,62 @@ def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     return left
 
 
+def _get_pool_combos(
+    operation: APIOperation,
+    extra_data_source: OpenApiExtraDataSource,
+) -> list[dict[str, Any]]:
+    """Return pool variants as parameter dicts, merging all locations into each slot."""
+    per_location: list[list[dict[str, Any]]] = []
+    for location in (
+        ParameterLocation.PATH,
+        ParameterLocation.QUERY,
+        ParameterLocation.HEADER,
+        ParameterLocation.COOKIE,
+    ):
+        schema = _build_location_schema(operation, location)
+        if schema is None:
+            continue
+        variants = extra_data_source.get_captured_variants(
+            operation=operation,
+            location=location,
+            schema=schema,
+        )
+        if variants:
+            container = location.container_name
+            per_location.append([{container: variant} for variant in variants])
+
+    if not per_location:
+        return []
+
+    # Round-robin across locations: each slot gets pool values from all locations merged.
+    n = max(len(loc) for loc in per_location)
+    combos: list[dict[str, Any]] = []
+    for i in range(n):
+        merged: dict[str, Any] = {}
+        for loc_variants in per_location:
+            merged.update(loc_variants[i % len(loc_variants)])
+        combos.append(merged)
+    return combos
+
+
+def _build_location_schema(
+    operation: APIOperation,
+    location: ParameterLocation,
+) -> dict[str, Any] | None:
+    """Build a minimal JSON schema covering all parameters at a given location."""
+    properties = {
+        p.name: (p.definition.get("schema") or {}) for p in operation.iter_parameters() if p.location == location
+    }
+    return {"type": "object", "properties": properties} if properties else None
+
+
 def get_strategies_from_examples(
-    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters], **kwargs: Any
+    operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
+    extra_data_source: OpenApiExtraDataSource | None = None,
+    fill_missing_from_pool: bool = False,
+    **kwargs: Any,
 ) -> list[SearchStrategy[Case]]:
-    """Build a set of strategies that generate test cases based on explicit examples in the schema."""
+    """Build strategies from schema examples, augmented with pool values where available."""
     maps = get_serializers_for_operation(operation)
 
     def serialize_components(case: Case) -> Case:
@@ -89,14 +144,41 @@ def get_strategies_from_examples(
         return case
 
     # Extract all top-level examples from the `examples` & `example` fields (`x-` prefixed versions in Open API 2)
-    examples = list(extract_top_level(operation))
+    schema_examples = list(extract_top_level(operation))
     # Add examples from parameter's schemas
-    examples.extend(extract_from_schemas(operation))
+    schema_examples.extend(extract_from_schemas(operation))
+    schema_combos = list(produce_combinations(schema_examples))
+
+    pool_combos = _get_pool_combos(operation, extra_data_source) if extra_data_source is not None else []
+
+    if schema_combos and pool_combos:
+        # Round-robin merge: schema as base, pool wins for overlapping keys.
+        n = max(len(schema_combos), len(pool_combos))
+        pool_augmented = [
+            merge_kwargs(
+                {k: dict(v) if isinstance(v, dict) else v for k, v in schema_combos[i % len(schema_combos)].items()},
+                pool_combos[i % len(pool_combos)],
+            )
+            for i in range(n)
+        ]
+        # Keep original schema combos; append pool-augmented ones that differ.
+        schema_combo_keys = {jsonschema_rs.canonical.json.to_string(c) for c in schema_combos}
+        all_combos = [
+            *schema_combos,
+            *(c for c in pool_augmented if jsonschema_rs.canonical.json.to_string(c) not in schema_combo_keys),
+        ]
+    elif schema_combos:
+        all_combos = schema_combos
+    elif pool_combos and fill_missing_from_pool:
+        all_combos = [{k: dict(v) if isinstance(v, dict) else v for k, v in combo.items()} for combo in pool_combos]
+    else:
+        all_combos = []
+
     return [
-        openapi_cases(operation=operation, phase=TestPhase.EXAMPLES, **merge_kwargs(parameters, kwargs)).map(
+        openapi_cases(operation=operation, phase=TestPhase.EXAMPLES, **merge_kwargs(combo, kwargs)).map(
             serialize_components
         )
-        for parameters in produce_combinations(examples)
+        for combo in all_combos
     ]
 
 

@@ -77,7 +77,7 @@ Schemathesis captures useful values from successful responses and reuses them wh
 
 During fuzzing, captured values augment random generation. `GET /users/{id}` tests with both random IDs (finding 404 handling bugs) and real IDs from earlier `POST /users` calls (finding bugs in success paths).
 
-This works across non-stateful test phases and within them. The examples phase might create a user that the fuzzing phase later references. Within fuzzing itself, early test cases discover values that later cases use.
+This works across non-stateful test phases and within them. The examples phase both contributes to and draws from the pool - a `POST /users` example populates the pool, and `GET /users/{id}` examples use the captured ID to reach code paths that random IDs never hit. Within fuzzing itself, early test cases discover values that later cases use.
 
 ## Connecting Operations
 
