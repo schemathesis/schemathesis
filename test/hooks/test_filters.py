@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -186,45 +184,33 @@ def test_filter_body_works_in_negative_mode(ctx):
     inner()
 
 
-def _make_hook_context(operation_id):
-    """Build a minimal HookContext whose operation carries the given operationId."""
-    operation = SimpleNamespace(
-        definition=SimpleNamespace(raw={"operationId": operation_id}),
-        label=operation_id,
-        method="POST",
-        path=f"/fake/{operation_id}",
-        tags=[],
-    )
-    return HookContext(operation=operation)
+def _build_operation(ctx, operation_id, path):
+    op = {"operationId": operation_id, "responses": {"200": {"description": "OK"}}}
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema({path: {"post": op}}))
+    return schema[path]["POST"]
 
 
+# Each hook registered with a different apply_to filter must receive its own filter_set
 def test_multiple_apply_to_have_distinct_filters(ctx):
-    """Hooks registered with different apply_to filters must each receive their own filter_set.
-
-    Regression: a bug in to_filterable_hook caused the outer ``filter_set``
-    variable to go stale after the first registration, so every subsequent hook
-    was silently assigned the *first* hook's filter_set.
-    """
     with ctx.restore_hooks():
 
         @schemathesis.hook.apply_to(operation_id="operationA")
         def before_call(context, case, **kwargs):
-            """Hook for operation A."""
+            pass
 
         hook_a = before_call
 
         @schemathesis.hook.apply_to(operation_id="operationB")
         def before_call(context, case, **kwargs):  # noqa: F811
-            """Hook for operation B."""
+            pass
 
         hook_b = before_call
 
-        # Each hook must carry its own, distinct filter_set
         assert hook_a.filter_set is not hook_b.filter_set
 
-        ctx_a = _make_hook_context("operationA")
-        ctx_b = _make_hook_context("operationB")
-        ctx_other = _make_hook_context("operationC")
+        ctx_a = HookContext(operation=_build_operation(ctx, "operationA", "/a"))
+        ctx_b = HookContext(operation=_build_operation(ctx, "operationB", "/b"))
+        ctx_other = HookContext(operation=_build_operation(ctx, "operationC", "/c"))
 
         # hook_a should run for operationA only
         assert not _should_skip_hook(hook_a, ctx_a)
@@ -237,25 +223,25 @@ def test_multiple_apply_to_have_distinct_filters(ctx):
         assert _should_skip_hook(hook_b, ctx_other)
 
 
+# Mixing apply_to and skip_for across multiple hooks must keep filters independent
 def test_multiple_apply_to_with_skip_for(ctx):
-    """Mixing apply_to and skip_for across multiple hooks must keep filters independent."""
     with ctx.restore_hooks():
 
         @schemathesis.hook.apply_to(operation_id="opInclude")
         def before_call(context, case, **kwargs):
-            """Include-filtered hook."""
+            pass
 
         hook_include = before_call
 
         @schemathesis.hook.skip_for(operation_id="opExclude")
         def before_call(context, case, **kwargs):  # noqa: F811
-            """Exclude-filtered hook."""
+            pass
 
         hook_exclude = before_call
 
-        ctx_include = _make_hook_context("opInclude")
-        ctx_exclude = _make_hook_context("opExclude")
-        ctx_other = _make_hook_context("opOther")
+        ctx_include = HookContext(operation=_build_operation(ctx, "opInclude", "/include"))
+        ctx_exclude = HookContext(operation=_build_operation(ctx, "opExclude", "/exclude"))
+        ctx_other = HookContext(operation=_build_operation(ctx, "opOther", "/other"))
 
         # hook_include: runs only for opInclude
         assert not _should_skip_hook(hook_include, ctx_include)
