@@ -12,6 +12,7 @@
 
 - Strip API version prefixes during dependency inference.
 - Do not cross-link same-named resources from different API namespaces in during dependency inference.
+- GET list operations are now used to upgrade resource definitions during dependency inference.
 
 ### :bug: Fixed
 

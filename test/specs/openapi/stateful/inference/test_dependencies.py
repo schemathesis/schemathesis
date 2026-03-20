@@ -3036,6 +3036,104 @@ def snapshot_json(snapshot):
             None,
             id="cross-namespace-collision-bare-id",
         ),
+        pytest.param(
+            {
+                "/contacts": {
+                    "get": {
+                        "operationId": "listContacts",
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/Person"},
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/contacts/{id}": {
+                    "get": {
+                        "operationId": "getContact",
+                        "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                },
+            },
+            {
+                "schemas": {
+                    "Person": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "email": {"type": "string"},
+                            "name": {"type": "string"},
+                        },
+                        "required": ["id"],
+                    }
+                }
+            },
+            id="get-list-as-producer",
+        ),
+        pytest.param(
+            {
+                "/contacts": {
+                    "post": {
+                        "operationId": "createContact",
+                        "responses": {
+                            "201": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {"type": "integer"},
+                                                "email": {"type": "string"},
+                                                "name": {"type": "string"},
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    },
+                    "get": {
+                        "operationId": "listContacts",
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {"type": "integer"},
+                                                    "email": {"type": "string"},
+                                                    "name": {"type": "string"},
+                                                },
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    },
+                },
+                "/contacts/{id}": {
+                    "get": {
+                        "operationId": "getContact",
+                        "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                },
+            },
+            None,
+            id="post-and-get-list-same-resource",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

@@ -12,6 +12,7 @@ from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
     CanonicalizationCache,
+    Cardinality,
     DefinitionSource,
     InputSlot,
     OperationMap,
@@ -539,8 +540,12 @@ def find_producer_consumer_candidates(operations: OperationMap) -> list[tuple[st
     for names in paths.values():
         for producer_name in names:
             producer = operations[producer_name]
-            # Producer must create/update and return data
-            if producer.method not in ("post", "put") or not producer.outputs:
+            # POST/PUT producers create/update resources and return data.
+            # GET list producers (cardinality MANY) qualify for read-only APIs
+            # that have no mutating endpoints.
+            is_mutating = producer.method in ("post", "put") and bool(producer.outputs)
+            is_get_list = producer.method == "get" and any(o.cardinality == Cardinality.MANY for o in producer.outputs)
+            if not (is_mutating or is_get_list):
                 continue
 
             for consumer_name in names:

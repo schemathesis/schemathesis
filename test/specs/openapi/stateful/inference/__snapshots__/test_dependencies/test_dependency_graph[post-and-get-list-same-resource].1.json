@@ -1,0 +1,32 @@
+[
+  [
+    "201",
+    "#/paths/~1contacts/post",
+    {
+      "GetContact": {
+        "operationRef": "#/paths/~1contacts~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ],
+  [
+    "200",
+    "#/paths/~1contacts/get",
+    {
+      "GetContact": {
+        "operationRef": "#/paths/~1contacts~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/0/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

@@ -1,0 +1,48 @@
+{
+  "operations": {
+    "GET /contacts": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": false,
+          "pointer": "/",
+          "resource": "Person",
+          "status_code": "200"
+        }
+      ]
+    },
+    "GET /contacts/{id}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "id",
+          "resource": "Person",
+          "resource_field": "id"
+        }
+      ],
+      "outputs": []
+    }
+  },
+  "resources": {
+    "Person": {
+      "fields": [
+        "email",
+        "id",
+        "name"
+      ],
+      "types": {
+        "email": [
+          "string"
+        ],
+        "id": [
+          "integer"
+        ],
+        "name": [
+          "string"
+        ]
+      }
+    }
+  }
+}
