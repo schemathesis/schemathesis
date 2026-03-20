@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
-from schemathesis.specs.openapi.stateful.dependencies.naming import to_pascal_case
+from schemathesis.specs.openapi.stateful.dependencies.naming import from_path, strip_version_prefix, to_pascal_case
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
 
 if TYPE_CHECKING:
@@ -57,6 +57,26 @@ class DependencyGraph:
         """
         encoded_paths = {id(op): encode_pointer(op.path) for op in self.operations.values()}
 
+        # Precomputed data for the cross-namespace scope guard (bare {id} collision check).
+        # All string work happens once here rather than inside the hot inner loop.
+        path_resource_names: dict[int, str | None] = {}
+        # Stripped producer path per operation
+        stripped_paths: dict[int, str] = {}
+        # (consumer_collection, consumer_collection + "/") for ops with a bare {id} segment
+        id_collection_paths: dict[int, tuple[str, str] | None] = {}
+        for op in self.operations.values():
+            op_id = id(op)
+            path_resource_names[op_id] = from_path(op.path)
+            stripped_paths[op_id] = strip_version_prefix(op.path)
+            segments = op.path.split("/")
+            for i, seg in enumerate(segments):
+                if seg == "{id}":
+                    collection = strip_version_prefix("/".join(segments[:i]) or "/")
+                    id_collection_paths[op_id] = (collection, collection + "/")
+                    break
+            else:
+                id_collection_paths[op_id] = None
+
         # Index consumers by resource
         consumers_by_resource: dict[int, dict[int, tuple[OperationNode, list[InputSlot]]]] = defaultdict(dict)
         for consumer in self.operations.values():
@@ -84,6 +104,24 @@ class DependencyGraph:
                     links: dict[str, LinkDefinition] = {}
 
                     for input_slot in input_slots:
+                        # Scope guard: skip bare {id} links where the producer is from a
+                        # different namespace. Triggered only when the resource name matches the
+                        # producer's path-derived name — i.e., the collision is path-based, not
+                        # schema-based (POST /something -> CategoryFields is left untouched).
+                        if (
+                            input_slot.parameter_name == "id"
+                            and output_slot.resource.name == path_resource_names[producer_id]
+                        ):
+                            consumer_data = id_collection_paths[consumer_id]
+                            if consumer_data is not None:
+                                consumer_collection, consumer_collection_prefix = consumer_data
+                                producer_collection = stripped_paths[producer_id]
+                                # Sub-paths are fine: /users/{userId}/messages -> /users/{id}
+                                if consumer_collection != producer_collection and not producer_collection.startswith(
+                                    consumer_collection_prefix
+                                ):
+                                    continue
+
                         if output_slot.is_primitive_identifier:
                             # Primitive identifier (e.g., string response from POST)
                             # The whole response IS the identifier value
