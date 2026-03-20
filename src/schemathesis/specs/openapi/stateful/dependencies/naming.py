@@ -6,6 +6,31 @@ from __future__ import annotations
 GENERIC_PREFIXES = frozenset({"item", "resource", "object", "entity"})
 
 
+def strip_version_prefix(path: str) -> str:
+    """Remove leading /api and /vN prefix segments from an API path.
+
+    Examples:
+        /v1/users/{id}    -> /users/{id}
+        /api/v2/orders    -> /orders
+        /api/users        -> /users
+        /oauth2/files     -> /oauth2/files  (NOT stripped)
+        /giving/tags      -> /giving/tags   (NOT stripped)
+
+    """
+    if not path:
+        return path
+    segments = path.split("/")
+    # segments[0] is always '' (from leading /)
+    start = 1
+    while start < len(segments):
+        seg = segments[start]
+        if seg == "api" or (len(seg) > 1 and seg[0] == "v" and seg[1:].isdigit()):
+            start += 1
+        else:
+            break
+    return "/" + "/".join(segments[start:])
+
+
 def from_parameter(parameter: str, path: str) -> str | None:
     parameter = parameter.strip()
     lower = parameter.lower()
