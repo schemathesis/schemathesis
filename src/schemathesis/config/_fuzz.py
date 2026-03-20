@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
@@ -19,5 +19,7 @@ class FuzzConfig(DiffBase):
         self.max_steps = max_steps or DEFAULT_MAX_SCENARIO_STEPS
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> FuzzConfig:
-        return cls(max_time=data.get("max-time"), max_steps=data.get("max-steps"))
+    def from_dict(cls, data: dict[str, object]) -> FuzzConfig:
+        return cls(
+            max_time=cast("int | None", data.get("max-time")), max_steps=cast("int | None", data.get("max-steps"))
+        )

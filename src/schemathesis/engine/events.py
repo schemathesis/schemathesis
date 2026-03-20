@@ -211,6 +211,51 @@ class ScenarioFinished(ScenarioEvent):
 
 
 @dataclass
+class FuzzScenarioStarted(ScenarioEvent):
+    """Before executing a fuzz scenario (multi-operation sequence)."""
+
+    worker_id: int
+
+    __slots__ = ("id", "timestamp", "suite_id", "worker_id")
+
+    def __init__(self, *, suite_id: uuid.UUID, worker_id: int) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.suite_id = suite_id
+        self.worker_id = worker_id
+
+
+@dataclass
+class FuzzScenarioFinished(ScenarioEvent):
+    """After executing a fuzz scenario."""
+
+    worker_id: int
+    recorder: ScenarioRecorder
+    status: Status
+    elapsed_time: float
+
+    __slots__ = ("id", "timestamp", "suite_id", "worker_id", "recorder", "status", "elapsed_time")
+
+    def __init__(
+        self,
+        *,
+        id: uuid.UUID,
+        suite_id: uuid.UUID,
+        worker_id: int,
+        recorder: ScenarioRecorder,
+        status: Status,
+        elapsed_time: float,
+    ) -> None:
+        self.id = id
+        self.timestamp = time.time()
+        self.suite_id = suite_id
+        self.worker_id = worker_id
+        self.recorder = recorder
+        self.status = status
+        self.elapsed_time = elapsed_time
+
+
+@dataclass
 class Interrupted(EngineEvent):
     """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
 
@@ -230,7 +275,7 @@ class NonFatalError(EngineEvent):
 
     info: EngineErrorInfo
     value: Exception
-    phase: PhaseName
+    phase: PhaseName | None
     label: str
     related_to_operation: bool
 
@@ -240,7 +285,7 @@ class NonFatalError(EngineEvent):
         self,
         *,
         error: Exception,
-        phase: PhaseName,
+        phase: PhaseName | None,
         label: str,
         related_to_operation: bool,
         code_sample: str | None = None,

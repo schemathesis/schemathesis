@@ -4,9 +4,10 @@ import threading
 from dataclasses import dataclass
 
 from schemathesis import auths
+from schemathesis.config import FuzzConfig
 from schemathesis.core import SpecificationFeature
 from schemathesis.core.errors import HookExecutionError
-from schemathesis.engine import Status, events, run
+from schemathesis.engine import Status, events, fuzz, run
 from schemathesis.engine.observations import Observations
 from schemathesis.schemas import BaseSchema
 
@@ -40,6 +41,15 @@ class Engine:
 
         ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), observations=observations)
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
+
+    def fuzz(self, config: FuzzConfig | None = None) -> EventStream:
+        """Execute in fuzz mode."""
+        if self.schema.config.auth.is_defined:
+            auths.unregister()
+
+        resolved_config = config or self.schema.config.fuzz
+        ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), max_time=resolved_config.max_time)
+        return EventStream(fuzz.execute(ctx, resolved_config), ctx.control.stop_event)
 
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""

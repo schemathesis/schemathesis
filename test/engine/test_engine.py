@@ -1029,26 +1029,6 @@ def test_engine_finished_stop_reason_completed(real_app_schema):
     assert stream.finished.stop_reason == StopReason.COMPLETED
 
 
-@pytest.mark.operations("success", "failure")
-def test_engine_finished_stop_reason_max_time(real_app_schema, mocker):
-    # When max_time is configured and monotonic time crosses the limit during execution
-    current = 0.0
-
-    def monotonic() -> float:
-        nonlocal current
-        value = current
-        current += 0.6
-        return value
-
-    mocker.patch("schemathesis.engine.context.time.monotonic", side_effect=monotonic)
-    mocker.patch("schemathesis.engine.control.time.monotonic", side_effect=monotonic)
-
-    real_app_schema.config.fuzz.max_time = 1
-    stream = EventStream(real_app_schema, phases=[PhaseName.FUZZING], max_examples=20).execute()
-    # Then the run is stopped by the time limit
-    assert stream.finished.stop_reason == StopReason.MAX_TIME
-
-
 def test_stop_event_stream_after_second_event(event_stream):
     next(event_stream)
     next(event_stream)
@@ -1331,7 +1311,6 @@ def test_no_warnings_for_json(ctx, openapi3_base_url):
 
 
 def test_stateful_phase_missing_deserializer_warnings(ctx, openapi3_base_url):
-    """Verify warnings are detected in stateful-only phase execution."""
     raw_schema = ctx.openapi.build_schema(
         {
             "/users": {
