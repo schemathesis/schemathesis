@@ -99,7 +99,7 @@ def parse_schemas(directory: pathlib.Path) -> dict[str, dict[str, Any]]:
                 file_path = os.path.join(root, file)
                 try:
                     with open(file_path) as fd:
-                        schema = yaml.load(fd, Loader)
+                        schema = yaml.safe_load(fd, Loader)
                     version = get_schema_version(schema)
                     schema_name = (
                         os.path.relpath(file_path, directory)
