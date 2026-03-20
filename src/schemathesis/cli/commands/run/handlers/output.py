@@ -1537,7 +1537,9 @@ class OutputHandler(EventHandler):
         assert self.stateful_tests_manager is None
         if self.errors:
             display_section_name("ERRORS")
-            errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label, r.info.title))
+            errors = sorted(
+                self.errors, key=lambda r: (r.phase.value if r.phase is not None else "", r.label, r.info.title)
+            )
             for label, group_errors in groupby(errors, key=lambda r: r.label):
                 display_section_name(label, "_", fg="red")
                 _errors = list(group_errors)

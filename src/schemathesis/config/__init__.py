@@ -22,8 +22,10 @@ from schemathesis.config._checks import (
 )
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError
+from schemathesis.config._fuzz import FuzzConfig
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._health_check import HealthCheck
+from schemathesis.config._operations import OperationConfig, OperationsConfig
 from schemathesis.config._output import OutputConfig, SanitizationConfig, TruncationConfig
 from schemathesis.config._phases import (
     CoveragePhaseConfig,
@@ -69,6 +71,8 @@ __all__ = [
     "ExtraDataSourcesConfig",
     "InferenceAlgorithm",
     "OperationOrdering",
+    "OperationConfig",
+    "OperationsConfig",
     "ProjectsConfig",
     "ProjectConfig",
     "get_workers_count",
@@ -78,6 +82,7 @@ __all__ = [
     "DynamicTokenAuthConfig",
     "HttpBasicAuthConfig",
     "HttpBearerAuthConfig",
+    "FuzzConfig",
 ]
 
 

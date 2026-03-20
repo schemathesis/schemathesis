@@ -48,13 +48,14 @@ class EngineContext:
         schema: BaseSchema,
         stop_event: threading.Event,
         observations: Observations | None = None,
+        max_time: int | None = None,
     ) -> None:
         self.schema = schema
         self.start_time = time.monotonic()
         self.control = ExecutionControl(
             stop_event=stop_event,
             max_failures=schema.config.max_failures,
-            max_time=schema.config.fuzz.max_time,
+            max_time=max_time,
             start_time=self.start_time,
         )
         self.outcome_cache = {}
