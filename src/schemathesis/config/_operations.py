@@ -24,6 +24,16 @@ if TYPE_CHECKING:
 
     from schemathesis.schemas import APIOperation
 
+
+def _parse_request_retries(value: int | dict | None) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    # schema guarantees key exists
+    return value["max-attempts"]
+
+
 FILTER_ATTRIBUTES = [
     ("name", "name"),
     ("method", "method"),
@@ -208,6 +218,7 @@ class OperationConfig(DiffBase):
     rate_limit: Limiter | None
     max_redirects: int | None
     request_timeout: float | int | None
+    request_retries: int | None
     request_cert: str | None
     request_cert_key: str | None
     parameters: dict[str, Any]
@@ -228,6 +239,7 @@ class OperationConfig(DiffBase):
         "_rate_limit",
         "max_redirects",
         "request_timeout",
+        "request_retries",
         "request_cert",
         "request_cert_key",
         "parameters",
@@ -250,6 +262,7 @@ class OperationConfig(DiffBase):
         rate_limit: str | None = None,
         max_redirects: int | None = None,
         request_timeout: float | int | None = None,
+        request_retries: int | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         parameters: dict[str, Any] | None = None,
@@ -272,6 +285,7 @@ class OperationConfig(DiffBase):
         self._rate_limit = rate_limit
         self.max_redirects = max_redirects
         self.request_timeout = request_timeout
+        self.request_retries = request_retries
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
         self.parameters = parameters or {}
@@ -329,6 +343,7 @@ class OperationConfig(DiffBase):
             rate_limit=resolve(data.get("rate-limit")),
             max_redirects=data.get("max-redirects"),
             request_timeout=data.get("request-timeout"),
+            request_retries=_parse_request_retries(data.get("request-retries")),
             request_cert=resolve(data.get("request-cert")),
             request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),

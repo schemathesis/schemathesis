@@ -230,6 +230,12 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     default=DEFAULT_RESPONSE_TIMEOUT,
 )
 @grouped_option(
+    "--request-retries",
+    help="Number of times to retry a request on network-level failures",
+    type=click.IntRange(min=0),
+    default=None,
+)
+@grouped_option(
     "--request-cert",
     help="File path of unencrypted client certificate for authentication. "
     "The certificate can be bundled with a private key (e.g. PEM) or the private "
@@ -462,6 +468,7 @@ def run(
     rate_limit: str | None = None,
     max_redirects: int | None = None,
     request_timeout: int | None = None,
+    request_retries: int | None = None,
     request_tls_verify: bool | None = None,
     request_cert: str | None = None,
     request_cert_key: str | None = None,
@@ -545,6 +552,7 @@ def run(
         rate_limit=rate_limit,
         max_redirects=max_redirects,
         request_timeout=request_timeout,
+        request_retries=request_retries,
         tls_verify=request_tls_verify,
         request_cert=request_cert,
         request_cert_key=request_cert_key,

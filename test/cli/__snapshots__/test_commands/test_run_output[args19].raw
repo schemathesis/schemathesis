@@ -71,26 +71,29 @@ Filtering options:
   --exclude-deprecated  Skip deprecated operations
 
 Network requests options:
-  -H, --header NAME:VALUE        Add a custom HTTP header to all API requests
-  -a, --auth USER:PASS           Authenticate all API requests with basic
-                                 authentication
-  --proxy URL                    Set the proxy for all network requests
-  --tls-verify TEXT              Path to CA bundle for TLS verification, or
-                                 'false' to disable
-  --rate-limit TEXT              Specify a rate limit for test requests in
-                                 '<limit>/<duration>' format. Example - `100/m`
-                                 for 100 requests per minute
-  --max-redirects INTEGER RANGE  Maximum number of redirects to follow for each
-                                 request  [x>=0]
-  --request-timeout FLOAT RANGE  Timeout limit, in seconds, for each network
-                                 request during tests  [x>0.0]
-  --request-cert PATH            File path of unencrypted client certificate for
-                                 authentication. The certificate can be bundled
-                                 with a private key (e.g. PEM) or the private
-                                 key can be provided with the --request-cert-key
-                                 argument
-  --request-cert-key PATH        Specify the file path of the private key for
-                                 the client certificate
+  -H, --header NAME:VALUE         Add a custom HTTP header to all API requests
+  -a, --auth USER:PASS            Authenticate all API requests with basic
+                                  authentication
+  --proxy URL                     Set the proxy for all network requests
+  --tls-verify TEXT               Path to CA bundle for TLS verification, or
+                                  'false' to disable
+  --rate-limit TEXT               Specify a rate limit for test requests in
+                                  '<limit>/<duration>' format. Example - `100/m`
+                                  for 100 requests per minute
+  --max-redirects INTEGER RANGE   Maximum number of redirects to follow for each
+                                  request  [x>=0]
+  --request-timeout FLOAT RANGE   Timeout limit, in seconds, for each network
+                                  request during tests  [x>0.0]
+  --request-retries INTEGER RANGE
+                                  Number of times to retry a request on network-
+                                  level failures  [x>=0]
+  --request-cert PATH             File path of unencrypted client certificate
+                                  for authentication. The certificate can be
+                                  bundled with a private key (e.g. PEM) or the
+                                  private key can be provided with the
+                                  --request-cert-key argument
+  --request-cert-key PATH         Specify the file path of the private key for
+                                  the client certificate
 
 Output options:
   --report FORMAT                Generate test reports in formats specified as a

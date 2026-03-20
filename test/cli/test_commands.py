@@ -4,8 +4,10 @@ import os
 import pathlib
 import platform
 import sys
+import threading
 import time
 from http.client import RemoteDisconnected
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urljoin
 
 import hypothesis
@@ -2641,3 +2643,55 @@ if __name__ == "__main__":
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_request_retries_option(cli, ctx, snapshot_cli):
+    # Server drops first 2 /users connections, succeeds on 3rd.
+    # Without --request-retries=2 the run would fail; with it, it passes.
+    paths = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+    spec_bytes = json.dumps(ctx.openapi.build_schema(paths)).encode()
+    attempt = [0]
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.close_connection = True
+            if self.path == "/openapi.json":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(spec_bytes)))
+                self.end_headers()
+                self.wfile.write(spec_bytes)
+            elif self.path.startswith("/users"):
+                attempt[0] += 1
+                if attempt[0] > 2:
+                    body = b"[]"
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                # else: close without response → ConnectionError → retry
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", "2")
+                self.end_headers()
+                self.wfile.write(b"{}")
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        result = cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--request-retries=2",
+            "--max-examples=1",
+            "--checks=response_schema_conformance",
+        )
+        assert result == snapshot_cli
+    finally:
+        server.shutdown()

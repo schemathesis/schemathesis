@@ -8,6 +8,8 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode, urlparse
 
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from schemathesis.core import NotSet
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
@@ -181,8 +183,18 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         try:
             rate_limit = config.rate_limit_for(operation=case.operation)
+            retries = config.request_retries_for(operation=case.operation) or 0
+            if retries > 0:
+                _request = retry(
+                    retry=retry_if_exception_type((requests.exceptions.ConnectionError, requests.exceptions.Timeout)),
+                    stop=stop_after_attempt(retries + 1),
+                    wait=wait_exponential(multiplier=1, max=10),
+                    reraise=True,
+                )(session.request)
+            else:
+                _request = session.request
             with ratelimit(rate_limit, config.base_url):
-                response = session.request(**data)
+                response = _request(**data)
             return Response.from_requests(
                 response,
                 verify=verify,

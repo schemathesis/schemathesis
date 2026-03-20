@@ -6,6 +6,7 @@
 
 - `[auth.dynamic.openapi.<scheme>]` config block for token fetch authentication that allows for dynamic authentication without writing Python code. [#3620](https://github.com/schemathesis/schemathesis/issues/3620)
 - Use captured response data in the examples phase. [#638](https://github.com/schemathesis/schemathesis/issues/638)
+- `--request-retries` to retry requests on network failures with exponential back-off.
 
 ### :bug: Fixed
 
