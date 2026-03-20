@@ -133,6 +133,7 @@
       "type": "number",
       "minimum": 0
     },
+    "request-retries": { "$ref": "#/$defs/RequestRetriesConfig" },
     "request-cert": {
       "type": "string"
     },
@@ -144,6 +145,20 @@
     }
   },
   "$defs": {
+    "RequestRetriesConfig": {
+      "description": "Number of retries on network failures (connection errors, timeouts). N retries = N+1 total attempts. Integer shorthand is equivalent to { max-attempts: N }.",
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        {
+          "type": "object",
+          "required": ["max-attempts"],
+          "properties": {
+            "max-attempts": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
     "ReportConfig": {
       "type": "object",
       "additionalProperties": false,
@@ -716,6 +731,7 @@
           "type": "number",
           "minimum": 0
         },
+        "request-retries": { "$ref": "#/$defs/RequestRetriesConfig" },
         "request-cert": {
           "type": "string"
         },
@@ -831,6 +847,7 @@
           "type": "number",
           "minimum": 0
         },
+        "request-retries": { "$ref": "#/$defs/RequestRetriesConfig" },
         "request-cert": {
           "type": "string"
         },

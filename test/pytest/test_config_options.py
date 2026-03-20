@@ -1,3 +1,5 @@
+import platform
+
 import pytest
 
 
@@ -147,3 +149,78 @@ def test_max_examples(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([rf"Hypothesis calls: {max_examples}"])
+
+
+@pytest.mark.skipif(
+    platform.system() == "Windows", reason="conn.close() on Windows does not raise ConnectionError on the client side"
+)
+@pytest.mark.parametrize("is_lazy", [False, True])
+def test_config_request_retries_is_used(testdir, is_lazy):
+    # Server drops first 2 connections, succeeds on 3rd.
+    # Without request_retries=2 the test would raise ConnectionError; with it, it passes.
+    if is_lazy:
+        schema_setup = """
+@pytest.fixture
+def api_schema():
+    config = SchemathesisConfig()
+    config.projects.default.update(request_retries=2, base_url=f"http://127.0.0.1:{port}")
+    return schemathesis.openapi.from_dict(raw_schema, config=config)
+
+schema = schemathesis.pytest.from_fixture("api_schema")
+"""
+    else:
+        schema_setup = """
+config = SchemathesisConfig()
+config.projects.default.update(request_retries=2, base_url=f"http://127.0.0.1:{port}")
+schema = schemathesis.openapi.from_dict(raw_schema, config=config)
+"""
+
+    testdir.make_test(
+        f"""
+import socket, threading
+
+server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server.bind(("127.0.0.1", 0))
+port = server.getsockname()[1]
+server.listen(10)
+server.settimeout(5.0)
+_attempt = [0]
+
+def _serve():
+    while True:
+        try:
+            conn, _ = server.accept()
+        except OSError:
+            break
+        _attempt[0] += 1
+        if _attempt[0] <= 2:
+            conn.close()  # drop → ConnectionError → retry
+        else:
+            conn.sendall(
+                b"HTTP/1.1 200 OK\\r\\n"
+                b"Content-Type: application/json\\r\\n"
+                b"Content-Length: 2\\r\\n"
+                b"Connection: close\\r\\n"
+                b"\\r\\n{{}}"
+            )
+            conn.close()
+            break
+
+_thread = threading.Thread(target=_serve, daemon=True)
+_thread.start()
+
+def pytest_unconfigure(config):
+    server.close()
+    _thread.join(timeout=5.0)
+
+{schema_setup}
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_retries(case):
+    case.call()  # succeeds after 2 retries; without retries would raise ConnectionError
+""",
+    )
+    result = testdir.runpytest("-q")
+    result.assert_outcomes(passed=1)

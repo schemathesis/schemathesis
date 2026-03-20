@@ -157,3 +157,27 @@ def test_hypothesis_max_examples_and_no_shrink_override(operation):
     assert hypothesis.Phase.reuse in op_settings.phases
 
     assert op_settings.derandomize is False
+
+
+@pytest.mark.parametrize(
+    ["matcher", "expected"],
+    [
+        (LABEL, 5),
+        ("Unknown", 3),
+    ],
+    ids=["operation-override", "project-fallback"],
+)
+def test_request_retries_for_override_and_fallback(operation, matcher, expected):
+    config = SchemathesisConfig.from_dict(
+        {
+            "request-retries": 3,
+            "operations": [
+                {
+                    "include-name": matcher,
+                    "request-retries": 5,
+                }
+            ],
+        }
+    )
+    project = config.projects.get_default()
+    assert project.request_retries_for(operation=operation) == expected

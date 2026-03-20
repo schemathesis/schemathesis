@@ -962,6 +962,26 @@ The following settings control how Schemathesis makes network requests to the AP
     request-timeout = 0.5
     ```
 
+#### `request-retries`
+
+!!! note ""
+
+    **Type:** `Integer` or `{ max-attempts = N }`  
+    **Default:** `0`  
+
+    Number of times to retry a request on network-level failures (connection errors, timeouts). Uses exponential back-off between attempts. N retries mean N+1 total attempts.
+
+    ```toml
+    # Integer shorthand
+    request-retries = 3
+    ```
+
+    ```
+    # Table form (equivalent)
+    [request-retries]
+    max-attempts = 3
+    ```
+
 #### `request-cert`
 
 !!! note ""

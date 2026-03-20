@@ -218,6 +218,12 @@ def _format_oneof_error(error: ValidationError) -> str:
             "  - http+bearer: requires 'bearer'"
         )
 
+    if list(error.instance_path)[-1:] == ["request-retries"]:
+        if isinstance(error.instance, int):
+            return "'request-retries' must be a non-negative integer"
+        if isinstance(error.instance, dict):
+            return "'request-retries' table requires 'max-attempts'"
+
     return error.message  # pragma: no cover
 
 

@@ -335,14 +335,28 @@ The following options control how Schemathesis makes network requests to the API
 
 !!! note ""
 
-    **Type**: `Float`
-    **Default**: `10.0`
-    **Range**: `>0.0`
+    **Type**: `Float`  
+    **Default**: `10.0`  
+    **Range**: `>0.0`  
 
     Timeout limit, in seconds, for each network request during tests. This is the maximum time to wait for a response before aborting the request.
 
     ```console
     $ st run openapi.yaml --request-timeout 5.0
+    ```
+
+#### `--request-retries N`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `0`  
+    **Range**: `>=0`  
+
+    Number of times to retry a request on network-level failures (connection errors, timeouts). Uses exponential back-off between attempts. N retries mean N+1 total attempts.
+
+    ```console
+    $ st run openapi.yaml --request-retries 3
     ```
 
 #### `--request-cert PATH`
