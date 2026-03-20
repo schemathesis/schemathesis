@@ -8,6 +8,10 @@
 - Use captured response data in the examples phase. [#638](https://github.com/schemathesis/schemathesis/issues/638)
 - `--request-retries` to retry requests on network failures with exponential back-off.
 
+### :wrench: Changed
+
+- Strip API version prefixes during dependency inference.
+
 ### :bug: Fixed
 
 - `apply_to` / `skip_for` filter sets not updated between hook registrations, causing hooks registered after the first to silently receive the wrong filter set.

@@ -2953,6 +2953,36 @@ def snapshot_json(snapshot):
             },
             id="requestbody-array-and-property-same-resource",
         ),
+        pytest.param(
+            {
+                "/v1/users": {
+                    "post": {
+                        "operationId": "createUser",
+                        "responses": {
+                            "201": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {"id": {"type": "string"}},
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/v2/users/{id}": {
+                    "get": {
+                        "operationId": "getUser",
+                        "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                },
+            },
+            None,
+            id="cross-version-prefix-linking",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):
@@ -3060,6 +3090,28 @@ def test_recursion(ctx, paths, kwargs, version, snapshot_json):
 )
 def test_resource_name_from_path(path, expected):
     assert naming.from_path(path) == expected
+
+
+@pytest.mark.parametrize(
+    ["path", "expected"],
+    [
+        pytest.param("/v1/users/{id}", "/users/{id}", id="v1-prefix"),
+        pytest.param("/v2/orders", "/orders", id="v2-prefix"),
+        pytest.param("/v10/items", "/items", id="v10-prefix"),
+        pytest.param("/api/v3/items", "/items", id="api-plus-v3"),
+        pytest.param("/api/users", "/users", id="api-only"),
+        pytest.param("/users/{id}", "/users/{id}", id="no-prefix-unchanged"),
+        pytest.param("/oauth2/files/{id}", "/oauth2/files/{id}", id="oauth2-not-stripped"),
+        pytest.param("/giving/tags/{id}", "/giving/tags/{id}", id="giving-not-stripped"),
+        pytest.param("/smallgroups/groups", "/smallgroups/groups", id="smallgroups-not-stripped"),
+        pytest.param("/v1/", "/", id="v1-only-trailing-slash"),
+        pytest.param("/v1", "/", id="v1-no-trailing"),
+        pytest.param("/", "/", id="root-unchanged"),
+        pytest.param("", "", id="empty-unchanged"),
+    ],
+)
+def test_strip_version_prefix(path, expected):
+    assert naming.strip_version_prefix(path) == expected
 
 
 @pytest.mark.parametrize(
