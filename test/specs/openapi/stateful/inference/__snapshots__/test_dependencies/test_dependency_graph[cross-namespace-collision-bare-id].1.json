@@ -1,0 +1,17 @@
+[
+  [
+    "200",
+    "#/paths/~1smallgroups~1groups/get",
+    {
+      "GetGroup": {
+        "operationRef": "#/paths/~1smallgroups~1groups~1{id}/get",
+        "parameters": {
+          "path.id": "$response.body#/0/id"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

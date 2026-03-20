@@ -2983,6 +2983,59 @@ def snapshot_json(snapshot):
             None,
             id="cross-version-prefix-linking",
         ),
+        pytest.param(
+            {
+                "/children/groups": {
+                    "get": {
+                        "operationId": "listChildrenGroups",
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {"id": {"type": "integer"}},
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/smallgroups/groups": {
+                    "get": {
+                        "operationId": "listSmallGroups",
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {"id": {"type": "integer"}},
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/smallgroups/groups/{id}": {
+                    "get": {
+                        "operationId": "getSmallGroup",
+                        "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                },
+            },
+            None,
+            id="cross-namespace-collision-bare-id",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):
