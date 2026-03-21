@@ -407,9 +407,11 @@ class CoverageContext:
             if min_length is not None or max_length is not None:
                 pattern = update_quantifier(pattern, min_length, max_length)
             strategy = st.from_regex(pattern)
-            if min_length is not None:
+            if min_length is not None and max_length is not None:
+                strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
+            elif min_length is not None:
                 strategy = strategy.filter(lambda s: len(s) >= min_length)
-            if max_length is not None:
+            elif max_length is not None:
                 strategy = strategy.filter(lambda s: len(s) <= max_length)
             return cached_draw(strategy)
         if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
