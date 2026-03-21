@@ -22,11 +22,6 @@ from schemathesis.generation.metrics import MetricFunction
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
 )
-INVALID_REPORT_USAGE = (
-    "Can't use `--report-preserve-bytes` without enabling cassette formats. "
-    "Enable VCR or HAR format with `--report=vcr`, `--report-vcr-path`, "
-    "`--report=har`, or `--report-har-path`"
-)
 INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL or file path."
 FILE_DOES_NOT_EXIST_MESSAGE = "The specified file does not exist. Please provide a valid path to an existing file."
 INVALID_BASE_URL_MESSAGE = (
@@ -181,20 +176,6 @@ def validate_request_cert_key(
     return raw_value
 
 
-def validate_preserve_bytes(ctx: click.core.Context, param: click.core.Parameter, raw_value: bool) -> bool:
-    if not raw_value:
-        return False
-
-    report_formats = ctx.params.get("report_formats", []) or []
-    vcr_enabled = ReportFormat.VCR in report_formats or ctx.params.get("report_vcr_path")
-    har_enabled = ReportFormat.HAR in report_formats or ctx.params.get("report_har_path")
-
-    if not (vcr_enabled or har_enabled):
-        raise click.UsageError(INVALID_REPORT_USAGE)
-
-    return True
-
-
 def reduce_list(
     ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]] | None
 ) -> list[str] | None:
@@ -242,7 +223,27 @@ def convert_workers(ctx: click.core.Context, param: click.core.Parameter, value:
     return int(value)
 
 
+INVALID_REPORT_USAGE = (
+    "Can't use `--report-preserve-bytes` without enabling cassette formats. "
+    "Enable VCR or HAR format with `--report=vcr`, `--report-vcr-path`, "
+    "`--report=har`, or `--report-har-path`"
+)
+
 WARNINGS_CHOICE = CsvEnumChoice(SchemathesisWarning)
+
+
+def validate_preserve_bytes(ctx: click.core.Context, param: click.core.Parameter, raw_value: bool) -> bool:
+    if not raw_value:
+        return False
+
+    report_formats = ctx.params.get("report_formats", []) or []
+    vcr_enabled = ReportFormat.VCR in report_formats or ctx.params.get("report_vcr_path")
+    har_enabled = ReportFormat.HAR in report_formats or ctx.params.get("report_har_path")
+
+    if not (vcr_enabled or har_enabled):
+        raise click.UsageError(INVALID_REPORT_USAGE)
+
+    return True
 
 
 def validate_warnings(

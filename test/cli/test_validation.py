@@ -3,7 +3,8 @@ import pytest
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
-from schemathesis.cli.commands.run import validation
+from schemathesis.cli import validation
+from schemathesis.config import get_workers_count
 from schemathesis.core.validation import is_latin_1_encodable
 
 
@@ -61,7 +62,7 @@ def test_convert_request_tls_verify(value, expected):
     assert validation.convert_boolean_string(None, None, value) == expected
 
 
-@pytest.mark.parametrize(("value", "expected"), [("2", 2), ("auto", validation.get_workers_count())])
+@pytest.mark.parametrize(("value", "expected"), [("2", 2), ("auto", get_workers_count())])
 def test_convert_workers(value, expected):
     assert validation.convert_workers(None, None, value) == expected
 
