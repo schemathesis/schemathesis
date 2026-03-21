@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from schemathesis.cli.commands import Group, run, schemathesis
 from schemathesis.cli.commands.run.context import ExecutionContext
-from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.executor import handler
 from schemathesis.cli.commands.run.handlers import EventHandler
+from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.ext.groups import GROUPS, OptionGroup
 
 __all__ = [

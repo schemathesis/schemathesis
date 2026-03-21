@@ -7,26 +7,28 @@ from dataclasses import dataclass, field
 from itertools import groupby
 from json.decoder import JSONDecodeError
 from types import GeneratorType
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import click
 
-from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
+from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
-from schemathesis.cli.core import get_terminal_width
 from schemathesis.cli.output import (
     BLOCK_PADDING,
     LoadingProgressManager,
     _style,
+    display_errors_summary,
+    display_failures,
     display_header,
+    display_section_name,
     format_duration,
     make_console,
 )
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
-from schemathesis.core.failures import MessageBlock, Severity, format_failures
+from schemathesis.core.failures import Severity
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
@@ -64,53 +66,8 @@ def get_status_icon(stats: dict[Status, int], *, is_interrupted: bool, default: 
     return default
 
 
-def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> None:
-    """Print section name with separators in terminal with the given title nicely centered."""
-    message = f" {title} ".center(get_terminal_width(), separator)
-    kwargs.setdefault("bold", True)
-    click.echo(_style(message, **kwargs))
-
-
 def bold(option: str) -> str:
     return click.style(option, bold=True)
-
-
-def display_failures(ctx: ExecutionContext) -> None:
-    """Display all failures in the test run."""
-    if not ctx.statistic.failures:
-        return
-
-    display_section_name("FAILURES")
-    for label, failures in ctx.statistic.failures.items():
-        display_failures_for_single_test(ctx, label, failures.values())
-
-
-def failure_formatter(block: MessageBlock, content: str) -> str:
-    if block == MessageBlock.CASE_ID:
-        return _style(content, bold=True)
-    if block == MessageBlock.FAILURE:
-        return _style(content, fg="red", bold=True)
-    if block == MessageBlock.STATUS:
-        return _style(content, bold=True)
-    assert block == MessageBlock.CURL
-    return _style(content.replace("Reproduce with", bold("Reproduce with")))
-
-
-def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: Iterable[GroupedFailures]) -> None:
-    """Display a failure for a single method / path."""
-    display_section_name(label, "_", fg="red")
-    for idx, group in enumerate(checks, 1):
-        click.echo(
-            format_failures(
-                case_id=f"{idx}. Test Case ID: {group.case_id}",
-                response=group.response,
-                failures=group.failures,
-                curl=group.code_sample,
-                formatter=failure_formatter,
-                config=ctx.config.output,
-            )
-        )
-        click.echo()
 
 
 VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema or GraphQL endpoint"
@@ -1461,18 +1418,7 @@ class OutputHandler(EventHandler):
         click.echo()
 
     def display_errors_summary(self) -> None:
-        # Group errors by title and count occurrences
-        error_counts: dict[str, int] = {}
-        for error in self.errors:
-            title = error.info.title
-            error_counts[title] = error_counts.get(title, 0) + 1
-
-        click.echo(_style("Errors:", bold=True))
-
-        for title in sorted(error_counts):
-            click.echo(_style(f"  🚫 {title}: "), nl=False)
-            click.echo(_style(str(error_counts[title]), bold=True))
-        click.echo()
+        display_errors_summary(self.errors)
 
     def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         parts = []
@@ -1553,7 +1499,7 @@ class OutputHandler(EventHandler):
                     fg="red",
                 )
             )
-        display_failures(ctx)
+        display_failures(ctx.statistic, ctx.config.output)
         if not self.warnings.is_empty:
             self.display_warnings()
         if ctx.statistic.extraction_failures:
