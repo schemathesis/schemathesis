@@ -1110,6 +1110,16 @@ def test_positive_pattern(pctx):
     assert_conform(covered, schema)
 
 
+def test_positive_pattern_with_char_class_and_min_length(pctx):
+    # Regression: update_quantifier can't encode minLength into patterns with bare
+    # character classes like [a-z] (IN opcode). The .filter() safety net ensures
+    # generated strings still respect minLength.
+    schema = {"pattern": r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$", "minLength": 3, "type": "string"}
+    covered = cover_schema(pctx, schema)
+    for value in covered:
+        assert len(value) >= 3, f"Generated string {value!r} violates minLength=3"
+
+
 def test_negative_pattern_with_incompatible_length(nctx):
     schema = {
         "minLength": 6,

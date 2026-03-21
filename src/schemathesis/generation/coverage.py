@@ -402,11 +402,16 @@ class CoverageContext:
                 re.compile(pattern)
             except re.error:
                 raise Unsatisfiable from None
-            if "minLength" in schema or "maxLength" in schema:
-                min_length = schema.get("minLength")
-                max_length = schema.get("maxLength")
+            min_length = schema.get("minLength")
+            max_length = schema.get("maxLength")
+            if min_length is not None or max_length is not None:
                 pattern = update_quantifier(pattern, min_length, max_length)
-            return cached_draw(st.from_regex(pattern))
+            strategy = st.from_regex(pattern)
+            if min_length is not None:
+                strategy = strategy.filter(lambda s: len(s) >= min_length)
+            if max_length is not None:
+                strategy = strategy.filter(lambda s: len(s) <= max_length)
+            return cached_draw(strategy)
         if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
             items = schema["items"]
             min_items = schema.get("minItems", 0)
