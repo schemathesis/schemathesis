@@ -29,6 +29,16 @@ if TYPE_CHECKING:
 
 FUZZ_TESTS_LABEL = "Fuzz tests"
 EVENT_QUEUE_TIMEOUT = 0.01
+
+
+class _StopFuzzing(KeyboardInterrupt):
+    """Raised inside the scheduler to stop a thread's Hypothesis run without signaling other workers.
+
+    Inherits from KeyboardInterrupt so Hypothesis treats it as immediate abort (no shrinking/replay),
+    but is caught before the generic KeyboardInterrupt handler to avoid calling ctx.stop().
+    """
+
+
 FUZZ_MAX_EXAMPLES = sys.maxsize
 
 
@@ -170,9 +180,8 @@ def _run_forever_thread(
          - Prefers producers over consumers
          - Does not use data from responses
         """
-        if not any(op.label not in excluded_operations for op in operations):
-            # All operations have been excluded due to errors; stop the campaign.
-            raise KeyboardInterrupt
+        if ctx.has_to_stop or not any(op.label not in excluded_operations for op in operations):
+            raise _StopFuzzing
 
         started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
         event_queue.put(started)
@@ -181,11 +190,9 @@ def _run_forever_thread(
         recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL)
 
         for _ in range(config.max_steps):
-            if ctx.has_to_stop:
-                raise KeyboardInterrupt
             choices = [op for op in weighted_operations if op.label not in excluded_operations]
-            if not choices:
-                raise KeyboardInterrupt
+            if not choices or ctx.has_to_stop:
+                break
             operation = draw(st.sampled_from(choices))
             try:
                 case = draw(operation.as_strategy(**strategy_kwargs_by_label[operation.label]))
@@ -287,6 +294,9 @@ def _run_forever_thread(
     try:
         with catch_warnings(), ignore_hypothesis_output():
             fuzz_test()
+    except _StopFuzzing:
+        # natural thread completion — no work left, don't touch other workers
+        pass
     except KeyboardInterrupt:
         ctx.stop()
     except FailureGroup:
