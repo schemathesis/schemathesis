@@ -351,6 +351,43 @@ def test_fuzz_choices_become_empty_mid_scenario(real_app_schema):
     assert isinstance(collected[-1], events.EngineFinished)
 
 
+@pytest.mark.operations("success")
+def test_fuzz_scenario_events_paired_when_choices_exhausted_mid_loop(real_app_schema):
+    # When the only operation is excluded mid-scenario (step 2 sees empty choices),
+    # FuzzScenarioFinished must still be emitted for the already-started scenario.
+    @real_app_schema.hook
+    def before_generate_case(context, strategy):
+        def fail_generation(case):
+            raise RuntimeError("generation error")
+
+        return strategy.map(fail_generation)
+
+    started_ids: set[uuid.UUID] = set()
+    finished_ids: set[uuid.UUID] = set()
+    for event in from_schema(real_app_schema).fuzz(FuzzConfig(max_steps=2)):
+        if isinstance(event, events.FuzzScenarioStarted):
+            started_ids.add(event.id)
+        elif isinstance(event, events.FuzzScenarioFinished):
+            finished_ids.add(event.id)
+    assert started_ids == finished_ids
+
+
+@pytest.mark.operations("success")
+def test_fuzz_completed_stop_reason_when_all_operations_exhausted(real_app_schema):
+    # When all operations are excluded due to errors, the engine should finish
+    # with COMPLETED (natural end), not INTERRUPTED (which implies external stop).
+    @real_app_schema.hook
+    def before_generate_case(context, strategy):
+        def fail_generation(case):
+            raise RuntimeError("generation error")
+
+        return strategy.map(fail_generation)
+
+    collected = list(from_schema(real_app_schema).fuzz(FuzzConfig(max_steps=2)))
+    finished = next(e for e in collected if isinstance(e, events.EngineFinished))
+    assert finished.stop_reason == StopReason.COMPLETED
+
+
 @pytest.mark.operations("path_variable")
 def test_fuzz_interrupted_by_keyboard_interrupt(real_app_schema):
     # Inject KeyboardInterrupt directly into the generator — safe under xdist (no OS signals)
