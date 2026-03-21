@@ -6,8 +6,9 @@ from dataclasses import dataclass
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
-from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
+from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, open_text_output
+from schemathesis.cli.statistics import GroupedFailures
 from schemathesis.core.failures import format_failures
 from schemathesis.engine import Status, events
 
