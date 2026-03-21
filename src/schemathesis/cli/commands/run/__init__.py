@@ -7,18 +7,62 @@ from typing import Any
 import click
 from click.utils import LazyFile
 
-from schemathesis.checks import CHECKS, load_all_checks
-from schemathesis.cli.commands.run import executor, validation
+from schemathesis.checks import load_all_checks
+from schemathesis.cli.commands.run import executor
 from schemathesis.cli.commands.run.filters import with_filters
-from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE, MAX_WORKERS, MIN_WORKERS
+from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
-from schemathesis.cli.ext.options import (
-    CsvChoice,
-    CsvEnumChoice,
-    CustomHelpMessageChoice,
-    RegistryChoice,
+from schemathesis.cli.ext.options import CsvChoice
+from schemathesis.cli.options import (
+    AUTH,
+    BASE_URL,
+    CHECKS_OPTION,
+    CONTINUE_ON_FAILURE,
+    EXCLUDE_BY,
+    EXCLUDE_CHECKS,
+    EXCLUDE_DEPRECATED,
+    FORCE_COLOR,
+    GENERATION_ALLOW_X00,
+    GENERATION_CODEC,
+    GENERATION_DATABASE,
+    GENERATION_DETERMINISTIC,
+    GENERATION_GRAPHQL_ALLOW_NULL,
+    GENERATION_MAX_EXAMPLES,
+    GENERATION_MAXIMIZE,
+    GENERATION_MODE,
+    GENERATION_SEED,
+    GENERATION_UNIQUE_INPUTS,
+    GENERATION_WITH_SECURITY_PARAMETERS,
+    HEADER,
+    INCLUDE_BY,
+    LOCATION,
+    MAX_FAILURES,
+    MAX_REDIRECTS,
+    MAX_RESPONSE_TIME,
+    NO_COLOR,
+    OUTPUT_SANITIZE,
+    OUTPUT_TRUNCATE,
+    PROXY,
+    RATE_LIMIT,
+    REPORT,
+    REPORT_DIR,
+    REPORT_HAR_PATH,
+    REPORT_JUNIT_PATH,
+    REPORT_NDJSON_PATH,
+    REPORT_PRESERVE_BYTES,
+    REPORT_VCR_PATH,
+    REQUEST_CERT,
+    REQUEST_CERT_KEY,
+    REQUEST_RETRIES,
+    REQUEST_TIMEOUT,
+    SUPPRESS_HEALTH_CHECK,
+    TLS_VERIFY,
+    WAIT_FOR_SCHEMA,
+    WARNINGS,
+    WORKERS,
 )
+from schemathesis.cli.validation import validate_auth_overlap
 from schemathesis.config import (
     DEFAULT_REPORT_DIRECTORY,
     HealthCheck,
@@ -27,46 +71,18 @@ from schemathesis.config import (
     SchemathesisWarning,
     WarningsConfig,
 )
-from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
-from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.metrics import METRICS, MetricFunction
+from schemathesis.generation.metrics import MetricFunction
 
 load_all_checks()
 
 DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 
 
-@click.argument(  # type: ignore[untyped-decorator]
-    "location",
-    type=str,
-    callback=validation.validate_schema_location,
-)
+@click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
 @group("Options")
-@grouped_option(
-    "--url",
-    "-u",
-    "base_url",
-    help="API base URL (required for file-based schemas)",
-    metavar="URL",
-    type=str,
-    callback=validation.validate_base_url,
-    envvar="SCHEMATHESIS_BASE_URL",
-)
-@grouped_option(
-    "--workers",
-    "-w",
-    "workers",
-    help="Number of concurrent workers for testing. Auto-adjusts if 'auto' is specified",
-    type=CustomHelpMessageChoice(
-        ["auto", *list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1)))],
-        choices_repr=f"[auto, {MIN_WORKERS}-{MAX_WORKERS}]",
-    ),
-    default=None,
-    show_default=True,
-    callback=validation.convert_workers,
-    metavar="",
-)
+@grouped_option(*BASE_URL.args, **BASE_URL.kwargs)
+@grouped_option(*WORKERS.args, **WORKERS.kwargs)
 @grouped_option(
     "--phases",
     help="A comma-separated list of test phases to run",
@@ -74,72 +90,15 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     default=",".join(DEFAULT_PHASES),
     metavar="",
 )
-@grouped_option(
-    "--suppress-health-check",
-    help="A comma-separated list of Schemathesis health checks to disable",
-    type=CsvEnumChoice(HealthCheck),
-    metavar="",
-)
-@grouped_option(
-    "--wait-for-schema",
-    help="Maximum duration, in seconds, to wait for the API schema to become available. Disabled by default",
-    type=click.FloatRange(1.0),
-    default=None,
-    envvar="SCHEMATHESIS_WAIT_FOR_SCHEMA",
-)
-@grouped_option(
-    "--warnings",
-    help="Control warning display: 'off' to disable all, or comma-separated list of warning types to enable",
-    type=str,
-    default=None,
-    callback=validation.validate_warnings,
-    metavar="WARNINGS",
-)
+@grouped_option(*SUPPRESS_HEALTH_CHECK.args, **SUPPRESS_HEALTH_CHECK.kwargs)
+@grouped_option(*WAIT_FOR_SCHEMA.args, **WAIT_FOR_SCHEMA.kwargs)
+@grouped_option(*WARNINGS.args, **WARNINGS.kwargs)
 @group("API validation options")
-@grouped_option(
-    "--checks",
-    "-c",
-    "included_check_names",
-    multiple=True,
-    help="Comma-separated list of checks to run against API responses",
-    type=RegistryChoice(CHECKS, with_all=True),
-    default=None,
-    callback=validation.reduce_list,
-    show_default=True,
-    metavar="",
-)
-@grouped_option(
-    "--exclude-checks",
-    "excluded_check_names",
-    multiple=True,
-    help="Comma-separated list of checks to skip during testing",
-    type=RegistryChoice(CHECKS, with_all=True),
-    default=None,
-    callback=validation.reduce_list,
-    show_default=True,
-    metavar="",
-)
-@grouped_option(
-    "--max-failures",
-    "max_failures",
-    type=click.IntRange(min=1),
-    help="Terminate the test suite after reaching a specified number of failures or errors",
-    show_default=True,
-)
-@grouped_option(
-    "--continue-on-failure",
-    "continue_on_failure",
-    help="Continue executing all test cases within a scenario, even after encountering failures",
-    is_flag=True,
-    default=False,
-    metavar="",
-)
-@grouped_option(
-    "--max-response-time",
-    help="Maximum allowed API response time in seconds",
-    type=click.FloatRange(min=0.0, min_open=True),
-    metavar="SECONDS",
-)
+@grouped_option(*CHECKS_OPTION.args, **CHECKS_OPTION.kwargs)
+@grouped_option(*EXCLUDE_CHECKS.args, **EXCLUDE_CHECKS.kwargs)
+@grouped_option(*MAX_FAILURES.args, **MAX_FAILURES.kwargs)
+@grouped_option(*CONTINUE_ON_FAILURE.args, **CONTINUE_ON_FAILURE.kwargs)
+@grouped_option(*MAX_RESPONSE_TIME.args, **MAX_RESPONSE_TIME.kwargs)
 @group(
     "Filtering options",
     description=(
@@ -151,199 +110,34 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     ),
 )
 @with_filters
-@grouped_option(
-    "--include-by",
-    "include_by",
-    type=str,
-    metavar="EXPR",
-    callback=validation.validate_filter_expression,
-    help="Include using custom expression",
-)
-@grouped_option(
-    "--exclude-by",
-    "exclude_by",
-    type=str,
-    callback=validation.validate_filter_expression,
-    metavar="EXPR",
-    help="Exclude using custom expression",
-)
-@grouped_option(
-    "--exclude-deprecated",
-    help="Skip deprecated operations",
-    is_flag=True,
-    is_eager=True,
-    default=None,
-    show_default=True,
-)
+@grouped_option(*INCLUDE_BY.args, **INCLUDE_BY.kwargs)
+@grouped_option(*EXCLUDE_BY.args, **EXCLUDE_BY.kwargs)
+@grouped_option(*EXCLUDE_DEPRECATED.args, **EXCLUDE_DEPRECATED.kwargs)
 @group("Network requests options")
-@grouped_option(
-    "--header",
-    "-H",
-    "headers",
-    help=r"Add a custom HTTP header to all API requests",
-    metavar="NAME:VALUE",
-    multiple=True,
-    type=str,
-    callback=validation.validate_headers,
-)
-@grouped_option(
-    "--auth",
-    "-a",
-    help="Authenticate all API requests with basic authentication",
-    metavar="USER:PASS",
-    type=str,
-    callback=validation.validate_auth,
-)
-@grouped_option(
-    "--proxy",
-    "request_proxy",
-    help="Set the proxy for all network requests",
-    metavar="URL",
-    type=str,
-)
-@grouped_option(
-    "--tls-verify",
-    "request_tls_verify",
-    help="Path to CA bundle for TLS verification, or 'false' to disable",
-    type=str,
-    default=None,
-    show_default=True,
-    callback=validation.convert_boolean_string,
-)
-@grouped_option(
-    "--rate-limit",
-    help="Specify a rate limit for test requests in '<limit>/<duration>' format. "
-    "Example - `100/m` for 100 requests per minute",
-    type=str,
-    callback=validation.validate_rate_limit,
-)
-@grouped_option(
-    "--max-redirects",
-    help="Maximum number of redirects to follow for each request",
-    type=click.IntRange(min=0),
-    show_default=True,
-)
-@grouped_option(
-    "--request-timeout",
-    help="Timeout limit, in seconds, for each network request during tests",
-    type=click.FloatRange(min=0.0, min_open=True),
-    default=DEFAULT_RESPONSE_TIMEOUT,
-)
-@grouped_option(
-    "--request-retries",
-    help="Number of times to retry a request on network-level failures",
-    type=click.IntRange(min=0),
-    default=None,
-)
-@grouped_option(
-    "--request-cert",
-    help="File path of unencrypted client certificate for authentication. "
-    "The certificate can be bundled with a private key (e.g. PEM) or the private "
-    "key can be provided with the --request-cert-key argument",
-    type=click.Path(exists=True),
-    default=None,
-    show_default=False,
-)
-@grouped_option(
-    "--request-cert-key",
-    help="Specify the file path of the private key for the client certificate",
-    type=click.Path(exists=True),
-    default=None,
-    show_default=False,
-    callback=validation.validate_request_cert_key,
-)
+@grouped_option(*HEADER.args, **HEADER.kwargs)
+@grouped_option(*AUTH.args, **AUTH.kwargs)
+@grouped_option(*PROXY.args, **PROXY.kwargs)
+@grouped_option(*TLS_VERIFY.args, **TLS_VERIFY.kwargs)
+@grouped_option(*RATE_LIMIT.args, **RATE_LIMIT.kwargs)
+@grouped_option(*MAX_REDIRECTS.args, **MAX_REDIRECTS.kwargs)
+@grouped_option(*REQUEST_TIMEOUT.args, **REQUEST_TIMEOUT.kwargs)
+@grouped_option(*REQUEST_RETRIES.args, **REQUEST_RETRIES.kwargs)
+@grouped_option(*REQUEST_CERT.args, **REQUEST_CERT.kwargs)
+@grouped_option(*REQUEST_CERT_KEY.args, **REQUEST_CERT_KEY.kwargs)
 @group("Output options")
-@grouped_option(
-    "--report",
-    "report_formats",
-    help="Generate test reports in formats specified as a comma-separated list",
-    type=CsvEnumChoice(ReportFormat),
-    is_eager=True,
-    metavar="FORMAT",
-)
-@grouped_option(
-    "--report-dir",
-    "report_directory",
-    help="Directory to store all report files",
-    type=click.Path(file_okay=False, dir_okay=True),
-    default=DEFAULT_REPORT_DIRECTORY,
-    show_default=True,
-)
-@grouped_option(
-    "--report-junit-path",
-    help="Custom path for JUnit XML report",
-    type=click.File("w", encoding="utf-8"),
-    is_eager=True,
-)
-@grouped_option(
-    "--report-vcr-path",
-    help="Custom path for VCR cassette",
-    type=click.File("w", encoding="utf-8"),
-    is_eager=True,
-)
-@grouped_option(
-    "--report-har-path",
-    help="Custom path for HAR file",
-    type=click.File("w", encoding="utf-8"),
-    is_eager=True,
-)
-@grouped_option(
-    "--report-ndjson-path",
-    help="Custom path for NDJSON events file",
-    type=click.File("w", encoding="utf-8"),
-    is_eager=True,
-)
-@grouped_option(
-    "--report-preserve-bytes",
-    help="Retain exact byte sequence of payloads in cassettes, encoded as base64",
-    type=bool,
-    is_flag=True,
-    default=None,
-    callback=validation.validate_preserve_bytes,
-)
-@grouped_option(
-    "--output-sanitize",
-    type=str,
-    default=None,
-    show_default=True,
-    help="Enable or disable automatic output sanitization to obscure sensitive data",
-    metavar="BOOLEAN",
-    callback=validation.convert_boolean_string,
-)
-@grouped_option(
-    "--output-truncate",
-    help="Truncate schemas and responses in error messages",
-    type=str,
-    default=None,
-    show_default=True,
-    metavar="BOOLEAN",
-    callback=validation.convert_boolean_string,
-)
+@grouped_option(*REPORT.args, **REPORT.kwargs)
+@grouped_option(*REPORT_DIR.args, **REPORT_DIR.kwargs)
+@grouped_option(*REPORT_JUNIT_PATH.args, **REPORT_JUNIT_PATH.kwargs)
+@grouped_option(*REPORT_VCR_PATH.args, **REPORT_VCR_PATH.kwargs)
+@grouped_option(*REPORT_HAR_PATH.args, **REPORT_HAR_PATH.kwargs)
+@grouped_option(*REPORT_NDJSON_PATH.args, **REPORT_NDJSON_PATH.kwargs)
+@grouped_option(*REPORT_PRESERVE_BYTES.args, **REPORT_PRESERVE_BYTES.kwargs)
+@grouped_option(*OUTPUT_SANITIZE.args, **OUTPUT_SANITIZE.kwargs)
+@grouped_option(*OUTPUT_TRUNCATE.args, **OUTPUT_TRUNCATE.kwargs)
 @group("Data generation options")
-@grouped_option(
-    "--mode",
-    "-m",
-    "generation_modes",
-    help="Test data generation mode",
-    type=click.Choice([item.value for item in GenerationMode] + ["all"]),
-    default="all",
-    callback=validation.convert_generation_mode,
-    show_default=True,
-    metavar="",
-)
-@grouped_option(
-    "--max-examples",
-    "-n",
-    "generation_max_examples",
-    help="Maximum number of test cases per API operation",
-    type=click.IntRange(1),
-)
-@grouped_option(
-    "--seed",
-    "generation_seed",
-    help="Random seed for reproducible test runs",
-    type=int,
-)
+@grouped_option(*GENERATION_MODE.args, **GENERATION_MODE.kwargs)
+@grouped_option(*GENERATION_MAX_EXAMPLES.args, **GENERATION_MAX_EXAMPLES.kwargs)
+@grouped_option(*GENERATION_SEED.args, **GENERATION_SEED.kwargs)
 @grouped_option(
     "--no-shrink",
     "generation_no_shrink",
@@ -351,79 +145,17 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     is_flag=True,
     default=None,
 )
-@grouped_option(
-    "--generation-deterministic",
-    help="Enables deterministic mode, which eliminates random variation between tests",
-    is_flag=True,
-    is_eager=True,
-    default=None,
-    show_default=True,
-)
-@grouped_option(
-    "--generation-allow-x00",
-    help="Whether to allow the generation of 'NULL' bytes within strings",
-    type=str,
-    default=None,
-    show_default=True,
-    metavar="BOOLEAN",
-    callback=validation.convert_boolean_string,
-)
-@grouped_option(
-    "--generation-codec",
-    help="The codec used for generating strings",
-    type=str,
-    default=None,
-    callback=validation.validate_generation_codec,
-)
-@grouped_option(
-    "--generation-maximize",
-    "generation_maximize",
-    multiple=True,
-    help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
-    type=RegistryChoice(METRICS),
-    default=None,
-    callback=validation.convert_maximize,
-    show_default=True,
-    metavar="METRIC",
-)
-@grouped_option(
-    "--generation-with-security-parameters",
-    help="Whether to generate security parameters",
-    type=str,
-    default=None,
-    show_default=True,
-    callback=validation.convert_boolean_string,
-    metavar="BOOLEAN",
-)
-@grouped_option(
-    "--generation-graphql-allow-null",
-    help="Whether to use `null` values for optional arguments in GraphQL queries",
-    type=str,
-    default=None,
-    show_default=True,
-    callback=validation.convert_boolean_string,
-    metavar="BOOLEAN",
-)
-@grouped_option(
-    "--generation-database",
-    help="Storage for examples discovered by Schemathesis. "
-    f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
-    f"or specify a file path for persistent storage",
-    type=str,
-    callback=validation.validate_hypothesis_database,
-)
-@grouped_option(
-    "--generation-unique-inputs",
-    "generation_unique_inputs",
-    help="Force the generation of unique test cases",
-    is_flag=True,
-    default=None,
-    show_default=True,
-    metavar="BOOLEAN",
-)
+@grouped_option(*GENERATION_DETERMINISTIC.args, **GENERATION_DETERMINISTIC.kwargs)
+@grouped_option(*GENERATION_ALLOW_X00.args, **GENERATION_ALLOW_X00.kwargs)
+@grouped_option(*GENERATION_CODEC.args, **GENERATION_CODEC.kwargs)
+@grouped_option(*GENERATION_MAXIMIZE.args, **GENERATION_MAXIMIZE.kwargs)
+@grouped_option(*GENERATION_WITH_SECURITY_PARAMETERS.args, **GENERATION_WITH_SECURITY_PARAMETERS.kwargs)
+@grouped_option(*GENERATION_GRAPHQL_ALLOW_NULL.args, **GENERATION_GRAPHQL_ALLOW_NULL.kwargs)
+@grouped_option(*GENERATION_DATABASE.args, **GENERATION_DATABASE.kwargs)
+@grouped_option(*GENERATION_UNIQUE_INPUTS.args, **GENERATION_UNIQUE_INPUTS.kwargs)
 @group("Global options")
-@grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
-@grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
+@grouped_option(*NO_COLOR.args, **NO_COLOR.kwargs)
+@grouped_option(*FORCE_COLOR.args, **FORCE_COLOR.kwargs)
 @click.pass_context  # type: ignore[untyped-decorator]
 def run(
     ctx: click.Context,
@@ -521,7 +253,7 @@ def run(
         color = config.color
     ensure_color(ctx, color)
 
-    validation.validate_auth_overlap(auth, headers)
+    validate_auth_overlap(auth, headers)
 
     # Then override the global config from CLI options
     config.update(

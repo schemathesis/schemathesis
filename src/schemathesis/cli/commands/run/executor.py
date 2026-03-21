@@ -14,8 +14,9 @@ from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonWriter
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
-from schemathesis.cli.commands.run.loaders import load_schema
+from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.ext.fs import open_file
+from schemathesis.cli.loaders import load_schema
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.fs import file_exists
@@ -44,9 +45,6 @@ def execute(
 ) -> None:
     event_stream = into_event_stream(location=location, config=config, filter_set=filter_set)
     _execute(event_stream, config=config, args=args, params=params)
-
-
-MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
 
 
 def into_event_stream(*, location: str, config: ProjectConfig, filter_set: dict[str, Any]) -> EventGenerator:

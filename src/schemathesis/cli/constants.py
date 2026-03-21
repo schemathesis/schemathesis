@@ -1,3 +1,4 @@
+MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
 MIN_WORKERS = 1
 DEFAULT_WORKERS = MIN_WORKERS
 MAX_WORKERS = 64
