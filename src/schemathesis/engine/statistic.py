@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -63,7 +64,9 @@ class Statistic:
         self.cases_with_failures = 0
         self.cases_without_checks = 0
 
-    def on_scenario_finished(self, recorder: ScenarioRecorder) -> None:
+    def on_scenario_finished(
+        self, recorder: ScenarioRecorder, *, failure_label: Callable[[Case], str] | None = None
+    ) -> None:
         """Update statistics and store failures from a new batch of checks."""
         from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
@@ -122,7 +125,7 @@ class Statistic:
                 ):
                     label = f"{case.value.method} {case.value.path}"
                 else:
-                    label = recorder.label
+                    label = failure_label(case.value) if failure_label is not None else recorder.label
                 failures_by_label.setdefault(label, {})[case_id] = GroupedFailures(
                     case_id=case_id,
                     code_sample=last_failure_info.code_sample,

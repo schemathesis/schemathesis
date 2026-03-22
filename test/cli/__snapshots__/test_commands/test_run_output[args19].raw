@@ -5,6 +5,9 @@ Usage: schemathesis run [OPTIONS] LOCATION
 
   Generate and run property-based tests against your API.
 
+  Runs configured test phases in order and exits on completion. Use --phases to
+  select which phases to run.
+
   LOCATION can be:
       - Local file: ./openapi.json, ./schema.yaml, ./schema.graphql
       - OpenAPI URL: https://api.example.com/openapi.json

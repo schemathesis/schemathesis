@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(fuzz=FuzzConfig(max_steps=11))))

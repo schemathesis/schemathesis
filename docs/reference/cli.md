@@ -457,7 +457,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String`  
 
-    Custom path for NDJSON events file. This format exports all engine events as newline-delimited JSON, useful for analysis and tooling integration. Available in `st run` only - not applicable to the pytest plugin.
+    Custom path for NDJSON events file. This format exports all engine events as newline-delimited JSON, useful for analysis and tooling integration. Not applicable to the pytest plugin.
 
     ```console
     $ st run openapi.yaml --report ndjson --report-ndjson-path ./events.ndjson
@@ -668,6 +668,31 @@ These options control how Schemathesis generates test data for API testing:
 
     ```console
     $ st run openapi.yaml --generation-unique-inputs
+    ```
+
+## `fuzz`
+
+The `fuzz` command continuously generates multi-step API scenarios.
+
+```console
+$ st fuzz [OPTIONS] SCHEMA
+```
+
+`st fuzz` accepts all options from [`st run`](#run) except `--phases`, `--no-shrink`, and `--max-examples`, plus the following fuzzing-specific options:
+
+### Fuzzing Options
+
+#### `--max-time SECONDS`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `null`  
+
+    Stop fuzzing after this many seconds. Without this option, `st fuzz` runs until the first failure or interrupted.
+
+    ```console
+    $ st fuzz openapi.yaml --max-time 3600
     ```
 
 ## Exit codes

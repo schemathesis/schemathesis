@@ -1,0 +1,25 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+Test Execution Error
+
+An internal error occurred during the test run
+
+    Traceback (most recent call last):
+      File "/package-root/cli/loaders.py", line XXX, in into_event_stream
+        yield from engine_callback(schema)
+      File "/package-root/cli/commands/fuzz/executor.py", line XXX, in <lambda>
+        engine_callback=lambda schema: from_schema(schema).fuzz(fuzz_config),
+      File "/test-root/cli/test_fuzz.py", line XXX, in fuzz
+        raise RuntimeError("internal error")
+    RuntimeError: internal error
+
+Tip: Please consider reporting the traceback above to our issue tracker:
+
+  https://github.com/schemathesis/schemathesis/issues/new?labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D.

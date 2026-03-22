@@ -4,22 +4,17 @@ from dataclasses import dataclass
 from typing import cast
 
 from schemathesis.config._diff_base import DiffBase
-from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 
 
 @dataclass(repr=False)
 class FuzzConfig(DiffBase):
     max_time: int | None
-    max_steps: int
 
-    __slots__ = ("max_time", "max_steps")
+    __slots__ = ("max_time",)
 
-    def __init__(self, *, max_time: int | None = None, max_steps: int | None = None) -> None:
+    def __init__(self, *, max_time: int | None = None) -> None:
         self.max_time = max_time
-        self.max_steps = max_steps or DEFAULT_MAX_SCENARIO_STEPS
 
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> FuzzConfig:
-        return cls(
-            max_time=cast("int | None", data.get("max-time")), max_steps=cast("int | None", data.get("max-steps"))
-        )
+        return cls(max_time=cast("int | None", data.get("max-time")))

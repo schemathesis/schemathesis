@@ -1,0 +1,35 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ 🚫  Fuzzing (in 0.00s)
+
+     ✅ N scenarios  🚫 N errors
+
+==================================== ERRORS ====================================
+__________________________________ GET /users __________________________________
+Network Error
+
+Read timed out after 0.001 seconds
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+  Errored: 1
+
+Stop reason: Completed
+
+Errors:
+  🚫 Network Error: 1
+
+Test cases:
+  N generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

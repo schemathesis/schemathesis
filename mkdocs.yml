@@ -28,6 +28,7 @@ nav:
       - guides/graphql-custom-scalars.md
       - guides/extending.md
       - guides/extending-cli.md
+      - Continuous Fuzzing: guides/continuous-fuzzing.md
       - guides/stateful-testing.md
       - Hypothesis Strategies: guides/hypothesis-strategies.md
       - guides/targeted.md

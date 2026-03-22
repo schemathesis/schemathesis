@@ -1,0 +1,49 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ N scenarios  ❌ N unique failures
+
+=================================== FAILURES ===================================
+__________________________________ GET /users __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200
+
+[500] Internal Server Error:
+
+    `{}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: N
+
+Stop reason: Completed
+
+Failures:
+  ❌ Server error: 1
+  ❌ Undocumented HTTP status code: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 2 failures in 1.00s ==============================

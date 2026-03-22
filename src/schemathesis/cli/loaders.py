@@ -8,19 +8,69 @@ from __future__ import annotations
 
 import os
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
+import click
+
 from schemathesis import graphql, openapi
+from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
+from schemathesis.cli.events import LoadingFinished, LoadingStarted
 from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
+from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
 
 if TYPE_CHECKING:
+    from schemathesis.engine import events
     from schemathesis.schemas import BaseSchema
 
 Loader = Callable[["ProjectConfig"], "BaseSchema"]
+
+
+def into_event_stream(
+    *,
+    location: str,
+    config: ProjectConfig,
+    filter_set: dict[str, Any],
+    engine_callback: Callable[[BaseSchema], Iterable[events.EngineEvent]],
+) -> EventGenerator:
+    # The whole engine idea is that it communicates with the outside via events, so handlers can react to them.
+    # For this reason, even schema loading is done via a separate set of events.
+    loading_started = LoadingStarted(location=location)
+    yield loading_started
+
+    try:
+        schema = load_schema(location=location, config=config)
+        # Schemas don't (yet?) use configs for deciding what operations should be tested, so
+        # a separate FilterSet is passed there. It combines both config file filters + CLI options.
+        schema.filter_set = schema.config.operations.create_filter_set(**filter_set)
+        if file_exists(location) and schema.config.base_url is None:
+            raise click.UsageError(MISSING_BASE_URL_MESSAGE)
+    except KeyboardInterrupt:
+        yield Interrupted(phase=None)
+        return
+    except LoaderError as exc:
+        yield FatalError(exception=exc)
+        return
+
+    yield LoadingFinished(
+        location=location,
+        start_time=loading_started.timestamp,
+        base_url=schema.get_base_url(),
+        specification=schema.specification,
+        statistic=schema.statistic,
+        schema=schema.raw_schema,
+        config=schema.config,
+        base_path=schema.base_path,
+        find_operation_by_label=schema.find_operation_by_label,
+    )
+
+    try:
+        yield from engine_callback(schema)
+    except Exception as exc:
+        yield FatalError(exception=exc)
 
 
 def load_schema(location: str, config: ProjectConfig) -> BaseSchema:
