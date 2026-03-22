@@ -402,11 +402,18 @@ class CoverageContext:
                 re.compile(pattern)
             except re.error:
                 raise Unsatisfiable from None
-            if "minLength" in schema or "maxLength" in schema:
-                min_length = schema.get("minLength")
-                max_length = schema.get("maxLength")
+            min_length = schema.get("minLength")
+            max_length = schema.get("maxLength")
+            if min_length is not None or max_length is not None:
                 pattern = update_quantifier(pattern, min_length, max_length)
-            return cached_draw(st.from_regex(pattern))
+            strategy = st.from_regex(pattern, fullmatch=True)
+            if min_length is not None and max_length is not None:
+                strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
+            elif min_length is not None:
+                strategy = strategy.filter(lambda s: len(s) >= min_length)
+            elif max_length is not None:
+                strategy = strategy.filter(lambda s: len(s) <= max_length)
+            return cached_draw(strategy)
         if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
             items = schema["items"]
             min_items = schema.get("minItems", 0)
@@ -1187,35 +1194,38 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         key = (min_length, min_length)
         if key not in seen_constraints:
             seen_constraints.add(key)
-            value = ctx.generate_from_schema({**schema, "maxLength": min_length})
-            if seen_values.insert(value):
-                yield PositiveValue(
-                    value, scenario=CoverageScenario.MINIMUM_LENGTH_STRING, description="Minimum length string"
-                )
+            with _ignore_unfixable():
+                value = ctx.generate_from_schema({**schema, "maxLength": min_length})
+                if seen_values.insert(value):
+                    yield PositiveValue(
+                        value, scenario=CoverageScenario.MINIMUM_LENGTH_STRING, description="Minimum length string"
+                    )
 
         # One character more than minimum if possible
         larger = min_length + 1
         key = (larger, larger)
         if larger < INTERNAL_BUFFER_SIZE and key not in seen_constraints and (not max_length or larger <= max_length):
             seen_constraints.add(key)
-            value = ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger})
-            if seen_values.insert(value):
-                yield PositiveValue(
-                    value,
-                    scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
-                    description="Near-boundary length string",
-                )
+            with _ignore_unfixable():
+                value = ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger})
+                if seen_values.insert(value):
+                    yield PositiveValue(
+                        value,
+                        scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
+                        description="Near-boundary length string",
+                    )
 
     if max_length is not None:
         # Exactly the maximum length
         key = (max_length, max_length)
         if max_length < INTERNAL_BUFFER_SIZE and key not in seen_constraints:
             seen_constraints.add(key)
-            value = ctx.generate_from_schema({**schema, "minLength": max_length, "maxLength": max_length})
-            if seen_values.insert(value):
-                yield PositiveValue(
-                    value, scenario=CoverageScenario.MAXIMUM_LENGTH_STRING, description="Maximum length string"
-                )
+            with _ignore_unfixable():
+                value = ctx.generate_from_schema({**schema, "minLength": max_length, "maxLength": max_length})
+                if seen_values.insert(value):
+                    yield PositiveValue(
+                        value, scenario=CoverageScenario.MAXIMUM_LENGTH_STRING, description="Maximum length string"
+                    )
 
         # One character less than maximum if possible
         smaller = max_length - 1
@@ -1226,13 +1236,14 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             and (smaller > 0 and (min_length is None or smaller >= min_length))
         ):
             seen_constraints.add(key)
-            value = ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller})
-            if seen_values.insert(value):
-                yield PositiveValue(
-                    value,
-                    scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
-                    description="Near-boundary length string",
-                )
+            with _ignore_unfixable():
+                value = ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller})
+                if seen_values.insert(value):
+                    yield PositiveValue(
+                        value,
+                        scenario=CoverageScenario.NEAR_BOUNDARY_LENGTH_STRING,
+                        description="Near-boundary length string",
+                    )
 
 
 def closest_multiple_greater_than(y: int, x: int) -> int:
