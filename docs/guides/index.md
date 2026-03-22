@@ -39,6 +39,9 @@ Transform test data into non-JSON formats like CSV, MessagePack, or XML for APIs
 ### [Custom Response Deserializers](custom-response-deserializers.md)
 Decode non-JSON or vendor-specific responses back into Python objects so schema checks work with your API.
 
+### [Server-Sent Events](server-sent-events.md)
+Test `text/event-stream` endpoints - validate each event against `itemSchema`, handle polymorphic event types, and work with embedded JSON payloads.
+
 ### [GraphQL Custom Scalars](graphql-custom-scalars.md)
 Configure domain-specific scalar types so Schemathesis generates appropriate test data for emails, phone numbers, or custom IDs.
 
