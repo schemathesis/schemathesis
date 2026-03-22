@@ -122,7 +122,7 @@ class Statistic:
                 ):
                     label = f"{case.value.method} {case.value.path}"
                 else:
-                    label = recorder.label
+                    label = case.value.operation.label
                 failures_by_label.setdefault(label, {})[case_id] = GroupedFailures(
                     case_id=case_id,
                     code_sample=last_failure_info.code_sample,
