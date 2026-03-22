@@ -7,6 +7,7 @@ from typing import Any
 import click
 
 from schemathesis.cli.commands.data import Data
+from schemathesis.cli.commands.fuzz import fuzz as fuzz_command
 from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
 from schemathesis.cli.core import get_terminal_width
@@ -140,3 +141,9 @@ run = schemathesis.command(
     cls=CommandWithGroupedOptions,
     context_settings={"terminal_width": get_terminal_width(), **CONTEXT_SETTINGS},
 )(run_command)
+
+fuzz = schemathesis.command(
+    short_help="Run continuous fuzzing tests against your API",
+    cls=CommandWithGroupedOptions,
+    context_settings={"terminal_width": get_terminal_width(), **CONTEXT_SETTINGS},
+)(fuzz_command)

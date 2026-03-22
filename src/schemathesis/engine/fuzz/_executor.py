@@ -5,12 +5,14 @@ import sys
 import threading
 import time
 import uuid
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from warnings import catch_warnings
 
 import requests
 from requests.exceptions import ChunkedEncodingError
+from urllib3.exceptions import InsecureRequestWarning
 
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
@@ -105,11 +107,13 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
             target=_run_forever_thread,
             name=f"schemathesis_fuzz_{worker_id}",
             kwargs={"ctx": ctx, "config": config, "event_queue": event_queue, "worker_id": worker_id},
+            daemon=True,  # killed when the main thread exits; prevents _thread._shutdown() hang
         )
         for worker_id in range(ctx.config.workers)
     ]
     for thread in threads:
         thread.start()
+    _join_on_exit = True
     try:
         while True:
             try:
@@ -122,11 +126,15 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
                 if not any(t.is_alive() for t in threads):
                     break
     except KeyboardInterrupt:
+        _join_on_exit = False
         ctx.stop()
         yield events.Interrupted(phase=None)
     finally:
-        for thread in threads:
-            thread.join()
+        # On interrupt, skip join — workers are daemon threads and will be killed at process exit.
+        # Workers blocked in HTTP calls cannot be interrupted from the main thread anyway.
+        if _join_on_exit:
+            for thread in threads:
+                thread.join()
 
 
 def _run_forever_thread(
@@ -152,11 +160,9 @@ def _run_forever_thread(
     )
 
     suite_id = uuid.uuid4()
-    # Used to communicate current scenario ID from hypothesis strategy to the test function
+    # Used to communicate scenario start time from hypothesis strategy to the test function
     scenario_cell: Cell = Cell(value=None)
     check_context_cache = CheckContextCache()
-    # Operations excluded after generation errors; updated across scenario invocations.
-    excluded_operations: set[str] = set()
     strategy_kwargs_by_label: dict[str, dict] = {
         op.label: _build_strategy_kwargs(ctx.config, operation=op) for op in operations
     }
@@ -170,6 +176,8 @@ def _run_forever_thread(
     # Layer-0 producers appear more often; consumers and non-OpenAPI ops get weight 1.
     weights_by_label = compute_operation_weights(ctx.schema, operations)
     weighted_operations = [op for op in operations for _ in range(weights_by_label[op.label])]
+    # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
+    seen_error_labels: set[str] = set()
 
     @st.composite  # type: ignore[untyped-decorator]
     def scheduler(draw: hypothesis.strategies.DrawFn) -> ScenarioRecorder:
@@ -180,14 +188,15 @@ def _run_forever_thread(
          - Prefers producers over consumers
          - Does not use data from responses
         """
-        if ctx.has_to_stop or not any(op.label not in excluded_operations for op in operations):
+        if ctx.has_to_stop:
             raise _StopFuzzing
 
-        started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
-        event_queue.put(started)
-        scenario_cell.value = ActiveScenario(scenario_id=started.id, started_at=time.monotonic())
-
+        # Capture timing before any draws so elapsed_time covers HTTP calls made in the strategy.
+        scenario_started_at = time.monotonic()
         recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL)
+        # Local to this scenario invocation — avoids cross-scenario shared state that causes
+        # FlakyStrategyDefinition when Hypothesis replays examples.
+        excluded_operations: set[str] = set()
 
         for _ in range(config.max_steps):
             choices = [op for op in weighted_operations if op.label not in excluded_operations]
@@ -200,14 +209,16 @@ def _run_forever_thread(
                 raise  # let Hypothesis handle filtered examples normally
             except Exception as exc:
                 excluded_operations.add(operation.label)
-                event_queue.put(
-                    events.NonFatalError(
-                        error=exc,
-                        phase=None,
-                        label=operation.label,
-                        related_to_operation=True,
+                if operation.label not in seen_error_labels:
+                    seen_error_labels.add(operation.label)
+                    event_queue.put(
+                        events.NonFatalError(
+                            error=exc,
+                            phase=None,
+                            label=operation.label,
+                            related_to_operation=True,
+                        )
                     )
-                )
                 continue
             recorder.record_case(
                 parent_id=None,
@@ -218,17 +229,24 @@ def _run_forever_thread(
             try:
                 response = case.call(**ctx.get_transport_kwargs(operation=operation))
             except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as exc:
-                event_queue.put(
-                    events.NonFatalError(
-                        error=exc,
-                        phase=None,
-                        label=operation.label,
-                        related_to_operation=True,
+                if operation.label not in seen_error_labels:
+                    seen_error_labels.add(operation.label)
+                    event_queue.put(
+                        events.NonFatalError(
+                            error=exc,
+                            phase=None,
+                            label=operation.label,
+                            related_to_operation=True,
+                        )
                     )
-                )
                 continue
             recorder.record_response(case_id=case.id, response=response)
 
+        # Emit the start event only after all draws complete — if Hypothesis retries the strategy
+        # due to UnsatisfiedAssumption, no orphaned FuzzScenarioStarted is left on the queue.
+        started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
+        event_queue.put(started)
+        scenario_cell.value = ActiveScenario(scenario_id=started.id, started_at=scenario_started_at)
         return recorder
 
     @hypothesis.seed(ctx.config.seed)  # type: ignore[untyped-decorator]
@@ -293,6 +311,7 @@ def _run_forever_thread(
 
     try:
         with catch_warnings(), ignore_hypothesis_output():
+            warnings.filterwarnings("ignore", category=InsecureRequestWarning)
             fuzz_test()
     except _StopFuzzing:
         # natural thread completion — no work left, don't touch other workers
