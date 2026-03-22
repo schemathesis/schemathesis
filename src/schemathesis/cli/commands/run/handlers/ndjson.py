@@ -3,13 +3,16 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from queue import Queue
+from typing import TYPE_CHECKING
 
-from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEOUT, EventHandler, TextOutput
 from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.engine import events
 from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.ndjson import NdjsonWriter
+
+if TYPE_CHECKING:
+    from schemathesis.cli.context import BaseExecutionContext
 
 
 class NdjsonHandler(EventHandler):
@@ -38,13 +41,13 @@ class NdjsonHandler(EventHandler):
         )
         self.worker.start()
 
-    def start(self, ctx: ExecutionContext) -> None:
+    def start(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Initialize(seed=ctx.config.seed, command=get_command_representation()))
 
-    def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
+    def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         self.queue.put(_Process(payload=event))
 
-    def shutdown(self, ctx: ExecutionContext) -> None:
+    def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.queue.put(_Finalize())
         self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
 

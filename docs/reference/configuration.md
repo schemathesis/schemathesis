@@ -1225,3 +1225,21 @@ Controls whether Schemathesis produces unexpected query, header, cookie, or body
     [generation]
     unique-inputs = true
     ```
+
+## Continuous Fuzzing
+
+Settings for `st fuzz`.
+
+#### `fuzz.max-time`
+
+!!! note ""
+
+    **Type:** `Integer`  
+    **Default:** `null`  
+
+    Stop fuzzing after this many seconds. Without this setting, `st fuzz` runs until the first failure or interrupted.
+
+    ```toml
+    [fuzz]
+    max-time = 3600
+    ```

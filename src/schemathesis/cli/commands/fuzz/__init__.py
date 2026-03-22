@@ -8,12 +8,11 @@ import click
 from click.utils import LazyFile
 
 from schemathesis.checks import load_all_checks
-from schemathesis.cli.commands.run import executor
+from schemathesis.cli.commands.fuzz import executor
 from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import COLOR_OPTIONS_INVALID_USAGE_MESSAGE
 from schemathesis.cli.core import ensure_color, resolve_color
 from schemathesis.cli.ext.groups import group, grouped_option
-from schemathesis.cli.ext.options import CsvChoice
 from schemathesis.cli.options import (
     AUTH,
     BASE_URL,
@@ -28,7 +27,6 @@ from schemathesis.cli.options import (
     GENERATION_DATABASE,
     GENERATION_DETERMINISTIC,
     GENERATION_GRAPHQL_ALLOW_NULL,
-    GENERATION_MAX_EXAMPLES,
     GENERATION_MAXIMIZE,
     GENERATION_MODE,
     GENERATION_SEED,
@@ -66,6 +64,7 @@ from schemathesis.cli.options import (
 from schemathesis.cli.validation import validate_auth_overlap
 from schemathesis.config import (
     DEFAULT_REPORT_DIRECTORY,
+    FuzzConfig,
     HealthCheck,
     ReportFormat,
     SchemathesisConfig,
@@ -77,19 +76,18 @@ from schemathesis.generation.metrics import MetricFunction
 
 load_all_checks()
 
-DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
-
 
 @click.argument(*LOCATION.args, **LOCATION.kwargs)  # type: ignore[untyped-decorator]
 @group("Options")
 @grouped_option(*BASE_URL.args, **BASE_URL.kwargs)
 @grouped_option(*WORKERS.args, **WORKERS.kwargs)
 @grouped_option(
-    "--phases",
-    help="A comma-separated list of test phases to run",
-    type=CsvChoice(DEFAULT_PHASES),
-    default=",".join(DEFAULT_PHASES),
-    metavar="",
+    "--max-time",
+    "max_time",
+    help="Stop fuzzing after this many seconds",
+    type=int,
+    default=None,
+    metavar="SECONDS",
 )
 @grouped_option(*SUPPRESS_HEALTH_CHECK.args, **SUPPRESS_HEALTH_CHECK.kwargs)
 @grouped_option(*WAIT_FOR_SCHEMA.args, **WAIT_FOR_SCHEMA.kwargs)
@@ -138,15 +136,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 @grouped_option(*OUTPUT_TRUNCATE.args, **OUTPUT_TRUNCATE.kwargs)
 @group("Data generation options")
 @grouped_option(*GENERATION_MODE.args, **GENERATION_MODE.kwargs)
-@grouped_option(*GENERATION_MAX_EXAMPLES.args, **GENERATION_MAX_EXAMPLES.kwargs)
 @grouped_option(*GENERATION_SEED.args, **GENERATION_SEED.kwargs)
-@grouped_option(
-    "--no-shrink",
-    "generation_no_shrink",
-    help="Disable test case shrinking. Makes test failures harder to debug but improves performance",
-    is_flag=True,
-    default=None,
-)
 @grouped_option(*GENERATION_DETERMINISTIC.args, **GENERATION_DETERMINISTIC.kwargs)
 @grouped_option(*GENERATION_ALLOW_X00.args, **GENERATION_ALLOW_X00.kwargs)
 @grouped_option(*GENERATION_CODEC.args, **GENERATION_CODEC.kwargs)
@@ -159,7 +149,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 @grouped_option(*NO_COLOR.args, **NO_COLOR.kwargs)
 @grouped_option(*FORCE_COLOR.args, **FORCE_COLOR.kwargs)
 @click.pass_context  # type: ignore[untyped-decorator]
-def run(
+def fuzz(
     ctx: click.Context,
     *,
     location: str,
@@ -168,7 +158,7 @@ def run(
     included_check_names: list[str] | None,
     excluded_check_names: list[str] | None,
     max_response_time: float | None = None,
-    phases: list[str] = DEFAULT_PHASES,
+    max_time: int | None = None,
     max_failures: int | None = None,
     continue_on_failure: bool | None = None,
     include_path: tuple[str, ...],
@@ -219,7 +209,6 @@ def run(
     output_truncate: bool | None = None,
     generation_modes: list[GenerationMode],
     generation_seed: int | None = None,
-    generation_max_examples: int | None = None,
     generation_maximize: list[MetricFunction] | None,
     generation_deterministic: bool | None = None,
     generation_database: str | None = None,
@@ -228,15 +217,14 @@ def run(
     generation_graphql_allow_null: bool | None = None,
     generation_with_security_parameters: bool | None = None,
     generation_codec: str | None = None,
-    generation_no_shrink: bool | None = None,
     force_color: bool = False,
     no_color: bool = False,
     **__kwargs: Any,
 ) -> None:
-    """Generate and run property-based tests against your API.
+    """Continuously fuzz your API with multi-step operation sequences.
 
-    Runs configured test phases in order and exits on completion.
-    Use --phases to select which phases to run.
+    Generates chains of API calls across operations and validates each
+    response. Runs until --max-time is reached or interrupted.
 
     \b
     LOCATION can be:
@@ -249,13 +237,11 @@ def run(
 
     config: SchemathesisConfig = ctx.obj.config
 
-    # First, set the right color
     color = resolve_color(force_color, no_color, config.color)
     ensure_color(ctx, color)
 
     validate_auth_overlap(auth, headers)
 
-    # Then override the global config from CLI options
     config.update(
         color=color,
         suppress_health_check=suppress_health_check,
@@ -275,7 +261,6 @@ def run(
         directory=Path(report_directory),
         preserve_bytes=report_preserve_bytes,
     )
-    # Other CLI options work as an override for all defined projects
     config.projects.override.update(
         base_url=base_url,
         headers=headers or None,
@@ -294,7 +279,6 @@ def run(
         if warnings is not None
         else None,
     )
-    # These are filters for what API operations should be tested
     filter_set = {
         "include_path": include_path,
         "include_method": include_method,
@@ -320,7 +304,6 @@ def run(
         "exclude_by": exclude_by,
         "exclude_deprecated": exclude_deprecated,
     }
-    config.projects.override.phases.update(phases=phases)
     config.projects.override.checks.update(
         included_check_names=included_check_names,
         excluded_check_names=excluded_check_names,
@@ -328,8 +311,6 @@ def run(
     )
     config.projects.override.generation.update(
         modes=generation_modes,
-        max_examples=generation_max_examples,
-        no_shrink=generation_no_shrink,
         maximize=generation_maximize,
         deterministic=generation_deterministic,
         database=generation_database,
@@ -340,11 +321,14 @@ def run(
         codec=generation_codec,
     )
 
+    project_fuzz = config.projects.get_default().fuzz
+    fuzz_config = FuzzConfig(max_time=max_time if max_time is not None else project_fuzz.max_time)
+
     executor.execute(
         location=location,
         filter_set=filter_set,
-        # We don't the project yet, so pass the default config
         config=config.projects.get_default(),
+        fuzz_config=fuzz_config,
         args=ctx.args,
         params=ctx.params,
     )

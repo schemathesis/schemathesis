@@ -207,6 +207,20 @@ uvx schemathesis --config-file path/to/config.toml run http://...
 !!! info "Configuration precedence"
     CLI options override config file settings, so you can still adjust settings temporarily.
 
+## Continuous Fuzzing
+
+`st run` exits when it's done. `st fuzz` is designed for the opposite: it keeps running, continuously generating test cases, until it finds a failure, a time limit is reached, or you stop it.
+
+Run a short fuzzing session:
+
+```bash
+uvx schemathesis fuzz http://127.0.0.1:8080/openapi.json --max-time 30
+```
+
+`st fuzz` stops on the first failure, when `--max-time` expires, or when you press Ctrl+C.
+
+For details, see [Continuous Fuzzing](../guides/continuous-fuzzing.md).
+
 ## What's next?
 
 **Continue learning:**

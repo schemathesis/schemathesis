@@ -7,6 +7,7 @@ from typing import Any
 import click
 
 from schemathesis.cli.commands.data import Data
+from schemathesis.cli.commands.fuzz import fuzz as fuzz_command
 from schemathesis.cli.commands.run import run as run_command
 from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL
 from schemathesis.cli.core import get_terminal_width
@@ -132,11 +133,18 @@ class Group:
     __slots__ = ("name",)
 
     def add_option(self, *args: Any, **kwargs: Any) -> None:
-        run.params.append(GroupedOption(args, group=self.name, **kwargs))
+        for command in (run, fuzz):
+            command.params.append(GroupedOption(args, group=self.name, **kwargs))
 
 
 run = schemathesis.command(
-    short_help="Execute automated tests based on API specifications",
+    short_help="Run property-based API tests",
     cls=CommandWithGroupedOptions,
     context_settings={"terminal_width": get_terminal_width(), **CONTEXT_SETTINGS},
 )(run_command)
+
+fuzz = schemathesis.command(
+    short_help="Run continuous API fuzzing",
+    cls=CommandWithGroupedOptions,
+    context_settings={"terminal_width": get_terminal_width(), **CONTEXT_SETTINGS},
+)(fuzz_command)

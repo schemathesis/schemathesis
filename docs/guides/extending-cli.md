@@ -119,6 +119,9 @@ class CounterHandler(cli.EventHandler):
 
 ## Using the extension
 
+!!! note "Works with `st fuzz` too"
+    Handlers registered with `@cli.handler()` run for both `st run` and `st fuzz`. Events like `EngineFinished` fire in both commands.
+
 ```bash
 export SCHEMATHESIS_HOOKS=cli_extensions
 

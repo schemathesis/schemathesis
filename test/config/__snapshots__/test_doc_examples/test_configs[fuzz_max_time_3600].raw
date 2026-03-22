@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(fuzz=FuzzConfig(max_time=3600))))

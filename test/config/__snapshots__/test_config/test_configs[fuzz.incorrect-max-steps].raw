@@ -1,4 +1,0 @@
-Error in [fuzz] section:
-  Type error:
-
-  - 'max-steps' -> Must be an integer, but got str: eleven

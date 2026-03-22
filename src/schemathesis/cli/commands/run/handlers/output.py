@@ -2,33 +2,36 @@ from __future__ import annotations
 
 import textwrap
 import time
-from collections.abc import Callable, Generator, Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from itertools import groupby
 from json.decoder import JSONDecodeError
-from types import GeneratorType
 from typing import TYPE_CHECKING
 
 import click
 
-from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
-from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.constants import ISSUE_TRACKER_URL
+from schemathesis.cli.commands.run.handlers.base import BaseOutputHandler
+from schemathesis.cli.context import BaseExecutionContext
 from schemathesis.cli.output import (
     BLOCK_PADDING,
     LoadingProgressManager,
     _style,
+    display_api_operations,
     display_errors_summary,
     display_failures,
+    display_failures_summary,
+    display_fatal_error,
+    display_final_line,
     display_header,
     display_section_name,
+    display_seed,
+    display_test_cases,
     format_duration,
     make_console,
+    print_lines,
 )
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
-from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
-from schemathesis.core.failures import Severity
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
@@ -70,45 +73,7 @@ def bold(option: str) -> str:
     return click.style(option, bold=True)
 
 
-VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema or GraphQL endpoint"
-DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--tls-verify=false`')}."
-LOADER_ERROR_SUGGESTIONS = {
-    # SSL-specific connection issue
-    LoaderErrorKind.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
-    # Other connection problems
-    LoaderErrorKind.CONNECTION_OTHER: f"Use {bold('`--wait-for-schema=NUM`')} to wait up to NUM seconds for schema availability.",
-    # Response issues
-    LoaderErrorKind.UNEXPECTED_CONTENT_TYPE: VERIFY_URL_SUGGESTION,
-    LoaderErrorKind.HTTP_FORBIDDEN: "Verify your API keys or authentication headers.",
-    LoaderErrorKind.HTTP_NOT_FOUND: VERIFY_URL_SUGGESTION,
-    # OpenAPI specification issues
-    LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION: "Include the version in the schema.",
-    # YAML specific issues
-    LoaderErrorKind.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
-    LoaderErrorKind.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",
-    # Unclassified
-    LoaderErrorKind.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can:\n\n  {ISSUE_TRACKER_URL}",
-}
-
-
-def _display_extras(extras: list[str]) -> None:
-    if extras:
-        click.echo()
-    for extra in extras:
-        click.echo(_style(f"    {extra}"))
-
-
-DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 TRUNCATION_PLACEHOLDER = "[...]"
-
-
-def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
-    for entry in lines:
-        if isinstance(entry, str):
-            click.echo(entry)
-        elif isinstance(entry, GeneratorType):
-            for line in entry:
-                click.echo(line)
 
 
 @dataclass
@@ -648,7 +613,7 @@ class StatefulProgressManager:
 
 
 @dataclass
-class OutputHandler(EventHandler):
+class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
     config: ProjectConfig
 
     loading_manager: LoadingProgressManager | None = None
@@ -665,7 +630,7 @@ class OutputHandler(EventHandler):
     )
     console: Console = field(default_factory=make_console)
 
-    def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
+    def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.PhaseStarted):
             self._on_phase_started(event)
         elif isinstance(event, events.PhaseFinished):
@@ -689,10 +654,10 @@ class OutputHandler(EventHandler):
         elif isinstance(event, LoadingFinished):
             self._on_loading_finished(ctx, event)
 
-    def start(self, ctx: ExecutionContext) -> None:
+    def start(self, ctx: BaseExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
 
-    def shutdown(self, ctx: ExecutionContext) -> None:
+    def shutdown(self, ctx: BaseExecutionContext) -> None:
         if self.unit_tests_manager is not None:
             self.unit_tests_manager.stop()
         if self.stateful_tests_manager is not None:
@@ -702,11 +667,7 @@ class OutputHandler(EventHandler):
         if self.probing_manager is not None:
             self.probing_manager.stop()
 
-    def _on_loading_started(self, event: LoadingStarted) -> None:
-        self.loading_manager = LoadingProgressManager(console=self.console, location=event.location)
-        self.loading_manager.start()
-
-    def _on_loading_finished(self, ctx: ExecutionContext, event: LoadingFinished) -> None:
+    def _on_loading_finished(self, ctx: BaseExecutionContext, event: LoadingFinished) -> None:
         from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
@@ -746,7 +707,7 @@ class OutputHandler(EventHandler):
         self.console.print()
 
         if ctx.initialization_lines:
-            _print_lines(ctx.initialization_lines)
+            print_lines(ctx.initialization_lines)
 
     def _on_phase_started(self, event: events.PhaseStarted) -> None:
         phase = event.phase
@@ -894,7 +855,7 @@ class OutputHandler(EventHandler):
             assert self.unit_tests_manager is not None
             self.unit_tests_manager.start_operation(event.label)
 
-    def _on_scenario_finished(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+    def _on_scenario_finished(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
             assert self.unit_tests_manager is not None
             if event.label:
@@ -918,7 +879,7 @@ class OutputHandler(EventHandler):
             self.stateful_tests_manager.update(links_seen, event.status)
             self._check_stateful_warnings(ctx, event)
 
-    def _check_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+    def _check_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         from schemathesis.core.compat import RefResolutionError
 
         statistic = aggregate_status_codes(event.recorder.interactions.values())
@@ -995,7 +956,7 @@ class OutputHandler(EventHandler):
                 )
 
     def _handle_warning(
-        self, ctx: ExecutionContext, kind: SchemathesisWarning, record_callback: Callable[[], None]
+        self, ctx: BaseExecutionContext, kind: SchemathesisWarning, record_callback: Callable[[], None]
     ) -> None:
         """Handle a warning by checking display/fail config and recording it."""
         if not self.config.warnings.should_display(kind):
@@ -1028,7 +989,7 @@ class OutputHandler(EventHandler):
 
         return record
 
-    def _check_stateful_warnings(self, ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
+    def _check_stateful_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
         # If stateful testing had successful responses for API operations that were marked with "missing_test_data"
         # warnings, then remove them from warnings
         for key, node in event.recorder.cases.items():
@@ -1040,7 +1001,7 @@ class OutputHandler(EventHandler):
                     self.warnings.missing_test_data.remove(node.value.operation.label)
                     continue
 
-    def _on_schema_warnings(self, ctx: ExecutionContext, event: events.SchemaAnalysisWarnings) -> None:
+    def _on_schema_warnings(self, ctx: BaseExecutionContext, event: events.SchemaAnalysisWarnings) -> None:
         """Process schema-level warnings emitted outside of scenarios."""
         for warning in event.warnings:
             if warning.kind is SchemathesisWarning.MISSING_DESERIALIZER:
@@ -1091,49 +1052,15 @@ class OutputHandler(EventHandler):
             self.console.print()
             self.probing_manager = None
 
-    def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
-        from rich.padding import Padding
-        from rich.text import Text
-
+    def _on_fatal_error(self, ctx: BaseExecutionContext, event: events.FatalError) -> None:
         self.shutdown(ctx)
-
-        if isinstance(event.exception, LoaderError):
-            assert self.loading_manager is not None
-            message = Padding(self.loading_manager.get_error_message(event.exception), BLOCK_PADDING)
-            self.console.print(message)
-            self.console.print()
-            self.loading_manager = None
-
-            if event.exception.extras:
-                for extra in event.exception.extras:
-                    self.console.print(Padding(Text(extra), (0, 0, 0, 5)))
-                self.console.print()
-
-            if not (
-                event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.config.wait_for_schema is not None
-            ):
-                suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
-                if suggestion is not None:
-                    click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
-
-            raise click.Abort
-        title = "Test Execution Error"
-        message = DEFAULT_INTERNAL_ERROR_MESSAGE
-        traceback = format_exception(event.exception, with_traceback=True)
-        extras = split_traceback(traceback)
-        suggestion = f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-        click.echo(_style(title, fg="red", bold=True))
-        click.echo()
-        click.echo(message)
-        _display_extras(extras)
-        if not (
-            isinstance(event.exception, LoaderError)
-            and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
-            and self.config.wait_for_schema is not None
-        ):
-            click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
-
-        raise click.Abort
+        display_fatal_error(
+            self.console,
+            self.loading_manager,
+            event,
+            wait_for_schema=self.config.wait_for_schema,
+        )
+        self.loading_manager = None
 
     def _print_warning_header(self, title: str, count: int, entity_name: str, suffix_text: str) -> None:
         """Print warning block header."""
@@ -1263,7 +1190,7 @@ class OutputHandler(EventHandler):
                 tips=["💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html"],
             )
 
-    def display_stateful_failures(self, ctx: ExecutionContext) -> None:
+    def display_stateful_failures(self, ctx: BaseExecutionContext) -> None:
         display_section_name("Stateful tests")
 
         click.echo("\nFailed to extract data from response:")
@@ -1312,17 +1239,9 @@ class OutputHandler(EventHandler):
 
         click.echo()
 
-    def display_api_operations(self, ctx: ExecutionContext) -> None:
+    def display_api_operations(self, ctx: BaseExecutionContext) -> None:
         assert self.statistic is not None
-        click.echo(_style("API Operations:", bold=True))
-        click.echo(
-            _style(
-                f"  Selected: {click.style(str(self.statistic.operations.selected), bold=True)}/"
-                f"{click.style(str(self.statistic.operations.total), bold=True)}"
-            )
-        )
-        click.echo(_style(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}"))
-        errors = len(
+        errored = len(
             {
                 err.label
                 for err in self.errors
@@ -1332,16 +1251,16 @@ class OutputHandler(EventHandler):
                 and err.related_to_operation
             }
         )
-        if errors:
-            click.echo(_style(f"  Errored: {click.style(str(errors), bold=True)}"))
-
         # API operations that are skipped due to fail-fast are counted here as well
-        total_skips = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errors
-        if total_skips:
-            click.echo(_style(f"  Skipped: {click.style(str(total_skips), bold=True)}"))
-            for reason in sorted(set(self.skip_reasons)):
-                click.echo(_style(f"    - {reason.rstrip('.')}"))
-        click.echo()
+        skipped = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errored
+        display_api_operations(
+            selected=self.statistic.operations.selected,
+            total=self.statistic.operations.total,
+            tested=len(ctx.statistic.tested_operations),
+            errored=errored,
+            skipped=skipped,
+            skip_reasons=self.skip_reasons,
+        )
 
     def display_phases(self) -> None:
         click.echo(_style("Test Phases:", bold=True))
@@ -1368,88 +1287,26 @@ class OutputHandler(EventHandler):
                 click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
         click.echo()
 
-    def display_test_cases(self, ctx: ExecutionContext) -> None:
-        if ctx.statistic.total_cases == 0:
-            click.echo(_style("Test cases:", bold=True))
-            click.echo("  No test cases were generated\n")
-            return
+    def display_test_cases(self, ctx: BaseExecutionContext) -> None:
+        display_test_cases(ctx.statistic)
 
-        unique_failures = sum(
-            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
-        )
-        click.echo(_style("Test cases:", bold=True))
-
-        parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
-
-        # Don't show pass/fail status if all cases were skipped
-        if ctx.statistic.cases_without_checks == ctx.statistic.total_cases:
-            parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
-        else:
-            if unique_failures > 0:
-                parts.append(
-                    f"{click.style(str(ctx.statistic.cases_with_failures), bold=True)} found "
-                    f"{click.style(str(unique_failures), bold=True)} unique failures"
-                )
-            else:
-                parts.append(f"{click.style(str(ctx.statistic.total_cases), bold=True)} passed")
-
-            if ctx.statistic.cases_without_checks > 0:
-                parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
-
-        click.echo(_style(", ".join(parts) + "\n"))
-
-    def display_failures_summary(self, ctx: ExecutionContext) -> None:
-        # Collect all unique failures and their counts by title
-        failure_counts: dict[str, tuple[Severity, int]] = {}
-        for grouped in ctx.statistic.failures.values():
-            for group in grouped.values():
-                for failure in group.failures:
-                    data = failure_counts.get(failure.title, (failure.severity, 0))
-                    failure_counts[failure.title] = (failure.severity, data[1] + 1)
-
-        click.echo(_style("Failures:", bold=True))
-
-        # Sort by severity first, then by title
-        sorted_failures = sorted(failure_counts.items(), key=lambda x: (x[1][0], x[0]))
-
-        for title, (_, count) in sorted_failures:
-            click.echo(_style(f"  ❌ {title}: "), nl=False)
-            click.echo(_style(str(count), bold=True))
-        click.echo()
+    def display_failures_summary(self, ctx: BaseExecutionContext) -> None:
+        display_failures_summary(ctx.statistic)
 
     def display_errors_summary(self) -> None:
         display_errors_summary(self.errors)
 
-    def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
-        parts = []
-
+    def display_final_line(self, ctx: BaseExecutionContext, event: events.EngineFinished) -> None:
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
         )
-        if unique_failures:
-            suffix = "s" if unique_failures > 1 else ""
-            parts.append(f"{unique_failures} failure{suffix}")
-
-        if self.errors:
-            suffix = "s" if len(self.errors) > 1 else ""
-            parts.append(f"{len(self.errors)} error{suffix}")
-
-        warning_kinds = self.warnings.kind_count
-        if warning_kinds:
-            suffix = "s" if warning_kinds > 1 else ""
-            parts.append(f"{warning_kinds} warning{suffix}")
-
-        if parts:
-            message = f"{', '.join(parts)} in {event.running_time:.2f}s"
-            color = "red" if (unique_failures or self.errors) else "yellow"
-        elif ctx.statistic.total_cases == 0:
-            message = "Empty test suite"
-            color = "yellow"
-        else:
-            message = f"No issues found in {event.running_time:.2f}s"
-            color = "green"
-
-        display_section_name(message, fg=color)
+        display_final_line(
+            failures=unique_failures,
+            errors=len(self.errors),
+            warnings=self.warnings.kind_count,
+            running_time=event.running_time,
+            total_cases=ctx.statistic.total_cases,
+        )
 
     def display_reports(self) -> None:
         reports = self.config.reports
@@ -1467,16 +1324,9 @@ class OutputHandler(EventHandler):
             click.echo()
 
     def display_seed(self) -> None:
-        click.echo(_style("Seed: ", bold=True), nl=False)
-        # Deterministic mode can be applied to a subset of tests, but we only care if it is enabled everywhere
-        # If not everywhere, then the seed matter and should be displayed
-        if self.config.seed is None or self.config.generation.deterministic:
-            click.echo("not used in the deterministic mode")
-        else:
-            click.echo(str(self.config.seed))
-        click.echo()
+        display_seed(self.config)
 
-    def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
+    def _on_engine_finished(self, ctx: BaseExecutionContext, event: events.EngineFinished) -> None:
         assert self.loading_manager is None
         assert self.probing_manager is None
         assert self.unit_tests_manager is None
@@ -1584,7 +1434,7 @@ class OutputHandler(EventHandler):
             click.echo()
 
         if ctx.summary_lines:
-            _print_lines(ctx.summary_lines)
+            print_lines(ctx.summary_lines)
             click.echo()
 
         self.display_test_cases(ctx)

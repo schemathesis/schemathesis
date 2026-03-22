@@ -1,13 +1,10 @@
-import click
-
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.har import HarHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
-from schemathesis.cli.constants import EXTENSIONS_DOCUMENTATION_URL, ISSUE_TRACKER_URL
-from schemathesis.core.errors import format_exception
+from schemathesis.cli.executor import display_handler_error, is_built_in_handler
 
 __all__ = [
     "EventHandler",
@@ -17,48 +14,5 @@ __all__ = [
     "NdjsonHandler",
     "OutputHandler",
     "display_handler_error",
+    "is_built_in_handler",
 ]
-
-
-try:
-    from schemathesis.cli.commands.run.handlers.allure import AllureHandler
-
-    _BUILT_IN_HANDLERS: tuple[type[EventHandler], ...] = (
-        VcrHandler,
-        HarHandler,
-        JunitXMLHandler,
-        NdjsonHandler,
-        OutputHandler,
-        AllureHandler,
-    )
-except ImportError:
-    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, OutputHandler)
-
-
-def is_built_in_handler(handler: EventHandler) -> bool:
-    return type(handler) in _BUILT_IN_HANDLERS
-
-
-def display_handler_error(handler: EventHandler, exc: Exception) -> None:
-    """Display error that happened within."""
-    is_built_in = is_built_in_handler(handler)
-    if is_built_in:
-        click.secho("Internal Error", fg="red", bold=True)
-        click.secho("\nSchemathesis encountered an unexpected issue.")
-        message = format_exception(exc, with_traceback=True)
-    else:
-        click.secho("CLI Handler Error", fg="red", bold=True)
-        click.echo(
-            f"\nAn error occurred within your custom CLI handler `{click.style(handler.__class__.__name__, bold=True)}`."
-        )
-        message = format_exception(exc, with_traceback=True, skip_frames=1)
-    click.secho(f"\n{message}", fg="red")
-    if is_built_in:
-        click.echo(
-            f"\nWe apologize for the inconvenience. This appears to be an internal issue.\n"
-            f"Please consider reporting this error to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-        )
-    else:
-        click.echo(
-            f"\nFor more information on implementing extensions for Schemathesis CLI, visit {EXTENSIONS_DOCUMENTATION_URL}"
-        )

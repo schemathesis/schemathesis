@@ -13,4 +13,5 @@ Options:
   -h, --help          Show this message and exit
 
 Commands:
-  run  Execute automated tests based on API specifications
+  fuzz  Run continuous API fuzzing
+  run   Run property-based API tests

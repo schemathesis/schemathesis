@@ -56,6 +56,9 @@ Add custom command-line options and event handlers for integration with external
 
 ## Advanced Testing
 
+### [Continuous Fuzzing](continuous-fuzzing.md)
+Run `st fuzz` for extended sessions that keep generating test cases until stopped or a time limit is reached.
+
 ### [Customizing Stateful Testing](stateful-testing.md)
 Configure authentication, data initialization, and scenario setup for stateful API testing workflows.
 

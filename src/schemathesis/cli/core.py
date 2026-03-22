@@ -17,3 +17,11 @@ def ensure_color(ctx: click.Context, color: bool | None) -> None:
     elif color is False or "NO_COLOR" in os.environ:
         ctx.color = False
         os.environ["NO_COLOR"] = "1"
+
+
+def resolve_color(force_color: bool, no_color: bool, config_color: bool | None) -> bool | None:
+    if force_color:
+        return True
+    if no_color:
+        return False
+    return config_color
