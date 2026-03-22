@@ -159,6 +159,8 @@ For `text/event-stream` responses, Schemathesis validates each event individuall
 
 When `itemSchema` properties use `contentMediaType` and `contentSchema`, the embedded payload is deserialized and validated against the nested schema. For example, a `data` field with `contentMediaType: application/json` and `contentSchema: {type: object}` causes Schemathesis to parse the JSON payload and validate it — not just treat it as a raw string.
 
+For schema examples, polymorphic events, and current limitations, see [Testing Server-Sent Events](../guides/server-sent-events.md).
+
 ---
 
 ## Input handling
