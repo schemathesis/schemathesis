@@ -154,6 +154,21 @@ user_phone:
   format: phone  # Uses your custom strategy
 ```
 
+### Overriding built-in formats
+
+The same API overrides standard formats like `date`, `date-time`, `uuid`, and others. By default Schemathesis generates values across the full valid range — including far-future dates and extreme integers — which is intentional: many server-side bugs only surface when the input isn't sanitised before hitting a database or arithmetic operation. If your application already handles those cases and the out-of-range values are producing noise, restrict the range:
+
+```python
+from datetime import date
+from hypothesis import strategies as st
+import schemathesis
+
+today = date.today()
+schemathesis.openapi.format("date", st.dates(max_value=today).map(str))
+```
+
+After this registration, every `format: date` field in the schema draws from the restricted strategy instead of the built-in one.
+
 ## Setting Up Extensions
 
 Define your hooks:

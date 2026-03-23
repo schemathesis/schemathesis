@@ -1,5 +1,36 @@
 # Frequently Asked Questions
 
+## How do I restrict the range of generated values?
+
+Schemathesis generates values across the full range permitted by the spec — including far-future dates, large integers, and unusual Unicode characters. This is intentional: servers that crash on extreme-but-valid input have real bugs. If your application already handles those cases correctly and you want to reduce noise, there are three levers:
+
+**Restrict a string format** — override the built-in strategy for any `format` keyword:
+
+```python
+from datetime import date
+from hypothesis import strategies as st
+import schemathesis
+
+today = date.today()
+schemathesis.openapi.format("date", st.dates(max_value=today).map(str))
+```
+
+See [Overriding built-in formats](guides/extending.md#overriding-built-in-formats) for more detail.
+
+**Restrict the string character set** — limit generated strings to a specific encoding, which also constrains the range of code points:
+
+```toml
+[generation]
+codec = "ascii"
+```
+
+**Disable null bytes** — some systems mishandle the `\x00` byte, causing spurious failures unrelated to your application logic:
+
+```toml
+[generation]
+allow-x00 = false
+```
+
 ## What kind of data does Schemathesis generate?
 
 Schemathesis generates three types of data:
