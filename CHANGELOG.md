@@ -2,11 +2,14 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.13.0...HEAD) - TBD
 
+### :rocket: Added
+
+- Examples phase generates optional properties and one disjoint set per `oneOf`/`anyOf` branch. [#2371](https://github.com/schemathesis/schemathesis/issues/2371)
+
 ## [4.13.0](https://github.com/schemathesis/schemathesis/compare/v4.12.2...v4.13.0) - 2026-03-22
 
 ### :rocket: Added
 
-- Examples phase generates optional properties and one disjoint set per `oneOf`/`anyOf` branch. [#2371](https://github.com/schemathesis/schemathesis/issues/2371)
 - `[auth.dynamic.openapi.<scheme>]` config block for token fetch authentication that allows for dynamic authentication without writing Python code. [#3620](https://github.com/schemathesis/schemathesis/issues/3620)
 - Use captured response data in the examples phase. [#638](https://github.com/schemathesis/schemathesis/issues/638)
 - `--request-retries` to retry requests on network failures with exponential back-off.
