@@ -10,10 +10,11 @@ from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers import display_handler_error
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
+from schemathesis.cli.commands.run.handlers.har import HarHandler
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
-from schemathesis.cli.commands.run.handlers.ndjson import NdjsonWriter
+from schemathesis.cli.commands.run.handlers.ndjson import NdjsonHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
+from schemathesis.cli.commands.run.handlers.vcr import VcrHandler
 from schemathesis.cli.constants import MISSING_BASE_URL_MESSAGE
 from schemathesis.cli.ext.fs import open_file
 from schemathesis.cli.loaders import load_schema
@@ -99,19 +100,19 @@ def initialize_handlers(
         path = config.reports.get_path(ReportFormat.JUNIT)
         open_file(path)
         handlers.append(JunitXMLHandler(path))
-    for format, report in (
-        (ReportFormat.VCR, config.reports.vcr),
-        (ReportFormat.HAR, config.reports.har),
-    ):
-        if report.enabled:
-            path = config.reports.get_path(format)
-            open_file(path)
-            handlers.append(CassetteWriter(format=format, output=path, config=config))
+    if config.reports.vcr.enabled:
+        path = config.reports.get_path(ReportFormat.VCR)
+        open_file(path)
+        handlers.append(VcrHandler(output=path, config=config))
+    if config.reports.har.enabled:
+        path = config.reports.get_path(ReportFormat.HAR)
+        open_file(path)
+        handlers.append(HarHandler(output=path, config=config))
 
     if config.reports.ndjson.enabled:
         path = config.reports.get_path(ReportFormat.NDJSON)
         open_file(path)
-        handlers.append(NdjsonWriter(output=path, config=config))
+        handlers.append(NdjsonHandler(output=path, config=config))
 
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))

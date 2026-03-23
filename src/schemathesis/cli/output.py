@@ -18,11 +18,11 @@ if TYPE_CHECKING:
     from rich.progress import Progress, TaskID
     from rich.text import Text
 
-    from schemathesis.cli.statistics import GroupedFailures, Statistic
     from schemathesis.config import OutputConfig
     from schemathesis.core.errors import LoaderError
     from schemathesis.core.failures import MessageBlock
     from schemathesis.engine import events
+    from schemathesis.engine.statistic import GroupedFailures, Statistic
 
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 

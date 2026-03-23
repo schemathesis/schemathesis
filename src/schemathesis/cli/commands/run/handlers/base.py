@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 from io import StringIO
@@ -30,6 +31,15 @@ class WritableText(Protocol):
 
 
 TextOutput = IO[str] | StringIO | Path
+
+
+def get_command_representation() -> str:
+    """Get how Schemathesis was run."""
+    # It is supposed to be executed from Schemathesis CLI, not via Click's `command.invoke`
+    if not sys.argv[0].endswith(("schemathesis", "st")):
+        return "<unknown entrypoint>"
+    args = " ".join(sys.argv[1:])
+    return f"st {args}"
 
 
 @contextmanager

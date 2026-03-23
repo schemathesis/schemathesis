@@ -4,9 +4,9 @@ from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
 
 from schemathesis.cli.commands.run.events import LoadingFinished
-from schemathesis.cli.statistics import Statistic
 from schemathesis.config import ProjectConfig
 from schemathesis.engine import Status, events
+from schemathesis.engine.statistic import Statistic
 from schemathesis.schemas import APIOperation
 
 

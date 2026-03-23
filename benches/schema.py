@@ -2,14 +2,12 @@ import json
 import pathlib
 import sys
 from io import StringIO
-from queue import Queue
 from unittest.mock import patch
 
 import pytest
 import requests
 
 import schemathesis
-from schemathesis.cli.commands.run.handlers.cassettes import Finalize, Initialize, Process, har_writer, vcr_writer
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -17,6 +15,8 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import events, from_schema
 from schemathesis.generation.hypothesis import setup
 from schemathesis.generation.modes import GenerationMode
+from schemathesis.reporting.har import HarWriter
+from schemathesis.reporting.vcr import VcrWriter
 from schemathesis.specs.openapi._hypothesis import get_parameters_strategy
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
@@ -209,44 +209,39 @@ def test_events(benchmark):
     benchmark(_events_run)
 
 
-def _write_vcr(entries, config):
-    queue = Queue()
-    for entry in entries:
-        queue.put(entry)
-
-    vcr_writer(StringIO(), config, queue)
-
-
-def _write_har(entries, config):
-    queue = Queue()
-    for entry in entries:
-        queue.put(entry)
-
-    har_writer(StringIO(), config, queue)
+def _write_vcr(recorders, config, seed):
+    writer = VcrWriter(StringIO(), config)
+    writer.open(seed=seed, command="<benchmark>")
+    for recorder in recorders:
+        writer.write(recorder)
+    writer.close()
 
 
-def _collect_cassette_entries(schema):
+def _write_har(recorders, config, seed):
+    writer = HarWriter(StringIO(), config)
+    writer.open(seed=seed)
+    for recorder in recorders:
+        writer.write(recorder)
+    writer.close()
+
+
+def _collect_recorders(schema):
     engine = from_schema(schema)
-    entries = [Initialize(seed=schema.config.seed)]
-    entries.extend(
-        Process(recorder=event.recorder) for event in engine.execute() if isinstance(event, events.ScenarioFinished)
-    )
-    entries.append(Finalize())
-    return entries
+    return [event.recorder for event in engine.execute() if isinstance(event, events.ScenarioFinished)]
 
 
 @pytest.mark.parametrize("schema", [VMWARE_SCHEMA], ids=("vmware",))
 @pytest.mark.benchmark(group="vcr")
 def test_vcr(benchmark, schema):
-    entries = _collect_cassette_entries(schema)
-    benchmark(_write_vcr, entries, schema.config)
+    recorders = _collect_recorders(schema)
+    benchmark(_write_vcr, recorders, schema.config, schema.config.seed)
 
 
 @pytest.mark.parametrize("schema", [BBCI_SCHEMA, VMWARE_SCHEMA], ids=("bbci", "vmware"))
 @pytest.mark.benchmark(group="har")
 def test_har(benchmark, schema):
-    entries = _collect_cassette_entries(schema)
-    benchmark(_write_har, entries, schema.config)
+    recorders = _collect_recorders(schema)
+    benchmark(_write_har, recorders, schema.config, schema.config.seed)
 
 
 @pytest.mark.benchmark(group="deepclone")
