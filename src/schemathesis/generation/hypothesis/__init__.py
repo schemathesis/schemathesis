@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections import OrderedDict
 from functools import lru_cache
 from typing import Any, Literal
@@ -210,7 +211,9 @@ def setup() -> None:
             if cached is not None:
                 return cached
 
-        strategy = _original_from_schema(schema, alphabet=alphabet, custom_formats=custom_formats)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Overriding standard format", category=Warning)
+            strategy = _original_from_schema(schema, alphabet=alphabet, custom_formats=custom_formats)
 
         if key is not None:
             _from_schema_cache_set(key, strategy)

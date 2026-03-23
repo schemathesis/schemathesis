@@ -6,6 +6,10 @@
 
 - Examples phase generates optional properties and one disjoint set per `oneOf`/`anyOf` branch. [#2371](https://github.com/schemathesis/schemathesis/issues/2371)
 
+### :wrench: Changed
+
+- Suppress `HypothesisWarning` when overriding built-in string formats via `schemathesis.openapi.format()`. [#3269](https://github.com/schemathesis/schemathesis/issues/3269)
+
 ## [4.13.0](https://github.com/schemathesis/schemathesis/compare/v4.12.2...v4.13.0) - 2026-03-22
 
 ### :rocket: Added
