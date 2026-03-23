@@ -11,8 +11,9 @@ from _pytest.main import ExitCode
 from hypothesis import example, given
 from hypothesis import strategies as st
 
-from schemathesis.cli.commands.run.handlers.cassettes import _cookie_to_har, write_double_quoted
 from schemathesis.generation import GenerationMode
+from schemathesis.reporting.har import _cookie_to_har
+from schemathesis.reporting.vcr import write_double_quoted
 
 
 @pytest.fixture
