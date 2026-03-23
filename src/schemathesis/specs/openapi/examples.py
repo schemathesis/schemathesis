@@ -479,6 +479,118 @@ def extract_from_schemas(
                 yield BodyExample(value=value, media_type=body.media_type)
 
 
+def _yield_examples_from_properties(
+    *,
+    operation: APIOperation,
+    properties: dict[str, Any],
+    example_keyword: str,
+    examples_container_keyword: str,
+    resolver: RefResolver,
+    current_path: tuple[str, ...],
+    bundle_storage: dict[str, Any] | None,
+) -> Generator[Any, None, None]:
+    variants: dict[str, list[Any]] = {}
+    to_generate: dict[str, Any] = {}
+
+    for name, subschema in properties.items():
+        values: list[Any] = []
+        for expanded_schema, expanded_path in _expand_subschemas(
+            schema=subschema, resolver=resolver, reference_path=current_path
+        ):
+            if isinstance(expanded_schema, bool):
+                to_generate[name] = expanded_schema
+                continue
+
+            if example_keyword in expanded_schema:
+                values.append(expanded_schema[example_keyword])
+
+            if examples_container_keyword in expanded_schema and isinstance(
+                expanded_schema[examples_container_keyword], list
+            ):
+                values.extend(expanded_schema[examples_container_keyword])
+
+            values.extend(
+                extract_from_schema(
+                    operation=operation,
+                    schema=expanded_schema,
+                    example_keyword=example_keyword,
+                    examples_container_keyword=examples_container_keyword,
+                    resolver=resolver,
+                    reference_path=expanded_path,
+                    bundle_storage=bundle_storage,
+                )
+            )
+
+            if not values:
+                to_generate[name] = expanded_schema
+                continue
+
+            variants[name] = values
+
+    if variants:
+        config = operation.schema.config.generation_for(operation=operation, phase="examples")
+        for name, subschema in to_generate.items():
+            if name in variants:
+                continue
+            if bundle_storage is not None:
+                subschema = dict(subschema)
+                subschema[BUNDLE_STORAGE_KEY] = bundle_storage
+            generated = _generate_single_example(subschema, config)
+            variants[name] = [generated]
+
+        total_combos = max(len(v) for v in variants.values())
+        for idx in range(total_combos):
+            yield {
+                name: next(islice(cycle(property_variants), idx, None)) for name, property_variants in variants.items()
+            }
+
+
+def _yield_examples_per_branch(
+    *,
+    operation: APIOperation,
+    parent_properties: dict[str, Any],
+    branches: list[dict[str, Any]],
+    example_keyword: str,
+    examples_container_keyword: str,
+    resolver: RefResolver,
+    current_path: tuple[str, ...],
+    bundle_storage: dict[str, Any] | None,
+) -> Generator[Any, None, None]:
+    # Identify which properties are claimed by at least one branch
+    branch_prop_sets: list[set[str]] = []
+    for branch in branches:
+        props = set(branch.get("properties", {}).keys())
+        reqs = set(branch.get("required", []))
+        branch_prop_sets.append(props | reqs)
+
+    all_branch_props: set[str] = set().union(*branch_prop_sets)
+
+    for branch_idx, branch in enumerate(branches):
+        branch_claimed = branch_prop_sets[branch_idx]
+        branch_own = branch.get("properties", {})
+
+        # Active: parent properties shared (not claimed by any branch) OR claimed by this branch
+        active: dict[str, Any] = {
+            name: sub
+            for name, sub in parent_properties.items()
+            if name not in all_branch_props or name in branch_claimed
+        }
+        # Add branch-only properties (defined in the branch, not in parent)
+        for name, sub in branch_own.items():
+            if name not in parent_properties:
+                active[name] = sub
+
+        yield from _yield_examples_from_properties(
+            operation=operation,
+            properties=active,
+            example_keyword=example_keyword,
+            examples_container_keyword=examples_container_keyword,
+            resolver=resolver,
+            current_path=current_path,
+            bundle_storage=bundle_storage,
+        )
+
+
 def extract_from_schema(
     *,
     operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
@@ -496,101 +608,49 @@ def extract_from_schema(
     except InfiniteRecursiveReference:
         return
 
-    # If schema has allOf, we need to get merged properties and required fields from allOf items
+    # If schema has allOf, we need to get merged properties from allOf items
     # This handles cases where parent has properties alongside allOf
     properties_to_process = schema.get("properties", {})
-    required = list(schema.get("required", []))
-
-    # For anyOf/oneOf with required constraints, pick the first branch's required fields
-    # This ensures at least one branch is satisfied (e.g., anyOf: [{required: [name]}, {required: [id]}])
-    for key in ("anyOf", "oneOf"):
-        sub_schemas = schema.get(key)
-        if sub_schemas:
-            for sub_schema in sub_schemas:
-                if isinstance(sub_schema, dict) and "required" in sub_schema:
-                    for field in sub_schema["required"]:
-                        if field not in required and field in properties_to_process:
-                            required.append(field)
-                    break
 
     if "allOf" in schema and "properties" in schema:
-        # Get the merged allOf schema which includes properties and required fields from all allOf items
+        # Get the merged allOf schema which includes properties from all allOf items
         for expanded_schema, _ in _expand_subschemas(schema=schema, resolver=resolver, reference_path=current_path):
             if expanded_schema is not schema and isinstance(expanded_schema, dict):
-                # This is the merged allOf result with combined properties and required fields
+                # This is the merged allOf result with combined properties
                 if "properties" in expanded_schema:
                     properties_to_process = expanded_schema["properties"]
-                if "required" in expanded_schema:
-                    required = expanded_schema["required"]
                 break
 
     if properties_to_process:
-        variants = {}
-        to_generate: dict[str, Any] = {}
+        # Detect top-level oneOf/anyOf branches for per-branch generation
+        branches: list[dict[str, Any]] | None = None
+        for keyword in ("oneOf", "anyOf"):
+            raw = schema.get(keyword)
+            if raw:
+                branches = [b for b in raw if isinstance(b, dict)]
+                break
 
-        for name, subschema in list(properties_to_process.items()):
-            values = []
-            for expanded_schema, expanded_path in _expand_subschemas(
-                schema=subschema, resolver=resolver, reference_path=current_path
-            ):
-                if isinstance(expanded_schema, bool):
-                    to_generate[name] = expanded_schema
-                    continue
-
-                if example_keyword in expanded_schema:
-                    values.append(expanded_schema[example_keyword])
-
-                if examples_container_keyword in expanded_schema and isinstance(
-                    expanded_schema[examples_container_keyword], list
-                ):
-                    # These are JSON Schema examples, which is an array of values
-                    values.extend(expanded_schema[examples_container_keyword])
-
-                # Check nested examples as well
-                values.extend(
-                    extract_from_schema(
-                        operation=operation,
-                        schema=expanded_schema,
-                        example_keyword=example_keyword,
-                        examples_container_keyword=examples_container_keyword,
-                        resolver=resolver,
-                        reference_path=expanded_path,
-                        bundle_storage=bundle_storage,
-                    )
-                )
-
-                if not values:
-                    if name in required:
-                        # Defer generation to only generate these variants if at least one property has examples
-                        to_generate[name] = expanded_schema
-                    continue
-
-                variants[name] = values
-
-        if variants:
-            # Check if all required fields will be present in the generated examples
-            all_required_covered = all(field in variants or field in to_generate for field in required)
-
-            if all_required_covered:
-                config = operation.schema.config.generation_for(operation=operation, phase="examples")
-                for name, subschema in to_generate.items():
-                    if name in variants:
-                        # Generated by one of `anyOf` or similar sub-schemas
-                        continue
-                    if bundle_storage is not None:
-                        subschema = dict(subschema)
-                        subschema[BUNDLE_STORAGE_KEY] = bundle_storage
-                    generated = _generate_single_example(subschema, config)
-                    variants[name] = [generated]
-
-                # Calculate the maximum number of examples any property has
-                total_combos = max(len(examples) for examples in variants.values())
-                # Evenly distribute examples by cycling through them
-                for idx in range(total_combos):
-                    yield {
-                        name: next(islice(cycle(property_variants), idx, None))
-                        for name, property_variants in variants.items()
-                    }
+        if branches:
+            yield from _yield_examples_per_branch(
+                operation=operation,
+                parent_properties=properties_to_process,
+                branches=branches,
+                example_keyword=example_keyword,
+                examples_container_keyword=examples_container_keyword,
+                resolver=resolver,
+                current_path=current_path,
+                bundle_storage=bundle_storage,
+            )
+        else:
+            yield from _yield_examples_from_properties(
+                operation=operation,
+                properties=properties_to_process,
+                example_keyword=example_keyword,
+                examples_container_keyword=examples_container_keyword,
+                resolver=resolver,
+                current_path=current_path,
+                bundle_storage=bundle_storage,
+            )
 
     elif "items" in schema and isinstance(schema["items"], dict):
         # Each inner value should be wrapped in an array

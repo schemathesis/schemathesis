@@ -437,10 +437,10 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
 def test_extract_from_schemas(operation_with_property_examples):
     extracted = [example_to_dict(example) for example in extract_from_schemas(operation_with_property_examples)]
     assert extracted == [
-        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-11"}},
-        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-12"}},
-        {"container": "query", "name": "q-2", "value": [{"bar-2": "bar-21", "foo-2": "foo-21", "spam-2": ""}]},
-        {"container": "query", "name": "q-2", "value": [{"bar-2": "bar-22", "foo-2": "foo-21", "spam-2": ""}]},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-11", "spam-1": ANY}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-12", "spam-1": ANY}},
+        {"container": "query", "name": "q-2", "value": [{"bar-2": "bar-21", "foo-2": "foo-21", "spam-2": ANY}]},
+        {"container": "query", "name": "q-2", "value": [{"bar-2": "bar-22", "foo-2": "foo-21", "spam-2": ANY}]},
         {"media_type": "application/json", "value": {"key": "json-key-1"}},
         {"media_type": "application/json", "value": {"key": "json-key-2"}},
         {"media_type": "multipart/form-data", "value": [{"key": "form-key-1"}]},
@@ -877,10 +877,10 @@ def test_examples_in_any_of_in_schemas(ctx, key):
     schema = schemathesis.openapi.from_dict(schema)
     extracted = [example_to_dict(example) for example in extract_from_schemas(schema["/test"]["POST"])]
     assert extracted == [
-        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-1-1"}},
-        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-1-2"}},
-        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-2-1"}},
-        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-2-2"}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-1-1", "spam-1": ANY}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-1-2", "spam-1": ANY}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-2-1", "spam-1": ANY}},
+        {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-2-2", "spam-1": ANY}},
         {"media_type": "application/json", "value": {"key": "json-key-1-1"}},
         {"media_type": "application/json", "value": {"key": "json-key-1-2"}},
         {"media_type": "application/json", "value": {"key": "json-key-2-1"}},
@@ -1730,6 +1730,8 @@ def test_allof_without_parent_example_preserves_existing_behavior(ctx):
             {
                 "name": "Widget",
                 "price": 19.99,
+                "id": ANY,
+                "created": ANY,
             },
         ),
     ],
@@ -2402,8 +2404,8 @@ def test_allof_with_required_field_should_not_use_incomplete_property_examples(c
 def test_anyof_with_required_constraints(ctx):
     # See GH-3404
     # When a schema uses `anyOf` with `required` constraints (but no properties inside anyOf branches)
-    # to express "either field A or field B must be present", generated examples must satisfy the
-    # anyOf constraint by including fields from the first branch
+    # to express "either field A or field B must be present", per-branch generation produces one
+    # example per branch - each satisfying its own required constraint
     raw_schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -2437,8 +2439,10 @@ def test_anyof_with_required_constraints(ctx):
     operation = schema["/test"]["POST"]
 
     extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
+    # Two examples produced - one per branch, each with the shared `type` field plus the branch field
     assert extracted == [
         {"media_type": "application/json", "value": {"type": "item", "name": ""}},
+        {"media_type": "application/json", "value": {"type": "item", "id": "e3e70682-c209-4cac-629f-6fbed82c07cd"}},
     ]
 
     body_schema = list(operation.body)[0].optimized_schema
@@ -2643,3 +2647,136 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
         {"path_parameters": {"itemId": "abc"}, "query": {"tenantId": "x"}},
         {"path_parameters": {"itemId": "def"}, "query": {"tenantId": "x"}},
     ]
+
+
+def _extract_json_body_examples(ctx, body_schema):
+    raw = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    return [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
+
+
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "example": "Alice"},
+                    "nickname": {"type": "string"},
+                },
+                "required": ["name"],
+            },
+            [{"media_type": "application/json", "value": {"name": "Alice", "nickname": ""}}],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "example": "Alice"},
+                    "age": {"type": "integer"},
+                },
+                "required": ["name", "age"],
+            },
+            [{"media_type": "application/json", "value": {"name": "Alice", "age": 0}}],
+        ),
+    ],
+    ids=["optional", "required"],
+)
+def test_property_without_example_is_generated(ctx, body_schema, expected):
+    # Properties without an explicit example are generated regardless of whether they are required
+    assert _extract_json_body_examples(ctx, body_schema) == expected
+
+
+@pytest.mark.parametrize(
+    "body_schema",
+    [
+        {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+            "required": ["name"],
+        },
+        {
+            "type": "object",
+            "properties": {"credit_card": {"type": "string"}, "paypal_email": {"type": "string"}},
+            "oneOf": [{"required": ["credit_card"]}, {"required": ["paypal_email"]}],
+        },
+    ],
+    ids=["plain", "oneof"],
+)
+def test_gate_preserved_when_no_explicit_examples(ctx, body_schema):
+    # When no property has an explicit example, no examples are produced
+    assert _extract_json_body_examples(ctx, body_schema) == []
+
+
+@pytest.mark.parametrize("keyword", ["oneOf", "anyOf"])
+def test_branch_required_yields_disjoint_sets(ctx, keyword):
+    # oneOf and anyOf are treated identically — one disjoint set per branch
+    assert _extract_json_body_examples(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "amount": {"type": "number", "example": 99.9},
+                "credit_card": {"type": "string"},
+                "paypal_email": {"type": "string"},
+            },
+            "required": ["amount"],
+            keyword: [{"required": ["credit_card"]}, {"required": ["paypal_email"]}],
+        },
+    ) == [
+        {"media_type": "application/json", "value": {"amount": 99.9, "credit_card": ""}},
+        {"media_type": "application/json", "value": {"amount": 99.9, "paypal_email": ""}},
+    ]
+
+
+@pytest.mark.parametrize(
+    ("body_schema", "expected"),
+    [
+        (
+            {
+                "type": "object",
+                "properties": {"amount": {"type": "number", "example": 99.9}},
+                "required": ["amount"],
+                "oneOf": [
+                    {"properties": {"credit_card": {"type": "string"}}, "required": ["credit_card"]},
+                    {"properties": {"paypal_email": {"type": "string"}}, "required": ["paypal_email"]},
+                ],
+            },
+            [
+                {"media_type": "application/json", "value": {"amount": 99.9, "credit_card": ""}},
+                {"media_type": "application/json", "value": {"amount": 99.9, "paypal_email": ""}},
+            ],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "base": {"type": "string", "example": "x"},
+                    "shared_opt": {"type": "integer"},
+                    "extra": {"type": "boolean"},
+                },
+                "oneOf": [{"required": ["shared_opt"]}, {"required": ["shared_opt", "extra"]}],
+            },
+            [
+                {"media_type": "application/json", "value": {"base": "x", "shared_opt": 0}},
+                {"media_type": "application/json", "value": {"base": "x", "shared_opt": 0, "extra": False}},
+            ],
+        ),
+    ],
+    ids=["branch-own-properties", "property-in-multiple-branches"],
+)
+def test_oneof_branch_isolation(ctx, body_schema, expected):
+    assert _extract_json_body_examples(ctx, body_schema) == expected
