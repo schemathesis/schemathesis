@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING
 
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -23,6 +24,7 @@ class PytestReportDispatcher:
     def __init__(self, schema: BaseSchema) -> None:
         self._schema = schema
         self._recorders: dict[str, ScenarioRecorder] = {}
+        self._start_times: dict[str, float] = {}
         # Store bound methods so unregister() removes the same objects.
         # Python bound methods are not cached - accessing self._on_after_call twice
         # gives two different objects, breaking identity comparison in hooks.unregister().
@@ -33,6 +35,7 @@ class PytestReportDispatcher:
 
     def _on_after_call(self, context: HookContext, case: Case, response: Response) -> None:
         label = case.operation.label
+        self._start_times.setdefault(label, time.monotonic())
         recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label))
         recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
         recorder.record_response(case_id=case.id, response=response)
@@ -57,13 +60,17 @@ class PytestReportDispatcher:
             else:
                 recorder.record_check_success(name=result.name, case_id=case.id)
 
-    def pop_recorder(self, label: str) -> ScenarioRecorder | None:
-        """Remove and return the recorder for this label.
+    def pop_recorder(self, label: str) -> tuple[ScenarioRecorder, float] | None:
+        """Remove and return the recorder and elapsed seconds for this label.
 
         Removing the recorder lets the GC reclaim the Case objects it holds.
         Called by the plugin at test teardown after writing to all report writers.
         """
-        return self._recorders.pop(label, None)
+        recorder = self._recorders.pop(label, None)
+        if recorder is None:
+            return None
+        elapsed = time.monotonic() - self._start_times.pop(label, time.monotonic())
+        return recorder, elapsed
 
     def unregister(self) -> None:
         """Remove both hooks from schema.hooks. Called at pytest_sessionfinish."""

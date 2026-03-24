@@ -55,12 +55,13 @@ if TYPE_CHECKING:
 
     from schemathesis.pytest.reporting import PytestReportDispatcher
     from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
     from schemathesis.schemas import BaseSchema
 
-_CASSETTE_KEY: pytest.StashKey[dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter]]]] = (
-    pytest.StashKey()
-)
+_CASSETTE_KEY: pytest.StashKey[
+    dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter]]]
+] = pytest.StashKey()
 
 
 def _is_schema(value: object) -> bool:
@@ -438,12 +439,13 @@ def pytest_configure(config: pytest.Config) -> None:
     config.stash[_CASSETTE_KEY] = {}
 
 
-def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter]:
+def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter | JunitXmlWriter]:
     from schemathesis.config._report import ReportFormat
     from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
 
-    writers: list[VcrWriter | HarWriter] = []
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter] = []
     reports = schema.config.reports
     seed = schema.config.seed
     command = " ".join(sys.argv)
@@ -457,6 +459,9 @@ def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter]:
         har_writer = HarWriter(output=path, config=schema.config)
         har_writer.open(seed=seed)
         writers.append(har_writer)
+    if reports.junit.enabled:
+        path = reports.get_path(ReportFormat.JUNIT)
+        writers.append(JunitXmlWriter(output=path, config=schema.config.output))
     return writers
 
 
@@ -489,10 +494,16 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> 
     if entry is None:
         return
     dispatcher, writers = entry
-    recorder = dispatcher.pop_recorder(item.operation_label)
-    if recorder is not None:
+    result = dispatcher.pop_recorder(item.operation_label)
+    if result is not None:
+        from schemathesis.reporting.junitxml import JunitXmlWriter
+
+        recorder, elapsed_sec = result
         for writer in writers:
-            writer.write(recorder)
+            if isinstance(writer, JunitXmlWriter):
+                writer.write(recorder, elapsed_sec)
+            else:
+                writer.write(recorder)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
