@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- Support for recording VCR and HAR reports from the `pytest` plugin via `schema.config.reports`. [#701](https://github.com/schemathesis/schemathesis/issues/701)
 - `after_validate` hook fires after all checks run on a response, carrying a list of `CheckResult` objects.
 - Examples phase generates optional properties and one disjoint set per `oneOf`/`anyOf` branch. [#2371](https://github.com/schemathesis/schemathesis/issues/2371)
 

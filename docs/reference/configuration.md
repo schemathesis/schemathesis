@@ -185,12 +185,9 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
 ### Reporting
 
-!!! info "CLI Only"
-    These options only apply when using the `schemathesis run` command. Reports are not generated when using the pytest plugin, as pytest has its own reporting mechanisms.
-
 #### `reports.directory`
 
-!!! note "" 
+!!! note ""
 
     **Type**: `String`  
     **Default**: `"schemathesis-report"`  
@@ -218,7 +215,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
 #### `reports.<format>.enabled`
 
-!!! note "" 
+!!! note ""
 
     **Type**: `Boolean`  
     **Default**: `false`  
@@ -239,7 +236,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
     Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, or `har`.
 
-    Setting this option automatically enables the report generation without requiring `enable = true`.
+    Setting this path automatically enables report generation without requiring `enabled = true`.
 
     ```toml
     [reports.junit]
