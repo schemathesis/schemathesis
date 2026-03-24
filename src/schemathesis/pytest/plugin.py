@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import sys
 import unittest
 from collections.abc import Callable, Generator
 from functools import partial
@@ -52,7 +53,14 @@ if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
     from _pytest.terminal import TerminalReporter
 
+    from schemathesis.pytest.reporting import PytestReportDispatcher
+    from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.vcr import VcrWriter
     from schemathesis.schemas import BaseSchema
+
+_CASSETTE_KEY: pytest.StashKey[dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter]]]] = (
+    pytest.StashKey()
+)
 
 
 def _is_schema(value: object) -> bool:
@@ -70,11 +78,13 @@ class SchemathesisFunction(Function):
         *args: Any,
         test_func: Callable,
         test_name: str | None = None,
+        operation_label: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.test_function = test_func
         self.test_name = test_name
+        self.operation_label = operation_label
 
 
 class SchemathesisCase(PyCollector):
@@ -205,6 +215,8 @@ class SchemathesisCase(PyCollector):
             # On pytest 7, Class collects the test methods directly, therefore
             funcobj = partial(funcobj, self.parent.obj)
 
+        operation_label = operation.label if isinstance(result, Ok) else None
+
         if not metafunc._calls:
             yield SchemathesisFunction.from_parent(
                 name=name,
@@ -213,6 +225,7 @@ class SchemathesisCase(PyCollector):
                 fixtureinfo=fixtureinfo,
                 test_func=self.test_function,
                 originalname=self.name,
+                operation_label=operation_label,
             )
         else:
             fixtureinfo.prune_dependency_tree()
@@ -227,6 +240,7 @@ class SchemathesisCase(PyCollector):
                     keywords={callspec.id: True},
                     originalname=name,
                     test_func=self.test_function,
+                    operation_label=operation_label,
                 )
 
     def _get_class_parent(self) -> type | None:
@@ -418,3 +432,71 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
             raise missing_path_parameters from None
     else:
         yield
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.stash[_CASSETTE_KEY] = {}
+
+
+def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter]:
+    from schemathesis.config._report import ReportFormat
+    from schemathesis.reporting.har import HarWriter
+    from schemathesis.reporting.vcr import VcrWriter
+
+    writers: list[VcrWriter | HarWriter] = []
+    reports = schema.config.reports
+    seed = schema.config.seed
+    command = " ".join(sys.argv)
+    if reports.vcr.enabled:
+        path = reports.get_path(ReportFormat.VCR)
+        vcr_writer = VcrWriter(output=path, config=schema.config)
+        vcr_writer.open(seed=seed, command=command)
+        writers.append(vcr_writer)
+    if reports.har.enabled:
+        path = reports.get_path(ReportFormat.HAR)
+        har_writer = HarWriter(output=path, config=schema.config)
+        har_writer.open(seed=seed)
+        writers.append(har_writer)
+    return writers
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    if not isinstance(item, SchemathesisFunction):
+        return
+    if item.operation_label is None:
+        return
+    schema = SchemaHandleMark.get(item.test_function)
+    if schema is None or id(schema) in item.config.stash[_CASSETTE_KEY]:
+        return
+    writers = _open_writers(schema)
+    if not writers:
+        return
+    from schemathesis.pytest.reporting import PytestReportDispatcher
+
+    dispatcher = PytestReportDispatcher(schema)
+    item.config.stash[_CASSETTE_KEY][id(schema)] = (dispatcher, writers)
+
+
+def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
+    if not isinstance(item, SchemathesisFunction):
+        return
+    if item.operation_label is None:
+        return
+    schema = SchemaHandleMark.get(item.test_function)
+    if schema is None:
+        return
+    entry = item.config.stash[_CASSETTE_KEY].get(id(schema))
+    if entry is None:
+        return
+    dispatcher, writers = entry
+    recorder = dispatcher.pop_recorder(item.operation_label)
+    if recorder is not None:
+        for writer in writers:
+            writer.write(recorder)
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    for dispatcher, writers in session.config.stash.get(_CASSETTE_KEY, {}).values():
+        dispatcher.unregister()
+        for writer in writers:
+            writer.close()
