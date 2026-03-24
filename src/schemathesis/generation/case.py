@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from jsonschema_rs import Validator
 
-from schemathesis import transport
+from schemathesis import hooks, transport
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult, load_all_checks, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage
@@ -17,7 +17,7 @@ from schemathesis.engine import Status
 from schemathesis.generation import GenerationMode, generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.generation.overrides import Override, store_components
-from schemathesis.hooks import HookContext, dispatch, get_all_by_name
+from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
 
 if TYPE_CHECKING:
@@ -403,6 +403,7 @@ class Case:
                 pass
             raise
         dispatch("after_call", hook_context, self, response)
+        self.operation.schema.hooks.dispatch("after_call", hook_context, self, response)
         return response
 
     def validate_response(
@@ -456,7 +457,7 @@ class Case:
             transport_kwargs=transport_kwargs,
             recorder=None,
         )
-        has_after_validate = bool(get_all_by_name("after_validate"))
+        has_after_validate = hooks.defines("after_validate") or self.operation.schema.hooks.defines("after_validate")
         check_results: list[CheckResult] = []
         _on_success: Callable[[str, Case], None] | None
 
@@ -489,6 +490,7 @@ class Case:
         if has_after_validate:
             hook_context = HookContext(operation=self.operation)
             dispatch("after_validate", hook_context, self, response, check_results)
+            self.operation.schema.hooks.dispatch("after_validate", hook_context, self, response, check_results)
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"

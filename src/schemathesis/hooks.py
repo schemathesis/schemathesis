@@ -216,6 +216,10 @@ class HookDispatcher:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
 
+    def defines(self, name: str) -> bool:
+        """Return True if any hooks are registered under the given name."""
+        return bool(self._hooks.get(name))
+
     def get_all(self) -> dict[str, list[Callable]]:
         return self._hooks
 
@@ -429,7 +433,7 @@ def before_call(context: HookContext, case: Case, kwargs: dict[str, Any]) -> Non
     """
 
 
-@HookDispatcher.register_spec([HookScope.GLOBAL])
+@HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
 def after_call(context: HookContext, case: Case, response: Response) -> None:
     """Called after every network call in CLI tests.
 
@@ -458,6 +462,7 @@ def after_validate(context: HookContext, case: Case, response: Response, results
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
+defines = GLOBAL_HOOK_DISPATCHER.defines
 unregister = GLOBAL_HOOK_DISPATCHER.unregister
 unregister_all = GLOBAL_HOOK_DISPATCHER.unregister_all
 
