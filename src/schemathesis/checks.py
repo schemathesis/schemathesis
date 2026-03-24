@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Iterable, Iterator
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ChecksConfig
@@ -16,6 +17,7 @@ from schemathesis.core.failures import (
 )
 from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
+from schemathesis.engine import Status
 from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
@@ -25,6 +27,15 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], bool | None]
+
+
+@dataclass(slots=True)
+class CheckResult:
+    """Outcome of a single validation check."""
+
+    name: str
+    status: Status
+    failure: Failure | None
 
 
 class CheckContext:

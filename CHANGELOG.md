@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- `after_validate` hook fires after all checks run on a response, carrying a list of `CheckResult` objects.
 - Examples phase generates optional properties and one disjoint set per `oneOf`/`anyOf` branch. [#2371](https://github.com/schemathesis/schemathesis/issues/2371)
 
 ### :wrench: Changed

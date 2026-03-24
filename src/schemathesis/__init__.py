@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from schemathesis import errors, graphql, openapi, pytest
 from schemathesis.auths import AuthContext, AuthProvider, auth
-from schemathesis.checks import CheckContext, CheckFunction, check
+from schemathesis.checks import CheckContext, CheckFunction, CheckResult, check
 from schemathesis.config import SchemathesisConfig as Config
 from schemathesis.core.deserialization import DeserializationContext, deserializer
 from schemathesis.core.transport import Response
@@ -39,6 +39,7 @@ __all__ = [
     "check",
     "CheckContext",
     "CheckFunction",
+    "CheckResult",
     # Auth
     "auth",
     "AuthContext",

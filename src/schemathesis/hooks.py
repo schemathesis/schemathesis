@@ -17,8 +17,10 @@ from schemathesis.filters import FilterSet, attach_filter_chain
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
+    from schemathesis.checks import CheckResult
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
+
 
 HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
 
@@ -436,6 +438,20 @@ def after_call(context: HookContext, case: Case, response: Response) -> None:
     Use cases:
      - Response post-processing, like modifying its payload.
      - Logging
+    """
+
+
+@all_scopes
+def after_validate(context: HookContext, case: Case, response: Response, results: list[CheckResult]) -> None:
+    """Called after all validation checks run on a response.
+
+    `results` contains one entry per check that was executed — `status` is
+    `Status.SUCCESS` when the check passed, `Status.FAILURE` with `failure`
+    populated when it did not.
+
+    Use cases:
+     - Recording check outcomes for cassette/report writers.
+     - Custom observability / logging of validation results.
     """
 
 
