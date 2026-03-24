@@ -37,8 +37,11 @@ Hooks that execute during test case execution.
 |------|-----------|-----------------|---------|
 | **before_call** | `(ctx, case: Case, kwargs) -> None` | Before HTTP request | Modify test case (headers, body, etc.) |
 | **after_call** | `(ctx, case: Case, response: Response) -> None` | After HTTP response | Inspect/modify response before checks |
+| **after_validate** | `(ctx, case: Case, response: Response, results: list[CheckResult]) -> None` | After all checks run | Observe check outcomes for logging or reporting |
 
-**Flow:** `before_call` → HTTP Request → `after_call` → Checks
+**Flow:** `before_call` -> HTTP Request -> `after_call` -> Checks -> `after_validate`
+
+`CheckResult` fields: `name` (check name), `status` (`Status.SUCCESS` or `Status.FAILURE`), `failure` (`Failure` instance or `None`).
 
 ## Hook Registration
 

@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from jsonschema_rs import Validator
 
 from schemathesis import transport
-from schemathesis.checks import CHECKS, CheckContext, CheckFunction, load_all_checks, run_checks
+from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult, load_all_checks, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
+from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transport import Response
+from schemathesis.engine import Status
 from schemathesis.generation import GenerationMode, generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.generation.overrides import Override, store_components
-from schemathesis.hooks import HookContext, dispatch
+from schemathesis.hooks import HookContext, dispatch, get_all_by_name
 from schemathesis.transport.prepare import prepare_path, prepare_request
 
 if TYPE_CHECKING:
@@ -455,13 +456,39 @@ class Case:
             transport_kwargs=transport_kwargs,
             recorder=None,
         )
+        has_after_validate = bool(get_all_by_name("after_validate"))
+        check_results: list[CheckResult] = []
+        _on_success: Callable[[str, Case], None] | None
+
+        if has_after_validate:
+
+            def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+                collected.add(failure)
+                check_results.append(CheckResult(name=name, status=Status.FAILURE, failure=failure))
+
+            def on_success(name: str, _: Case) -> None:
+                check_results.append(CheckResult(name=name, status=Status.SUCCESS, failure=None))
+
+            _on_success = on_success
+
+        else:
+
+            def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+                collected.add(failure)
+
+            _on_success = None
+
         failures = run_checks(
             case=self,
             response=response,
             ctx=ctx,
             checks=checks,
-            on_failure=lambda _, collected, failure: collected.add(failure),
+            on_failure=on_failure,
+            on_success=_on_success,
         )
+        if has_after_validate:
+            hook_context = HookContext(operation=self.operation)
+            dispatch("after_validate", hook_context, self, response, check_results)
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"
