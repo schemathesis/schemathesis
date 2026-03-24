@@ -457,7 +457,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String`  
 
-    Custom path for NDJSON events file. This format exports all engine events as newline-delimited JSON, useful for analysis and tooling integration.
+    Custom path for NDJSON events file. This format exports all engine events as newline-delimited JSON, useful for analysis and tooling integration. Available in `st run` only - not applicable to the pytest plugin.
 
     ```console
     $ st run openapi.yaml --report ndjson --report-ndjson-path ./events.ndjson
