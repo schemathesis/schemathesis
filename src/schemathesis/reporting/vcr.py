@@ -4,6 +4,7 @@ import datetime
 import json
 from io import StringIO
 from pathlib import Path
+from types import TracebackType
 from typing import IO
 
 from schemathesis.config import ProjectConfig
@@ -204,6 +205,17 @@ class VcrWriter:
             self._owned_file.close()
             self._owned_file = None
         self._stream = None
+
+    def __enter__(self) -> VcrWriter:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()
 
 
 def write_double_quoted(stream: IO, text: str | None) -> None:

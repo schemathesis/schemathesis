@@ -5,12 +5,11 @@ from dataclasses import dataclass
 from queue import Queue
 
 from schemathesis.cli.commands.run.context import ExecutionContext
-from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput, get_command_representation
+from schemathesis.cli.commands.run.handlers.base import WRITER_WORKER_JOIN_TIMEOUT, EventHandler, TextOutput
 from schemathesis.config import ProjectConfig, SanitizationConfig
 from schemathesis.engine import events
+from schemathesis.reporting._command import get_command_representation
 from schemathesis.reporting.ndjson import NdjsonWriter
-
-_WRITER_WORKER_JOIN_TIMEOUT = 1
 
 
 class NdjsonHandler(EventHandler):
@@ -22,11 +21,11 @@ class NdjsonHandler(EventHandler):
         self,
         output: TextOutput,
         config: ProjectConfig,
-        queue: Queue | None = None,
+        queue: Queue[_Initialize | _Process | _Finalize] | None = None,
     ) -> None:
         self.output = output
         self.config = config
-        self.queue: Queue = queue or Queue()
+        self.queue: Queue[_Initialize | _Process | _Finalize] = queue or Queue()
         sanitization = config.output.sanitization if config.output.sanitization.enabled else None
         self.worker = threading.Thread(
             name="SchemathesisNdjsonWriter",
@@ -43,11 +42,28 @@ class NdjsonHandler(EventHandler):
         self.queue.put(_Initialize(seed=ctx.config.seed, command=get_command_representation()))
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
-        self.queue.put(_Event(payload=event))
+        self.queue.put(_Process(payload=event))
 
     def shutdown(self, ctx: ExecutionContext) -> None:
-        self.queue.put(_Shutdown())
-        self.worker.join(_WRITER_WORKER_JOIN_TIMEOUT)
+        self.queue.put(_Finalize())
+        self.worker.join(WRITER_WORKER_JOIN_TIMEOUT)
+
+
+def _run(
+    output: TextOutput,
+    queue: Queue[_Initialize | _Process | _Finalize],
+    sanitization: SanitizationConfig | None,
+) -> None:
+    writer = NdjsonWriter(output=output, sanitization=sanitization)
+    while True:
+        item = queue.get()
+        if isinstance(item, _Initialize):
+            writer.open(seed=item.seed, command=item.command)
+        elif isinstance(item, _Process):
+            writer.write_event(item.payload)
+        else:  # _Finalize
+            writer.close()
+            break
 
 
 @dataclass(slots=True)
@@ -57,23 +73,10 @@ class _Initialize:
 
 
 @dataclass(slots=True)
-class _Event:
+class _Process:
     payload: events.EngineEvent
 
 
 @dataclass(slots=True)
-class _Shutdown:
+class _Finalize:
     pass
-
-
-def _run(output: TextOutput, queue: Queue, sanitization: SanitizationConfig | None) -> None:
-    writer = NdjsonWriter(output=output, sanitization=sanitization)
-    while True:
-        item = queue.get()
-        if isinstance(item, _Initialize):
-            writer.open(seed=item.seed, command=item.command)
-        elif isinstance(item, _Event):
-            writer.write_event(item.payload)
-        else:  # _Shutdown
-            writer.close()
-            break

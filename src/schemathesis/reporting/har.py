@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from http.cookies import SimpleCookie
 from io import StringIO
 from pathlib import Path
+from types import TracebackType
 from typing import IO
 from urllib.parse import parse_qsl, urlparse
 
@@ -130,6 +131,17 @@ class HarWriter:
         if self._har is not None:
             self._ctx.__exit__(None, None, None)
             self._har = None
+
+    def __enter__(self) -> HarWriter:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()
 
 
 def _headers_size(headers: dict[str, list[str]]) -> int:

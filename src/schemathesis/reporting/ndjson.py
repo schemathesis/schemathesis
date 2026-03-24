@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
 from io import StringIO
 from pathlib import Path
+from types import TracebackType
 from typing import IO, TYPE_CHECKING, Any
 
 from schemathesis.core import NOT_SET
@@ -173,3 +174,14 @@ class NdjsonWriter:
             self._owned_file.close()
             self._owned_file = None
         self._stream = None
+
+    def __enter__(self) -> NdjsonWriter:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()

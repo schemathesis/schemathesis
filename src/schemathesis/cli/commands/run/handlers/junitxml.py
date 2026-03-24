@@ -11,19 +11,19 @@ from schemathesis.reporting.junitxml import JunitXmlWriter
 @dataclass
 class JunitXMLHandler(EventHandler):
     output: TextOutput
-    _writer: JunitXmlWriter
+    writer: JunitXmlWriter
 
-    __slots__ = ("output", "_writer")
+    __slots__ = ("output", "writer")
 
     def __init__(self, output: TextOutput) -> None:
         self.output = output
-        self._writer = JunitXmlWriter(output)
+        self.writer = JunitXmlWriter(output)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
             failures = ctx.statistic.failures.get(label, {}).values() if event.status == Status.FAILURE else []
-            self._writer.record_scenario(
+            self.writer.record_scenario(
                 label=label,
                 elapsed_sec=event.elapsed_time,
                 failures=failures,
@@ -31,7 +31,7 @@ class JunitXMLHandler(EventHandler):
                 config=ctx.config.output,
             )
         elif isinstance(event, events.NonFatalError):
-            self._writer.record_error(label=event.label, message=event.info.format())
+            self.writer.record_error(label=event.label, message=event.info.format())
 
     def shutdown(self, ctx: ExecutionContext) -> None:
-        self._writer.close()
+        self.writer.close()

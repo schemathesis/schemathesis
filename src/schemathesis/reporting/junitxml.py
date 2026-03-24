@@ -4,6 +4,7 @@ import platform
 from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
+from types import TracebackType
 from typing import IO, TYPE_CHECKING
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
@@ -68,3 +69,14 @@ class JunitXmlWriter:
 
     def _get_or_create(self, label: str) -> TestCase:
         return self._test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
+
+    def __enter__(self) -> JunitXmlWriter:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> None:
+        self.close()

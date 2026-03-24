@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import MutableMapping, MutableSequence
 from functools import lru_cache
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
@@ -14,8 +13,10 @@ def sanitize_value(item: Any, *, config: SanitizationConfig) -> None:
     This function is recursive and will sanitize sensitive data within nested
     dictionaries and lists as well.
     """
-    if isinstance(item, MutableMapping):
-        for key in list(item.keys()):
+    from requests.structures import CaseInsensitiveDict
+
+    if isinstance(item, dict | CaseInsensitiveDict):
+        for key in item:
             lower_key = key.lower()
             if lower_key in config.keys_to_sanitize or any(marker in lower_key for marker in config.sensitive_markers):
                 if isinstance(item[key], list):
@@ -23,11 +24,11 @@ def sanitize_value(item: Any, *, config: SanitizationConfig) -> None:
                 else:
                     item[key] = config.replacement
         for value in item.values():
-            if isinstance(value, MutableMapping | MutableSequence):
+            if isinstance(value, dict | list):
                 sanitize_value(value, config=config)
-    elif isinstance(item, MutableSequence):
+    elif isinstance(item, list):
         for value in item:
-            if isinstance(value, MutableMapping | MutableSequence):
+            if isinstance(value, dict | list):
                 sanitize_value(value, config=config)
 
 
