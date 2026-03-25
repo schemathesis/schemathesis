@@ -230,3 +230,77 @@ class CaseMetadata:
     def update_validated_hash(self, location: ParameterLocation, value: int) -> None:
         """Store hash after validation to detect future changes."""
         self._last_validated_hashes[location] = value
+
+    def to_dict(self) -> dict:
+        """Serialize to a plain dict for cross-process transport."""
+        phase_data = self.phase.data
+        phase_data_dict: dict[str, str | None] = {
+            "type": type(phase_data).__name__,
+            "description": phase_data.description,
+            "location": phase_data.location,
+            "parameter": phase_data.parameter,
+            "parameter_location": (
+                phase_data.parameter_location.name if phase_data.parameter_location is not None else None
+            ),
+        }
+        if isinstance(phase_data, CoveragePhaseData):
+            phase_data_dict["scenario"] = phase_data.scenario.value
+        return {
+            "generation": {
+                "time": self.generation.time,
+                "mode": self.generation.mode.value,
+            },
+            "components": {loc.name: info.mode.value for loc, info in self.components.items()},
+            "phase": {
+                "name": self.phase.name.value,
+                "data": phase_data_dict,
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> CaseMetadata:
+        """Reconstruct from a plain dict produced by ``to_dict``."""
+        generation = GenerationInfo(
+            time=data["generation"]["time"],
+            mode=GenerationMode(data["generation"]["mode"]),
+        )
+        components = {
+            ParameterLocation[loc_name]: ComponentInfo(mode=GenerationMode(mode_val))
+            for loc_name, mode_val in data["components"].items()
+        }
+        phase_data_raw = data["phase"]["data"]
+        param_loc_name = phase_data_raw["parameter_location"]
+        param_loc = ParameterLocation[param_loc_name] if param_loc_name is not None else None
+        phase_data_type = phase_data_raw["type"]
+        phase_data: CoveragePhaseData | FuzzingPhaseData | StatefulPhaseData | ExamplesPhaseData
+        if phase_data_type == "CoveragePhaseData":
+            phase_data = CoveragePhaseData(
+                scenario=CoverageScenario(phase_data_raw["scenario"]),
+                description=phase_data_raw["description"],
+                location=phase_data_raw["location"],
+                parameter=phase_data_raw["parameter"],
+                parameter_location=param_loc,
+            )
+        elif phase_data_type == "FuzzingPhaseData":
+            phase_data = FuzzingPhaseData(
+                description=phase_data_raw["description"],
+                parameter=phase_data_raw["parameter"],
+                parameter_location=param_loc,
+                location=phase_data_raw["location"],
+            )
+        elif phase_data_type == "StatefulPhaseData":
+            phase_data = StatefulPhaseData(
+                description=phase_data_raw["description"],
+                parameter=phase_data_raw["parameter"],
+                parameter_location=param_loc,
+                location=phase_data_raw["location"],
+            )
+        else:
+            phase_data = ExamplesPhaseData(
+                description=phase_data_raw["description"],
+                parameter=phase_data_raw["parameter"],
+                parameter_location=param_loc,
+                location=phase_data_raw["location"],
+            )
+        phase = PhaseInfo(name=TestPhase(data["phase"]["name"]), data=phase_data)
+        return cls(generation=generation, components=components, phase=phase)

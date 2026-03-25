@@ -435,8 +435,16 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore[no-untyped-def]
         yield
 
 
+def _is_xdist_worker(config: pytest.Config) -> bool:
+    return hasattr(config, "workerinput")
+
+
 def pytest_configure(config: pytest.Config) -> None:
     config.stash[_CASSETTE_KEY] = {}
+    if config.pluginmanager.hasplugin("xdist"):
+        from schemathesis.pytest.xdist import XdistReportingPlugin
+
+        config.pluginmanager.register(XdistReportingPlugin(), "schemathesis-xdist")
 
 
 def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter | JunitXmlWriter]:
@@ -451,12 +459,12 @@ def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter | JunitXmlWr
     command = " ".join(sys.argv)
     if reports.vcr.enabled:
         path = reports.get_path(ReportFormat.VCR)
-        vcr_writer = VcrWriter(output=path, config=schema.config)
+        vcr_writer = VcrWriter(output=path, config=schema.config.output, preserve_bytes=reports.preserve_bytes)
         vcr_writer.open(seed=seed, command=command)
         writers.append(vcr_writer)
     if reports.har.enabled:
         path = reports.get_path(ReportFormat.HAR)
-        har_writer = HarWriter(output=path, config=schema.config)
+        har_writer = HarWriter(output=path, config=schema.config.output, preserve_bytes=reports.preserve_bytes)
         har_writer.open(seed=seed)
         writers.append(har_writer)
     if reports.junit.enabled:
@@ -472,6 +480,15 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
         return
     schema = SchemaHandleMark.get(item.test_function)
     if schema is None or id(schema) in item.config.stash[_CASSETTE_KEY]:
+        return
+    if _is_xdist_worker(item.config):
+        reports = schema.config.reports
+        if not (reports.vcr.enabled or reports.har.enabled or reports.junit.enabled):
+            return
+        from schemathesis.pytest.reporting import PytestReportDispatcher
+
+        dispatcher = PytestReportDispatcher(schema)
+        item.config.stash[_CASSETTE_KEY][id(schema)] = (dispatcher, [])
         return
     writers = _open_writers(schema)
     if not writers:
@@ -496,9 +513,18 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> 
     dispatcher, writers = entry
     result = dispatcher.pop_recorder(item.operation_label)
     if result is not None:
+        recorder, elapsed_sec = result
+        if _is_xdist_worker(item.config):
+            from schemathesis.pytest.xdist import _schema_id, _serialize_writer_config, serialize_recorder
+
+            schema_id = _schema_id(schema)
+            recorders: dict = item.config.workeroutput.setdefault("schemathesis_recorders", {})
+            if schema_id not in recorders:
+                recorders[schema_id] = {"writer_config": _serialize_writer_config(schema), "records": []}
+            recorders[schema_id]["records"].append(serialize_recorder(recorder, elapsed_sec))
+            return
         from schemathesis.reporting.junitxml import JunitXmlWriter
 
-        recorder, elapsed_sec = result
         for writer in writers:
             if isinstance(writer, JunitXmlWriter):
                 writer.write(recorder, elapsed_sec)

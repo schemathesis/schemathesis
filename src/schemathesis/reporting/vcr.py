@@ -7,7 +7,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO
 
-from schemathesis.config import ProjectConfig
+from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
@@ -21,9 +21,10 @@ TextOutput = IO[str] | StringIO | Path
 class VcrWriter:
     """Write network interactions to a VCR YAML cassette file."""
 
-    def __init__(self, output: TextOutput, config: ProjectConfig) -> None:
+    def __init__(self, output: TextOutput, config: OutputConfig, preserve_bytes: bool = False) -> None:
         self._output = output
         self._config = config
+        self._preserve_bytes = preserve_bytes
         self._stream: IO[str] | None = None
         self._owned_file: IO[str] | None = None
 
@@ -50,10 +51,10 @@ class VcrWriter:
         def write_header_values(values: list[str]) -> None:
             stream.writelines(f"      - {json.dumps(v)}\n" for v in values)
 
-        if config.output.sanitization.enabled:
-            sanitization_keys = config.output.sanitization.keys_to_sanitize
-            sensitive_markers = config.output.sanitization.sensitive_markers
-            replacement = config.output.sanitization.replacement
+        if config.sanitization.enabled:
+            sanitization_keys = config.sanitization.keys_to_sanitize
+            sensitive_markers = config.sanitization.sensitive_markers
+            replacement = config.sanitization.replacement
 
             def write_headers(headers: dict[str, list[str]]) -> None:
                 for name, values in headers.items():
@@ -85,7 +86,7 @@ class VcrWriter:
                     f"      message: {message_str}\n"
                 )
 
-        if config.reports.preserve_bytes:
+        if self._preserve_bytes:
 
             def write_request_body(request: Request) -> None:
                 if request.encoded_body is not None:
@@ -169,8 +170,8 @@ class VcrWriter:
                 stream.write("\n  metadata: null")
 
             # Sanitize URL if needed
-            if config.output.sanitization.enabled:
-                uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
+            if config.sanitization.enabled:
+                uri = sanitize_url(interaction.request.uri, config=config.sanitization)
             else:
                 uri = interaction.request.uri
 

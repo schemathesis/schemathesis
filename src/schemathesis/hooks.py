@@ -15,6 +15,7 @@ from schemathesis.core.transport import Response
 from schemathesis.filters import FilterSet, attach_filter_chain
 
 if TYPE_CHECKING:
+    import requests
     from hypothesis import strategies as st
 
     from schemathesis.checks import CheckResult
@@ -442,6 +443,18 @@ def after_call(context: HookContext, case: Case, response: Response) -> None:
     Use cases:
      - Response post-processing, like modifying its payload.
      - Logging
+    """
+
+
+@HookDispatcher.register_spec([HookScope.GLOBAL, HookScope.SCHEMA])
+def after_network_error(context: HookContext, case: Case, request: requests.PreparedRequest) -> None:
+    """Called when a network-level error (timeout, connection failure) occurs during case.call().
+
+    The prepared request that was attempted is available for logging or recording.
+
+    Use cases:
+     - Recording failed network interactions alongside successful ones.
+     - Logging connection failures.
     """
 
 

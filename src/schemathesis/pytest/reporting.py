@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 from schemathesis.engine.recorder import ScenarioRecorder
 
 if TYPE_CHECKING:
+    import requests
+
     from schemathesis.checks import CheckResult
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
@@ -30,8 +32,10 @@ class PytestReportDispatcher:
         # gives two different objects, breaking identity comparison in hooks.unregister().
         self._after_call_hook = self._on_after_call
         self._after_validate_hook = self._on_after_validate
+        self._after_network_error_hook = self._on_after_network_error
         schema.hooks.register_hook_with_name(self._after_call_hook, "after_call")
         schema.hooks.register_hook_with_name(self._after_validate_hook, "after_validate")
+        schema.hooks.register_hook_with_name(self._after_network_error_hook, "after_network_error")
 
     def _on_after_call(self, context: HookContext, case: Case, response: Response) -> None:
         label = case.operation.label
@@ -39,6 +43,13 @@ class PytestReportDispatcher:
         recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label))
         recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
         recorder.record_response(case_id=case.id, response=response)
+
+    def _on_after_network_error(self, context: HookContext, case: Case, request: requests.PreparedRequest) -> None:
+        label = case.operation.label
+        self._start_times.setdefault(label, time.monotonic())
+        recorder = self._recorders.setdefault(label, ScenarioRecorder(label=label))
+        recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
+        recorder.record_request(case_id=case.id, request=request)
 
     def _on_after_validate(
         self, context: HookContext, case: Case, response: Response, check_results: list[CheckResult]
@@ -73,6 +84,7 @@ class PytestReportDispatcher:
         return recorder, elapsed
 
     def unregister(self) -> None:
-        """Remove both hooks from schema.hooks. Called at pytest_sessionfinish."""
+        """Remove all hooks from schema.hooks. Called at pytest_sessionfinish."""
         self._schema.hooks.unregister(self._after_call_hook)
         self._schema.hooks.unregister(self._after_validate_hook)
+        self._schema.hooks.unregister(self._after_network_error_hook)

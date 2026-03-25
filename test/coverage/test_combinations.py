@@ -1110,6 +1110,19 @@ def test_positive_pattern(pctx):
     assert_conform(covered, schema)
 
 
+def test_positive_pattern_with_wildcard_prefix_and_digit_limit(pctx):
+    # Regression: https://github.com/schemathesis/schemathesis/issues/3154
+    # Pattern with `.*` prefix and bounded digit quantifier `{1,10}`.
+    # st.from_regex(pattern) without fullmatch=True allowed strings with a trailing \n
+    # (Python's `$` matches before \n; JSON Schema / ECMAScript `$` does not),
+    # producing values that fail the schema but passed the Python-side filter,
+    # causing the hook to see a schema-conformant value while the URL carried an
+    # invalid one.
+    schema = {"type": "string", "pattern": r"^.*Id,([0-9]{1,10})$"}
+    covered = cover_schema(pctx, schema)
+    assert_conform(covered, schema)
+
+
 def test_positive_pattern_with_char_class_and_min_length(pctx):
     # Regression: update_quantifier can't encode minLength into patterns with bare
     # character classes like [a-z] (IN opcode). The .filter() safety net ensures
