@@ -101,6 +101,7 @@ class InvalidSchema(SchemathesisError):
         path: str | None = None,
         method: str | None = None,
     ) -> None:
+        super().__init__(message)
         self.message = message
         self.path = path
         self.method = method
