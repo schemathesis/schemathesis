@@ -8,6 +8,10 @@
 - `after_validate` hook fires after all checks run on a response, carrying a list of `CheckResult` objects.
 - Examples phase generates optional properties and one disjoint set per `oneOf`/`anyOf` branch. [#2371](https://github.com/schemathesis/schemathesis/issues/2371)
 
+### :bug: Fixed
+
+- `InvalidSchema` exceptions displayed an empty message in `pytest` output.
+
 ### :wrench: Changed
 
 - Suppress `HypothesisWarning` when overriding built-in string formats via `schemathesis.openapi.format()`. [#3269](https://github.com/schemathesis/schemathesis/issues/3269)

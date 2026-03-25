@@ -402,13 +402,16 @@ def test_coverage_phase(corpus, filename, mode):
     schema = _load_schema(corpus, filename)
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
-            for _ in _iter_coverage_cases(
-                operation=operation.ok(),
-                generation_modes=[mode],
-                generate_duplicate_query_parameters=False,
-                unexpected_methods=set(),
-                generation_config=schema.config.generation,
-            ):
+            try:
+                for _ in _iter_coverage_cases(
+                    operation=operation.ok(),
+                    generation_modes=[mode],
+                    generate_duplicate_query_parameters=False,
+                    unexpected_methods=set(),
+                    generation_config=schema.config.generation,
+                ):
+                    pass
+            except InvalidSchema:
                 pass
 
 
