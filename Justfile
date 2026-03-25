@@ -19,14 +19,14 @@ test-dist *ARGS:
 # Run tests with coverage
 test-cov *ARGS:
     @rm -f .coverage*
-    COVERAGE_PROCESS_START=pyproject.toml coverage run -m pytest test/ -n auto --dist=worksteal {{ARGS}} || true
-    coverage combine
-    coverage report
+    COVERAGE_PROCESS_START="$(pwd)/pyproject.toml" COVERAGE_FILE="$(pwd)/.coverage" uv run python -m coverage run -m pytest test/ -n auto --dist=worksteal {{ARGS}} || true
+    uv run python -m coverage combine
+    uv run python -m coverage report
 
 # Run tests with coverage and open HTML report
 test-cov-html *ARGS:
     @just test-cov {{ARGS}}
-    coverage html
+    uv run python -m coverage html
     @xdg-open htmlcov/index.html
 
 # Run tests matching pattern

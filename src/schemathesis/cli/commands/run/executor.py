@@ -103,11 +103,11 @@ def initialize_handlers(
     if config.reports.vcr.enabled:
         path = config.reports.get_path(ReportFormat.VCR)
         open_file(path)
-        handlers.append(VcrHandler(output=path, config=config))
+        handlers.append(VcrHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes))
     if config.reports.har.enabled:
         path = config.reports.get_path(ReportFormat.HAR)
         open_file(path)
-        handlers.append(HarHandler(output=path, config=config))
+        handlers.append(HarHandler(output=path, config=config.output, preserve_bytes=config.reports.preserve_bytes))
 
     if config.reports.ndjson.enabled:
         path = config.reports.get_path(ReportFormat.NDJSON)

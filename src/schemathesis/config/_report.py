@@ -128,3 +128,18 @@ class ReportsConfig(DiffBase):
             return report.path
 
         return self.directory / f"{format.value}-{self._timestamp}.{format.extension}"
+
+    def get_stable_path(self, format: ReportFormat, suffix: str | None = None) -> Path:
+        """Get a stable, timestamp-free path for cross-process transport.
+
+        Unlike get_path(), this omits the timestamp so all workers in an xdist
+        run produce identical paths regardless of when they start.
+        If `suffix` is given it is inserted before the extension (e.g. ``cassette-abc12345.yaml``).
+        """
+        report: ReportConfig = getattr(self, format.value)
+        if report.path is not None:
+            return report.path
+        path = self.directory / f"{format.value}.{format.extension}"
+        if suffix:
+            path = path.with_stem(f"{path.stem}-{suffix}")
+        return path

@@ -210,7 +210,7 @@ def test_events(benchmark):
 
 
 def _write_vcr(recorders, config, seed):
-    writer = VcrWriter(StringIO(), config)
+    writer = VcrWriter(StringIO(), config.output)
     writer.open(seed=seed, command="<benchmark>")
     for recorder in recorders:
         writer.write(recorder)
@@ -218,7 +218,7 @@ def _write_vcr(recorders, config, seed):
 
 
 def _write_har(recorders, config, seed):
-    writer = HarWriter(StringIO(), config)
+    writer = HarWriter(StringIO(), config.output)
     writer.open(seed=seed)
     for recorder in recorders:
         writer.write(recorder)

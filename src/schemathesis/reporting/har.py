@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl, urlparse
 
 import harfile
 
-from schemathesis.config import ProjectConfig
+from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -31,9 +31,10 @@ HARFILE_NO_RESPONSE = harfile.Response(
 class HarWriter:
     """Write network interactions to a HAR JSON cassette file."""
 
-    def __init__(self, output: TextOutput, config: ProjectConfig) -> None:
+    def __init__(self, output: TextOutput, config: OutputConfig, preserve_bytes: bool = False) -> None:
         self._output = output
         self._config = config
+        self._preserve_bytes = preserve_bytes
         self._har: harfile.HarFile | None = None
 
     def open(self, seed: int | None = None) -> None:
@@ -48,8 +49,8 @@ class HarWriter:
         config = self._config
 
         for interaction in recorder.interactions.values():
-            if config.output.sanitization.enabled:
-                uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
+            if config.sanitization.enabled:
+                uri = sanitize_url(interaction.request.uri, config=config.sanitization)
             else:
                 uri = interaction.request.uri
             query_params = urlparse(uri).query
@@ -57,7 +58,7 @@ class HarWriter:
                 post_data = harfile.PostData(
                     mimeType=interaction.request.headers.get("Content-Type", [""])[0],
                     text=interaction.request.encoded_body
-                    if config.reports.preserve_bytes
+                    if self._preserve_bytes
                     else interaction.request.body.decode("utf-8", "replace"),
                 )
             else:
@@ -68,18 +69,16 @@ class HarWriter:
                     size=interaction.response.body_size or 0,
                     mimeType=content_type,
                     text=interaction.response.encoded_body
-                    if config.reports.preserve_bytes
+                    if self._preserve_bytes
                     else interaction.response.content.decode("utf-8", "replace")
                     if interaction.response.content is not None
                     else None,
-                    encoding="base64"
-                    if interaction.response.content is not None and config.reports.preserve_bytes
-                    else None,
+                    encoding="base64" if interaction.response.content is not None and self._preserve_bytes else None,
                 )
                 http_version = f"HTTP/{interaction.response.http_version}"
-                if config.output.sanitization.enabled:
+                if config.sanitization.enabled:
                     resp_headers = deepclone(interaction.response.headers)
-                    sanitize_value(resp_headers, config=config.output.sanitization)
+                    sanitize_value(resp_headers, config=config.sanitization)
                 else:
                     resp_headers = interaction.response.headers
                 response = harfile.Response(
@@ -99,9 +98,9 @@ class HarWriter:
                 time = 0
                 http_version = ""
 
-            if config.output.sanitization.enabled:
+            if config.sanitization.enabled:
                 req_headers = deepclone(interaction.request.headers)
-                sanitize_value(req_headers, config=config.output.sanitization)
+                sanitize_value(req_headers, config=config.sanitization)
             else:
                 req_headers = interaction.request.headers
             started_datetime = datetime.datetime.fromtimestamp(interaction.timestamp, datetime.timezone.utc).isoformat()

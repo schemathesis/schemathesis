@@ -401,6 +401,13 @@ class Case:
                 # (e.g., malformed path template). Skip adding curl command to avoid
                 # replacing the original exception with a secondary error.
                 pass
+            # Notify hooks about network-level failures (connection errors, timeouts, etc.)
+            import requests
+
+            request = getattr(exc, "request", None)
+            if isinstance(request, requests.PreparedRequest):
+                dispatch("after_network_error", hook_context, self, request)
+                self.operation.schema.hooks.dispatch("after_network_error", hook_context, self, request)
             raise
         dispatch("after_call", hook_context, self, response)
         self.operation.schema.hooks.dispatch("after_call", hook_context, self, response)
