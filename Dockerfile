@@ -80,14 +80,14 @@ RUN mkdir -p src/schemathesis && \
     touch src/schemathesis/__init__.py
 
 RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir ./
+    /opt/venv/bin/pip install --no-cache-dir ".[allure]"
 
 COPY src ./src
 
 RUN /opt/venv/bin/pip install --no-cache-dir --no-deps --force-reinstall ./
 
 RUN /opt/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /opt/venv/bin/pip install --no-cache-dir tracecov==0.16.6
+    /opt/venv/bin/pip install --no-cache-dir tracecov==0.19.3
 
 RUN find /opt/venv -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete && \
     find /opt/venv -type d -name __pycache__ -delete

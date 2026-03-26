@@ -17,6 +17,7 @@ nav:
       - guides/auth.md
       - guides/schema-conformance.md
       - guides/cicd.md
+      - Allure Integration: guides/allure.md
       - Docker: guides/docker.md
       - guides/coverage.md
       - guides/python-apps.md

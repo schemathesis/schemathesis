@@ -57,6 +57,8 @@ jobs:
 
 The JUnit report is written to `schemathesis-report/junit-<timestamp>.xml` by default. The `upload-artifact` step above uploads the entire `schemathesis-report/` directory, which captures this file regardless of the timestamp in its name.
 
+Allure reports are also supported — see [Allure Integration](allure.md).
+
 ## GitLab CI
 
 Use the official Docker image for consistent environments.

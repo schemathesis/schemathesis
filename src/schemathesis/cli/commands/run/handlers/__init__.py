@@ -20,11 +20,23 @@ __all__ = [
 ]
 
 
-def is_built_in_handler(handler: EventHandler) -> bool:
-    # Look for exact instances, not subclasses
-    return any(
-        type(handler) is class_ for class_ in (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, OutputHandler)
+try:
+    from schemathesis.cli.commands.run.handlers.allure import AllureHandler
+
+    _BUILT_IN_HANDLERS: tuple[type[EventHandler], ...] = (
+        VcrHandler,
+        HarHandler,
+        JunitXMLHandler,
+        NdjsonHandler,
+        OutputHandler,
+        AllureHandler,
     )
+except ImportError:
+    _BUILT_IN_HANDLERS = (VcrHandler, HarHandler, JunitXMLHandler, NdjsonHandler, OutputHandler)
+
+
+def is_built_in_handler(handler: EventHandler) -> bool:
+    return type(handler) in _BUILT_IN_HANDLERS
 
 
 def display_handler_error(handler: EventHandler, exc: Exception) -> None:

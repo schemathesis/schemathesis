@@ -48,6 +48,9 @@
         },
         "ndjson": {
           "$ref": "#/$defs/ReportConfig"
+        },
+        "allure": {
+          "$ref": "#/$defs/ReportConfig"
         }
       }
     },

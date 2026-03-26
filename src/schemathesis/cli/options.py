@@ -447,6 +447,13 @@ REPORT_NDJSON_PATH = OptionSpec(
     is_eager=True,
 )
 
+REPORT_ALLURE_PATH = OptionSpec(
+    "--report-allure-path",
+    help="Directory for Allure result files",
+    type=click.Path(file_okay=False),
+    is_eager=True,
+)
+
 REPORT_PRESERVE_BYTES = OptionSpec(
     "--report-preserve-bytes",
     help="Retain exact byte sequence of payloads in cassettes, encoded as base64",
