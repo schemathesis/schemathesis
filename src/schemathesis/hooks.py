@@ -247,7 +247,7 @@ class HookDispatcher:
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
-            hook = _wrap_hook_for_generated_value(hook)
+            hook = _wrap_flatmap_hook_for_generated_value(hook)
             strategy = strategy.flatmap(hook)
         return strategy
 
@@ -305,6 +305,25 @@ def _wrap_hook_for_generated_value(hook: Callable) -> Callable:
         if isinstance(value, GeneratedValue):
             result = hook(value.value)
             return GeneratedValue(value=result, meta=value.meta)
+        return hook(value)
+
+    return wrapper
+
+
+def _wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
+    """Wrap a flatmap hook to handle GeneratedValue transparently.
+
+    Unlike map hooks, flatmap hooks return a SearchStrategy — not a value.
+    In NEGATIVE mode the input is a GeneratedValue wrapper, so we unwrap it,
+    call the hook to get a SearchStrategy, then re-wrap each drawn result so
+    the GeneratedValue metadata is preserved through the flatmap.
+    """
+    from schemathesis.specs.openapi.negative import GeneratedValue
+
+    def wrapper(value: Any) -> st.SearchStrategy:
+        if isinstance(value, GeneratedValue):
+            meta = value.meta
+            return hook(value.value).map(lambda v: GeneratedValue(value=v, meta=meta))
         return hook(value)
 
     return wrapper

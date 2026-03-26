@@ -157,6 +157,32 @@ def test_hook_receives_dict(case):
     result.assert_outcomes(passed=1)
 
 
+def test_flatmap_hooks_work_in_negative_mode(testdir, simple_openapi):
+    # See GH-3652
+    testdir.make_test(
+        """
+from hypothesis import strategies as st
+
+@st.composite
+def new_query(draw, query):
+    return {"id": str(draw(st.integers(min_value=1, max_value=100)))}
+
+def replacement(context, query):
+    return new_query(query)
+
+@schema.hooks.apply(replacement, name="flatmap_query")
+@schema.parametrize()
+@settings(max_examples=5)
+def test_hook_works(case):
+    pass
+""",
+        schema=simple_openapi,
+        generation_modes=[GenerationMode.NEGATIVE],
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=1)
+
+
 def test_per_test_hooks(testdir, simple_openapi):
     testdir.make_test(
         """
