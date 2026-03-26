@@ -126,6 +126,11 @@ def duration_values() -> st.SearchStrategy[str]:
     )
 
 
+def _lowercase_email_domain(email: str) -> str:
+    local, domain = email.rsplit("@", 1)
+    return f"{local}@{domain.lower()}"
+
+
 @lru_cache
 def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""
@@ -140,7 +145,14 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     # Define valid characters here to avoid filtering them out in `is_valid_header` later
     header_value = header_values()
 
+    # st.emails() generates IDN domains with mixed-case `xn--` ACE prefix (e.g. `Xn--`, `XN--`)
+    # which jsonschema_rs rejects per RFC 3490. Email domains are case-insensitive (RFC 5321),
+    # so lowercasing the domain is correct and ensures generated emails pass schema validation.
+    email_strategy = st.emails().map(_lowercase_email_domain)
+
     return {
+        "email": email_strategy,
+        "idn-email": email_strategy,
         "binary": st.binary().map(Binary),
         "byte": st.binary().map(lambda x: b64encode(x).decode()),
         "duration": duration_values(),
