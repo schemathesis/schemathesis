@@ -10,6 +10,7 @@
 
 ### :bug: Fixed
 
+- `format: email` fields generating values rejected by `jsonschema_rs` response validation.
 - `flatmap_*` hooks raising `RuntimeError` in negative testing mode. [#3652](https://github.com/schemathesis/schemathesis/issues/3652)
 - Stateful checks (e.g. `use_after_free`) not triggering when run via `schema.as_state_machine()`.
 - `InvalidSchema` exceptions displayed an empty message in `pytest` output.
