@@ -4,8 +4,6 @@ Customize how Schemathesis generates test data, validates responses, and handles
 
 ## When to extend Schemathesis
 
-Extend Schemathesis when the default behavior doesn't match your API requirements:
-
 - **Test with realistic data** - Use actual user IDs, valid timestamps, or existing database records
 - **Validate business rules** - Check application-specific response patterns
 - **Work with custom formats** - Generate valid credit cards, phone numbers, or other formats
@@ -13,42 +11,38 @@ Extend Schemathesis when the default behavior doesn't match your API requirement
 
 ## Quick Start: Your First Hook
 
-**Problem:** Your API requires existing user IDs, but Schemathesis generates random values that cause 404 errors.
-
-Replace random generated data with realistic values that work with your test environment:
+Your API requires existing user IDs, but Schemathesis generates random values that cause 404 errors. Replace random generated data with realistic values that work with your test environment:
 
 ```python
 # hooks.py
 import schemathesis
 
-@schemathesis.hook  
+@schemathesis.hook
 def map_query(ctx, query):
-    """Replace random user_id with a known test user"""
     if query and "user_id" in query:
         query["user_id"] = "test-user-123"
     return query
 ```
 
 ```bash
-# Run with hooks
 export SCHEMATHESIS_HOOKS=hooks
 schemathesis run http://localhost:8000/openapi.json
 ```
 
 ## Hook Types and Naming
 
-**Data generation hooks** use a naming pattern: `<operation>_<part>` where the operation determines what the hook does and the part determines which request data it affects.
+Data generation hooks use a naming pattern: `<operation>_<part>` where the operation determines what the hook does and the part determines which request data it affects.
 
 **Operations:**
 
 - **`filter_<part>`** - Skip test cases (return `True` to keep, `False` to skip)
-- **`map_<part>`** - Modify existing data (return the modified data)
-- **`flatmap_<part>`** - Generate new data with dependencies using Hypothesis strategies
+- **`map_<part>`** - Transform the drawn value; return the new value
+- **`flatmap_<part>`** - Transform the drawn value using additional Hypothesis strategies; return a `SearchStrategy`
 
 **Request parts:**
 
 - `query` - Query parameters
-- `headers` - HTTP headers  
+- `headers` - HTTP headers
 - `path_parameters` - URL path parameters
 - `body` - Request body
 - `case` - The entire test case
@@ -65,19 +59,21 @@ filter_* → map_* → flatmap_* → Final test case
 
 ### Filtering unwanted data
 
-**Problem:** Skip test cases that cause known issues or aren't relevant for your API.
+Skip test cases that cause known issues or aren't relevant for your API:
 
 ```python
 @schemathesis.hook
 def filter_query(ctx, query):
-    return query and query.get("user_id") != "admin"
+    if not query:
+        return True
+    return query.get("user_id") != "admin"
 ```
 
-When multiple hooks of the same type are registered, they run in the order they were registered. For `filter_*` hooks, the case is discarded if any hook returns `False` — later hooks are not called. For `map_*` hooks, each receives the output of the previous.
+When multiple hooks of the same type are registered, they run in the order they were registered. For `filter_*` hooks, the case is discarded if any hook returns `False` - later hooks are not called. For `map_*` hooks, each receives the output of the previous.
 
 ### Using real database values
 
-**Problem:** Your API validates IDs against a database, but Schemathesis generates random values that don't exist.
+Your API validates IDs against a database, but Schemathesis generates random values that don't exist:
 
 ```python
 @schemathesis.hook
@@ -87,34 +83,42 @@ def map_path_parameters(ctx, path_parameters):
     return path_parameters
 ```
 
-### Generating dependent data
+### Generating dependent data with `flatmap`
 
-**Problem:** Create relationships between different parts of the request when fields must match.
+Use `flatmap_<part>` when the strategy for one field depends on the value of another - the already-drawn value determines which strategy runs next.
+
+`flatmap` receives the already-drawn value and must return a `SearchStrategy`. Hypothesis draws from that strategy to produce the final value.
 
 ```python
 from hypothesis import strategies as st
 
+SUBCATEGORIES = {
+    "electronics": ["phones", "laptops", "tablets"],
+    "clothing": ["shirts", "pants", "shoes"],
+}
+
+@st.composite
+def with_subcategory(draw, body):
+    category = (body or {}).get("category")
+    options = SUBCATEGORIES.get(category, ["other"])
+    subcategory = draw(st.sampled_from(options))
+    return {**(body or {}), "subcategory": subcategory}
+
 @schemathesis.hook
 def flatmap_body(ctx, body):
-    if body and "email" in body and "organization" in body:
-        org = body["organization"]
-        domain = f"{org.lower()}.com"
-        return st.just(body).map(lambda b: {**b, "email": f"user@{domain}"})
-    return st.just(body)
+    return with_subcategory(body)
 ```
 
-## Custom Validation Checks
+The subcategory choices are determined by the generated `category` - that dependency is why `flatmap` is needed here. Use `map_<part>` instead when the transformation is deterministic.
 
-Check business rules specific to your application beyond schema validation:
+## Custom Validation Checks
 
 ```python
 @schemathesis.check
 def check_user_permissions(ctx, response, case):
-    """Verify user can only access their own data"""
     if case.path.startswith("/users/") and response.status_code == 200:
         user_id = case.path_parameters.get("user_id")
         response_data = response.json()
-        
         if response_data.get("id") != user_id:
             actual = response_data.get("id")
             raise AssertionError(
@@ -123,7 +127,6 @@ def check_user_permissions(ctx, response, case):
 
 @schemathesis.check
 def check_audit_trail(ctx, response, case):
-    """Ensure all data modifications are logged"""
     if case.method in ("POST", "PUT", "DELETE") and response.status_code < 400:
         if "X-Audit-ID" not in response.headers:
             raise AssertionError("Data modification missing audit trail")
@@ -131,16 +134,12 @@ def check_audit_trail(ctx, response, case):
 
 ## Custom Data Formats
 
-Generate valid data for custom string formats in your OpenAPI schema:
-
 ```python
 from hypothesis import strategies as st
 
-# Generate valid phone numbers
 phone_strategy = st.from_regex(r"\+1-\d{3}-\d{3}-\d{4}")
 schemathesis.openapi.format("phone", phone_strategy)
 
-# Generate valid credit card numbers (simplified)
 card_strategy = st.from_regex(r"4\d{15}")  # Visa-like format
 schemathesis.openapi.format("credit_card", card_strategy)
 ```
@@ -156,7 +155,7 @@ user_phone:
 
 ### Overriding built-in formats
 
-The same API overrides standard formats like `date`, `date-time`, `uuid`, and others. By default Schemathesis generates values across the full valid range — including far-future dates and extreme integers — which is intentional: many server-side bugs only surface when the input isn't sanitised before hitting a database or arithmetic operation. If your application already handles those cases and the out-of-range values are producing noise, restrict the range:
+The same API overrides standard formats like `date`, `date-time`, `uuid`, and others. By default Schemathesis generates values across the full valid range - including far-future dates and extreme integers - which is intentional: many server-side bugs only surface when the input isn't sanitised before hitting a database or arithmetic operation. If your application already handles those cases and the out-of-range values are producing noise, restrict the range:
 
 ```python
 from datetime import date
@@ -167,11 +166,7 @@ today = date.today()
 schemathesis.openapi.format("date", st.dates(max_value=today).map(str))
 ```
 
-After this registration, every `format: date` field in the schema draws from the restricted strategy instead of the built-in one.
-
 ## Setting Up Extensions
-
-Define your hooks:
 
 ```python
 # hooks.py (for CLI) or conftest.py (for pytest)
@@ -192,12 +187,15 @@ export SCHEMATHESIS_HOOKS=hooks
 schemathesis run http://localhost:8000/openapi.json
 ```
 
-!!! warning "Common issue"
-    Use `SCHEMATHESIS_HOOKS=hooks` (not `hooks.py`). The file must be in your current directory or Python path.
+!!! tip
+    Two forms are accepted:
+
+    - **Module name**: `SCHEMATHESIS_HOOKS=hooks` - imports `hooks.py` from the current directory or Python path
+    - **File path**: `SCHEMATHESIS_HOOKS=hooks.py` or `SCHEMATHESIS_HOOKS=/path/to/hooks.py` - loads the file directly, useful in Docker or CI where the file isn't on the Python path
 
 ### For pytest integration
 
-Put hooks in conftest.py to make them available to all tests:
+Put hooks in `conftest.py` to make them available to all tests:
 
 ```python
 # test_api.py
@@ -209,8 +207,6 @@ def test_api(case):
 ```
 
 ## Targeting Specific Operations
-
-Apply hooks only to certain API endpoints:
 
 ```python
 # Only apply to user endpoints, skip POST requests
@@ -224,32 +220,26 @@ def map_headers(ctx, headers):
 @schemathesis.hook.apply_to(name="GET /orders/{order_id}")
 def map_path_parameters(ctx, path_parameters):
     path_parameters = path_parameters or {}
-    path_parameters["order_id"] = "order_12345"  # Known test order
+    path_parameters["order_id"] = "order_12345"
     return path_parameters
 ```
 
 ## Advanced: Request Modification
 
-For complex scenarios, modify the entire request:
-
 ```python
 @schemathesis.hook
 def before_call(ctx, case, kwargs):
-    """Modify the request just before it's sent"""
-    # Add correlation ID for tracing
     case.headers["X-Correlation-ID"] = f"test-{uuid.uuid4()}"
-    # Set `mode=testing` for every request
     case.query["mode"] = "testing"
 ```
 
 ## Advanced: Schema Modification Patterns
 
-**Problem:** You want faster tests by only generating required fields, skipping optional parameters that don't affect core functionality.
+Remove optional properties to focus tests on required fields only:
 
 ```python
 @schemathesis.hook
 def before_init_operation(ctx, operation):
-    """Remove optional properties to focus tests on required fields only"""
     for parameter in operation.iter_parameters():
         schema = parameter.definition.get("schema", {})
         remove_optional_properties(schema)
@@ -259,26 +249,16 @@ def before_init_operation(ctx, operation):
         remove_optional_properties(schema)
 
 def remove_optional_properties(schema):
-    """Recursively remove non-required properties from schema"""
     if not isinstance(schema, dict):
         return
-
     required = schema.get("required", [])
     properties = schema.get("properties", {})
-
-    # Remove optional properties
     for name in list(properties.keys()):
         if name not in required:
             del properties[name]
-
-    # Recurse into remaining properties
     for subschema in properties.values():
         remove_optional_properties(subschema)
 ```
-
-**When to use:** When you want to focus on core functionality testing and reduce test execution time.
-
-**Trade-offs:** Faster tests but reduced coverage of optional parameter combinations.
 
 ## GraphQL Hooks
 
@@ -289,23 +269,16 @@ GraphQL hooks work with `graphql.DocumentNode` objects instead of JSON data. The
 ```python
 @schemathesis.hook
 def map_body(ctx, body):
-    """Change field names in the GraphQL query"""
     node = body.definitions[0].selection_set.selections[0]
-    
-    # Change the field name
     node.name.value = "addedViaHook"
-    
     return body
 ```
 
 ### Adding query variables
 
-Use `map_query` to provide variables:
-
 ```python
 @schemathesis.hook
 def map_query(ctx, query):
-    """Add query parameters to GraphQL requests"""
     return {"q": "42"}
 ```
 
@@ -316,7 +289,6 @@ Note that `query` is always `None` for GraphQL requests since Schemathesis doesn
 ```python
 @schemathesis.hook
 def filter_body(ctx, body):
-    """Skip queries with specific field names"""
     node = body.definitions[0].selection_set.selections[0]
     return node.name.value != "excludeThisField"
 ```
@@ -328,22 +300,19 @@ from hypothesis import strategies as st
 
 @schemathesis.hook
 def flatmap_body(ctx, body):
-    """Generate dependent fields based on query content"""
     node = body.definitions[0].selection_set.selections[0]
     if node.name.value == "someField":
         return st.just(body).map(lambda b: modify_body(b, "someDependentField"))
     return st.just(body)
 
 def modify_body(body, new_field_name):
-    # Create and add a new field to the query
     new_field = ...  # Create a new field node
     new_field.name.value = new_field_name
-    
     body.definitions[0].selection_set.selections.append(new_field)
     return body
 ```
 
 ## What's Next
 
-- **[Authentication Guide](../guides/auth.md)** - Configure API authentication
-- **[Hook Reference](../reference/hooks.md)** - Complete list of available hooks
+- [Authentication Guide](../guides/auth.md) - Configure API authentication
+- [Hook Reference](../reference/hooks.md) - Complete list of available hooks
