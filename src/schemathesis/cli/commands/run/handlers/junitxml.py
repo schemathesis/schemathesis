@@ -27,7 +27,7 @@ class JunitXMLHandler(EventHandler):
                 label=label,
                 elapsed_sec=event.elapsed_time,
                 failures=failures,
-                skip_reason=event.skip_reason if event.status == Status.SKIP else None,
+                skip_reason=event.skip_reason,
                 config=ctx.config.output,
             )
         elif isinstance(event, events.NonFatalError):

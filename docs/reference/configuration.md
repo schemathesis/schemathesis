@@ -220,7 +220,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     **Type**: `Boolean`  
     **Default**: `false`  
 
-    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, or `har`.
+    Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, `har`, or `allure`.
 
     ```toml
     [reports.junit]
@@ -234,7 +234,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     **Type**: `String`  
     **Default**: `null`  
 
-    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, or `har`.
+    Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, `har`, or `allure`. For `allure`, this is a directory path.
 
     Setting this path automatically enables report generation without requiring `enabled = true`.
 

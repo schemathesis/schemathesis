@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.meta import CaseMetadata
+    from schemathesis.reporting.allure import AllureWriter
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
@@ -28,6 +29,19 @@ if TYPE_CHECKING:
 _XDIST_WRITERS_KEY: pytest.StashKey[dict[str, dict]] = pytest.StashKey()
 # Key used in xdist workeroutput to pass serialized recorders from workers to the controller
 SCHEMATHESIS_RECORDERS_KEY = "schemathesis_recorders"
+
+
+class _MimeProxy:
+    """Carries a mime-type string when replaying serialized attachment calls.
+
+    Satisfies the _HasMimeType protocol (runtime_checkable) checked inside
+    AllureWriter.accumulate_attachment.
+    """
+
+    __slots__ = ("mime_type",)
+
+    def __init__(self, mime_type: str) -> None:
+        self.mime_type = mime_type
 
 
 class _CaseMetaProxy:
@@ -43,7 +57,12 @@ class _CaseMetaProxy:
         self.meta = meta
 
 
-def serialize_recorder(recorder: ScenarioRecorder, elapsed_sec: float) -> dict:
+def serialize_recorder(
+    recorder: ScenarioRecorder,
+    elapsed_sec: float,
+    tags: list[str] | None = None,
+    allure_calls: list[dict] | None = None,
+) -> dict:
     """Serialize a ScenarioRecorder for cross-process transport via workeroutput."""
     interactions: dict[str, dict] = {}
     for case_id, interaction in recorder.interactions.items():
@@ -103,12 +122,29 @@ def serialize_recorder(recorder: ScenarioRecorder, elapsed_sec: float) -> dict:
         meta = case_node.value.meta if case_node.value is not None else None
         cases[case_id] = meta.to_dict() if meta is not None else None
 
+    serialized_calls: list[dict] = []
+    for call in allure_calls or []:
+        if call["type"] == "attach":
+            serialized_calls.append(
+                {
+                    "type": "attach",
+                    "label": call["label"],
+                    "name": call["name"],
+                    "body": {"$base64": base64.b64encode(call["body"]).decode()},
+                    "mime": call["mime"],
+                }
+            )
+        else:
+            serialized_calls.append(call)
+
     return {
         "label": recorder.label,
         "elapsed_sec": elapsed_sec,
         "interactions": interactions,
         "checks": checks,
         "cases": cases,
+        "tags": tags,
+        "allure_calls": serialized_calls,
     }
 
 
@@ -216,7 +252,7 @@ def _serialize_writer_config(schema: BaseSchema) -> dict:
     """Serialize the minimal writer configuration for cross-process transport."""
     reports = schema.config.reports
     paths: dict[str, str | None] = {}
-    for fmt in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT):
+    for fmt in (ReportFormat.VCR, ReportFormat.HAR, ReportFormat.JUNIT, ReportFormat.ALLURE):
         report = getattr(reports, fmt.value)
         if report.enabled:
             paths[fmt.value] = str(report.path) if report.path is not None else None
@@ -228,13 +264,15 @@ def _serialize_writer_config(schema: BaseSchema) -> dict:
         "sanitization": dataclasses.asdict(schema.config.output.sanitization),
         "directory": str(reports.directory),
         "paths": paths,
+        "api_title": schema.raw_schema.get("info", {}).get("title"),
     }
 
 
 def _open_writers_from_config(
     writer_config: dict, suffix: str | None = None
-) -> list[VcrWriter | HarWriter | JunitXmlWriter]:
+) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
     """Open report writers on the controller using serialized writer configuration."""
+    from schemathesis.reporting.allure import AllureWriter
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
@@ -262,9 +300,10 @@ def _open_writers_from_config(
         vcr=_rc(ReportFormat.VCR),
         har=_rc(ReportFormat.HAR),
         junit=_rc(ReportFormat.JUNIT),
+        allure=_rc(ReportFormat.ALLURE),
     )
 
-    writers: list[VcrWriter | HarWriter | JunitXmlWriter] = []
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter] = []
     try:
         if ReportFormat.VCR.value in paths:
             vcr_writer = VcrWriter(
@@ -286,6 +325,14 @@ def _open_writers_from_config(
             writers.append(
                 JunitXmlWriter(output=reports.get_stable_path(ReportFormat.JUNIT, suffix=suffix), config=output)
             )
+        if ReportFormat.ALLURE.value in paths:
+            writers.append(
+                AllureWriter(
+                    output_dir=reports.get_stable_path(ReportFormat.ALLURE, suffix=suffix),
+                    config=output,
+                    api_title=writer_config.get("api_title"),
+                )
+            )
     except Exception:
         for writer in writers:
             writer.close()
@@ -306,6 +353,7 @@ class XdistReportingPlugin:
             stash[schema_id]["records"].extend(payload["records"])
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
+        from schemathesis.reporting.allure import AllureWriter
         from schemathesis.reporting.junitxml import JunitXmlWriter
 
         if hasattr(session.config, "workerinput"):
@@ -321,9 +369,24 @@ class XdistReportingPlugin:
             try:
                 for record in payload["records"]:
                     recorder, elapsed_sec = deserialize_recorder(record)
+                    tags: list[str] | None = record.get("tags")
                     for writer in writers:
                         if isinstance(writer, JunitXmlWriter):
                             writer.write(recorder, elapsed_sec)
+                        elif isinstance(writer, AllureWriter):
+                            writer.write(recorder, elapsed_sec, tags=tags)
+                            for call in record.get("allure_calls", []):
+                                t = call["type"]
+                                label = call["label"]
+                                if t == "attach":
+                                    body = base64.b64decode(call["body"]["$base64"])
+                                    writer.accumulate_attachment(label, call["name"], body, _MimeProxy(call["mime"]))
+                                elif t == "link":
+                                    writer.accumulate_link(label, call["url"], call["link_type"], call["name"])
+                                elif t == "title":
+                                    writer.accumulate_title(label, call["title"])
+                                elif t == "description":
+                                    writer.accumulate_description(label, call["description"])
                         else:
                             writer.write(recorder)
             finally:

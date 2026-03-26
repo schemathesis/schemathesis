@@ -114,6 +114,15 @@ def initialize_handlers(
         open_file(path)
         handlers.append(NdjsonHandler(output=path, config=config))
 
+    if config.reports.allure.enabled:
+        try:
+            from schemathesis.cli.commands.run.handlers.allure import AllureHandler
+        except ImportError as exc:
+            raise click.ClickException(str(exc)) from exc
+
+        allure_path = config.reports.get_path(ReportFormat.ALLURE)
+        handlers.append(AllureHandler(output_dir=allure_path, config=config.output))
+
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))
 

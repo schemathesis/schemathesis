@@ -2,9 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from schemathesis.config import ConfigError, SchemathesisConfig
-from schemathesis.config._operations import OperationConfig, OperationsConfig
-from schemathesis.config._projects import ProjectConfig
+from schemathesis.config import ConfigError, OperationConfig, OperationsConfig, ProjectConfig, SchemathesisConfig
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.errors import HookError
 from schemathesis.filters import FilterSet
