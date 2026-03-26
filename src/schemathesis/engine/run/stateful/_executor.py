@@ -155,7 +155,6 @@ def execute_state_machine_loop(
         def validate_response(
             self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
         ) -> None:
-            self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
 

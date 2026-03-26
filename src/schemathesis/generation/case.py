@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
     from werkzeug.test import TestResponse
 
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.schemas import APIOperation
 
 
@@ -421,6 +422,7 @@ class Case:
         excluded_checks: list[CheckFunction] | None = None,
         headers: dict[str, Any] | None = None,
         transport_kwargs: dict[str, Any] | None = None,
+        recorder: ScenarioRecorder | None = None,
     ) -> None:
         """Validate a response against the API schema and built-in checks.
 
@@ -431,6 +433,7 @@ class Case:
             excluded_checks: Built-in checks to skip.
             headers: Headers used in the original request.
             transport_kwargs: Transport arguments used in the original request.
+            recorder: Recorder for stateful check context (case/response lookups).
 
         """
         __tracebackhide__ = True
@@ -462,7 +465,7 @@ class Case:
             headers=CaseInsensitiveDict(headers) if headers else None,
             config=config,
             transport_kwargs=transport_kwargs,
-            recorder=None,
+            recorder=recorder,
         )
         has_after_validate = hooks.defines("after_validate") or self.operation.schema.hooks.defines("after_validate")
         check_results: list[CheckResult] = []
