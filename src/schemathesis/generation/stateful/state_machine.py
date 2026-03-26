@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -12,14 +14,20 @@ from hypothesis.stateful import RuleBasedStateMachine
 from schemathesis.checks import CheckFunction
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.core.errors import STATEFUL_TESTING_GUIDE_URL, NoLinksFound
+from schemathesis.core.marks import Mark
 from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
+
+StatefulSchemaMark = Mark["BaseSchema"](attr_name="stateful_schema")
+StatefulCallbackMark = Mark[Callable | None](attr_name="stateful_callback")
 
 if TYPE_CHECKING:
     import hypothesis
     from requests.structures import CaseInsensitiveDict
 
+    from schemathesis.checks import CheckResult
+    from schemathesis.hooks import HookContext
     from schemathesis.schemas import BaseSchema
 
 
@@ -177,12 +185,67 @@ class APIStateMachine(RuleBasedStateMachine):
             settings = DEFAULT_STATE_MACHINE_SETTINGS
 
             def runTest(self) -> None:
-                run_state_machine_as_test(cls, settings=self.settings)
+                # A callback is attached by the pytest plugin when report writers are configured.
+                # It connects this state machine class to the writers at the pytest level.
+                callback = StatefulCallbackMark.get(self.__class__)
+                if callback is not None:
+                    _callback = callback
+
+                    # Wraps the state machine to capture interactions into the recorder,
+                    # then hands the recorder off to the callback (i.e. the report writers)
+                    # via schema-scoped hooks.
+                    class _Capturing(cls):  # type: ignore[valid-type, misc]
+                        def __init__(self) -> None:
+                            self._start_time = time.monotonic()
+                            super().__init__()
+                            _recorder = self.recorder
+
+                            # Capture check results via the after_validate hook
+                            def _on_after_validate(
+                                context: HookContext,
+                                case: Case,
+                                response: Response,
+                                results: list[CheckResult],
+                            ) -> None:
+                                for result in results:
+                                    if result.failure is not None:
+                                        code_sample = case.as_curl_command(
+                                            headers=dict(response.request.headers),
+                                            verify=getattr(response, "verify", True),
+                                        )
+                                        _recorder.record_check_failure(
+                                            name=result.name,
+                                            case_id=case.id,
+                                            code_sample=code_sample,
+                                            failure=result.failure,
+                                        )
+                                    else:
+                                        _recorder.record_check_success(name=result.name, case_id=case.id)
+
+                            self._on_after_validate = _on_after_validate
+                            self.schema.hooks.register_hook_with_name(_on_after_validate, "after_validate")
+
+                        def after_call(self, response: Response, case: Case) -> None:
+                            # Capture each response as it arrives
+                            self.recorder.record_response(case_id=case.id, response=response)
+                            super().after_call(response, case)
+
+                        def teardown(self) -> None:
+                            self.schema.hooks.unregister(self._on_after_validate)
+                            elapsed = time.monotonic() - self._start_time
+                            # Hand the completed recorder to the pytest-level callback
+                            _callback(self.recorder, elapsed)
+                            super().teardown()
+
+                    run_state_machine_as_test(_Capturing, settings=self.settings)
+                else:
+                    run_state_machine_as_test(cls, settings=self.settings)
 
             runTest.is_hypothesis_test = True  # type: ignore[attr-defined]
 
         StateMachineTestCase.__name__ = cls.__name__ + ".TestCase"
         StateMachineTestCase.__qualname__ = cls.__qualname__ + ".TestCase"
+        StatefulSchemaMark.set(StateMachineTestCase, cls.schema)
         return StateMachineTestCase
 
     def _new_name(self, target: str) -> str:
