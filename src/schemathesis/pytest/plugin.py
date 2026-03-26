@@ -45,6 +45,7 @@ from schemathesis.generation.hypothesis.reporting import (
     build_unsatisfiable_error,
     ignore_hypothesis_output,
 )
+from schemathesis.generation.stateful.state_machine import StatefulCallbackMark, StatefulSchemaMark
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.pytest.warnings import emit_openapi_auth_warnings
 from schemathesis.schemas import APIOperation
@@ -53,6 +54,7 @@ if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
     from _pytest.terminal import TerminalReporter
 
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.pytest.reporting import PytestReportDispatcher
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
@@ -62,6 +64,7 @@ if TYPE_CHECKING:
 _CASSETTE_KEY: pytest.StashKey[
     dict[int, tuple[PytestReportDispatcher, list[VcrWriter | HarWriter | JunitXmlWriter]]]
 ] = pytest.StashKey()
+_STATEFUL_WRITERS_KEY: pytest.StashKey[list[VcrWriter | HarWriter | JunitXmlWriter]] = pytest.StashKey()
 
 
 def _is_schema(value: object) -> bool:
@@ -473,7 +476,66 @@ def _open_writers(schema: BaseSchema) -> list[VcrWriter | HarWriter | JunitXmlWr
     return writers
 
 
+def _write_to_writers(
+    writers: list[VcrWriter | HarWriter | JunitXmlWriter],
+    recorder: ScenarioRecorder,
+    elapsed_sec: float,
+) -> None:
+    from schemathesis.reporting.junitxml import JunitXmlWriter
+
+    for writer in writers:
+        if isinstance(writer, JunitXmlWriter):
+            writer.write(recorder, elapsed_sec)
+        else:
+            writer.write(recorder)
+
+
+def _push_to_xdist_workeroutput(
+    workeroutput: dict,
+    schema: BaseSchema,
+    recorder: ScenarioRecorder,
+    elapsed_sec: float,
+) -> None:
+    from schemathesis.pytest.xdist import (
+        SCHEMATHESIS_RECORDERS_KEY,
+        _schema_id,
+        _serialize_writer_config,
+        serialize_recorder,
+    )
+
+    sid = _schema_id(schema)
+    recorders = workeroutput.setdefault(SCHEMATHESIS_RECORDERS_KEY, {})
+    if sid not in recorders:
+        recorders[sid] = {"writer_config": _serialize_writer_config(schema), "records": []}
+    recorders[sid]["records"].append(serialize_recorder(recorder, elapsed_sec))
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
+    schema = StatefulSchemaMark.get(item.cls) if item.cls is not None else None
+    if schema is not None:
+        # Attach a callback to the TestCase class so the state machine can hand off
+        # its recorder to the report writers once the scenario finishes.
+        _schema = schema
+        if _is_xdist_worker(item.config):
+            reports = _schema.config.reports
+            if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled:
+
+                def _xdist_stateful_callback(recorder: Any, elapsed_sec: float) -> None:
+                    _push_to_xdist_workeroutput(item.config.workeroutput, _schema, recorder, elapsed_sec)
+
+                item.stash[_STATEFUL_WRITERS_KEY] = []
+                StatefulCallbackMark.set(item.cls, _xdist_stateful_callback)
+        else:
+            writers = _open_writers(_schema)
+            item.stash[_STATEFUL_WRITERS_KEY] = writers
+            if writers:
+
+                def _stateful_callback(recorder: Any, elapsed_sec: float) -> None:
+                    _write_to_writers(writers, recorder, elapsed_sec)
+
+                StatefulCallbackMark.set(item.cls, _stateful_callback)
+        return
+
     if not isinstance(item, SchemathesisFunction):
         return
     if item.operation_label is None:
@@ -500,6 +562,12 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
+    if item.cls is not None and StatefulSchemaMark.is_set(item.cls):
+        StatefulCallbackMark.set(item.cls, None)
+        for writer in item.stash.get(_STATEFUL_WRITERS_KEY, []):
+            writer.close()
+        return
+
     if not isinstance(item, SchemathesisFunction):
         return
     if item.operation_label is None:
@@ -515,21 +583,9 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> 
     if result is not None:
         recorder, elapsed_sec = result
         if _is_xdist_worker(item.config):
-            from schemathesis.pytest.xdist import _schema_id, _serialize_writer_config, serialize_recorder
-
-            schema_id = _schema_id(schema)
-            recorders: dict = item.config.workeroutput.setdefault("schemathesis_recorders", {})
-            if schema_id not in recorders:
-                recorders[schema_id] = {"writer_config": _serialize_writer_config(schema), "records": []}
-            recorders[schema_id]["records"].append(serialize_recorder(recorder, elapsed_sec))
-            return
-        from schemathesis.reporting.junitxml import JunitXmlWriter
-
-        for writer in writers:
-            if isinstance(writer, JunitXmlWriter):
-                writer.write(recorder, elapsed_sec)
-            else:
-                writer.write(recorder)
+            _push_to_xdist_workeroutput(item.config.workeroutput, schema, recorder, elapsed_sec)
+        else:
+            _write_to_writers(writers, recorder, elapsed_sec)
 
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:

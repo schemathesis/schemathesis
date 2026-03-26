@@ -2,20 +2,11 @@ import json
 import pathlib
 from xml.etree import ElementTree
 
+import pytest
 import yaml
 
 
 def _make_xdist_test(testdir, content, base_url, paths=None):
-    """Create a test module suitable for xdist execution.
-
-    testdir.make_test always prepends `from test.utils import *`. That import
-    works in non-xdist mode because runpytest_inprocess shares the outer
-    process's sys.path (which has the project root after conftest discovery).
-    Under xdist, workers are fresh subprocesses; xdist.plugin._sys_path is
-    frozen at plugin import time, before conftest discovery adds the project
-    root, so test.utils is unreachable. This helper builds the test file and
-    conftest directly without importing test.utils at all.
-    """
     if paths is None:
         paths = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
     schema_dict = {
@@ -23,22 +14,12 @@ def _make_xdist_test(testdir, content, base_url, paths=None):
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
         "paths": paths,
     }
-    testdir.makeconftest(
-        """
-def pytest_configure(config):
-    config.HYPOTHESIS_CASES = 0
-"""
-    )
     testdir.makepyfile(
         f"""
 import schemathesis
-from schemathesis.config import SchemathesisConfig
 from hypothesis import settings
 
-config = SchemathesisConfig()
-config.output.sanitization.update(enabled=False)
-
-schema = schemathesis.openapi.from_dict({schema_dict!r}, config=config)
+schema = schemathesis.openapi.from_dict({schema_dict!r})
 schema.config.update(base_url="{base_url}")
 
 {content}
@@ -473,24 +454,18 @@ def test_two_schemas_same_vcr_path_via_xdist(testdir, openapi3_base_url):
         "info": {"title": "B", "description": "", "version": "0.1.0"},
         "paths": {"/health": {"get": {"responses": {"200": {"description": "OK"}}}}},
     }
-    testdir.makeconftest("def pytest_configure(config):\n    config.HYPOTHESIS_CASES = 0\n")
     testdir.makepyfile(
         f"""
 import schemathesis
-from schemathesis.config import SchemathesisConfig
-from schemathesis.config._report import ReportFormat
+from schemathesis.config import ReportFormat
 from pathlib import Path
 from hypothesis import settings
 
-config_a = SchemathesisConfig()
-config_a.output.sanitization.update(enabled=False)
-schema_a = schemathesis.openapi.from_dict({schema_a!r}, config=config_a)
+schema_a = schemathesis.openapi.from_dict({schema_a!r})
 schema_a.config.update(base_url="{openapi3_base_url}")
 schema_a.config.reports.update(formats=[ReportFormat.VCR], directory=Path(r"{report_dir}"))
 
-config_b = SchemathesisConfig()
-config_b.output.sanitization.update(enabled=False)
-schema_b = schemathesis.openapi.from_dict({schema_b!r}, config=config_b)
+schema_b = schemathesis.openapi.from_dict({schema_b!r})
 schema_b.config.update(base_url="{openapi3_base_url}")
 schema_b.config.reports.update(formats=[ReportFormat.VCR], directory=Path(r"{report_dir}"))
 
@@ -541,3 +516,95 @@ def test_api(case):
     with open(vcr_path) as f:
         content = f.read()
     assert "recorded_with" in content
+
+
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_vcr_report_written_for_stateful_test(testdir, openapi3_base_url, openapi3_schema_url):
+    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.reports.update(vcr_path=r"{cassette_path}")
+TestCase = schema.as_state_machine().TestCase
+""",
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+
+    with open(cassette_path) as f:
+        cassette = yaml.safe_load(f)
+    interactions = cassette["http_interactions"]
+    assert len(interactions) >= 1
+    assert "request" in interactions[0]
+    assert "response" in interactions[0]
+
+
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_har_report_written_for_stateful_test(testdir, openapi3_base_url, openapi3_schema_url):
+    har_path = str(testdir.tmpdir.join("cassette.har"))
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.reports.update(har_path=r"{har_path}")
+TestCase = schema.as_state_machine().TestCase
+""",
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+
+    with open(har_path) as f:
+        har = json.load(f)
+    entries = har["log"]["entries"]
+    assert len(entries) >= 1
+    assert "request" in entries[0]
+    assert "response" in entries[0]
+
+
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_junit_report_written_for_stateful_test(testdir, openapi3_base_url, openapi3_schema_url):
+    report_path = str(testdir.tmpdir.join("report.xml"))
+    testdir.make_test(
+        f"""
+schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.reports.update(junit_path=r"{report_path}")
+TestCase = schema.as_state_machine().TestCase
+""",
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+
+    tree = ElementTree.parse(report_path)
+    test_cases = tree.findall(".//testcase")
+    assert len(test_cases) >= 1
+    # The bug is found → at least one check failed → JUnit records a failure
+    failures = tree.findall(".//failure")
+    assert len(failures) >= 1
+
+
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_vcr_report_written_for_stateful_test_via_xdist(testdir, openapi3_base_url, openapi3_schema_url):
+    cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
+    testdir.makepyfile(
+        f"""
+import schemathesis
+
+schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.reports.update(vcr_path=r"{cassette_path}")
+
+TestCase = schema.as_state_machine().TestCase
+"""
+    )
+    result = testdir.runpytest("-n", "2", "--dist=load")
+    result.assert_outcomes(failed=1)
+
+    assert pathlib.Path(cassette_path).exists()
+    with open(cassette_path) as f:
+        cassette = yaml.safe_load(f)
+    interactions = cassette["http_interactions"]
+    assert len(interactions) >= 1
+    assert "request" in interactions[0]
+    assert "response" in interactions[0]

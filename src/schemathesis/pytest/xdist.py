@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
 # schema_id -> {"writer_config": ..., "records": [...]}
 _XDIST_WRITERS_KEY: pytest.StashKey[dict[str, dict]] = pytest.StashKey()
+# Key used in xdist workeroutput to pass serialized recorders from workers to the controller
+SCHEMATHESIS_RECORDERS_KEY = "schemathesis_recorders"
 
 
 class _CaseMetaProxy:
@@ -298,7 +300,7 @@ class XdistReportingPlugin:
         # Accumulate per schema_id; writing is deferred to pytest_sessionfinish
         # so we know the full set of schemas before opening any files.
         stash = node.config.stash.setdefault(_XDIST_WRITERS_KEY, {})
-        for schema_id, payload in node.workeroutput.get("schemathesis_recorders", {}).items():
+        for schema_id, payload in node.workeroutput.get(SCHEMATHESIS_RECORDERS_KEY, {}).items():
             if schema_id not in stash:
                 stash[schema_id] = {"writer_config": payload["writer_config"], "records": []}
             stash[schema_id]["records"].extend(payload["records"])
