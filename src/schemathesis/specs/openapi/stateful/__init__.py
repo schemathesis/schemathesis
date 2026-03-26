@@ -8,10 +8,12 @@ from typing import TYPE_CHECKING, Any
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
+from schemathesis.checks import CheckFunction
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
+from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -38,6 +40,25 @@ class OpenAPIStateMachine(APIStateMachine):
         self.recorder = ScenarioRecorder(label=STATEFUL_TESTS_LABEL)
         self.control = TransitionController(self._transitions)
         super().__init__()
+
+    def after_call(self, response: Response, case: Case) -> None:
+        # Always record responses so stateful checks can look up prior responses
+        self.recorder.record_response(case_id=case.id, response=response)
+
+    def validate_response(
+        self,
+        response: Response,
+        case: Case,
+        additional_checks: list[CheckFunction] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        __tracebackhide__ = True
+        case.validate_response(
+            response,
+            additional_checks=additional_checks,
+            transport_kwargs=kwargs or None,
+            recorder=self.recorder,
+        )
 
     def _get_target_for_result(self, result: StepOutput) -> str | None:
         matcher = self._response_matchers.get(result.case.operation.label)

@@ -225,11 +225,6 @@ class APIStateMachine(RuleBasedStateMachine):
                             self._on_after_validate = _on_after_validate
                             self.schema.hooks.register_hook_with_name(_on_after_validate, "after_validate")
 
-                        def after_call(self, response: Response, case: Case) -> None:
-                            # Capture each response as it arrives
-                            self.recorder.record_response(case_id=case.id, response=response)
-                            super().after_call(response, case)
-
                         def teardown(self) -> None:
                             self.schema.hooks.unregister(self._on_after_validate)
                             elapsed = time.monotonic() - self._start_time

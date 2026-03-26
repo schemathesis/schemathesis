@@ -11,6 +11,8 @@ import schemathesis
 import schemathesis.openapi
 from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.config import ChecksConfig
+from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
+from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
@@ -302,6 +304,44 @@ def test_find_use_after_free(engine_factory):
     assert len(result.failures) == 1
     assert result.failures[0].failure_info.failure.title == "Use after free"
     assert result.events[-1].status == Status.FAILURE
+
+
+_STATE_MACHINE_SETTINGS = hypothesis.settings(
+    max_examples=60,
+    stateful_step_count=DEFAULT_MAX_SCENARIO_STEPS,
+    deadline=None,
+    suppress_health_check=list(hypothesis.HealthCheck),
+)
+
+
+def _use_after_free_schema(app_factory, app_runner):
+    app = app_factory(use_after_free=True)
+    port = app_runner.run_flask_app(app)
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema.config.checks.update(included_check_names=["use_after_free"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    return schema
+
+
+def test_find_use_after_free_via_state_machine(app_factory, app_runner):
+    schema = _use_after_free_schema(app_factory, app_runner)
+    StateMachine = schema.as_state_machine()
+
+    with pytest.raises(FailureGroup) as exc_info:
+        StateMachine.run(settings=_STATE_MACHINE_SETTINGS)
+    assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
+
+
+def test_find_use_after_free_via_state_machine_with_overridden_validate_response(app_factory, app_runner):
+    schema = _use_after_free_schema(app_factory, app_runner)
+
+    class CustomStateMachine(schema.as_state_machine()):
+        def validate_response(self, response, case, additional_checks=None, **kwargs):
+            super().validate_response(response, case, additional_checks=additional_checks, **kwargs)
+
+    with pytest.raises(FailureGroup) as exc_info:
+        CustomStateMachine.run(settings=_STATE_MACHINE_SETTINGS)
+    assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
 
 
 def test_no_false_positive_use_after_free_when_id_reused(engine_factory):

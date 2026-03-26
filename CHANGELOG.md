@@ -10,6 +10,7 @@
 
 ### :bug: Fixed
 
+- Stateful checks (e.g. `use_after_free`) not triggering when run via `schema.as_state_machine()`.
 - `InvalidSchema` exceptions displayed an empty message in `pytest` output.
 
 ### :wrench: Changed
