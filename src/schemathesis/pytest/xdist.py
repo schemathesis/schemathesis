@@ -272,7 +272,6 @@ def _open_writers_from_config(
     writer_config: dict, suffix: str | None = None
 ) -> list[VcrWriter | HarWriter | JunitXmlWriter | AllureWriter]:
     """Open report writers on the controller using serialized writer configuration."""
-    from schemathesis.reporting.allure import AllureWriter
     from schemathesis.reporting.har import HarWriter
     from schemathesis.reporting.junitxml import JunitXmlWriter
     from schemathesis.reporting.vcr import VcrWriter
@@ -326,6 +325,8 @@ def _open_writers_from_config(
                 JunitXmlWriter(output=reports.get_stable_path(ReportFormat.JUNIT, suffix=suffix), config=output)
             )
         if ReportFormat.ALLURE.value in paths:
+            from schemathesis.reporting.allure import AllureWriter
+
             writers.append(
                 AllureWriter(
                     output_dir=reports.get_stable_path(ReportFormat.ALLURE, suffix=suffix),
@@ -353,7 +354,10 @@ class XdistReportingPlugin:
             stash[schema_id]["records"].extend(payload["records"])
 
     def pytest_sessionfinish(self, session: pytest.Session, exitstatus: int) -> None:
-        from schemathesis.reporting.allure import AllureWriter
+        try:
+            from schemathesis.reporting.allure import AllureWriter
+        except ImportError:
+            AllureWriter = None  # type: ignore[assignment,misc]
         from schemathesis.reporting.junitxml import JunitXmlWriter
 
         if hasattr(session.config, "workerinput"):
@@ -373,7 +377,7 @@ class XdistReportingPlugin:
                     for writer in writers:
                         if isinstance(writer, JunitXmlWriter):
                             writer.write(recorder, elapsed_sec)
-                        elif isinstance(writer, AllureWriter):
+                        elif AllureWriter is not None and isinstance(writer, AllureWriter):
                             writer.write(recorder, elapsed_sec, tags=tags)
                             for call in record.get("allure_calls", []):
                                 t = call["type"]
