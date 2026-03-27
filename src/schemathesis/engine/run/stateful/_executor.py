@@ -40,6 +40,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
+from schemathesis.specs.openapi.stateful.pruning import record_pruning_observation
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -78,6 +79,7 @@ def execute_state_machine_loop(
         """State machine with additional hooks for emitting events."""
 
         def setup(self) -> None:
+            self._current_input: StepInput | None = None
             scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
@@ -100,6 +102,9 @@ def execute_state_machine_loop(
             return super().before_call(case)
 
         def step(self, input: StepInput) -> StepOutput | None:
+            # _current_input is set here and consumed once in validate_response(), then cleared.
+            # validate_response() is called at most once per step by the Hypothesis state machine.
+            self._current_input = input
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
             if engine.has_to_stop:
@@ -156,6 +161,10 @@ def execute_state_machine_loop(
             self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = (), **kwargs: Any
         ) -> None:
             ctx.collect_metric(case, response)
+            current_input = self._current_input
+            self._current_input = None
+            if current_input is not None:
+                record_pruning_observation(engine.pruning, response, current_input, self.recorder)
             ctx.current_response = response
 
             cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")
@@ -201,6 +210,9 @@ def execute_state_machine_loop(
     seed = engine.config.seed
 
     while True:
+        # Promote observations from the previous run into the stable read state.
+        # Strategies for this run will see a frozen snapshot; new observations accumulate in write.
+        engine.pruning.begin_iteration()
         # This loop is running until no new failures are found in a single iteration
         suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
         suite_id = suite_started.id

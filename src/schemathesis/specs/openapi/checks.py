@@ -38,6 +38,7 @@ from schemathesis.specs.openapi.utils import expand_status_code, expand_status_c
 from schemathesis.transport.prepare import prepare_path
 
 if TYPE_CHECKING:
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
@@ -889,19 +890,9 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
 
     # Look for any successful DELETE operations on this resource across all recorded cases,
     # not just the current root's subtree.
-    for related_case in ctx._find_all_cases():
-        related_response = ctx._find_response(case_id=related_case.id)
-        if (
-            related_case.operation.method.upper() == "DELETE"
-            and related_response is not None
-            and 200 <= related_response.status_code < 300
-            and _is_prefix_operation(
-                ResourcePath(related_case.path, related_case.path_parameters or {}),
-                ResourcePath(case.path, case.path_parameters or {}),
-            )
-        ):
-            # Resource was properly deleted, 404 is expected
-            return None
+    if ctx._recorder is not None and resource_was_deleted(ctx._recorder, case):
+        # Resource was properly deleted, 404 is expected
+        return None
 
     # If we got here:
     # 1. Resource was created successfully
@@ -1184,3 +1175,24 @@ def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
 
     # If we've reached this point, the LHS path is a prefix of the RHS path
     return True
+
+
+def resource_was_deleted(recorder: ScenarioRecorder, case: Case) -> bool:
+    """Return True if a successful DELETE in the scenario covers this case's resource path.
+
+    A DELETE path is considered to cover the current case when it is a prefix of the current
+    path with matching parameter values.  Used to suppress false positives in checks and in
+    pruning observations where a prior step deleted the resource.
+    """
+    case_path = ResourcePath(case.path, case.path_parameters or {})
+    for prior_case in recorder.find_all_cases():
+        if prior_case.id == case.id:
+            continue
+        if prior_case.operation.method.upper() != "DELETE":
+            continue
+        prior_response = recorder.find_response(case_id=prior_case.id)
+        if prior_response is None or not (200 <= prior_response.status_code < 300):
+            continue
+        if _is_prefix_operation(ResourcePath(prior_case.path, prior_case.path_parameters or {}), case_path):
+            return True
+    return False
