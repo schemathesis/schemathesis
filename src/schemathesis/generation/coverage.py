@@ -942,6 +942,7 @@ def cover_schema_iter(
                             ParameterLocation.QUERY,
                             ParameterLocation.HEADER,
                             ParameterLocation.COOKIE,
+                            ParameterLocation.BODY,
                         ):
                             continue
                         template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
