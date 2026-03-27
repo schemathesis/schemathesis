@@ -196,6 +196,26 @@ def test_query_unexpected_parameters_control(ctx_factory, allow_extra_parameters
         assert CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES not in scenarios
 
 
+@pytest.mark.parametrize("allow_extra_parameters", [True, False])
+def test_body_unexpected_parameters_control(ctx_factory, allow_extra_parameters):
+    schema = {
+        "type": "object",
+        "properties": {"token": {"type": "string"}},
+        "required": ["token"],
+        "additionalProperties": False,
+    }
+    ctx = ctx_factory(
+        location=ParameterLocation.BODY,
+        generation_modes=[GenerationMode.NEGATIVE],
+        allow_extra_parameters=allow_extra_parameters,
+    )
+    scenarios = {value.scenario for value in cover_schema_iter(ctx, schema) if isinstance(value, GeneratedValue)}
+    if allow_extra_parameters:
+        assert CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES in scenarios
+    else:
+        assert CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES not in scenarios
+
+
 @pytest.mark.parametrize(
     ("schema", "lengths"),
     [
