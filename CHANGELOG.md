@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.14.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- `ModuleNotFoundError` on `xdist` session end when the allure extra is not installed.
+
 ## [4.14.0](https://github.com/schemathesis/schemathesis/compare/v4.13.0...v4.14.0) - 2026-03-27
 
 ### :rocket: Added
