@@ -1590,3 +1590,19 @@ def test(case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
+
+
+def test_doctest_items_do_not_cause_attribute_error(testdir):
+    # See GH-3663
+    testdir.makepyfile(
+        mymodule="""
+def add(a, b):
+    '''
+    >>> add(1, 2)
+    3
+    '''
+    return a + b
+"""
+    )
+    result = testdir.runpytest("--doctest-modules", "mymodule.py")
+    result.assert_outcomes(passed=1)

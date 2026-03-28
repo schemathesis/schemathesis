@@ -561,7 +561,8 @@ def _push_to_xdist_workeroutput(
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
-    schema = StatefulSchemaMark.get(item.cls) if item.cls is not None else None
+    item_cls = getattr(item, "cls", None)
+    schema = StatefulSchemaMark.get(item_cls) if item_cls is not None else None
     if schema is not None:
         # Attach a callback to the TestCase class so the state machine can hand off
         # its recorder to the report writers once the scenario finishes.
@@ -632,8 +633,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:
-    if item.cls is not None and StatefulSchemaMark.is_set(item.cls):
-        StatefulCallbackMark.set(item.cls, None)
+    item_cls = getattr(item, "cls", None)
+    if item_cls is not None and StatefulSchemaMark.is_set(item_cls):
+        StatefulCallbackMark.set(item_cls, None)
         for writer in item.stash.get(_STATEFUL_WRITERS_KEY, []):
             writer.close()
         return
