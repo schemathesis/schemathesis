@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - `AttributeError` on `DoctestItem` when schemathesis plugin is loaded. [#3663](https://github.com/schemathesis/schemathesis/issues/3663)
+- Make dynamic auth (`[auth.dynamic.openapi.<scheme>]`) work with WSGI & ASGI transports. [#3664](https://github.com/schemathesis/schemathesis/issues/3664)
 
 ## [4.14.1](https://github.com/schemathesis/schemathesis/compare/v4.14.0...v4.14.1) - 2026-03-27
 

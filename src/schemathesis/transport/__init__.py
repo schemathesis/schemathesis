@@ -13,6 +13,13 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
+def is_asgi_app(app: Any) -> bool:
+    """Return True if the app uses ASGI (async) transport."""
+    return iscoroutinefunction(app) or (
+        hasattr(app, "__call__") and iscoroutinefunction(app.__call__)  # noqa: B004
+    )
+
+
 def get(app: Any) -> BaseTransport:
     """Get transport to send the data to the application."""
     from schemathesis.transport.asgi import ASGI_TRANSPORT
@@ -21,9 +28,7 @@ def get(app: Any) -> BaseTransport:
 
     if app is None:
         return REQUESTS_TRANSPORT
-    if iscoroutinefunction(app) or (
-        hasattr(app, "__call__") and iscoroutinefunction(app.__call__)  # noqa: B004
-    ):
+    if is_asgi_app(app):
         return ASGI_TRANSPORT
     return WSGI_TRANSPORT
 
