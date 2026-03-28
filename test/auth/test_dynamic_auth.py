@@ -306,6 +306,208 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
     )
 
 
+def test_dynamic_auth_wsgi_e2e(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"
+""",
+    )
+    testdir.makepyfile(
+        """
+import schemathesis
+from flask import Flask, jsonify, request
+from hypothesis import Phase, settings
+
+app = Flask("test")
+
+@app.route("/openapi.json")
+def spec():
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/protected": {
+                "get": {
+                    "security": [{"BearerAuth": []}],
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "BearerAuth": {"type": "http", "scheme": "bearer"}
+            }
+        },
+    }
+
+@app.route("/api/auth", methods=["POST"])
+def auth():
+    return jsonify({"access_token": "secret-token"})
+
+@app.route("/protected")
+def protected():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header == "Bearer secret-token":
+        return jsonify({"result": "ok"})
+    return jsonify({"error": "unauthorized"}), 401
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    response = case.call()
+    assert response.status_code == 200
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_dynamic_auth_asgi_e2e(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.dynamic.openapi.HTTPBearer]
+path = "/api/auth"
+extract_selector = "/access_token"
+""",
+    )
+    testdir.makepyfile(
+        """
+import schemathesis
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from hypothesis import Phase, settings
+
+app = FastAPI()
+security = HTTPBearer(auto_error=False)
+
+@app.post("/api/auth", include_in_schema=False)
+async def auth():
+    return {"access_token": "secret-token"}
+
+@app.get("/protected")
+async def protected(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials is None or credentials.credentials != "secret-token":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"result": "ok"}
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    response = case.call()
+    assert response.status_code == 200
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_dynamic_auth_wsgi_transport_error(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.dynamic.openapi.BearerAuth]
+path = "/api/auth"
+extract_selector = "/access_token"
+""",
+    )
+    testdir.makepyfile(
+        """
+import schemathesis
+from flask import Flask, jsonify
+from hypothesis import Phase, settings
+
+app = Flask("test")
+app.config["TESTING"] = True
+
+@app.route("/openapi.json")
+def spec():
+    return {
+        "openapi": "3.0.0",
+        "info": {"title": "Test", "version": "1.0"},
+        "paths": {
+            "/data": {
+                "get": {
+                    "security": [{"BearerAuth": []}],
+                    "responses": {"200": {"description": "OK"}}
+                }
+            }
+        },
+        "components": {
+            "securitySchemes": {
+                "BearerAuth": {"type": "http", "scheme": "bearer"}
+            }
+        },
+    }
+
+@app.route("/api/auth", methods=["POST"])
+def auth():
+    raise RuntimeError("auth endpoint crashed")
+
+@app.route("/data")
+def data():
+    return jsonify({"result": "ok"})
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call()
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+    result.stdout.fnmatch_lines(["*WSGI auth request failed*"])
+
+
+def test_dynamic_auth_asgi_transport_error(testdir):
+    testdir.makefile(
+        ".toml",
+        schemathesis="""
+[auth.dynamic.openapi.HTTPBearer]
+path = "/api/auth"
+extract_selector = "/access_token"
+""",
+    )
+    testdir.makepyfile(
+        """
+import schemathesis
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from hypothesis import Phase, settings
+
+app = FastAPI()
+security = HTTPBearer(auto_error=False)
+
+@app.post("/api/auth", include_in_schema=False)
+async def auth():
+    raise RuntimeError("auth endpoint crashed")
+
+@app.get("/protected")
+async def protected(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    return {"result": "ok"}
+
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=1, phases=[Phase.generate])
+def test_api(case):
+    case.call()
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+    result.stdout.fnmatch_lines(["*ASGI auth request failed*"])
+
+
 def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {

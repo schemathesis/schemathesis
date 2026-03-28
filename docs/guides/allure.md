@@ -41,9 +41,7 @@ path = "allure-results"
 
 Each API operation becomes one Allure test result.
 
-**Status** is `passed`, `failed`, `broken`, or `skipped`. A skip never masks a prior pass or failure — the highest-priority outcome wins.
-
-**Failures** appear as one step per unique failing request, titled `Test Case: <id>`, with check names, response body, and a curl command to reproduce.
+Failures appear as one step per unique failing request, titled `Test Case: <id>`, with check names, response body, and a curl command to reproduce.
 
 ![Allure detail view showing a failed operation with a Test Case step expanded](../img/allure-detail.png)
 

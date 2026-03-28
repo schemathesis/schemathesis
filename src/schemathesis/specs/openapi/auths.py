@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import requests
 
@@ -102,36 +103,93 @@ class DynamicTokenAuthProvider:
     __slots__ = ("path", "method", "payload", "extract_from", "extract_selector", "_applier")
 
     def get(self, case: Case, ctx: AuthContext) -> str:
+        from schemathesis.transport import is_asgi_app
+
+        app = ctx.app
+        if app is None:
+            return self._fetch_http(ctx)
+        if is_asgi_app(app):
+            return self._fetch_asgi(app, ctx)
+        return self._fetch_wsgi(app, ctx)
+
+    def _fetch_http(self, ctx: AuthContext) -> str:
         url = get_full_path(ctx.operation.schema.get_base_url() + "/", self.path)
+        timeout = ctx.operation.schema.config.request_timeout_for(operation=ctx.operation)
         try:
-            response = requests.request(
-                self.method,
-                url,
-                json=self.payload,
-                timeout=10,
-            )
+            response = requests.request(self.method, url, json=self.payload, timeout=timeout)
         except requests.exceptions.RequestException as exc:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",
                 f"Connection to auth endpoint failed: {exc}",
             ) from exc
+        return self._extract_token(
+            status_code=response.status_code,
+            text=response.text,
+            get_json=response.json,
+            headers=response.headers,
+        )
+
+    def _fetch_wsgi(self, app: Any, ctx: AuthContext) -> str:
+        from schemathesis.python.wsgi import get_client
+
         try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as exc:
+            client = get_client(app)
+            response = client.open(self.path, method=self.method.upper(), json=self.payload)
+        except Exception as exc:
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",
-                f"Auth endpoint returned {response.status_code}: {response.text!r}",
+                f"WSGI auth request failed: {exc}",
             ) from exc
+        return self._extract_token(
+            status_code=response.status_code,
+            text=response.get_data(as_text=True),
+            get_json=lambda: response.get_json(force=True, silent=False),
+            headers=response.headers,
+        )
+
+    def _fetch_asgi(self, app: Any, ctx: AuthContext) -> str:
+        from schemathesis.python.asgi import get_client
+
+        timeout = ctx.operation.schema.config.request_timeout_for(operation=ctx.operation)
+        try:
+            with get_client(app) as client:
+                response = client.request(self.method.upper(), self.path, json=self.payload, timeout=timeout)
+        except Exception as exc:
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"ASGI auth request failed: {exc}",
+            ) from exc
+        return self._extract_token(
+            status_code=response.status_code,
+            text=response.text,
+            get_json=response.json,
+            headers=response.headers,
+        )
+
+    def _extract_token(
+        self,
+        status_code: int,
+        text: str,
+        get_json: Callable[[], Any],
+        headers: Mapping[str, str],
+    ) -> str:
+        if status_code >= 400:
+            raise AuthenticationError(
+                "DynamicTokenAuthProvider",
+                "get",
+                f"Auth endpoint returned {status_code}: {text!r}",
+            )
         if self.extract_from == "body":
             try:
-                body = response.json()
+                body = get_json()
             except ValueError as exc:
                 raise AuthenticationError(
                     "DynamicTokenAuthProvider",
                     "get",
-                    f"Auth endpoint returned non-JSON body: {response.text!r}",
+                    f"Auth endpoint returned non-JSON body: {text!r}",
                 ) from exc
             raw = resolve_pointer(body, self.extract_selector)
             if raw is UNRESOLVABLE:
@@ -147,9 +205,9 @@ class DynamicTokenAuthProvider:
                     f"Expected a string at {self.extract_selector!r}, got {type(raw).__name__}: {raw!r}",
                 )
             return raw
-        result = response.headers.get(self.extract_selector)
+        result = headers.get(self.extract_selector)
         if result is None:
-            present = list(response.headers.keys())
+            present = list(headers.keys())
             raise AuthenticationError(
                 "DynamicTokenAuthProvider",
                 "get",
