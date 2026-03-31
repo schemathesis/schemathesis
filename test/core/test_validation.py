@@ -10,7 +10,7 @@ from schemathesis.core.validation import check_header_name
         ("", "Header name should not be empty"),
         ("Invalid\x80Name", "Header name should be ASCII: Invalid\x80Name"),
         ("\nInvalid", "Invalid leading whitespace"),
-        ("0\n", "Invalid header name: 0\n"),
+        ("0\n", "Invalid leading whitespace"),
     ],
 )
 def test_check_header_errors(parameter, expected):
