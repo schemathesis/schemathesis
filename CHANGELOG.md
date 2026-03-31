@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.14.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- `deadline=None` lost when `@settings` applied after `@lazy_schema.parametrize()`.
+
 ## [4.14.2](https://github.com/schemathesis/schemathesis/compare/v4.14.1...v4.14.2) - 2026-03-28
 
 ### :bug: Fixed

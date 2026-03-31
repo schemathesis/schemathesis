@@ -71,6 +71,7 @@ class HypothesisTestConfig:
     project: ProjectConfig
     modes: list[HypothesisTestMode]
     settings: hypothesis.settings | None
+    explicit_settings: hypothesis.settings | None
     seed: int | None
     as_strategy_kwargs: dict[str, Any]
     given_args: tuple[GivenInput, ...]
@@ -80,6 +81,7 @@ class HypothesisTestConfig:
         "project",
         "modes",
         "settings",
+        "explicit_settings",
         "seed",
         "as_strategy_kwargs",
         "given_args",
@@ -91,6 +93,7 @@ class HypothesisTestConfig:
         project: ProjectConfig,
         modes: list[HypothesisTestMode],
         settings: hypothesis.settings | None = None,
+        explicit_settings: hypothesis.settings | None = None,
         seed: int | None = None,
         as_strategy_kwargs: dict[str, Any] | None = None,
         given_args: tuple[GivenInput, ...] = (),
@@ -99,6 +102,7 @@ class HypothesisTestConfig:
         self.project = project
         self.modes = modes
         self.settings = settings
+        self.explicit_settings = explicit_settings
         self.seed = seed
         self.as_strategy_kwargs = as_strategy_kwargs or {}
         self.given_args = given_args
@@ -135,8 +139,10 @@ def create_test(
     if config.seed is not None and not hasattr(test_func, "_hypothesis_internal_use_seed"):
         hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
 
-    # Get user's explicit settings from their @settings decorator (if present)
-    user_explicit_settings = getattr(test_func, SETTINGS_ATTRIBUTE_NAME, None)
+    # Get user's explicit settings from their @settings decorator (if present).
+    # config.explicit_settings carries settings applied outside the lazy schema wrapper
+    # (e.g. @settings applied after @lazy_schema.parametrize()).
+    user_explicit_settings = getattr(test_func, SETTINGS_ATTRIBUTE_NAME, None) or config.explicit_settings
 
     # Get settings from the @given wrapper (inherits from loaded profile or default)
     given_settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)

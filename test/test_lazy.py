@@ -29,6 +29,30 @@ def test_(case):
     result.stdout.re_match_lines([r"test_default.py::test_ PASSED", r".*1 passed"])
 
 
+def test_deadline_is_none(testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+@lazy_schema.parametrize()
+def test_no_settings(case):
+    assert settings().deadline is None
+
+@settings(max_examples=1)
+@lazy_schema.parametrize()
+def test_inner_settings(case):
+    assert settings().deadline is None
+
+@lazy_schema.parametrize()
+@settings(max_examples=1)
+def test_outer_settings(case):
+    assert settings().deadline is None
+"""
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=3)
+
+
 def test_with_settings(testdir):
     # When hypothesis settings are applied to the test function
     testdir.make_test(
