@@ -2442,7 +2442,7 @@ def test_anyof_with_required_constraints(ctx):
     # Two examples produced - one per branch, each with the shared `type` field plus the branch field
     assert extracted == [
         {"media_type": "application/json", "value": {"type": "item", "name": ""}},
-        {"media_type": "application/json", "value": {"type": "item", "id": "e3e70682-c209-4cac-629f-6fbed82c07cd"}},
+        {"media_type": "application/json", "value": {"type": "item", "id": "e3e70682-c209-1cac-a29f-6fbed82c07cd"}},
     ]
 
     body_schema = list(operation.body)[0].optimized_schema

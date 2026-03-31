@@ -156,7 +156,7 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
         "binary": st.binary().map(Binary),
         "byte": st.binary().map(lambda x: b64encode(x).decode()),
         "duration": duration_values(),
-        "uuid": st.uuids().map(str),
+        "uuid": st.one_of(st.uuids(version=v) for v in [1, 2, 3, 4, 5]).map(str),
         # RFC 7230, Section 3.2.6
         "_header_name": st.text(
             min_size=1, alphabet=st.sampled_from("!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters)
