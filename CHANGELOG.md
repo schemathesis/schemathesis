@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - `deadline=None` lost when `@settings` applied after `@lazy_schema.parametrize()`.
+- `format: uuid` now generates RFC 4122 compliant UUIDs. [#2909](https://github.com/schemathesis/schemathesis/issues/2909)
 
 ## [4.14.2](https://github.com/schemathesis/schemathesis/compare/v4.14.1...v4.14.2) - 2026-03-28
 

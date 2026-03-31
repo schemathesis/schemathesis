@@ -1,3 +1,4 @@
+import uuid
 import warnings
 from datetime import date
 from pathlib import Path
@@ -766,3 +767,10 @@ def test_api(case):
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
+
+
+@given(st.data())
+@settings(max_examples=50)
+def test_uuid_format_is_rfc4122(data):
+    value = data.draw(formats.get_default_format_strategies()["uuid"])
+    assert uuid.UUID(value).variant == uuid.RFC_4122
