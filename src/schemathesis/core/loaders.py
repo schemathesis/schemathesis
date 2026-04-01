@@ -76,6 +76,10 @@ def make_request(func: Callable[..., requests.Response], url: str, **kwargs: Any
 WAIT_FOR_SCHEMA_INTERVAL = 0.05
 
 
+class _ServiceUnavailableError(Exception):
+    """Internal: HTTP 503 during schema load, eligible for retry under wait_for_schema."""
+
+
 def load_from_url(
     func: Callable[..., requests.Response],
     *,
@@ -92,12 +96,28 @@ def load_from_url(
     if wait_for_schema is not None:
         from tenacity import retry, retry_if_exception_type, stop_after_delay, wait_fixed
 
-        func = retry(
+        def _func(url_: str, **kw: Any) -> requests.Response:
+            response = func(url_, **kw)
+            if response.status_code == 503:
+                raise _ServiceUnavailableError
+            return response
+
+        retried = retry(
             wait=wait_fixed(WAIT_FOR_SCHEMA_INTERVAL),
             stop=stop_after_delay(wait_for_schema),
-            retry=retry_if_exception_type(requests.exceptions.ConnectionError),
+            retry=retry_if_exception_type((requests.exceptions.ConnectionError, _ServiceUnavailableError)),
             reraise=True,
-        )(func)
+        )(_func)
+
+        try:
+            return make_request(retried, url, **kwargs)
+        except _ServiceUnavailableError:
+            raise LoaderError(
+                message="Failed to load schema due to server error (HTTP 503 Service Unavailable)",
+                kind=LoaderErrorKind.HTTP_SERVER_ERROR,
+                url=url,
+                extras=[],
+            ) from None
 
     return make_request(func, url, **kwargs)
 

@@ -1669,6 +1669,42 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
     assert cli.run(schema_url, "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 
 
+def test_wait_for_schema_retries_503(cli, ctx, app_runner):
+    # When the schema endpoint returns 503 initially, then succeeds
+    schema = ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
+    app = Flask(__name__)
+    call_count = [0]
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        call_count[0] += 1
+        if call_count[0] < 3:
+            return jsonify({"error": "service unavailable"}), 503
+        return jsonify(schema)
+
+    @app.route("/success")
+    def success():
+        return jsonify({})
+
+    port = app_runner.run_flask_app(app)
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=5", "--max-examples=1", "--mode=positive"
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_wait_for_schema_503_exhausted(cli, snapshot_cli, app_runner):
+    # When the schema endpoint always returns 503 until the wait timeout expires
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def always_503():
+        return jsonify({"error": "service unavailable"}), 503
+
+    port = app_runner.run_flask_app(app)
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=1") == snapshot_cli
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_rate_limit(cli, schema_url):
