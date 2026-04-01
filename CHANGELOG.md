@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Structured generation for `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since`, and `Range` headers.
+- `filter_case` and `map_case` hooks now apply in the coverage phase. [#3675](https://github.com/schemathesis/schemathesis/discussions/3675)
 
 ### :wrench: Changed
 

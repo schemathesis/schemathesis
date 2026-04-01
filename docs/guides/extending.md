@@ -49,11 +49,14 @@ Data generation hooks use a naming pattern: `<operation>_<part>` where the opera
 
 **Other hooks** like `before_call`, `after_call`, and `before_load_schema` have specific names based on when they execute in the testing process.
 
-Data generation hooks apply in this sequence during test case generation:
+Data generation hooks apply in this sequence during the fuzzing phase:
 
 ```
 filter_* → map_* → flatmap_* → Final test case
 ```
+
+!!! note
+    Component-level hooks have no effect in the coverage phase — cases are built directly and bypass the strategy pipeline where these hooks are applied. See [phase compatibility](../reference/hooks.md#phase-compatibility) for the full breakdown.
 
 ## Common Hook Patterns
 

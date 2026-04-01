@@ -85,6 +85,36 @@ Apply hooks selectively using filters.
 !!! note
     Filters are not available for `before_process_path`, `before_load_schema`, and `after_load_schema` hooks.
 
+## Phase Compatibility
+
+Not all hooks apply in every phase.
+
+| Hook | Examples | Coverage | Fuzzing | Stateful |
+|------|:--------:|:--------:|:-------:|:--------:|
+| `before_add_examples` | ✓ | - | - | - |
+| `before_generate_{component}` | - | - | ✓ | ✓ |
+| `filter_{component}` | - | - | ✓ | ✓ |
+| `map_{component}` | - | - | ✓ | ✓ |
+| `flatmap_{component}` | - | - | ✓ | ✓ |
+| `before_generate_case` | - | - | ✓ | ✓ |
+| `filter_case` | - | ✓ | ✓ | ✓ |
+| `map_case` | - | ✓ | ✓ | ✓ |
+| `flatmap_case` | - | - | ✓ | ✓ |
+| `before_call` | ✓ | ✓ | ✓ | ✓ |
+| `after_call` | ✓ | ✓ | ✓ | ✓ |
+| `after_network_error` | ✓ | ✓ | ✓ | ✓ |
+| `after_validate` | ✓ | ✓ | ✓ | ✓ |
+
+**Examples phase** runs test cases embedded directly in the schema. Cases bypass the strategy pipeline, so data generation hooks have no effect on them.
+
+**Coverage phase** generates test cases from the schema based on coverage goals (boundary values, required/optional combinations, etc.). Cases bypass the strategy pipeline, so component-level hooks (`filter_query`, `map_headers`, etc.) have no effect.
+
+**Fuzzing phase** uses Hypothesis data generation and respects all data generation hooks.
+
+**Stateful phase** drives multi-step API workflows using a Hypothesis state machine. Each transition generates a new test case via the same strategy as the fuzzing phase, so all data generation hooks apply.
+
+Schema-level hooks (`before_load_schema`, `after_load_schema`, `before_process_path`, `before_init_operation`) run during schema loading, before any test phase begins.
+
 ## Execution Order
 
 When multiple hooks of the same type are registered, they execute in registration order. For `filter_*` hooks, the case is discarded as soon as any hook returns `False` — subsequent hooks for that event are not called. For `map_*` hooks, each hook receives the output of the previous. For `flatmap_*` hooks, each hook receives the output of the previous, as with `map_*` hooks. Schema-level hooks run before test-level hooks of the same type.

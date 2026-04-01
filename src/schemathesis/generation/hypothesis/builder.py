@@ -54,7 +54,13 @@ from schemathesis.generation.meta import (
     GenerationInfo,
     PhaseInfo,
 )
-from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
+from schemathesis.hooks import (
+    GLOBAL_HOOK_DISPATCHER,
+    HookContext,
+    HookDispatcher,
+    HookDispatcherMark,
+    _should_skip_hook,
+)
 from schemathesis.schemas import APIOperation, ParameterSet
 
 setup()
@@ -428,6 +434,10 @@ def generate_coverage_cases(
         warnings.filterwarnings(
             "ignore", message=".*but this is not valid syntax for a Python regular expression.*", category=UserWarning
         )
+        hook_context = HookContext(operation=operation)
+        per_test_hooks: HookDispatcher | None = as_strategy_kwargs.get("hooks")
+        dispatchers = [d for d in (GLOBAL_HOOK_DISPATCHER, operation.schema.hooks, per_test_hooks) if d is not None]
+
         for case in _iter_coverage_cases(
             operation=operation,
             generation_modes=generation_modes,
@@ -445,6 +455,24 @@ def generate_coverage_cases(
                     setattr(case, container_name, value)
                 else:
                     container.update(value)
+            # Apply filter_case and map_case hooks from all dispatchers
+            skip = False
+            for dispatcher in dispatchers:
+                for hook in dispatcher.get_all_by_name("filter_case"):
+                    if _should_skip_hook(hook, hook_context):
+                        continue
+                    if not hook(hook_context, case):
+                        skip = True
+                        break
+                if skip:
+                    break
+            if skip:
+                continue
+            for dispatcher in dispatchers:
+                for hook in dispatcher.get_all_by_name("map_case"):
+                    if _should_skip_hook(hook, hook_context):
+                        continue
+                    case = hook(hook_context, case)
             yield case
 
 
