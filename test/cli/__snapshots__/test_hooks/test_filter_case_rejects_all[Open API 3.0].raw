@@ -20,9 +20,9 @@ Schemathesis dev
 
      ⏭  1 skipped
 
- ✅  Coverage (in 0.00s)
+ ⏭   Coverage (in 0.00s)
 
-     ✅ 1 passed
+     ⏭  1 skipped
 
  🚫  Fuzzing (in 0.00s)
 
@@ -44,11 +44,12 @@ Need more help?
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Errored: 1
 
 Test Phases:
   ⏭  Examples
-  ✅ Coverage
+  ⏭  Coverage
   🚫 Fuzzing
   ⏭  Stateful (not applicable)
 
@@ -56,7 +57,7 @@ Errors:
   🚫 Hook Error: 1
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
 Seed: 42
 

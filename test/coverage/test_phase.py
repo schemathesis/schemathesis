@@ -26,6 +26,7 @@ from schemathesis.generation.hypothesis.builder import (
     HypothesisTestMode,
     _iter_coverage_cases,
     create_test,
+    generate_coverage_cases,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
 from test.utils import assert_requests_call
@@ -3375,4 +3376,80 @@ def test_missing_required_header_case_uses_invalid_template_body(ctx):
     # Template body must be valid so the server reaches header validation, not body rejection.
     assert all(validator.is_valid(case.body) for case in missing_header_cases), (
         f"Missing-header cases must have a valid body, got: {[case.body for case in missing_header_cases]}"
+    )
+
+
+def test_filter_case_hook_applied_in_coverage_phase(ctx):
+    schema_dict = build_schema(
+        ctx,
+        parameters=[{"name": "key", "in": "query", "schema": {"type": "integer"}}],
+        method="get",
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/foo"]["get"]
+
+    # Verify some cases are produced without hook
+    config = ProjectConfig()
+    base_cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=config.phases.coverage.unexpected_methods,
+            generation_config=config.generation,
+        )
+    )
+    assert base_cases, "Expected coverage cases before filtering"
+
+    @loaded.hook
+    def filter_case(context, case):
+        return False  # reject everything
+
+    filtered_cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=config.phases.coverage.unexpected_methods,
+            generation_config=config.generation,
+        )
+    )
+    assert filtered_cases == [], "filter_case hook should suppress all coverage cases"
+
+
+def test_map_case_hook_applied_in_coverage_phase(ctx):
+    schema_dict = build_schema(
+        ctx,
+        parameters=[{"name": "key", "in": "query", "schema": {"type": "integer"}}],
+        method="get",
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+
+    @loaded.hook
+    def map_case(context, case):
+        if case.query is not None:
+            case.query["injected"] = "yes"
+        return case
+
+    config = ProjectConfig()
+    operation = loaded["/foo"]["get"]
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=config.phases.coverage.unexpected_methods,
+            generation_config=config.generation,
+        )
+    )
+
+    assert cases, "Expected at least one coverage case"
+    assert all(c.query is None or c.query.get("injected") == "yes" for c in cases), (
+        "map_case hook should have injected 'injected' into every query"
     )
