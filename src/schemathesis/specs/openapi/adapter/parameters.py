@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
+from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -1254,9 +1255,10 @@ def _merge_parameters_to_object_schema(
 
         # Apply location-specific adjustments to individual parameter schemas
         if isinstance(subschema, dict):
-            # Headers: add HEADER_FORMAT for plain string types
+            # Headers: add format key for plain string types (structured for known headers)
             if location.is_in_header and list(subschema) == ["type"] and subschema["type"] == "string":
-                subschema = {**subschema, "format": HEADER_FORMAT}
+                format_key = KNOWN_HEADER_FORMATS.get(name.lower(), HEADER_FORMAT)
+                subschema = {**subschema, "format": format_key}
 
             # Path parameters: ensure string types have minLength >= 1
             elif location == ParameterLocation.PATH and subschema.get("type") == "string":
