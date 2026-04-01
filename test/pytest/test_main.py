@@ -1606,3 +1606,48 @@ def add(a, b):
     )
     result = testdir.runpytest("--doctest-modules", "mymodule.py")
     result.assert_outcomes(passed=1)
+
+
+def test_range_strategy_discovers_server_bug(testdir, ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/files": {
+                "get": {
+                    "parameters": [{"name": "Range", "in": "header", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    testdir.make_test(
+        """
+from flask import Flask, request, jsonify
+import re
+
+app = Flask(__name__)
+
+@app.route("/openapi.json")
+def openapi_spec():
+    return jsonify(raw_schema)
+
+@app.route("/files")
+def get_files():
+    range_header = request.headers.get("Range", "")
+    # Bug: only handles single int-range; fails on suffix-range and multi-range
+    if range_header and not re.match(r'^bytes=\\d+-\\d+$', range_header):
+        return jsonify({"error": "unsupported range"}), 500
+    return jsonify([])
+
+schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=10)
+def test_(case):
+    case.call_and_validate()
+""",
+        schema=schema,
+        generation_modes=[GenerationMode.POSITIVE],
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(failed=1)
+    assert "[500] Internal Server Error" in result.stdout.str()

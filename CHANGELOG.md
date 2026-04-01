@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.14.3...HEAD) - TBD
 
+### :rocket: Added
+
+- Structured generation for `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since`, and `Range` headers.
+
 ## [4.14.3](https://github.com/schemathesis/schemathesis/compare/v4.14.2...v4.14.3) - 2026-03-31
 
 ### :bug: Fixed

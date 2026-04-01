@@ -51,6 +51,7 @@ from .formats import (
     get_default_format_strategies,
     header_values,
 )
+from .headers import KNOWN_HEADER_FORMATS, get_header_format_strategies
 from .media_types import MEDIA_TYPES
 from .negative import GeneratedValue, negative_schema
 from .negative.utils import can_negate
@@ -61,6 +62,7 @@ VALID_HEADER_PROBABILITY = 0.95
 # RFC 9110 Section 5.5: Invalid header chars are 0x00-0x08, 0x0A-0x1F, 0x7F
 # Note: 0x09 (HTAB) is valid per RFC, so excluded from this set
 INVALID_HEADER_CHARS = "".join(chr(i) for i in range(9)) + "".join(chr(i) for i in range(10, 32)) + "\x7f"
+_PLAIN_HEADER_FORMATS = {HEADER_FORMAT} | set(KNOWN_HEADER_FORMATS.values())
 StrategyFactory = Callable[
     [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema_rs.Validator]],
     st.SearchStrategy,
@@ -736,9 +738,8 @@ def can_negate_headers(operation: APIOperation, location: ParameterLocation) -> 
     headers = container.schema["properties"]
     if not headers:
         return True
-    return any(
-        header not in ({"type": "string"}, {"type": "string", "format": HEADER_FORMAT}) for header in headers.values()
-    )
+    plain = ({"type": "string"}, *({"type": "string", "format": f} for f in _PLAIN_HEADER_FORMATS))
+    return any(header not in plain for header in headers.values())
 
 
 def get_parameters_strategy(
@@ -815,6 +816,7 @@ def _build_custom_formats(generation_config: GenerationConfig, mode: GenerationM
                 return draw(header_values(**header_values_kwargs))
 
             custom_formats[HEADER_FORMAT] = header_strategy()
+    custom_formats.update(get_header_format_strategies(mode))
     return custom_formats
 
 
@@ -838,8 +840,10 @@ def make_positive_strategy(
 
 
 def _can_skip_header_filter(schema: dict[str, Any]) -> bool:
-    # All headers should contain HEADER_FORMAT in order to avoid header filter
-    return all(sub_schema.get("format") == HEADER_FORMAT for sub_schema in schema.get("properties", {}).values())
+    # All headers should have a known format key in order to avoid the header filter
+    return all(
+        sub_schema.get("format") in _PLAIN_HEADER_FORMATS for sub_schema in schema.get("properties", {}).values()
+    )
 
 
 def make_negative_strategy(
