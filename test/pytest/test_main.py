@@ -1660,3 +1660,20 @@ def test_(case):
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
     assert "[500] Internal Server Error" in result.stdout.str()
+
+
+def test_reuse_test_function_across_schemas(testdir):
+    # The same base function should be reusable with multiple schemas
+    testdir.make_test(
+        """
+def _test_body(case):
+    pass
+
+schema2 = schemathesis.openapi.from_dict(raw_schema)
+test_a = schema.parametrize()(_test_body)
+test_b = schema2.parametrize()(_test_body)
+""",
+        paths={"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+    )
+    result = testdir.runpytest("-v")
+    result.assert_outcomes(passed=2)

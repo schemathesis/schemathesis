@@ -5,12 +5,13 @@
 ### :rocket: Added
 
 - Structured generation for `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since`, and `Range` headers.
-- `filter_case` and `map_case` hooks now apply in the coverage phase. [#3675](https://github.com/schemathesis/schemathesis/discussions/3675)
+- Apply `filter_case` and `map_case` hooks in the coverage phase. [#3675](https://github.com/schemathesis/schemathesis/discussions/3675)
 
 ### :wrench: Changed
 
-- `--wait-for-schema` now retries on HTTP 503 responses. [#3672](https://github.com/schemathesis/schemathesis/issues/3672)
-- pytest plugin now uses native subtest status labels (`SUBPASSED`, `SUBFAILED`) without redundant parameter suffixes.
+- Make `--wait-for-schema` retry on HTTP 503 responses. [#3672](https://github.com/schemathesis/schemathesis/issues/3672)
+- Use native subtest status labels without redundant parameter suffixes in the `pytest` plugin.
+- Allow reusing the same test function across multiple schemas via `schema.parametrize()`.
 
 ## [4.14.3](https://github.com/schemathesis/schemathesis/compare/v4.14.2...v4.14.3) - 2026-03-31
 
