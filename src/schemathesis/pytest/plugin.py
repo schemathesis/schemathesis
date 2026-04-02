@@ -52,7 +52,6 @@ from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
-    from _pytest.terminal import TerminalReporter
 
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.pytest.reporting import PytestReportDispatcher
@@ -297,22 +296,6 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
         outcome.get_result()
 
 
-@hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]
-def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    if isinstance(report, SubtestReport) and report.passed:
-        report._schemathesis_ignore_in_summary = True
-
-
-@hookimpl(tryfirst=True, hookwrapper=True)  # type: ignore[untyped-decorator]
-def pytest_terminal_summary(terminalreporter: TerminalReporter) -> Generator[None, None, None]:
-    passed = terminalreporter.stats.get("passed", [])
-    if passed:
-        terminalreporter.stats["passed"] = [
-            report for report in passed if not getattr(report, "_schemathesis_ignore_in_summary", False)
-        ]
-    yield
-
-
 @hookimpl(hookwrapper=True, trylast=True)  # type: ignore[untyped-decorator]
 def pytest_report_teststatus(
     report: pytest.TestReport,
@@ -322,15 +305,14 @@ def pytest_report_teststatus(
     result = cast(PluggyResult[tuple[str, str, str] | None], outcome)
     if not isinstance(report, SubtestReport):
         return
-
-    description = report._sub_test_description()
-
-    if report.passed:
-        result.force_result(("passed", ",", f"{description} SUBPASS"))
-    elif report.skipped:
-        result.force_result(("skipped", "-", f"{description} SUBSKIP"))
-    elif report.outcome == "failed":
-        result.force_result(("failed", "u", f"{description} SUBFAIL"))
+    r = result.get_result()
+    if r is not None:
+        category, short, verbose = r
+        if isinstance(verbose, str):
+            for prefix in ("SUBPASSED", "SUBFAILED", "SUBSKIPPED", "SUBXFAIL"):
+                if verbose.startswith(prefix):
+                    result.force_result((category, short, prefix))
+                    break
 
 
 @pytest.hookimpl(tryfirst=True)  # type: ignore[untyped-decorator]

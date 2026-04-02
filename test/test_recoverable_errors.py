@@ -60,11 +60,11 @@ def test_(case):
     result.stdout.re_match_lines(
         [
             # Path-level error. no method is displayed
-            r".*test_\[/foo\] \(path='/foo'\) SUBFAIL",
+            r".*test_\[/foo\] SUBFAILED",
             # Valid operation
-            r".*test_\[GET /bar\] \(label='GET /bar'\) SUBPASS",
+            r".*test_\[GET /bar\] SUBPASSED",
             # Operation-level error
-            r".*test_\[POST /bar\] \(method='POST', path='/bar'\) SUBFAIL",
+            r".*test_\[POST /bar\] SUBFAILED",
             # The error in both failing cases
             ".*Unresolvable reference in the schema.*",
         ]
