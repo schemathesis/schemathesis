@@ -78,6 +78,9 @@ def test_api(case):
 - **Test output:** Uses pytest subtests instead of parametrization
 - **Fixture support:** Schema can depend on other pytest fixtures
 
+!!! note "`--collect-only` shows one item per test function"
+    Because operations are discovered lazily at runtime, `--collect-only` cannot enumerate them upfront - this is by design.
+
 ## Error Handling and Reporting
 
 Failures from multiple Hypothesis examples are deduplicated, grouped by operation, and include reproduction steps for debugging:

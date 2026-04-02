@@ -10,6 +10,7 @@
 ### :wrench: Changed
 
 - `--wait-for-schema` now retries on HTTP 503 responses. [#3672](https://github.com/schemathesis/schemathesis/issues/3672)
+- pytest plugin now uses native subtest status labels (`SUBPASSED`, `SUBFAILED`) without redundant parameter suffixes.
 
 ## [4.14.3](https://github.com/schemathesis/schemathesis/compare/v4.14.2...v4.14.3) - 2026-03-31
 
