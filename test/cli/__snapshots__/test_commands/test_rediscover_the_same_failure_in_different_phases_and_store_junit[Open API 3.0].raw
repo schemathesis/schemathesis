@@ -67,7 +67,7 @@ Failures:
   ❌ Custom check failed: `always_fails`: 1
 
 Test cases:
-  N generated, N found N unique failures, N skipped
+  N generated, N found N unique failures
 
 Reports:
   - JUNIT: /tmp/test_rediscover_the_same_failu0/reports/junit.xml

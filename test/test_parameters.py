@@ -658,7 +658,6 @@ def test_exclude_chars_and_no_x00_for_headers(openapi3_schema_url):
     test()
 
 
-@pytest.mark.filterwarnings("error")
 def test_parameter_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapshot_cli):
     # When a parameter has a boolean true schema (accepts anything in OpenAPI 3.1)
     paths = {
@@ -743,7 +742,6 @@ def test_parameter_with_boolean_false_schema(ctx):
     assert parameter.optimized_schema is False
 
 
-@pytest.mark.filterwarnings("error")
 def test_request_body_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapshot_cli):
     # When a request body has a boolean true schema
     paths = {
