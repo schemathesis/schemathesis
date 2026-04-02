@@ -75,7 +75,7 @@ Failures:
   ❌ SSE event payload violates content schema: 1
 
 Test cases:
-  N generated, N found N unique failures, N skipped
+  N generated, N found N unique failures
 
 Seed: 42
 

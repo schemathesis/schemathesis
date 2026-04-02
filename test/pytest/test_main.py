@@ -147,7 +147,16 @@ def test_b(case, a):
 """,
     )
     # When a test is run with treating warnings as errors
-    result = testdir.runpytest("-Werror", "--asyncio-mode=strict")
+    # The socket/MemoryObject ignores must come AFTER -Werror on the command line so they
+    # get higher priority (warning filters are a stack; last-inserted = first-checked).
+    result = testdir.runpytest(
+        "-Werror",
+        "-W",
+        "ignore:unclosed <socket.socket:ResourceWarning",
+        "-W",
+        "ignore:Exception ignored in.*socket.socket:pytest.PytestUnraisableExceptionWarning",
+        "--asyncio-mode=strict",
+    )
     # There should be no errors. There are no warnings from Schemathesis pytest plugin.
     result.assert_outcomes(passed=3)
 

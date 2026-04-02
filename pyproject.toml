@@ -110,6 +110,7 @@ filterwarnings = [
     # aiohttp event loop / anyio stream deallocators raise on Python 3.14t free-threading GC
     "ignore:Exception ignored while calling deallocator <function BaseEventLoop.__del__.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:Exception ignored while calling deallocator <function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
+    "ignore:Exception ignored in.*<function MemoryObject.*.__del__.*:pytest.PytestUnraisableExceptionWarning",
     # unclosed socket from test server teardown (flaky on Python 3.12+)
     "ignore:Exception ignored in.*<socket.socket.*:pytest.PytestUnraisableExceptionWarning",
     "ignore:unclosed <socket.socket.*:ResourceWarning",
