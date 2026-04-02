@@ -20,6 +20,13 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 This command will immediately find real bugs in a demo API and show you exactly how to reproduce them.
 
+## Supported specifications
+
+| Specification | Versions |
+|---|---|
+| OpenAPI | 2.0 (Swagger), 3.0, 3.1, 3.2 |
+| GraphQL | June 2018 and later |
+
 ## Why teams choose Schemathesis
 
 - 🎯 Find real bugs on the first run (commonly 5–15 in production schemas).
