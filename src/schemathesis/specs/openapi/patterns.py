@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 from schemathesis.core.errors import InternalError
 
@@ -245,7 +245,7 @@ def _serialize(nodes: list[_Node], *, global_flags: int = 0) -> str:
     parts = []
     multi = len(nodes) > 1
     for op, value in nodes:
-        s = _serialize_node(op, value)
+        s = _serialize_node((op, value))
         # BRANCH must be wrapped when concatenated with other nodes,
         # otherwise | extends to the end of the enclosing group
         if op == sre.BRANCH and multi:
@@ -258,24 +258,25 @@ def _serialize(nodes: list[_Node], *, global_flags: int = 0) -> str:
     return body
 
 
-def _serialize_node(op: int, value: int | None | list[_Node] | _RepeatValue | _SubpatternValue | _BranchValue) -> str:
+def _serialize_node(node: _Node) -> str:
     """Serialize a single AST node."""
-    match op:
-        case sre.LITERAL:
+    op, value = node
+    match op, value:
+        case sre.LITERAL, int():
             return _serialize_literal(value)
-        case sre.NOT_LITERAL:
+        case sre.NOT_LITERAL, int():
             return f"[^{_serialize_literal_in_class(value)}]"
-        case sre.ANY:
+        case sre.ANY, _:
             return "."
-        case sre.AT:
+        case sre.AT, int():
             return _serialize_anchor(value)
-        case sre.IN:
+        case sre.IN, list():
             return _serialize_in(value)
-        case sre.BRANCH:
+        case sre.BRANCH, tuple():
             return _serialize_branch(value)
-        case sre.SUBPATTERN:
+        case sre.SUBPATTERN, tuple():
             return _serialize_subpattern(value)
-        case op if op in REPEATS:
+        case op, tuple() if op in REPEATS:
             return _serialize_repeat(op, value)
         case _:
             raise InternalError(f"Unsupported sre opcode: {op}")
@@ -311,23 +312,23 @@ def _serialize_anchor(anchor_type: int) -> str:
 def _serialize_in(items: list[_Node]) -> str:
     match items:
         case [(sre.NEGATE, _), *rest]:
-            inner = "".join(_serialize_in_item(op, val) for op, val in rest)
+            inner = "".join(_serialize_in_item(item) for item in rest)
             return f"[^{inner}]"
         case [(sre.CATEGORY, val)]:
             return _serialize_category(val)
         case rest:
-            inner = "".join(_serialize_in_item(op, val) for op, val in rest)
+            inner = "".join(_serialize_in_item(item) for item in rest)
             return f"[{inner}]"
 
 
-def _serialize_in_item(op: int, value: int | tuple[int, int]) -> str:
-    match op:
-        case sre.LITERAL:
+def _serialize_in_item(node: _Node) -> str:
+    op, value = node
+    match op, value:
+        case sre.LITERAL, int():
             return _serialize_literal_in_class(value)
-        case sre.RANGE:
-            lo, hi = value
+        case sre.RANGE, (int() as lo, int() as hi):
             return f"{_serialize_literal_in_class(lo)}-{_serialize_literal_in_class(hi)}"
-        case sre.CATEGORY:
+        case sre.CATEGORY, int():
             return _serialize_category(value)
         case _:
             return ""
@@ -391,7 +392,7 @@ def _serialize_repeat_inner(subpattern: list[_Node]) -> str:
             return _serialize_subpattern(value)
         case [(op, _)] if op in (LITERAL, NOT_LITERAL, IN, sre.ANY, sre.CATEGORY):
             # Single atomic node — already a valid quantifier target, no group needed
-            return _serialize_node(*items[0])
+            return _serialize_node(items[0])
         case _:
             return "(?:" + _serialize(items) + ")"
 
@@ -409,7 +410,7 @@ def _serialize_subpattern(value: _SubpatternValue) -> str:
 
 
 # Flag bit → letter mapping for inline flag serialization
-_FLAG_LETTERS = (
+_FLAG_LETTERS: tuple[tuple[int, str], ...] = (
     (sre.SRE_FLAG_IGNORECASE, "i"),
     (sre.SRE_FLAG_LOCALE, "L"),
     (sre.SRE_FLAG_MULTILINE, "m"),
@@ -448,11 +449,14 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
     nodes = list(parsed)
     match _classify_structure(nodes):
         case ("single", content):
-            prefix, suffix = [], []
+            result = _transform_node(content, min_length, max_length)
+            return [result] if result is not None else None
         case ("leading_anchor", anchor, content):
-            prefix, suffix = [anchor], []
+            result = _transform_node(content, min_length, max_length)
+            return [anchor, result] if result is not None else None
         case ("trailing_anchor", content, anchor):
-            prefix, suffix = [], [anchor]
+            result = _transform_node(content, min_length, max_length)
+            return [result, anchor] if result is not None else None
 
         case ("both_anchors", leading, content, trailing):
             return _transform_anchored_single(leading, content, trailing, min_length, max_length)
@@ -463,11 +467,19 @@ def _transform(parsed: list[_Node], min_length: int | None, max_length: int | No
         case _:
             return None
 
-    result = _transform_node(content, min_length, max_length)
-    return prefix + [result] + suffix if result is not None else None
+
+# Return type for _classify_structure — Literal tags let mypy narrow captures in match/case
+_Structure: TypeAlias = (
+    tuple[Literal["single"], _Node]
+    | tuple[Literal["leading_anchor"], _Node, _Node]
+    | tuple[Literal["trailing_anchor"], _Node, _Node]
+    | tuple[Literal["both_anchors"], _Node, _Node, _Node]
+    | tuple[Literal["anchored_multi"], _Node, list[_Node], _Node]
+    | tuple[Literal["unknown"]]
+)
 
 
-def _classify_structure(nodes: list[_Node]) -> tuple[str, ...]:
+def _classify_structure(nodes: list[_Node]) -> _Structure:
     """Classify pattern structure for dispatch."""
     _CONTENT_OPS = (LITERAL, NOT_LITERAL, IN, sre.ANY, *REPEATS)
     match nodes:
