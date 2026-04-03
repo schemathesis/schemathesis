@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, overload
 
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex, update_quantifier
@@ -17,6 +17,7 @@ def to_json_schema(
     update_quantifiers: bool = True,
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    name_to_uri: dict[str, str] | None = None,
 ) -> dict[str, Any]: ...  # pragma: no cover
 
 
@@ -28,6 +29,7 @@ def to_json_schema(
     update_quantifiers: bool = True,
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    name_to_uri: dict[str, str] | None = None,
 ) -> bool: ...  # pragma: no cover
 
 
@@ -38,6 +40,7 @@ def to_json_schema(
     update_quantifiers: bool = True,
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    name_to_uri: dict[str, str] | None = None,
 ) -> dict[str, Any] | bool:
     if isinstance(schema, bool):
         return schema
@@ -49,6 +52,7 @@ def to_json_schema(
         is_response_schema=is_response_schema,
         update_quantifiers=update_quantifiers,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        name_to_uri=name_to_uri,
     )
 
 
@@ -59,6 +63,7 @@ def _to_json_schema(
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    name_to_uri: dict[str, str] | None = None,
 ) -> JsonSchema:
     if isinstance(schema, bool):
         return schema
@@ -130,6 +135,9 @@ def _to_json_schema(
             schema["additionalItems"] = schema.pop("items")
         schema["items"] = prefix_items
 
+    if not is_response_schema:
+        _inject_discriminator_consts(schema, name_to_uri)
+
     for keyword, value in schema.items():
         if keyword in IN_VALUE and isinstance(value, dict):
             schema[keyword] = _to_json_schema(
@@ -138,6 +146,7 @@ def _to_json_schema(
                 is_response_schema=is_response_schema,
                 update_quantifiers=update_quantifiers,
                 upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+                name_to_uri=name_to_uri,
             )
         elif keyword in IN_ITEM and isinstance(value, list):
             for idx, subschema in enumerate(value):
@@ -147,6 +156,7 @@ def _to_json_schema(
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+                    name_to_uri=name_to_uri,
                 )
         elif keyword in IN_CHILD and isinstance(value, dict):
             for name, subschema in value.items():
@@ -156,9 +166,50 @@ def _to_json_schema(
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+                    name_to_uri=name_to_uri,
                 )
 
     return schema
+
+
+def _inject_discriminator_consts(schema: dict[str, Any], name_to_uri: dict[str, str] | None) -> None:
+    """Pin the discriminator property to its expected value in each oneOf/anyOf branch.
+
+    When a schema has a `discriminator`, each branch in oneOf/anyOf is wrapped in
+    `allOf` with a `const` constraint on the discriminator property. This ensures
+    hypothesis-jsonschema generates the correct discriminator value for each branch.
+    """
+    discriminator = schema.get("discriminator")
+    if not isinstance(discriminator, dict):
+        return
+    property_name = discriminator.get("propertyName")
+    if not property_name:
+        return
+    explicit_mapping: dict[str, str] = discriminator.get("mapping") or {}
+    ref_to_value = {ref: value for value, ref in explicit_mapping.items()}
+
+    for keyword in ("anyOf", "oneOf"):
+        items = schema.get(keyword)
+        if not isinstance(items, list):
+            continue
+        for idx, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+            ref = item.get("$ref")
+            if not isinstance(ref, str):
+                continue
+            # Resolve bundled ref (e.g. "#/x-bundled/schema1") back to original URI for schema name extraction
+            resolved_ref = ref
+            if name_to_uri and ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+                bundled_name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
+                original_uri = name_to_uri.get(bundled_name, "")
+                if "#" in original_uri:
+                    resolved_ref = "#" + original_uri.split("#", 1)[1]
+            # Look up explicit mapping first, then fall back to schema name from ref path
+            disc_value = ref_to_value.get(resolved_ref) or resolved_ref.rstrip("/").rsplit("/", 1)[-1]
+            if not disc_value:
+                continue
+            items[idx] = {"allOf": [item, {"properties": {property_name: {"const": disc_value}}}]}
 
 
 def _upgrade_legacy_exclusive_bounds(schema: dict[str, Any]) -> None:

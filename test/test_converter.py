@@ -2,7 +2,7 @@ import pytest
 
 from schemathesis.core.transforms import transform
 from schemathesis.specs.openapi import converter
-from schemathesis.specs.openapi.converter import is_read_only, is_write_only, rewrite_properties
+from schemathesis.specs.openapi.converter import is_read_only, is_write_only, rewrite_properties, to_json_schema
 
 
 @pytest.mark.parametrize(
@@ -247,3 +247,80 @@ def test_nested_object_required_array_not_duplicated():
     result = transform(schema, converter.to_json_schema, nullable_keyword="nullable")
     assert result["required"] == ["propOne"]
     assert result["properties"]["propOne"]["required"] == ["innerPropOne"]
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        pytest.param(
+            {
+                "oneOf": [
+                    {"$ref": "#/components/schemas/Cat"},
+                    {"$ref": "#/components/schemas/Dog"},
+                ],
+                "discriminator": {"propertyName": "petType"},
+            },
+            {
+                "oneOf": [
+                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"const": "Cat"}}}]},
+                    {"allOf": [{"$ref": "#/components/schemas/Dog"}, {"properties": {"petType": {"const": "Dog"}}}]},
+                ],
+                "discriminator": {"propertyName": "petType"},
+            },
+            id="implicit-mapping",
+        ),
+        pytest.param(
+            {
+                "anyOf": [
+                    {"$ref": "#/components/schemas/Cat"},
+                    {"$ref": "#/components/schemas/Dog"},
+                ],
+                "discriminator": {
+                    "propertyName": "petType",
+                    "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+                },
+            },
+            {
+                "anyOf": [
+                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"const": "feline"}}}]},
+                    {"allOf": [{"$ref": "#/components/schemas/Dog"}, {"properties": {"petType": {"const": "canine"}}}]},
+                ],
+                "discriminator": {
+                    "propertyName": "petType",
+                    "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+                },
+            },
+            id="explicit-mapping",
+        ),
+        pytest.param(
+            {
+                "oneOf": [{"$ref": "#/components/schemas/Cat"}],
+                "discriminator": {},
+            },
+            {
+                "oneOf": [{"$ref": "#/components/schemas/Cat"}],
+                "discriminator": {},
+            },
+            id="no-property-name-skip",
+        ),
+        pytest.param(
+            {
+                "anyOf": [
+                    {"$ref": "#/components/schemas/Cat"},
+                    True,
+                ],
+                "discriminator": {"propertyName": "petType"},
+            },
+            {
+                "anyOf": [
+                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"const": "Cat"}}}]},
+                    True,
+                ],
+                "discriminator": {"propertyName": "petType"},
+            },
+            id="boolean-schema-skipped",
+        ),
+    ],
+)
+def test_discriminator_const_injection(schema, expected):
+    assert to_json_schema(schema, nullable_keyword="nullable") == expected
