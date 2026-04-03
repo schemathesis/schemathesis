@@ -8,6 +8,7 @@
 - Apply `filter_case` and `map_case` hooks in the coverage phase. [#3675](https://github.com/schemathesis/schemathesis/discussions/3675)
 - `schemathesis.pytest.parametrize()` for testing multiple named schemas in a single test function. [#1409](https://github.com/schemathesis/schemathesis/issues/1409)
 - Validate `discriminator` property values against known schema mappings in `response_schema_conformance`. [#1589](https://github.com/schemathesis/schemathesis/issues/1589)
+- Pin `discriminator` property to the correct value when generating data for `oneOf`/`anyOf` schemas. [#1589](https://github.com/schemathesis/schemathesis/issues/1589)
 
 ### :wrench: Changed
 

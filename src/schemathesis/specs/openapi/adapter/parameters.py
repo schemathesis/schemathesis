@@ -315,6 +315,7 @@ class OpenApiComponent(ABC):
             upgrade_legacy_exclusive_bounds=(
                 self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
             ),
+            name_to_uri=self.name_to_uri,
         )
 
         # Missing the `type` keyword may significantly slowdown data generation, ensure it is set

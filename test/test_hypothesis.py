@@ -728,6 +728,60 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3
     )
 
 
+@pytest.mark.parametrize(
+    ("discriminator", "valid_values"),
+    [
+        ({"propertyName": "petType"}, {"Cat", "Dog"}),
+        (
+            {
+                "propertyName": "petType",
+                "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+            },
+            {"feline", "canine", "Cat", "Dog"},
+        ),
+    ],
+    ids=["implicit", "explicit"],
+)
+def test_discriminator_const_injection_in_generation(ctx, discriminator, valid_values):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/pets": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Cat"},
+                                        {"$ref": "#/components/schemas/Dog"},
+                                    ],
+                                    "discriminator": discriminator,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Cat": {"type": "object", "properties": {"petType": {"type": "string"}}, "required": ["petType"]},
+                "Dog": {"type": "object", "properties": {"petType": {"type": "string"}}, "required": ["petType"]},
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+
+    @given(case=schema["/pets"]["POST"].as_strategy())
+    @settings(max_examples=10, database=None, phases=[Phase.generate])
+    def inner(case):
+        assert case.body["petType"] in valid_values
+
+    inner()
+
+
 def test_hypothesis_observability_serialization(ctx):
     # Hypothesis observability serializes all dataclass fields on generated values
     schema = ctx.openapi.build_schema({"/test": {"get": {"responses": {"200": {"description": "OK"}}}}})
