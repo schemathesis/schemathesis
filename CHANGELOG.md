@@ -15,6 +15,7 @@
 - Make `--wait-for-schema` retry on HTTP 503 responses. [#3672](https://github.com/schemathesis/schemathesis/issues/3672)
 - Use native subtest status labels without redundant parameter suffixes in the `pytest` plugin.
 - Allow reusing the same test function across multiple schemas via `schema.parametrize()`.
+- Report all distinct JSON Schema errors per response in `response_schema_conformance` and `response_headers_conformance`. [#1174](https://github.com/schemathesis/schemathesis/issues/1174)
 
 ## [4.14.3](https://github.com/schemathesis/schemathesis/compare/v4.14.2...v4.14.3) - 2026-03-31
 

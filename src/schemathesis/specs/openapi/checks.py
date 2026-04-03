@@ -9,8 +9,6 @@ from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import parse_qs, unquote, urlparse
 
-import jsonschema_rs
-
 import schemathesis
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
@@ -190,9 +188,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
         if values is not None:
             value = values[0]
             coerced = _coerce_header_value(value, header.schema)
-            try:
-                header.validator.validate(coerced)
-            except jsonschema_rs.ValidationError as exc:
+            for exc in header.validator.iter_errors(coerced):
                 errors.append(
                     JsonSchemaError.from_exception(
                         title="Response header does not conform to the schema",

@@ -1,0 +1,91 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+__________________________________ GET /data ___________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    "not-an-int" is not of type "integer"
+
+    Schema at /properties/id:
+
+        {
+            "type": "integer"
+        }
+
+    Value:
+
+        "not-an-int"
+
+- Response violates schema
+
+    42 is not of type "string"
+
+    Schema at /properties/name:
+
+        {
+            "type": "string"
+        }
+
+    Value:
+
+        42
+
+[200] OK:
+
+    `{"id":"not-an-int","name":42}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (not applicable)
+
+Failures:
+  ❌ Response violates schema: 2
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 2 failures in 1.00s ==============================

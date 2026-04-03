@@ -19,6 +19,7 @@ from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
+from schemathesis.core.failures import FailureGroup
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -818,7 +819,7 @@ class APIOperation(Generic[P, R, S]):
         try:
             self.validate_response(response)
             return True
-        except AssertionError:
+        except (AssertionError, FailureGroup):
             return False
 
     def Case(
