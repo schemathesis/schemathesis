@@ -28,7 +28,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema import Bundler
-from schemathesis.core.jsonschema.bundler import BundleCache
+from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX, BundleCache
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import get_template_fields
@@ -41,6 +41,7 @@ from schemathesis.specs.openapi import adapter
 from schemathesis.specs.openapi.adapter import OpenApiResponses
 from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
+from schemathesis.specs.openapi.adapter.responses import ResolvedSchema
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurity, OpenApiSecurityParameters
 from schemathesis.specs.openapi.analysis import OpenAPIAnalysis
 from schemathesis.specs.openapi.content_keywords import ContentSchemaViolation
@@ -762,6 +763,9 @@ class OpenApiSchema(BaseSchema):
                         message=f"Response contains invalid JSON (lone Unicode surrogate characters are not valid per RFC 8259):\n\n  {exc}",
                     )
                 )
+        discriminator_failure = _check_discriminator(operation, data, resolved)
+        if discriminator_failure is not None:
+            failures.append(discriminator_failure)
         _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 
@@ -779,6 +783,62 @@ def _find_surrogate_location(doc: str) -> tuple[int, int, int]:
     lineno = text_before.count("\n") + 1
     colno = pos - text_before.rfind("\n")
     return pos, lineno, colno
+
+
+def _check_discriminator(
+    operation: APIOperation,
+    data: object,
+    resolved: ResolvedSchema,
+) -> Failure | None:
+    """Return a failure if the discriminator property value is not in the known schema mapping."""
+    if not isinstance(data, dict):
+        return None
+    schema = resolved.schema
+    if not isinstance(schema, dict):
+        return None
+    discriminator = schema.get("discriminator")
+    if not isinstance(discriminator, dict):
+        return None
+    property_name = discriminator.get("propertyName")
+    if not property_name:
+        return None
+    value = data.get(property_name)
+    if not isinstance(value, str):
+        return None
+
+    known_values: set[str] = set()
+    # Explicit mapping keys are always valid values
+    explicit_mapping = discriminator.get("mapping")
+    if isinstance(explicit_mapping, dict):
+        known_values.update(explicit_mapping.keys())
+    # Implicit mapping from schema names in anyOf/oneOf always applies alongside explicit mapping
+    for keyword in ("anyOf", "oneOf"):
+        for item in schema.get(keyword) or []:
+            if not isinstance(item, dict):
+                continue
+            ref = item.get("$ref", "")
+            if not isinstance(ref, str) or not ref.startswith(f"{REFERENCE_TO_BUNDLE_PREFIX}/"):
+                continue
+            bundled_name = ref[len(REFERENCE_TO_BUNDLE_PREFIX) + 1 :]
+            original_uri = resolved.name_to_uri.get(bundled_name)
+            if original_uri and "#" in original_uri:
+                fragment = original_uri.split("#", 1)[1]
+                schema_name = fragment.rstrip("/").rsplit("/", 1)[-1]
+                if schema_name:
+                    known_values.add(schema_name)
+
+    if not known_values or value in known_values:
+        return None
+
+    known = ", ".join(f"'{v}'" for v in sorted(known_values))
+    return Failure(
+        operation=operation.label,
+        title="Discriminator value not in schema mapping",
+        message=(
+            f"Response contains discriminator property '{property_name}' with value {value!r},\n"
+            f"which does not match any of the known schema values: {known}"
+        ),
+    )
 
 
 def _maybe_raise_one_or_more(failures: list[Failure]) -> None:

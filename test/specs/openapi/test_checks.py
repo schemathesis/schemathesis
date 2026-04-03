@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import yaml
 
@@ -838,3 +840,152 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     assert failure.position == 1
     assert failure.lineno == 1
     assert failure.colno == 2
+
+
+_CHECK_CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+
+def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
+    return ctx.openapi.build_schema(
+        {
+            "/pets": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "anyOf": [
+                                            {"$ref": "#/components/schemas/Cat"},
+                                            {"$ref": "#/components/schemas/Dog"},
+                                        ],
+                                        "discriminator": discriminator,
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+        version=version,
+        components={
+            "schemas": {
+                "Cat": {"type": "object", "properties": {"petType": {"type": "string"}}},
+                "Dog": {"type": "object", "properties": {"petType": {"type": "string"}}},
+            }
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("body", "discriminator", "should_fail"),
+    [
+        # Implicit mapping: schema name matches discriminator value
+        ({"petType": "Cat"}, {"propertyName": "petType"}, False),
+        ({"petType": "Dog"}, {"propertyName": "petType"}, False),
+        ({"petType": "Fish"}, {"propertyName": "petType"}, True),
+        # Explicit mapping values are valid
+        (
+            {"petType": "feline"},
+            {
+                "propertyName": "petType",
+                "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+            },
+            False,
+        ),
+        # Implicit schema names remain valid even when explicit mapping is present
+        (
+            {"petType": "Cat"},
+            {
+                "propertyName": "petType",
+                "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+            },
+            False,
+        ),
+        # Unknown value fails even when explicit mapping exists
+        (
+            {"petType": "Fish"},
+            {
+                "propertyName": "petType",
+                "mapping": {"feline": "#/components/schemas/Cat", "canine": "#/components/schemas/Dog"},
+            },
+            True,
+        ),
+        # Missing discriminator property: skip check (let JSON schema handle required fields)
+        ({}, {"propertyName": "petType"}, False),
+        # No propertyName in discriminator: skip check
+        ({"petType": "Fish"}, {}, False),
+    ],
+    ids=[
+        "implicit-valid-cat",
+        "implicit-valid-dog",
+        "implicit-invalid-fish",
+        "explicit-valid-feline",
+        "explicit-and-implicit-valid-cat",
+        "explicit-invalid-fish",
+        "missing-property-skip",
+        "no-property-name-skip",
+    ],
+)
+def test_response_schema_conformance_discriminator(ctx, response_factory, body, discriminator, should_fail):
+    raw_schema = _discriminator_schema(ctx, discriminator=discriminator)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/pets"]["GET"]
+    case = operation.Case()
+    response = response_factory.requests(content=json.dumps(body).encode())
+    response = Response.from_requests(response, True)
+
+    if should_fail:
+        with pytest.raises(Failure) as exc_info:
+            response_schema_conformance(_CHECK_CTX, response, case)
+        assert exc_info.value.title == "Discriminator value not in schema mapping"
+    else:
+        assert response_schema_conformance(_CHECK_CTX, response, case) is None
+
+
+def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_factory):
+    # Boolean schemas (true/false) in anyOf/oneOf are valid in OpenAPI 3.1.
+    # The boolean item is skipped during implicit mapping extraction; only $ref items contribute.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/pets": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "anyOf": [
+                                            {"$ref": "#/components/schemas/Cat"},
+                                            True,
+                                        ],
+                                        "discriminator": {"propertyName": "petType"},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "Cat": {"type": "object", "properties": {"petType": {"type": "string"}}},
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/pets"]["GET"]
+    case = operation.Case()
+
+    valid = response_factory.requests(content=b'{"petType": "Cat"}')
+    assert response_schema_conformance(_CHECK_CTX, Response.from_requests(valid, True), case) is None
+
+    invalid = response_factory.requests(content=b'{"petType": "Fish"}')
+    with pytest.raises(Failure) as exc_info:
+        response_schema_conformance(_CHECK_CTX, Response.from_requests(invalid, True), case)
+    assert exc_info.value.title == "Discriminator value not in schema mapping"
