@@ -1677,3 +1677,43 @@ test_b = schema2.parametrize()(_test_body)
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=2)
+
+
+def test_pytest_parametrize_multiple_schemas(testdir):
+    # When `schemathesis.pytest.parametrize` is called with named schemas (sync and async)
+    testdir.make_test(
+        """
+import asyncio
+
+users_schema = schemathesis.openapi.from_dict({
+    "openapi": "3.0.0",
+    "info": {"title": "Users", "description": "", "version": "0.1.0"},
+    "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
+})
+orders_schema = schemathesis.openapi.from_dict({
+    "openapi": "3.0.0",
+    "info": {"title": "Orders", "description": "", "version": "0.1.0"},
+    "paths": {"/orders": {"get": {"responses": {"200": {"description": "OK"}}}}}
+})
+
+@schemathesis.pytest.parametrize(users=users_schema, orders=orders_schema)
+def test_sync(case):
+    pass
+
+@schemathesis.pytest.parametrize(users=users_schema, orders=orders_schema)
+@pytest.mark.asyncio
+async def test_async(case):
+    await asyncio.sleep(0)
+""",
+    )
+    # Then each schema contributes its own test items delimited by square brackets
+    result = testdir.runpytest("-v", "-p", "no:randomly", "--asyncio-mode=auto")
+    result.assert_outcomes(passed=4)
+    result.stdout.re_match_lines(
+        [
+            r"test_pytest_parametrize_multiple_schemas.py::test_sync\[users\]\[GET /users\]",
+            r"test_pytest_parametrize_multiple_schemas.py::test_sync\[orders\]\[GET /orders\]",
+            r"test_pytest_parametrize_multiple_schemas.py::test_async\[users\]\[GET /users\]",
+            r"test_pytest_parametrize_multiple_schemas.py::test_async\[orders\]\[GET /orders\]",
+        ]
+    )

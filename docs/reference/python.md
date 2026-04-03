@@ -50,6 +50,7 @@ Reference for Schemathesis public Python API.
       show_labels: true
       members:
       - from_fixture
+      - parametrize
 
 ## Core Data Structures
 
