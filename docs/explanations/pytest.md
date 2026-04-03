@@ -81,6 +81,26 @@ def test_api(case):
 !!! note "`--collect-only` shows one item per test function"
     Because operations are discovered lazily at runtime, `--collect-only` cannot enumerate them upfront - this is by design.
 
+## Testing Multiple Schemas
+
+`schemathesis.pytest.parametrize()` accepts named schemas as keyword arguments and generates test items from all of them under a single function:
+
+```python
+@schemathesis.pytest.parametrize(
+    users=schemathesis.openapi.from_wsgi("/openapi.json", users_app),
+    orders=schemathesis.openapi.from_wsgi("/openapi.json", orders_app),
+)
+def test_api(case):
+    case.call_and_validate()
+```
+
+The keyword name becomes the first bracket segment in the test ID:
+
+```
+test_api.py::test_api[users][GET /users] PASSED
+test_api.py::test_api[orders][GET /orders] PASSED
+```
+
 ## Error Handling and Reporting
 
 Failures from multiple Hypothesis examples are deduplicated, grouped by operation, and include reproduction steps for debugging:
