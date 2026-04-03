@@ -20,6 +20,7 @@ from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._validate import validate_response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
+from schemathesis.generation.hypothesis import examples
 
 if TYPE_CHECKING:
     from schemathesis.config import FuzzConfig, ProjectConfig
@@ -82,6 +83,33 @@ def _build_strategy_kwargs(config: ProjectConfig, *, operation: APIOperation) ->
     }
 
 
+def _preflight_operations(
+    *,
+    operations: list[APIOperation],
+    strategy_kwargs_by_label: dict[str, dict[str, object]],
+    event_queue: queue.Queue[events.EngineEvent],
+) -> list[APIOperation]:
+    """Return only operations that can generate one case right now."""
+    active_operations = []
+    for operation in operations:
+        try:
+            examples.generate_one(
+                operation.as_strategy(**strategy_kwargs_by_label[operation.label]),  # type: ignore[arg-type]
+            )
+        except Exception as exc:
+            event_queue.put(
+                events.NonFatalError(
+                    error=exc,
+                    phase=None,
+                    label=operation.label,
+                    related_to_operation=True,
+                )
+            )
+        else:
+            active_operations.append(operation)
+    return active_operations
+
+
 @dataclass(slots=True)
 class ActiveScenario:
     """Metadata about the currently running scenario, shared between the strategy and test body."""
@@ -100,13 +128,33 @@ class Cell:
 def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
     """Yield fuzz scenario events produced by background Hypothesis threads until all stop."""
     event_queue: queue.Queue[events.EngineEvent] = queue.Queue()
+    operations = [op.ok() for op in ctx.schema.get_all_operations() if isinstance(op, Ok)]
+    if not operations:
+        return
+
+    strategy_kwargs_by_label: dict[str, dict[str, object]] = {
+        op.label: _build_strategy_kwargs(ctx.config, operation=op) for op in operations
+    }
+    active_operations = _preflight_operations(
+        operations=operations,
+        strategy_kwargs_by_label=strategy_kwargs_by_label,
+        event_queue=event_queue,
+    )
     threads = [
         threading.Thread(
             target=_run_forever_thread,
             name=f"schemathesis_fuzz_{worker_id}",
-            kwargs={"ctx": ctx, "config": config, "event_queue": event_queue, "worker_id": worker_id},
+            kwargs={
+                "ctx": ctx,
+                "config": config,
+                "event_queue": event_queue,
+                "worker_id": worker_id,
+                "operations": active_operations,
+                "strategy_kwargs_by_label": strategy_kwargs_by_label,
+            },
         )
         for worker_id in range(ctx.config.workers)
+        if active_operations
     ]
     for thread in threads:
         thread.start()
@@ -130,7 +178,12 @@ def run_forever(ctx: EngineContext, config: FuzzConfig) -> EventGenerator:
 
 
 def _run_forever_thread(
-    ctx: EngineContext, config: FuzzConfig, event_queue: queue.Queue[events.EngineEvent], worker_id: int
+    ctx: EngineContext,
+    config: FuzzConfig,
+    event_queue: queue.Queue[events.EngineEvent],
+    worker_id: int,
+    operations: list[APIOperation],
+    strategy_kwargs_by_label: dict[str, dict[str, object]],
 ) -> None:
     import hypothesis
     import hypothesis.strategies as st
@@ -139,7 +192,6 @@ def _run_forever_thread(
 
     from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
-    operations = [op.ok() for op in ctx.schema.get_all_operations() if isinstance(op, Ok)]
     if not operations:
         return
 
@@ -155,11 +207,6 @@ def _run_forever_thread(
     # Used to communicate current scenario ID from hypothesis strategy to the test function
     scenario_cell: Cell = Cell(value=None)
     check_context_cache = CheckContextCache()
-    # Operations excluded after generation errors; updated across scenario invocations.
-    excluded_operations: set[str] = set()
-    strategy_kwargs_by_label: dict[str, dict] = {
-        op.label: _build_strategy_kwargs(ctx.config, operation=op) for op in operations
-    }
     continue_on_failure_by_label: dict[str, bool] = {
         op.label: bool(
             ctx.config.operations.get_for_operation(operation=op).continue_on_failure or ctx.config.continue_on_failure
@@ -180,7 +227,7 @@ def _run_forever_thread(
          - Prefers producers over consumers
          - Does not use data from responses
         """
-        if ctx.has_to_stop or not any(op.label not in excluded_operations for op in operations):
+        if ctx.has_to_stop or not weighted_operations:
             raise _StopFuzzing
 
         started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
@@ -190,16 +237,15 @@ def _run_forever_thread(
         recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL)
 
         for _ in range(config.max_steps):
-            choices = [op for op in weighted_operations if op.label not in excluded_operations]
-            if not choices or ctx.has_to_stop:
-                break
-            operation = draw(st.sampled_from(choices))
+            if ctx.has_to_stop:
+                # property re-evaluated each iteration; can change via another thread
+                break  # type: ignore[unreachable]
+            operation = draw(st.sampled_from(weighted_operations))
             try:
                 case = draw(operation.as_strategy(**strategy_kwargs_by_label[operation.label]))
             except UnsatisfiedAssumption:
                 raise  # let Hypothesis handle filtered examples normally
             except Exception as exc:
-                excluded_operations.add(operation.label)
                 event_queue.put(
                     events.NonFatalError(
                         error=exc,
