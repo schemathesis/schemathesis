@@ -1318,3 +1318,46 @@ def test_missing_required_header_body_first_server_no_false_negative(ctx, app_ru
         "--phases=coverage",
         exit_code=ExitCode.OK,
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_response_schema_conformance_reports_all_errors_in_cli(ctx, app_runner, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "name": {"type": "string"},
+                                        },
+                                        "required": ["id", "name"],
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @app.route("/data")
+    def data():
+        # Always returns a response that violates schema in two ways:
+        # 'id' is a string (should be integer), 'name' is an integer (should be string)
+        return jsonify({"id": "not-an-int", "name": 42})
+
+    port = app_runner.run_flask_app(app)
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=response_schema_conformance",
+        "--max-examples=1",
+    )
+    assert result == snapshot_cli

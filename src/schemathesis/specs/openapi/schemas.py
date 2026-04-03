@@ -735,17 +735,16 @@ class OpenApiSchema(BaseSchema):
                             failures.append(failure)
         elif validator is not None:
             try:
-                validator.validate(data)
-            except jsonschema_rs.ValidationError as exc:
-                failures.append(
-                    JsonSchemaError.from_exception(
+                for err in validator.iter_errors(data):
+                    failure = JsonSchemaError.from_exception(
                         operation=operation.label,
-                        exc=exc,
+                        exc=err,
                         root_schema=resolved.schema,
                         config=operation.schema.config.output,
                         name_to_uri=resolved.name_to_uri,
                     )
-                )
+                    if failure not in failures:
+                        failures.append(failure)
             except ValueError as exc:
                 # jsonschema_rs raises ValueError for lone Unicode surrogate characters
                 # (e.g. \uDCF3), which are not valid JSON per RFC 8259 even though

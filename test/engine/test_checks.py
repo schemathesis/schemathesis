@@ -1201,3 +1201,109 @@ def test_module_access():
     # It is done via `__getattr__`
     _ = schemathesis.checks.negative_data_rejection
     assert "negative_data_rejection" in dir(schemathesis.checks)
+
+
+def test_response_schema_conformance_reports_all_errors(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "name": {"type": "string"},
+                                        },
+                                        "required": ["id", "name"],
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
+    response = Response.from_requests(
+        response_factory.requests(content=b'{"id": "not-an-int", "name": 42}'),
+        True,
+    )
+    with pytest.raises(FailureGroup) as exc_info:
+        response_schema_conformance(CTX, response, case)
+    failures = exc_info.value.exceptions
+    assert len(failures) == 2
+    assert all(isinstance(f, JsonSchemaError) for f in failures)
+    schema_paths = {"/".join(str(s) for s in f.schema_path) for f in failures}
+    assert schema_paths == {"properties/id/type", "properties/name/type"}
+
+
+def test_response_schema_conformance_deduplicates_same_schema_path(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
+    # All three items violate the same schema_path (items/type) — dedup collapses to one error
+    response = Response.from_requests(
+        response_factory.requests(content=b"[1, 2, 3]"),
+        True,
+    )
+    with pytest.raises(JsonSchemaError) as exc_info:
+        response_schema_conformance(CTX, response, case)
+    assert exc_info.value.schema_path == ["items", "type"]
+
+
+def test_header_conformance_reports_multiple_errors_from_one_header(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {"X-Rate-Limit": {"schema": {"type": "integer", "minimum": 100, "maximum": 50}}},
+                        }
+                    }
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
+    # 75 is both less than minimum=100 and greater than maximum=50 — two distinct violations
+    response = Response.from_requests(
+        response_factory.requests(headers={"X-Rate-Limit": "75"}),
+        True,
+    )
+    with pytest.raises(FailureGroup) as exc_info:
+        response_headers_conformance(CTX, response, case)
+    failures = exc_info.value.exceptions
+    assert len(failures) == 2
+    assert all(isinstance(f, JsonSchemaError) for f in failures)
+    schema_paths = {"/".join(str(s) for s in f.schema_path) for f in failures}
+    assert schema_paths == {"minimum", "maximum"}
