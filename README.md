@@ -80,7 +80,7 @@ TestAPI = APIWorkflow.TestCase
 
 **CI/CD:**
 ```yaml
-- uses: schemathesis/action@v2
+- uses: schemathesis/action@v3
   with:
     schema: "https://your-api.com/openapi.json"
 ```
