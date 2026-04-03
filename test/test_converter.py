@@ -81,21 +81,21 @@ def test_prefix_items_to_items_array(schema, expected):
                 "maxLength": 40,
                 "pattern": r"^[abc\d]$",
             },
-            {"pattern": r"^([abc\d]){3,40}$"},
+            {"pattern": r"^[abc\d]{3,40}$"},
         ),
         (
             {
                 "maxLength": 40,
                 "pattern": r"^[abc\d]$",
             },
-            {"pattern": r"^([abc\d]){1,40}$"},
+            {"pattern": r"^[abc\d]{1,40}$"},
         ),
         (
             {
                 "minLength": 3,
                 "pattern": r"^[abc\d]$",
             },
-            {"pattern": r"^([abc\d]){3,}$"},
+            {"pattern": r"^[abc\d]{3,}$"},
         ),
         (
             {
