@@ -17,6 +17,10 @@
 - Allow reusing the same test function across multiple schemas via `schema.parametrize()`.
 - Report all distinct JSON Schema errors per response in `response_schema_conformance` and `response_headers_conformance`. [#1174](https://github.com/schemathesis/schemathesis/issues/1174)
 
+### :bug: Fixed
+
+- Wrong length constraints for patterns with multi-character repeated groups.
+
 ## [4.14.3](https://github.com/schemathesis/schemathesis/compare/v4.14.2...v4.14.3) - 2026-03-31
 
 ### :bug: Fixed

@@ -233,10 +233,6 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
         return pattern
 
 
-# ---------------------------------------------------------------------------
-# Serializer: AST → regex string
-# ---------------------------------------------------------------------------
-
 _REGEX_META = set(r"\.^$*+?{[|()")
 
 
@@ -409,7 +405,7 @@ def _serialize_subpattern(value: _SubpatternValue) -> str:
     return f"({inner})"
 
 
-# Flag bit → letter mapping for inline flag serialization
+# Flag bit -> letter mapping for inline flag serialization
 _FLAG_LETTERS: tuple[tuple[int, str], ...] = (
     (sre.SRE_FLAG_IGNORECASE, "i"),
     (sre.SRE_FLAG_LOCALE, "L"),
@@ -437,11 +433,6 @@ def _serialize_flags(add_flags: int, del_flags: int) -> str:
 def _serialize_branch(value: _BranchValue) -> str:
     _, alternatives = value
     return "|".join(_serialize(alt) for alt in alternatives)
-
-
-# ---------------------------------------------------------------------------
-# Transformer: AST → modified AST
-# ---------------------------------------------------------------------------
 
 
 def _transform(parsed: list[_Node], min_length: int | None, max_length: int | None) -> list[_Node] | None:
