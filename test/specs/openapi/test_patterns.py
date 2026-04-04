@@ -1,4 +1,5 @@
 import re
+import string
 import sys
 
 import pytest
@@ -6,7 +7,13 @@ from flask import jsonify
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from schemathesis.specs.openapi.patterns import normalize_regex, update_quantifier
+try:
+    import re._parser as sre_parse
+except ImportError:
+    import sre_parse  # type: ignore[no-redef]
+
+from schemathesis.core.errors import InternalError
+from schemathesis.specs.openapi.patterns import _serialize, normalize_regex, update_quantifier
 
 SKIP_BEFORE_PY11 = pytest.mark.skipif(
     sys.version_info < (3, 11), reason="Possessive repeat is only available in Python 3.11+"
@@ -17,58 +24,58 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
     ("pattern", "min_length", "max_length", "expected"),
     [
         # Single literal
-        ("a", None, 3, "(a){1,3}"),
-        ("a", 3, 3, "(a){3}"),
-        ("a", 0, 3, "(a){1,3}"),
-        ("}?", 1, None, "(}){1}"),
+        ("a", None, 3, "a{1,3}"),
+        ("a", 3, 3, "a{3}"),
+        ("a", 0, 3, "a{1,3}"),
+        ("}?", 1, None, "}{1}"),
         # Simple quantifiers on a simple group
-        (".*", None, 3, "(.){0,3}"),
-        (".*", 0, 3, "(.){0,3}"),
-        (".*", 1, None, "(.){1,}"),
-        (".*", 1, 3, "(.){1,3}"),
-        (".+", None, 3, "(.){1,3}"),
-        (".+", 1, None, "(.){1,}"),
-        (".+", 1, 3, "(.){1,3}"),
-        (".+", 0, 3, "(.){1,3}"),
-        (".?", 0, 3, "(.){0,1}"),
-        (".*?", 0, 3, "(.){0,3}"),
-        (".+?", 0, 3, "(.){1,3}"),
+        (".*", None, 3, ".{0,3}"),
+        (".*", 0, 3, ".{0,3}"),
+        (".*", 1, None, ".{1,}"),
+        (".*", 1, 3, ".{1,3}"),
+        (".+", None, 3, ".{1,3}"),
+        (".+", 1, None, ".{1,}"),
+        (".+", 1, 3, ".{1,3}"),
+        (".+", 0, 3, ".{1,3}"),
+        (".?", 0, 3, ".{0,1}"),
+        (".*?", 0, 3, ".{0,3}"),
+        (".+?", 0, 3, ".{1,3}"),
         # Complex quantifiers on a simple group
-        (".{1,5}", None, 3, "(.){1,3}"),
-        (".{0,3}", 1, None, "(.){1,3}"),
-        (".{2,}", 1, 3, "(.){2,3}"),
-        (".{1,5}?", None, 3, "(.){1,3}"),
-        (".{0,3}?", 1, None, "(.){1,3}"),
-        (".{2,}?", 1, 3, "(.){2,3}"),
-        pytest.param(".{1,5}+", None, 3, "(.){1,3}", marks=SKIP_BEFORE_PY11),
-        pytest.param(".{0,3}+", 1, None, "(.){1,3}", marks=SKIP_BEFORE_PY11),
-        pytest.param(".{2,}+", 1, 3, "(.){2,3}", marks=SKIP_BEFORE_PY11),
+        (".{1,5}", None, 3, ".{1,3}"),
+        (".{0,3}", 1, None, ".{1,3}"),
+        (".{2,}", 1, 3, ".{2,3}"),
+        (".{1,5}?", None, 3, ".{1,3}"),
+        (".{0,3}?", 1, None, ".{1,3}"),
+        (".{2,}?", 1, 3, ".{2,3}"),
+        pytest.param(".{1,5}+", None, 3, ".{1,3}", marks=SKIP_BEFORE_PY11),
+        pytest.param(".{0,3}+", 1, None, ".{1,3}", marks=SKIP_BEFORE_PY11),
+        pytest.param(".{2,}+", 1, 3, ".{2,3}", marks=SKIP_BEFORE_PY11),
         # Group without quantifier
-        ("[a-z]", None, 5, "([a-z]){1,5}"),
-        ("[a-z]", 3, None, "([a-z]){3,}"),
-        ("[a-z]", 3, 5, "([a-z]){3,5}"),
-        ("[a-z]", 1, 5, "([a-z]){1,5}"),
-        ("a|b", 1, 5, "(a|b){1,5}"),
+        ("[a-z]", None, 5, "[a-z]{1,5}"),
+        ("[a-z]", 3, None, "[a-z]{3,}"),
+        ("[a-z]", 3, 5, "[a-z]{3,5}"),
+        ("[a-z]", 1, 5, "[a-z]{1,5}"),
+        ("a|b", 1, 5, "[ab]{1,5}"),
         # A more complex group with `*` quantifier
-        ("[a-z]*", None, 5, "([a-z]){0,5}"),
-        ("[a-z]*", 3, None, "([a-z]){3,}"),
-        ("[a-z]*", 3, 5, "([a-z]){3,5}"),
-        ("[a-z]*", 1, 5, "([a-z]){1,5}"),
+        ("[a-z]*", None, 5, "[a-z]{0,5}"),
+        ("[a-z]*", 3, None, "[a-z]{3,}"),
+        ("[a-z]*", 3, 5, "[a-z]{3,5}"),
+        ("[a-z]*", 1, 5, "[a-z]{1,5}"),
         # With anchors
-        ("^[a-z]*", None, 5, "^([a-z]){0,5}"),
-        ("^[a-z]*", 3, 5, "^([a-z]){3,5}"),
-        ("^[a-z]+", 0, 5, "^([a-z]){1,5}"),
-        ("^[a-z]*$", None, 5, "^([a-z]){0,5}$"),
-        ("^[a-z]*$", 3, 5, "^([a-z]){3,5}$"),
-        ("^[a-z]+$", 0, 5, "^([a-z]){1,5}$"),
-        ("^.+$", 0, 5, "^(.){1,5}$"),
-        ("^.{0,1}$", 0, 5, "^(.){0,1}$"),
-        ("^.$", 0, 5, "^(.){1}$"),
-        ("[a-z]*$", None, 5, "([a-z]){0,5}$"),
-        ("[a-z]*$", 3, 5, "([a-z]){3,5}$"),
-        ("[a-z]+$", 0, 5, "([a-z]){1,5}$"),
-        (r"\d*", 1, None, r"(\d){1,}"),
-        (r"0\A", 1, None, r"(0){1,}\A"),
+        ("^[a-z]*", None, 5, "^[a-z]{0,5}"),
+        ("^[a-z]*", 3, 5, "^[a-z]{3,5}"),
+        ("^[a-z]+", 0, 5, "^[a-z]{1,5}"),
+        ("^[a-z]*$", None, 5, "^[a-z]{0,5}$"),
+        ("^[a-z]*$", 3, 5, "^[a-z]{3,5}$"),
+        ("^[a-z]+$", 0, 5, "^[a-z]{1,5}$"),
+        ("^.+$", 0, 5, "^.{1,5}$"),
+        ("^.{0,1}$", 0, 5, "^.{0,1}$"),
+        ("^.$", 0, 5, "^.{1}$"),
+        ("[a-z]*$", None, 5, "[a-z]{0,5}$"),
+        ("[a-z]*$", 3, 5, "[a-z]{3,5}$"),
+        ("[a-z]+$", 0, 5, "[a-z]{1,5}$"),
+        (r"\d*", 1, None, r"\d{1,}"),
+        (r"0\A", 1, None, r"0{1,}^"),
         # Noop
         ("abc*def*", 1, 3, "abc*def*"),
         ("[bc]*[de]*", 1, 3, "[bc]*[de]*"),
@@ -85,17 +92,17 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("^0$", 0, 0, "^0$"),
         # More complex patterns
         # Fixed parts with single quantifier
-        ("^abc[0-9]*$", None, 5, "^abc([0-9]){0,2}$"),
-        ("^-[a-z]{1,10}-$", None, 4, "^-([a-z]){1,2}-$"),
+        ("^abc[0-9]*$", None, 5, "^abc[0-9]{0,2}$"),
+        ("^-[a-z]{1,10}-$", None, 4, "^-[a-z]{1,2}-$"),
         # Multiple quantifiers
-        (r"^[a-z]{2,4}-\d{4,15}$", 7, 7, r"^([a-z]){2}-(\d){4}$"),
-        (r"^[a-z]{2,4}-\d{4,15}$", 20, 20, r"^([a-z]){4}-(\d){15}$"),
+        (r"^[a-z]{2,4}-\d{4,15}$", 7, 7, r"^[a-z]{2}-\d{4}$"),
+        (r"^[a-z]{2,4}-\d{4,15}$", 20, 20, r"^[a-z]{4}-\d{15}$"),
         # Complex patterns with multiple parts
-        ("^[A-Z]{1,3}-[0-9]{2,4}-[a-z]{1,5}$", 8, 8, "^([A-Z]){1}-([0-9]){2}-([a-z]){3}$"),
-        (r"^\w{2,4}:\d{3,5}:[A-F]{1,2}$", 10, 10, r"^(\w){2}:(\d){4}:([A-F]){2}$"),
-        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 7, 7, r"^([a-zA-Z0-9]){2}-(\d){4}$"),
-        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 8, 8, r"^([a-zA-Z0-9]){2}-(\d){5}$"),
-        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 19, 19, r"^([a-zA-Z0-9]){3}-(\d){15}$"),
+        ("^[A-Z]{1,3}-[0-9]{2,4}-[a-z]{1,5}$", 8, 8, "^[A-Z]{1}-[0-9]{2}-[a-z]{3}$"),
+        (r"^\w{2,4}:\d{3,5}:[A-F]{1,2}$", 10, 10, r"^\w{2}:\d{4}:[A-F]{2}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 7, 7, r"^[a-zA-Z0-9]{2}-\d{4}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 8, 8, r"^[a-zA-Z0-9]{2}-\d{5}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 19, 19, r"^[a-zA-Z0-9]{3}-\d{15}$"),
         (r"^([a-zA-Z0-9]){2,4}-(\d){4,15}$", 19, 19, r"^([a-zA-Z0-9]){3}-(\d){15}$"),
         (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 50, 50, r"^[a-zA-Z0-9]{2,4}-\d{4,15}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 1, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
@@ -104,39 +111,62 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^abcd[a-zA-Z0-9]{2,4}$", None, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 0, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", None, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
-        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd([a-zA-Z0-9]){2,4}$"),
-        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd([a-zA-Z0-9]){2,4}$"),
-        (r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$", 5, 64, r"^([a-zA-Z0-9]){5,64}([-a-zA-Z0-9]?[a-zA-Z0-9]){0}$"),
-        (r"^\+[0-9]{5,}$", 6, 6, r"^\+([0-9]){5}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$", 5, 64, r"^[a-zA-Z0-9]{5,64}([\-a-zA-Z0-9]{0,1}[a-zA-Z0-9]){0}$"),
+        (r"^\+[0-9]{5,}$", 6, 6, r"^\+[0-9]{5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
         # Edge cases
-        ("^[a-z]*-[0-9]*$", 3, 3, "^([a-z]){0}-([0-9]){2}$"),
-        (r"^[+][\s0-9()-]+$", 1, 20, r"^[+]([\s0-9()-]){1,19}$"),
-        (r"^[\+][\s0-9()-]+$", 1, 20, r"^[\+]([\s0-9()-]){1,19}$"),
+        ("^[a-z]*-[0-9]*$", 3, 3, "^[a-z]{0}-[0-9]{2}$"),
+        (r"^[+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
+        (r"^[\+][\s0-9()-]+$", 1, 20, r"^\+[\s0-9()\-]{1,19}$"),
         # Multiple fixed parts
-        ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc([0-9]){1}def([a-z]){2}ghi$"),
+        ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc[0-9]{1}def[a-z]{2}ghi$"),
         # Others
-        ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, "^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,6000}$"),
-        (r"^geo:\w*\*?$", 5, 200, r"^geo:(\w){1,196}(\*){0}$"),
-        (r"^[\w\W]$", 1, 3, r"^(.){1}$"),
-        (r"^[\w\W]+$", 1, 3, r"^(.){1,3}$"),
-        (r"^[\w\W]*$", 1, 3, r"^(.){1,3}$"),
-        (r"^[\w\W]?$", 1, 3, r"^(.){1}$"),
-        (r"^[\w\W]{2,}$", 1, 3, r"^(.){2,3}$"),
-        (r"^[\W\w]$", 1, 3, r"^(.){1}$"),
-        (r"^[\W\w]+$", 1, 3, r"^(.){1,3}$"),
-        (r"^[\W\w]*$", 1, 3, r"^(.){1,3}$"),
-        (r"^[\W\w]?$", 1, 3, r"^(.){1}$"),
-        (r"^[\W\w]{2,}$", 1, 3, r"^(.){2,3}$"),
-        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix([|]){2}(?:,prefix[|]+){499}$"),
-        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.([^,]){1}(?:,bar\.spam\.[^,]+){0}$"),
-        (r"^\008+()?$", None, 2, r"^\00(8){1}(){0}$"),
-        (r"^\008+()?$", 2, None, r"^\00(8){1,}(){0}$"),
+        ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,6000}$"),
+        (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{1,196}\*{0}$"),
+        (r"^[\w\W]$", 1, 3, r"^.{1}$"),
+        (r"^[\w\W]+$", 1, 3, r"^.{1,3}$"),
+        (r"^[\w\W]*$", 1, 3, r"^.{1,3}$"),
+        (r"^[\w\W]?$", 1, 3, r"^.{1}$"),
+        (r"^[\w\W]{2,}$", 1, 3, r"^.{2,3}$"),
+        (r"^[\W\w]$", 1, 3, r"^.{1}$"),
+        (r"^[\W\w]+$", 1, 3, r"^.{1,3}$"),
+        (r"^[\W\w]*$", 1, 3, r"^.{1,3}$"),
+        (r"^[\W\w]?$", 1, 3, r"^.{1}$"),
+        (r"^[\W\w]{2,}$", 1, 3, r"^.{2,3}$"),
+        (r"^prefix[|]+(?:,prefix[|]+)*$", 4000, 4000, r"^prefix\|{2}(?:,prefix\|{1,}){499}$"),
+        (r"^bar\.spam\.[^,]+(?:,bar\.spam\.[^,]+)*$", 10, 10, r"^bar\.spam\.[^,]{1}(?:,bar\.spam\.[^,]{1,}){0}$"),
+        (r"^\008+()?$", None, 2, r"^\x008{1}(){0}$"),
+        (r"^\008+()?$", 2, None, r"^\x008{1,}(){0}$"),
         (r"^000(000)?$", 4, 5, r"^000(000)?$"),
         ("(abc)+", 1, 10, "(abc){1,3}"),
         ("(hello){2,5}", None, 12, "(hello){2}"),
         ("(abcd)*", 3, 7, "(abcd){1}"),
         ("^()?$", 4, 5, "^()?$"),
+        # Multi-char quantified inner in groups
+        (r"(\d{3})+", 6, 9, r"(\d{3}){2,3}"),
+        (r"(\d{3})+", 3, 3, r"(\d{3}){1}"),
+        (r"([A-Z]{2})+", 4, 10, r"([A-Z]{2}){2,5}"),
+        (r"([A-Z]\d)+", 4, 8, r"([A-Z]\d){2,4}"),
+        (r"(\d{2}){1,5}", 4, 8, r"(\d{2}){2,4}"),
+        (r"(\d{2}){3,7}", 8, 12, r"(\d{2}){4,6}"),
+        (r"(\d{3})+", 9, None, r"(\d{3}){3,}"),
+        (r"(\d{3})+", None, 9, r"(\d{3}){1,3}"),
+        (r"(?:\d{3})+", 6, 9, r"(?:\d{3}){2,3}"),
+        (r"(\d{3})+", 1, 2, r"(\d{3})+"),
+        (r"(\d{3})+", 7, 7, r"(\d{3})+"),
+        (r"(\d{3})+", 0, 0, r"(\d{3})+"),
+        (r"(a|bb)+", 4, 8, r"(a|bb)+"),
+        # Anchored multi-part with multi-char groups
+        (r"^(abc)+(def)+$", 6, 6, r"^(abc){1}(def){1}$"),
+        (r"^(abc)+(def)+$", 9, 9, r"^(abc){1}(def){2}$"),
+        (r"^(ab)+(cd)+(ef)+$", 6, 6, r"^(ab){1}(cd){1}(ef){1}$"),
+        (r"^(ab)+(cd)+(ef)+$", 10, 10, r"^(ab){1}(cd){1}(ef){3}$"),
+        (r"^(\d{3})+(\w{2})+$", 10, 10, r"^(\d{3}){2}(\w{2}){2}$"),
+        (r"^(abc)+\d+$", 4, 10, r"^(abc){2,3}\d{1}$"),
+        (r"^(abc)+(\d)+$", 7, 7, r"^(abc){1}(\d){4}$"),
+        (r"^abc(\d{3})+$", 6, 12, r"^abc(\d{3}){1,3}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
@@ -231,8 +261,239 @@ def is_valid_regex(pattern: str) -> bool:
     try:
         re.compile(pattern)
         return True
-    except re.error:
+    except (re.error, RecursionError):
         return False
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        # LITERAL
+        "a",
+        "0",
+        r"\.",
+        r"\*",
+        r"\\",
+        r"\^",
+        r"\$",
+        r"\|",
+        r"\(",
+        r"\)",
+        r"\[",
+        r"\{",
+        r"\+",
+        r"\?",
+        # NOT_LITERAL
+        r"[^a]",
+        # ANY
+        ".",
+        # AT (anchors)
+        "^a",
+        "a$",
+        r"\ba\b",
+        r"\Ba\B",
+        r"\Aa",
+        r"a\Z",
+        # IN (character classes)
+        "[abc]",
+        "[a-z]",
+        "[^abc]",
+        r"[\d]",
+        r"[a-z\d_]",
+        "[a-zA-Z0-9]",
+        # CATEGORY
+        r"\d",
+        r"\D",
+        r"\w",
+        r"\W",
+        r"\s",
+        r"\S",
+        # BRANCH
+        "a|b",
+        "a|b|c",
+        "(a)|(b)",
+        # SUBPATTERN
+        "(abc)",
+        "(?:abc)",
+        "((a)(b))",
+        # MAX_REPEAT
+        "a*",
+        "a+",
+        "a?",
+        "a{3}",
+        "a{2,5}",
+        "a{2,}",
+        "(ab)*",
+        "(ab)+",
+        "[a-z]*",
+        # MIN_REPEAT
+        "a*?",
+        "a+?",
+        "a??",
+        "a{2,5}?",
+        # Combinations
+        "^[a-z]+$",
+        "abc",
+        r"^[A-Z]{2}\d{3}-[a-z]+$",
+        "(a|b)+",
+        r"((\d{2})+)",
+    ],
+)
+def test_serialize_roundtrip(pattern):
+    parsed = sre_parse.parse(pattern)
+    serialized = _serialize(list(parsed))
+    re.compile(serialized)
+
+    # Idempotent
+    assert _serialize(list(sre_parse.parse(serialized))) == serialized
+
+    # Semantically equivalent
+    for s in ["", "a", "abc", "ABC", "123", "a-b", "\t\n", "\x00"]:
+        assert bool(re.search(pattern, s)) == bool(re.search(serialized, s))
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        pytest.param("a*+", marks=SKIP_BEFORE_PY11),
+        pytest.param("a++", marks=SKIP_BEFORE_PY11),
+        pytest.param("a{2,5}+", marks=SKIP_BEFORE_PY11),
+    ],
+)
+def test_serialize_possessive(pattern):
+    parsed = sre_parse.parse(pattern)
+    serialized = _serialize(list(parsed))
+    re.compile(serialized)
+    assert _serialize(list(sre_parse.parse(serialized))) == serialized
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        r"(?=foo)bar",
+        r"(?!foo)bar",
+        r"(?<=foo)bar",
+        r"(?<!foo)bar",
+        r"(foo)\1",
+        r"(x)(?(1)a|b)",
+        pytest.param("(?>abc)", marks=SKIP_BEFORE_PY11),
+    ],
+)
+def test_serialize_unsupported_opcodes(pattern):
+    parsed = sre_parse.parse(pattern)
+    with pytest.raises(InternalError, match="Unsupported sre opcode"):
+        _serialize(list(parsed))
+
+
+@pytest.mark.parametrize("char", list(string.printable))
+def test_serialize_printable_char(char):
+    parsed = sre_parse.parse(re.escape(char))
+    serialized = _serialize(list(parsed))
+    assert re.compile(serialized).fullmatch(char)
+
+
+@pytest.mark.parametrize(
+    ("char", "name"),
+    [
+        ("\x00", "null"),
+        ("\x01", "SOH"),
+        ("\x07", "BEL"),
+        ("\x08", "BS"),
+        ("\x1b", "ESC"),
+        ("\x7f", "DEL"),
+        ("\x80", "0x80"),
+        ("\xff", "0xff"),
+    ],
+)
+def test_serialize_control_char(char, name):
+    parsed = sre_parse.parse(re.escape(char))
+    serialized = _serialize(list(parsed))
+    assert re.compile(serialized).fullmatch(char)
+
+
+@pytest.mark.parametrize(
+    ("char", "name"),
+    [
+        ("\u00e9", "e-acute"),
+        ("\u00f1", "n-tilde"),
+        ("\u0100", "A-macron"),
+        ("\u4e2d", "CJK"),
+        ("\U0001f600", "emoji"),
+    ],
+)
+def test_serialize_unicode_char(char, name):
+    parsed = sre_parse.parse(re.escape(char))
+    serialized = _serialize(list(parsed))
+    assert re.compile(serialized).fullmatch(char)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "should_match", "should_not_match"),
+    [
+        ("[^a]", "b", "a"),
+        ("[^0-9]", "a", "5"),
+        (r"[^\d]", "a", "5"),
+        ("[^a-z]", "A", "a"),
+    ],
+)
+def test_serialize_negated_class(pattern, should_match, should_not_match):
+    parsed = sre_parse.parse(pattern)
+    serialized = _serialize(list(parsed))
+    compiled = re.compile(serialized)
+    assert compiled.fullmatch(should_match)
+    assert not compiled.fullmatch(should_not_match)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "samples_in", "samples_out"),
+    [
+        ("[a-z]", list("abcxyz"), list("ABC019")),
+        ("[A-Z]", list("ABCXYZ"), list("abc019")),
+        ("[0-9]", list("0159"), list("abcABC")),
+        ("[a-zA-Z0-9]", list("aZ0"), list("!@# ")),
+        ("[a-z0-9_-]", list("a0_-"), list("!@A")),
+    ],
+)
+def test_serialize_char_class_range(pattern, samples_in, samples_out):
+    parsed = sre_parse.parse(pattern)
+    serialized = _serialize(list(parsed))
+    compiled = re.compile(serialized)
+    for ch in samples_in:
+        assert compiled.fullmatch(ch)
+    for ch in samples_out:
+        assert not compiled.fullmatch(ch)
+
+
+@pytest.mark.parametrize(
+    ("pattern", "should_match"),
+    [
+        (r"a\.b", "a.b"),
+        (r"a\*b", "a*b"),
+        (r"a\+b", "a+b"),
+        (r"a\?b", "a?b"),
+        (r"\(x\)", "(x)"),
+        (r"\[x\]", "[x]"),
+        (r"a\\b", "a\\b"),
+        (r"\^\$", "^$"),
+    ],
+)
+def test_serialize_escaped_literal(pattern, should_match):
+    parsed = sre_parse.parse(pattern)
+    serialized = _serialize(list(parsed))
+    assert re.compile(serialized).fullmatch(should_match)
+
+
+@given(pattern=st.text(min_size=1, max_size=80).filter(is_valid_regex))
+@settings(max_examples=500, suppress_health_check=list(HealthCheck), deadline=None)
+def test_serialize_random_pattern(pattern):
+    parsed = sre_parse.parse(pattern)
+    try:
+        serialized = _serialize(list(parsed))
+    except InternalError:
+        return
+
+    re.compile(serialized)
+    assert _serialize(list(sre_parse.parse(serialized))) == serialized
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)

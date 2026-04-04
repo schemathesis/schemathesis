@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
+from typing import Any, Literal, TypeAlias
 
 from schemathesis.core.errors import InternalError
 
@@ -185,7 +186,7 @@ except ImportError:
     import sre_parse
 
 ANCHOR = sre.AT
-REPEATS: tuple
+REPEATS: tuple[int, ...]
 if hasattr(sre, "POSSESSIVE_REPEAT"):
     REPEATS = (sre.MIN_REPEAT, sre.MAX_REPEAT, sre.POSSESSIVE_REPEAT)
 else:
@@ -194,6 +195,16 @@ LITERAL = sre.LITERAL
 NOT_LITERAL = sre.NOT_LITERAL
 IN = sre.IN
 MAXREPEAT = sre_parse.MAXREPEAT
+
+# sre_parse AST node: (opcode, value)
+# Value varies by opcode (int for LITERAL/AT, list for IN, tuple for REPEAT/SUBPATTERN/BRANCH, None for ANY)
+# so `Any` is unavoidable here — this is a tagged union that Python's type system cannot express structurally
+_Node: TypeAlias = tuple[int, Any]
+
+# Specific value shapes for opcodes that carry structured data
+_RepeatValue: TypeAlias = tuple[int, int, list[_Node]]
+_SubpatternValue: TypeAlias = tuple[int | None, int, int, list[_Node]]
+_BranchValue: TypeAlias = tuple[None, list[list[_Node]]]
 
 
 @lru_cache
@@ -204,7 +215,11 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
 
     try:
         parsed = sre_parse.parse(pattern)
-        updated = _handle_parsed_pattern(parsed, pattern, min_length, max_length)
+        result = _transform(list(parsed), min_length, max_length)
+        if result is None:
+            return pattern
+        global_flags = parsed.state.flags & ~_DEFAULT_FLAGS
+        updated = _serialize(result, global_flags=global_flags)
         try:
             re.compile(updated)
         except re.error as exc:
@@ -218,60 +233,399 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
         return pattern
 
 
-def _handle_parsed_pattern(parsed: list, pattern: str, min_length: int | None, max_length: int | None) -> str:
-    """Handle the parsed pattern and update quantifiers based on different cases."""
-    if len(parsed) == 1:
-        op, value = parsed[0]
-        return _update_quantifier(op, value, pattern, min_length, max_length)
-    elif len(parsed) == 2:
-        if parsed[0][0] == ANCHOR:
-            # Starts with an anchor
-            op, value = parsed[1]
-            anchor_length = _get_anchor_length(parsed[0][1])
-            leading_anchor = pattern[:anchor_length]
-            return leading_anchor + _update_quantifier(op, value, pattern[anchor_length:], min_length, max_length)
-        if parsed[1][0] == ANCHOR:
-            # Ends with an anchor
-            op, value = parsed[0]
-            anchor_length = _get_anchor_length(parsed[1][1])
-            trailing_anchor = pattern[-anchor_length:]
-            return _update_quantifier(op, value, pattern[:-anchor_length], min_length, max_length) + trailing_anchor
-    elif len(parsed) == 3 and parsed[0][0] == ANCHOR and parsed[2][0] == ANCHOR:
-        op, value = parsed[1]
-        leading_anchor_length = _get_anchor_length(parsed[0][1])
-        trailing_anchor_length = _get_anchor_length(parsed[2][1])
-        leading_anchor = pattern[:leading_anchor_length]
-        trailing_anchor = pattern[-trailing_anchor_length:]
-        # Special case for patterns canonicalisation. Some frameworks generate `\\w\\W` instead of `.`
-        # Such patterns lead to significantly slower data generation
-        if op == sre.IN and _matches_anything(value):
-            op = sre.ANY
-            value = None
-            inner_pattern = "."
-        elif op in REPEATS and len(value[2]) == 1 and value[2][0][0] == sre.IN and _matches_anything(value[2][0][1]):
-            value = (value[0], value[1], [(sre.ANY, None)], *value[3:])
-            inner_pattern = "."
-        else:
-            inner_pattern = pattern[leading_anchor_length:-trailing_anchor_length]
-        # Single literal has the length of 1, but quantifiers could be != 1, which means we can't merge them
-        if op == LITERAL and (
-            (min_length is not None and min_length > 1) or (max_length is not None and max_length < 1)
-        ):
-            return pattern
-        return leading_anchor + _update_quantifier(op, value, inner_pattern, min_length, max_length) + trailing_anchor
-    elif (
-        len(parsed) > 3
-        and parsed[0][0] == ANCHOR
-        and parsed[-1][0] == ANCHOR
-        and all(op == LITERAL or op in REPEATS for op, _ in parsed[1:-1])
-    ):
-        return _handle_anchored_pattern(parsed, pattern, min_length, max_length)
-    return pattern
+# ---------------------------------------------------------------------------
+# Serializer: AST → regex string
+# ---------------------------------------------------------------------------
+
+_REGEX_META = set(r"\.^$*+?{[|()")
 
 
-def _matches_anything(value: list) -> bool:
+def _serialize(nodes: list[_Node], *, global_flags: int = 0) -> str:
+    """Serialize sre_parse AST back to regex string."""
+    parts = []
+    multi = len(nodes) > 1
+    for op, value in nodes:
+        s = _serialize_node((op, value))
+        # BRANCH must be wrapped when concatenated with other nodes,
+        # otherwise | extends to the end of the enclosing group
+        if op == sre.BRANCH and multi:
+            s = f"(?:{s})"
+        parts.append(s)
+    body = "".join(parts)
+    if global_flags:
+        prefix = _serialize_flags(global_flags, 0)
+        return f"(?{prefix}){body}"
+    return body
+
+
+def _serialize_node(node: _Node) -> str:
+    """Serialize a single AST node."""
+    op, value = node
+    match op, value:
+        case sre.LITERAL, int():
+            return _serialize_literal(value)
+        case sre.NOT_LITERAL, int():
+            return f"[^{_serialize_literal_in_class(value)}]"
+        case sre.ANY, _:
+            return "."
+        case sre.AT, int():
+            return _serialize_anchor(value)
+        case sre.IN, list():
+            return _serialize_in(value)
+        case sre.BRANCH, tuple():
+            return _serialize_branch(value)
+        case sre.SUBPATTERN, tuple():
+            return _serialize_subpattern(value)
+        case op, tuple() if op in REPEATS:
+            return _serialize_repeat(op, value)
+        case _:
+            raise InternalError(f"Unsupported sre opcode: {op}")
+
+
+def _serialize_literal(charcode: int) -> str:
+    ch = chr(charcode)
+    if ch in _REGEX_META:
+        return "\\" + ch
+    if not ch.isprintable():
+        if charcode <= 0xFF:
+            return f"\\x{charcode:02x}"
+        if charcode <= 0xFFFF:
+            return f"\\u{charcode:04x}"
+        return f"\\U{charcode:08x}"
+    return ch
+
+
+def _serialize_anchor(anchor_type: int) -> str:
+    match anchor_type:
+        case sre.AT_BEGINNING | sre.AT_BEGINNING_STRING:
+            return "^"
+        case sre.AT_END | sre.AT_END_STRING:
+            return "$"
+        case sre.AT_BOUNDARY:
+            return "\\b"
+        case sre.AT_NON_BOUNDARY:
+            return "\\B"
+        case _:
+            return "\\b"
+
+
+def _serialize_in(items: list[_Node]) -> str:
+    match items:
+        case [(sre.NEGATE, _), *rest]:
+            inner = "".join(_serialize_in_item(item) for item in rest)
+            return f"[^{inner}]"
+        case [(sre.CATEGORY, val)]:
+            return _serialize_category(val)
+        case rest:
+            inner = "".join(_serialize_in_item(item) for item in rest)
+            return f"[{inner}]"
+
+
+def _serialize_in_item(node: _Node) -> str:
+    op, value = node
+    match op, value:
+        case sre.LITERAL, int():
+            return _serialize_literal_in_class(value)
+        case sre.RANGE, (int() as lo, int() as hi):
+            return f"{_serialize_literal_in_class(lo)}-{_serialize_literal_in_class(hi)}"
+        case sre.CATEGORY, int():
+            return _serialize_category(value)
+        case _:
+            return ""
+
+
+_CLASS_META = set(r"\]^[-")
+
+
+def _serialize_literal_in_class(charcode: int) -> str:
+    ch = chr(charcode)
+    if ch in _CLASS_META:
+        return "\\" + ch
+    if not ch.isprintable():
+        if charcode <= 0xFF:
+            return f"\\x{charcode:02x}"
+        if charcode <= 0xFFFF:
+            return f"\\u{charcode:04x}"
+        return f"\\U{charcode:08x}"
+    return ch
+
+
+def _serialize_category(cat: int) -> str:
+    match cat:
+        case sre.CATEGORY_DIGIT:
+            return "\\d"
+        case sre.CATEGORY_NOT_DIGIT:
+            return "\\D"
+        case sre.CATEGORY_SPACE:
+            return "\\s"
+        case sre.CATEGORY_NOT_SPACE:
+            return "\\S"
+        case sre.CATEGORY_WORD:
+            return "\\w"
+        case sre.CATEGORY_NOT_WORD:
+            return "\\W"
+        case _:
+            return ""
+
+
+def _serialize_repeat(op: int, value: _RepeatValue) -> str:
+    min_r, max_r, subpattern = value
+    inner = _serialize_repeat_inner(subpattern)
+    quantifier = _build_quantifier(min_r, max_r)
+    match op:
+        case sre.MIN_REPEAT:
+            suffix = "?"
+        case _ if op == getattr(sre, "POSSESSIVE_REPEAT", None):
+            suffix = "+"
+        case _:
+            suffix = ""
+    return inner + quantifier + suffix
+
+
+def _serialize_repeat_inner(subpattern: list[_Node]) -> str:
+    """Serialize the inner part of a repeat, wrapping in parens only when needed."""
+    # sre_parse returns SubPattern objects (not plain lists) which don't
+    # match sequence patterns in match/case — convert to list first.
+    items = list(subpattern)
+    match items:
+        case [(sre.SUBPATTERN, value)]:
+            return _serialize_subpattern(value)
+        case [(op, _)] if op in (LITERAL, NOT_LITERAL, IN, sre.ANY, sre.CATEGORY):
+            # Single atomic node — already a valid quantifier target, no group needed
+            return _serialize_node(items[0])
+        case _:
+            return "(?:" + _serialize(items) + ")"
+
+
+def _serialize_subpattern(value: _SubpatternValue) -> str:
+    group_id, add_flags, del_flags, pattern = value
+    inner = _serialize(pattern)
+    flags = _serialize_flags(add_flags, del_flags)
+    if group_id is None or group_id == 0:
+        return f"(?{flags}:{inner})" if flags else f"(?:{inner})"
+    if flags:
+        # Capturing group with flags — wrap: (?flags:(inner))
+        return f"(?{flags}:({inner}))"
+    return f"({inner})"
+
+
+# Flag bit → letter mapping for inline flag serialization
+_FLAG_LETTERS: tuple[tuple[int, str], ...] = (
+    (sre.SRE_FLAG_IGNORECASE, "i"),
+    (sre.SRE_FLAG_LOCALE, "L"),
+    (sre.SRE_FLAG_MULTILINE, "m"),
+    (sre.SRE_FLAG_DOTALL, "s"),
+    (sre.SRE_FLAG_UNICODE, "u"),
+    (sre.SRE_FLAG_VERBOSE, "x"),
+)
+if hasattr(sre, "SRE_FLAG_ASCII"):
+    _FLAG_LETTERS += ((sre.SRE_FLAG_ASCII, "a"),)
+
+# Default flags set by sre_parse (Unicode mode)
+_DEFAULT_FLAGS = sre.SRE_FLAG_UNICODE
+
+
+def _serialize_flags(add_flags: int, del_flags: int) -> str:
+    """Serialize inline flags like 'i', 'im', 'i-s'."""
+    add = "".join(ch for flag, ch in _FLAG_LETTERS if add_flags & flag)
+    sub = "".join(ch for flag, ch in _FLAG_LETTERS if del_flags & flag)
+    if sub:
+        return f"{add}-{sub}"
+    return add
+
+
+def _serialize_branch(value: _BranchValue) -> str:
+    _, alternatives = value
+    return "|".join(_serialize(alt) for alt in alternatives)
+
+
+# ---------------------------------------------------------------------------
+# Transformer: AST → modified AST
+# ---------------------------------------------------------------------------
+
+
+def _transform(parsed: list[_Node], min_length: int | None, max_length: int | None) -> list[_Node] | None:
+    """Top-level transformer. Dispatches by pattern structure."""
+    nodes = list(parsed)
+    match _classify_structure(nodes):
+        case ("single", content):
+            result = _transform_node(content, min_length, max_length)
+            return [result] if result is not None else None
+        case ("leading_anchor", anchor, content):
+            result = _transform_node(content, min_length, max_length)
+            return [anchor, result] if result is not None else None
+        case ("trailing_anchor", content, anchor):
+            result = _transform_node(content, min_length, max_length)
+            return [result, anchor] if result is not None else None
+
+        case ("both_anchors", leading, content, trailing):
+            return _transform_anchored_single(leading, content, trailing, min_length, max_length)
+
+        case ("anchored_multi", leading, parts, trailing):
+            return _transform_anchored_multi(leading, parts, trailing, min_length, max_length)
+
+        case _:
+            return None
+
+
+# Return type for _classify_structure — Literal tags let mypy narrow captures in match/case
+_Structure: TypeAlias = (
+    tuple[Literal["single"], _Node]
+    | tuple[Literal["leading_anchor"], _Node, _Node]
+    | tuple[Literal["trailing_anchor"], _Node, _Node]
+    | tuple[Literal["both_anchors"], _Node, _Node, _Node]
+    | tuple[Literal["anchored_multi"], _Node, list[_Node], _Node]
+    | tuple[Literal["unknown"]]
+)
+
+
+def _classify_structure(nodes: list[_Node]) -> _Structure:
+    """Classify pattern structure for dispatch."""
+    _CONTENT_OPS = (LITERAL, NOT_LITERAL, IN, sre.ANY, *REPEATS)
+    match nodes:
+        case [content]:
+            return ("single", content)
+        case [(sre.AT, _) as anchor, content]:
+            return ("leading_anchor", anchor, content)
+        case [content, (sre.AT, _) as anchor]:
+            return ("trailing_anchor", content, anchor)
+        case [(sre.AT, _) as leading, content, (sre.AT, _) as trailing]:
+            return ("both_anchors", leading, content, trailing)
+        case [(sre.AT, _) as leading, *parts, (sre.AT, _) as trailing] if all(op in _CONTENT_OPS for op, _ in parts):
+            return ("anchored_multi", leading, parts, trailing)
+        case _:
+            return ("unknown",)
+
+
+def _transform_node(node: _Node, min_l: int | None, max_l: int | None) -> _Node | None:
+    """Transform a single content node."""
+    op, value = node
+    if op in REPEATS:
+        return _transform_repeat(op, value, min_l, max_l)
+    if op in (LITERAL, NOT_LITERAL, IN) and max_l != 0:
+        return _wrap_as_repeat(node, min_l, max_l)
+    if op == sre.ANY:
+        return _transform_repeat(sre.MAX_REPEAT, (1, 1, [(sre.ANY, None)]), min_l, max_l)
+    return None
+
+
+def _transform_repeat(op: int, value: _RepeatValue, min_l: int | None, max_l: int | None) -> _Node | None:
+    """Core transform: merge length constraints into repeat bounds."""
+    min_repeat, max_repeat, subpattern = value
+    inner_length = _calculate_min_repetition_length(subpattern)
+
+    if inner_length == 0:
+        if min_l is not None and min_l > 0:
+            return None
+        return (sre.MAX_REPEAT, (0, 0, subpattern))
+
+    if max_l is not None and 0 < max_l < inner_length:
+        return None
+
+    # Convert length constraints to repetition counts
+    ext_min = None
+    ext_max = None
+    if min_l is not None:
+        ext_min = -(-min_l // inner_length)  # ceil division
+    if max_l is not None:
+        ext_max = max_l // inner_length  # floor division
+
+    # Merge with existing bounds
+    final_min = min_repeat
+    if ext_min is not None:
+        final_min = max(min_repeat, ext_min)
+
+    final_max = max_repeat
+    if ext_max is not None:
+        final_max = ext_max if max_repeat == MAXREPEAT else min(max_repeat, ext_max)
+
+    if final_min > final_max:
+        return None
+
+    return (sre.MAX_REPEAT, (final_min, final_max, subpattern))
+
+
+def _wrap_as_repeat(node: _Node, min_l: int | None, max_l: int | None) -> _Node:
+    """Wrap a single-char node as a repeat."""
+    min_r = 1 if min_l is None else max(min_l, 1)
+    max_r = max_l if max_l is not None else MAXREPEAT
+    return (sre.MAX_REPEAT, (min_r, max_r, [node]))
+
+
+def _transform_anchored_single(
+    leading: _Node,
+    content: _Node,
+    trailing: _Node,
+    min_l: int | None,
+    max_l: int | None,
+) -> list[_Node] | None:
+    r"""^content$ with canonicalization of [\w\W] -> . before transform."""
+    op, value = content
+
+    # Canonicalize match-anything patterns
+    if op == sre.IN and _matches_anything(value):
+        content = (sre.ANY, None)
+    elif op in REPEATS and len(value[2]) == 1 and value[2][0][0] == sre.IN and _matches_anything(value[2][0][1]):
+        content = (op, (value[0], value[1], [(sre.ANY, None)]))
+
+    op, value = content
+    if op == LITERAL and ((min_l is not None and min_l > 1) or (max_l is not None and max_l < 1)):
+        return None
+
+    result = _transform_node(content, min_l, max_l)
+    if result is None:
+        return None
+    return [leading, result, trailing]
+
+
+def _transform_anchored_multi(
+    leading: _Node,
+    parts: list[_Node],
+    trailing: _Node,
+    min_l: int | None,
+    max_l: int | None,
+) -> list[_Node] | None:
+    """^part1 part2 ... partN$ — multiple quantified/fixed parts."""
+    fixed_length = 0
+    quantifier_bounds = []
+    repetition_lengths = []
+    quantified_indices = []
+
+    for idx, (op, value) in enumerate(parts):
+        if op in (LITERAL, NOT_LITERAL, IN, sre.ANY):
+            fixed_length += 1
+        elif op in REPEATS:
+            min_repeat, max_repeat, subpattern = value
+            quantifier_bounds.append((min_repeat, max_repeat))
+            repetition_lengths.append(_calculate_min_repetition_length(subpattern))
+            quantified_indices.append(idx)
+
+    adj_min = None if min_l is None else min_l - fixed_length
+    adj_max = None if max_l is None else max_l - fixed_length
+
+    if (adj_min is not None and adj_min < 0) or (adj_max is not None and adj_max < 0):
+        return None
+
+    if not quantifier_bounds:
+        return None
+
+    distribution = _distribute_length_constraints(quantifier_bounds, repetition_lengths, adj_min, adj_max)
+    if not distribution:
+        return None
+
+    # Apply distribution directly to AST nodes
+    new_parts = list(parts)
+    for dist_idx, part_idx in enumerate(quantified_indices):
+        op, value = parts[part_idx]
+        new_min, new_max = distribution[dist_idx]
+        _, _, subpattern = value
+        new_parts[part_idx] = (sre.MAX_REPEAT, (new_min, new_max, subpattern))
+
+    return [leading] + new_parts + [trailing]
+
+
+def _matches_anything(value: list[_Node]) -> bool:
     """Check if the given pattern is equivalent to '.' (match any character)."""
-    # Common forms: [\w\W], [\s\S], etc.
     return value in (
         [(sre.CATEGORY, sre.CATEGORY_WORD), (sre.CATEGORY, sre.CATEGORY_NOT_WORD)],
         [(sre.CATEGORY, sre.CATEGORY_SPACE), (sre.CATEGORY, sre.CATEGORY_NOT_SPACE)],
@@ -282,188 +636,75 @@ def _matches_anything(value: list) -> bool:
     )
 
 
-def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None, max_length: int | None) -> str:
-    """Update regex pattern with multiple quantified patterns to satisfy length constraints."""
-    # Extract anchors
-    leading_anchor_length = _get_anchor_length(parsed[0][1])
-    trailing_anchor_length = _get_anchor_length(parsed[-1][1])
-    leading_anchor = pattern[:leading_anchor_length]
-    trailing_anchor = pattern[-trailing_anchor_length:]
-
-    pattern_parts = parsed[1:-1]
-
-    # Calculate total fixed length and per-repetition lengths
-    fixed_length = 0
-    quantifier_bounds = []
-    repetition_lengths = []
-
-    for op, value in pattern_parts:
-        if op in (LITERAL, NOT_LITERAL):
-            fixed_length += 1
-        elif op in REPEATS:
-            min_repeat, max_repeat, subpattern = value
-            quantifier_bounds.append((min_repeat, max_repeat))
-            repetition_lengths.append(_calculate_min_repetition_length(subpattern))
-
-    # Adjust length constraints by subtracting fixed literals length
-    if min_length is not None:
-        min_length -= fixed_length
-        if min_length < 0:
-            return pattern
-    if max_length is not None:
-        max_length -= fixed_length
-        if max_length < 0:
-            return pattern
-
-    if not quantifier_bounds:
-        return pattern
-
-    length_distribution = _distribute_length_constraints(quantifier_bounds, repetition_lengths, min_length, max_length)
-    if not length_distribution:
-        return pattern
-
-    # Rebuild pattern with updated quantifiers
-    result = leading_anchor
-    current_position = leading_anchor_length
-    distribution_idx = 0
-
-    for op, value in pattern_parts:
-        if op == LITERAL:
-            # Check if the literal comes from a bracketed expression,
-            # e.g. Python regex parses "[+]" as a single LITERAL token.
-            if pattern[current_position] == "[":
-                # Find the matching closing bracket.
-                end_idx = current_position + 1
-                while end_idx < len(pattern):
-                    # Check for an unescaped closing bracket.
-                    if pattern[end_idx] == "]" and (end_idx == current_position + 1 or pattern[end_idx - 1] != "\\"):
-                        end_idx += 1
-                        break
-                    end_idx += 1
-                # Append the entire character set.
-                result += pattern[current_position:end_idx]
-                current_position = end_idx
-                continue
-            if pattern[current_position] == "\\":
-                # Escaped value
-                result += "\\"
-                # Could be an octal value
-                if (
-                    current_position + 2 < len(pattern)
-                    and pattern[current_position + 1] == "0"
-                    and pattern[current_position + 2] in ("0", "1", "2", "3", "4", "5", "6", "7")
-                ):
-                    result += pattern[current_position + 1]
-                    result += pattern[current_position + 2]
-                    current_position += 3
-                    continue
-                current_position += 2
-            else:
-                current_position += 1
-            result += chr(value)
-        else:
-            new_min, new_max = length_distribution[distribution_idx]
-            next_position = _find_quantified_end(pattern, current_position)
-            quantified_segment = pattern[current_position:next_position]
-            _, _, subpattern = value
-            new_value = (new_min, new_max, subpattern)
-
-            result += _update_quantifier(op, new_value, quantified_segment, new_min, new_max)
-            current_position = next_position
-            distribution_idx += 1
-
-    return result + trailing_anchor
-
-
-def _find_quantified_end(pattern: str, start: int) -> int:
-    """Find the end position of current quantified part."""
-    char_class_level = 0
-    group_level = 0
-
-    for i in range(start, len(pattern)):
-        char = pattern[i]
-
-        # Handle character class nesting
-        if char == "[":
-            char_class_level += 1
-        elif char == "]":
-            char_class_level -= 1
-
-        # Handle group nesting
-        elif char == "(":
-            group_level += 1
-        elif char == ")":
-            group_level -= 1
-
-        # Only process quantifiers when we're not inside any nested structure
-        elif char_class_level == 0 and group_level == 0:
-            if char in "*+?":
-                return i + 1
-            elif char == "{":
-                # Find matching }
-                while i < len(pattern) and pattern[i] != "}":
-                    i += 1
-                return i + 1
-
-    return len(pattern)
-
-
 def _distribute_length_constraints(
     bounds: list[tuple[int, int]], repetition_lengths: list[int], min_length: int | None, max_length: int | None
 ) -> list[tuple[int, int]] | None:
     """Distribute length constraints among quantified pattern parts."""
-    # Handle exact length case with dynamic programming
     if min_length == max_length:
         assert min_length is not None
-        target = min_length
-        dp: dict[tuple[int, int], list[tuple[int, ...]] | None] = {}
+        return _distribute_exact_length(bounds, repetition_lengths, min_length)
+    return _distribute_length_range(bounds, repetition_lengths, min_length, max_length)
 
-        def find_valid_combination(pos: int, remaining: int) -> list[tuple[int, ...]] | None:
-            if (pos, remaining) in dp:
+
+def _distribute_exact_length(
+    bounds: list[tuple[int, int]], repetition_lengths: list[int], target: int
+) -> list[tuple[int, int]] | None:
+    """Find exact repetition counts that sum to target length via dynamic programming."""
+    dp: dict[tuple[int, int], list[tuple[int, ...]] | None] = {}
+
+    def find_valid_combination(pos: int, remaining: int) -> list[tuple[int, ...]] | None:
+        if (pos, remaining) in dp:
+            return dp[(pos, remaining)]
+
+        if pos == len(bounds):
+            return [()] if remaining == 0 else None
+
+        max_repeat: int
+        min_repeat, max_repeat = bounds[pos]
+        repeat_length = repetition_lengths[pos]
+
+        if max_repeat == MAXREPEAT:
+            max_repeat = remaining // repeat_length + 1 if repeat_length > 0 else remaining + 1
+
+        for repeat_count in range(min_repeat, max_repeat + 1):
+            used_length = repeat_count * repeat_length
+            if used_length > remaining:
+                break
+
+            rest = find_valid_combination(pos + 1, remaining - used_length)
+            if rest is not None:
+                dp[(pos, remaining)] = [(repeat_count,) + r for r in rest]
                 return dp[(pos, remaining)]
 
-            if pos == len(bounds):
-                return [()] if remaining == 0 else None
-
-            max_repeat: int
-            min_repeat, max_repeat = bounds[pos]
-            repeat_length = repetition_lengths[pos]
-
-            if max_repeat == MAXREPEAT:
-                max_repeat = remaining // repeat_length + 1 if repeat_length > 0 else remaining + 1
-
-            # Try each possible length for current quantifier
-            for repeat_count in range(min_repeat, max_repeat + 1):
-                used_length = repeat_count * repeat_length
-                if used_length > remaining:
-                    break
-
-                rest = find_valid_combination(pos + 1, remaining - used_length)
-                if rest is not None:
-                    dp[(pos, remaining)] = [(repeat_count,) + r for r in rest]
-                    return dp[(pos, remaining)]
-
-            dp[(pos, remaining)] = None
-            return None
-
-        distribution = find_valid_combination(0, target)
-        if distribution:
-            return [(length, length) for length in distribution[0]]
+        dp[(pos, remaining)] = None
         return None
 
-    # Handle range case by distributing min/max bounds
+    distribution = find_valid_combination(0, target)
+    if distribution:
+        return [(length, length) for length in distribution[0]]
+    return None
+
+
+def _distribute_length_range(
+    bounds: list[tuple[int, int]], repetition_lengths: list[int], min_length: int | None, max_length: int | None
+) -> list[tuple[int, int]] | None:
+    """Greedy single-pass distribution of min/max length budget across quantifiers."""
     result = []
     remaining_min = min_length or 0
-    remaining_max = max_length or MAXREPEAT
+    remaining_max = MAXREPEAT if max_length is None else max_length
 
-    for min_repeat, max_repeat in bounds:
+    for (min_repeat, max_repeat), rep_len in zip(bounds, repetition_lengths, strict=True):
+        if rep_len == 0:
+            result.append((0, 0))
+            continue
+
         if remaining_min > 0:
-            part_min = min(max_repeat, max(min_repeat, remaining_min))
+            part_min = min(max_repeat, max(min_repeat, -(-remaining_min // rep_len)))
         else:
             part_min = min_repeat
 
         if remaining_max < MAXREPEAT:
-            part_max = min(max_repeat, remaining_max)
+            part_max = min(max_repeat, remaining_max // rep_len) if rep_len > 0 else max_repeat
         else:
             part_max = max_repeat
 
@@ -472,8 +713,8 @@ def _distribute_length_constraints(
 
         result.append((part_min, part_max))
 
-        remaining_min = max(0, remaining_min - part_min)
-        remaining_max -= part_max if part_max != MAXREPEAT else 0
+        remaining_min = max(0, remaining_min - part_min * rep_len)
+        remaining_max -= part_max * rep_len if part_max != MAXREPEAT else 0
 
     if remaining_min > 0 or remaining_max < 0:
         return None
@@ -481,7 +722,7 @@ def _distribute_length_constraints(
     return result
 
 
-def _calculate_min_repetition_length(subpattern: list) -> int:
+def _calculate_min_repetition_length(subpattern: list[_Node]) -> int:
     """Calculate minimum length contribution per repetition of a quantified group."""
     total = 0
     for op, value in subpattern:
@@ -497,102 +738,6 @@ def _calculate_min_repetition_length(subpattern: list) -> int:
     return total
 
 
-def _get_anchor_length(node_type: int) -> int:
-    """Determine the length of the anchor based on its type."""
-    if node_type in {sre.AT_BEGINNING_STRING, sre.AT_END_STRING, sre.AT_BOUNDARY, sre.AT_NON_BOUNDARY}:
-        return 2  # \A, \Z, \b, or \B
-    return 1  # ^ or $ or their multiline/locale/unicode variants
-
-
-def _update_quantifier(
-    op: int, value: tuple | None, pattern: str, min_length: int | None, max_length: int | None
-) -> str:
-    """Update the quantifier based on the operation type and given constraints."""
-    if op in REPEATS and value is not None:
-        return _handle_repeat_quantifier(value, pattern, min_length, max_length)
-    if op in (LITERAL, NOT_LITERAL, IN) and max_length != 0:
-        return _handle_literal_or_in_quantifier(pattern, min_length, max_length)
-    if op == sre.ANY and value is None:
-        # Equivalent to `.` which is in turn is the same as `.{1}`
-        return _handle_repeat_quantifier(
-            SINGLE_ANY,
-            pattern,
-            min_length,
-            max_length,
-        )
-    return pattern
-
-
-SINGLE_ANY = sre_parse.parse(".{1}")[0][1]
-
-
-def _handle_repeat_quantifier(
-    value: tuple[int, int, tuple], pattern: str, min_length: int | None, max_length: int | None
-) -> str:
-    """Handle repeat quantifiers (e.g., '+', '*', '?')."""
-    min_repeat, max_repeat, _ = value
-
-    # First, analyze the inner pattern
-    inner = _strip_quantifier(pattern)
-    if inner.startswith("(") and inner.endswith(")"):
-        inner = inner[1:-1]
-
-    # Determine the length of the inner pattern
-    inner_length = 1  # default assumption for non-literal patterns
-    try:
-        parsed = sre_parse.parse(inner)
-        if all(item[0] == LITERAL for item in parsed):
-            inner_length = len(parsed)
-            if max_length and 0 < max_length < inner_length:
-                return pattern
-    except re.error:
-        pass
-
-    if inner_length == 0:
-        # Empty pattern contributes 0 chars regardless of repetitions
-        # For length constraints, only 0 repetitions make sense
-        if min_length is not None and min_length > 0:
-            return pattern  # Can't satisfy positive length with empty pattern
-        return f"({inner})" + _build_quantifier(0, 0)
-
-    # Convert external length constraints to repetition constraints
-    external_min_repeat = None
-    external_max_repeat = None
-
-    if min_length is not None:
-        # Need at least ceil(min_length / inner_length) repetitions
-        external_min_repeat = (min_length + inner_length - 1) // inner_length
-
-    if max_length is not None:
-        # Can have at most floor(max_length / inner_length) repetitions
-        external_max_repeat = max_length // inner_length
-
-    # Merge original repetition constraints with external constraints
-    final_min_repeat = min_repeat
-    if external_min_repeat is not None:
-        final_min_repeat = max(min_repeat, external_min_repeat)
-
-    final_max_repeat = max_repeat
-    if external_max_repeat is not None:
-        if max_repeat == MAXREPEAT:
-            final_max_repeat = external_max_repeat
-        else:
-            final_max_repeat = min(max_repeat, external_max_repeat)
-
-    if final_min_repeat > final_max_repeat:
-        return pattern
-
-    return f"({inner})" + _build_quantifier(final_min_repeat, final_max_repeat)
-
-
-def _handle_literal_or_in_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
-    """Handle literal or character class quantifiers."""
-    min_length = 1 if min_length is None else max(min_length, 1)
-    if pattern.startswith("(") and pattern.endswith(")"):
-        pattern = pattern[1:-1]
-    return f"({pattern})" + _build_quantifier(min_length, max_length)
-
-
 def _build_quantifier(minimum: int | None, maximum: int | None) -> str:
     """Construct a quantifier string based on min and max values."""
     if maximum == MAXREPEAT or maximum is None:
@@ -600,31 +745,3 @@ def _build_quantifier(minimum: int | None, maximum: int | None) -> str:
     if minimum == maximum:
         return f"{{{minimum}}}"
     return f"{{{minimum or 0},{maximum}}}"
-
-
-def _build_size(min_repeat: int, max_repeat: int, min_length: int | None, max_length: int | None) -> tuple[int, int]:
-    """Merge the current repetition constraints with the provided min and max lengths."""
-    if min_length is not None:
-        min_repeat = max(min_repeat, min_length)
-    if max_length is not None:
-        if max_repeat == MAXREPEAT:
-            max_repeat = max_length
-        else:
-            max_repeat = min(max_repeat, max_length)
-    return min_repeat, max_repeat
-
-
-def _strip_quantifier(pattern: str) -> str:
-    """Remove quantifier from the pattern."""
-    # Lazy & posessive quantifiers
-    for marker in ("*?", "+?", "??", "*+", "?+", "++"):
-        if pattern.endswith(marker) and not pattern.endswith(rf"\{marker}"):
-            return pattern[:-2]
-    for marker in ("?", "*", "+"):
-        if pattern.endswith(marker) and not pattern.endswith(rf"\{marker}"):
-            pattern = pattern[:-1]
-    if pattern.endswith("}") and "{" in pattern:
-        # Find the start of the exact quantifier and drop everything since that index
-        idx = pattern.rfind("{")
-        pattern = pattern[:idx]
-    return pattern

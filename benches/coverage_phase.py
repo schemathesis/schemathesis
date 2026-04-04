@@ -60,6 +60,19 @@ def test_string_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
 
+PATTERN_WITH_LENGTH_CONSTRAINTS = [
+    {"type": "string", "pattern": "^[a-z]+$", "minLength": 3, "maxLength": 10},
+    {"type": "string", "pattern": r"^\w{2,4}:\d{3,5}:[A-F]{1,2}$", "minLength": 10, "maxLength": 10},
+]
+
+
+@pytest.mark.benchmark(group="coverage-pattern-with-length")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", PATTERN_WITH_LENGTH_CONSTRAINTS, ids=lambda x: x["pattern"][:50])
+def test_pattern_with_length_constraints(benchmark, ctx, schema):
+    benchmark(lambda: list(cover_schema_iter(ctx, schema)))
+
+
 NUMBER_CONSTRAINTS = [
     {"type": "number", "minimum": 0, "maximum": 100},
     {"type": "integer", "multipleOf": 5},
