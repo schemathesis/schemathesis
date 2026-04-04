@@ -144,6 +144,26 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("(hello){2,5}", None, 12, "(hello){2}"),
         ("(abcd)*", 3, 7, "(abcd){1}"),
         ("^()?$", 4, 5, "^()?$"),
+        # Global inline flags
+        (r"(?i).*", 1, 5, r"(?i).{1,5}"),
+        (r"(?i)[a-z]+", 2, 8, r"(?i)[a-z]{2,8}"),
+        (r"(?im)[a-z]+", 1, 5, r"(?im)[a-z]{1,5}"),
+        (r"(?s).+", 1, 3, r"(?s).{1,3}"),
+        # \b and \B anchors
+        (r"\b[a-z]+\b", 2, 5, r"\b[a-z]{2,5}\b"),
+        (r"\B\d+\B", 1, 3, r"\B\d{1,3}\B"),
+        # Non-printable literal (U+200B, 0x100–0xFFFF range) — single-char class collapses to LITERAL
+        (f"[{chr(0x200B)}]+", 2, 5, "\\u200b{2,5}"),
+        # Non-printable range in character class (stays as IN with RANGE)
+        (f"[{chr(0x200B)}-{chr(0x200D)}]+", 2, 5, "[\\u200b-\\u200d]{2,5}"),
+        # Subpatterns with inline flags
+        ("(?i:[a-z])+", 2, 5, "(?i:[a-z]){2,5}"),
+        ("(?im:[a-z])+", 1, 4, "(?im:[a-z]){1,4}"),
+        ("(?-i:[A-Z])+", 2, 4, "(?-i:[A-Z]){2,4}"),
+        ("(?i-m:[a-z])+", 1, 3, "(?i-m:[a-z]){1,3}"),
+        # Empty capturing group — zero-length inner
+        (r"^()+$", 0, 5, "^(){0}$"),
+        (r"^()+$", 1, 5, r"^()+$"),
         # Multi-char quantified inner in groups
         (r"(\d{3})+", 6, 9, r"(\d{3}){2,3}"),
         (r"(\d{3})+", 3, 3, r"(\d{3}){1}"),
@@ -301,6 +321,9 @@ def is_valid_regex(pattern: str) -> bool:
         r"[\d]",
         r"[a-z\d_]",
         "[a-zA-Z0-9]",
+        # Non-printable chars in character classes
+        f"[{chr(0x00)}-{chr(0x08)}]+",
+        f"[{chr(0x200B)}]+",
         # CATEGORY
         r"\d",
         r"\D",
@@ -316,6 +339,11 @@ def is_valid_regex(pattern: str) -> bool:
         "(abc)",
         "(?:abc)",
         "((a)(b))",
+        # Subpatterns with inline flags
+        "(?i:abc)",
+        "(?-i:abc)",
+        "(?im:abc)",
+        "(?i-m:abc)",
         # MAX_REPEAT
         "a*",
         "a+",
