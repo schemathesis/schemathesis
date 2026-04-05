@@ -4,6 +4,7 @@
 
 ### :rocket: Added
 
+- `st fuzz` command for continuous multi-step API fuzzing across operation sequences.
 - Structured generation for `If-Match`, `If-None-Match`, `If-Modified-Since`, `If-Unmodified-Since`, and `Range` headers.
 - Apply `filter_case` and `map_case` hooks in the coverage phase. [#3675](https://github.com/schemathesis/schemathesis/discussions/3675)
 - `schemathesis.pytest.parametrize()` for testing multiple named schemas in a single test function. [#1409](https://github.com/schemathesis/schemathesis/issues/1409)
