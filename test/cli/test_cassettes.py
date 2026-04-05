@@ -71,7 +71,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         success_interaction = interactions[success_idx]
         assert success_interaction["status"] == "SUCCESS"
         assert success_interaction["generation"]["mode"] == mode
-        assert success_interaction["phase"]["name"] in ("explicit", "coverage", "generate")
+        assert success_interaction["phase"]["name"] in ("examples", "coverage", "fuzzing")
         assert len(success_interaction["checks"]) == 1
         assert success_interaction["checks"][0] == {
             "name": "not_a_server_error",
