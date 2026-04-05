@@ -377,11 +377,13 @@ def test_default(corpus, filename):
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
-        VcrHandler(output=StringIO(), config=schema.config),
-        HarHandler(output=StringIO(), config=schema.config),
+        VcrHandler(output=StringIO(), config=schema.config.output),
+        HarHandler(output=StringIO(), config=schema.config.output),
         NdjsonHandler(output=StringIO(), config=schema.config),
     ]
     ctx = ExecutionContext(schema.config)
+    for handler in handlers:
+        handler.start(ctx)
 
     try:
         for event in from_schema(schema).execute():
@@ -559,11 +561,13 @@ def test_graphql(filename):
 
     handlers = [
         JunitXMLHandler(output=StringIO()),
-        VcrHandler(output=StringIO(), config=schema.config),
-        HarHandler(output=StringIO(), config=schema.config),
+        VcrHandler(output=StringIO(), config=schema.config.output),
+        HarHandler(output=StringIO(), config=schema.config.output),
         NdjsonHandler(output=StringIO(), config=schema.config),
     ]
     ctx = ExecutionContext(schema.config)
+    for handler in handlers:
+        handler.start(ctx)
 
     try:
         for event in from_schema(schema).execute():
