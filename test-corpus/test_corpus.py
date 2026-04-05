@@ -27,7 +27,7 @@ from schemathesis.core.errors import (
     OperationNotFound,
     format_exception,
 )
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.jsonschema import BundleError
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
@@ -365,7 +365,7 @@ def combined_check(ctx, response, case):
             continue
         try:
             check(ctx, response, case)
-        except (Failure, SchemaError):
+        except (Failure, FailureGroup, SchemaError):
             pass
 
 
