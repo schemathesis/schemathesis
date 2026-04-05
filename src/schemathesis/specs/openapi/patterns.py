@@ -222,14 +222,11 @@ def update_quantifier(pattern: str, min_length: int | None, max_length: int | No
         updated = _serialize(result, global_flags=global_flags)
         try:
             re.compile(updated)
-        except re.error as exc:
-            raise InternalError(
-                f"The combination of min_length={min_length} and max_length={max_length} applied to the original pattern '{pattern}' resulted in an invalid regex: '{updated}'. "
-                "This indicates a bug in the regex quantifier merging logic"
-            ) from exc
+        except re.error:
+            return pattern
         return updated
-    except re.error:
-        # Invalid pattern
+    except (re.error, InternalError):
+        # Invalid pattern or unsupported opcode — return unchanged
         return pattern
 
 
@@ -274,6 +271,23 @@ def _serialize_node(node: _Node) -> str:
             return _serialize_subpattern(value)
         case op, tuple() if op in REPEATS:
             return _serialize_repeat(op, value)
+        case sre.ASSERT, tuple():
+            direction, subpattern = value
+            inner = _serialize(list(subpattern))
+            return f"(?<={inner})" if direction == -1 else f"(?={inner})"
+        case sre.ASSERT_NOT, tuple():
+            direction, subpattern = value
+            inner = _serialize(list(subpattern))
+            return f"(?<!{inner})" if direction == -1 else f"(?!{inner})"
+        case sre.GROUPREF, int():
+            return f"\\{value}"
+        case sre.GROUPREF_EXISTS, tuple():
+            group_id, yes_pattern, no_pattern = value
+            yes = _serialize(list(yes_pattern))
+            no = _serialize(list(no_pattern)) if no_pattern else None
+            return f"(?({group_id}){yes}|{no})" if no is not None else f"(?({group_id}){yes})"
+        case _ if op == getattr(sre, "ATOMIC_GROUP", None):
+            return f"(?>{_serialize(list(value))})"
         case _:
             raise InternalError(f"Unsupported sre opcode: {op}")
 

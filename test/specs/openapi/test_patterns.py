@@ -187,6 +187,11 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^(abc)+\d+$", 4, 10, r"^(abc){2,3}\d{1}$"),
         (r"^(abc)+(\d)+$", 7, 7, r"^(abc){1}(\d){4}$"),
         (r"^abc(\d{3})+$", 6, 12, r"^abc(\d{3}){1,3}$"),
+        # Patterns containing lookahead / lookbehind assertions inside quantified groups
+        (r"^([a-z]+(?<!\s))+$", 1, 5, r"^([a-z]{1,}(?<!\s)){1,5}$"),
+        (r"^([a-z]+(?!\s))+$", 1, 5, r"^([a-z]{1,}(?!\s)){1,5}$"),
+        (r"^([a-z]+(?<=\s))+$", 1, 5, r"^([a-z]{1,}(?<=\s)){1,5}$"),
+        (r"^([a-z]+(?=\s))+$", 1, 5, r"^([a-z]{1,}(?=\s)){1,5}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
@@ -365,6 +370,21 @@ def is_valid_regex(pattern: str) -> bool:
         r"^[A-Z]{2}\d{3}-[a-z]+$",
         "(a|b)+",
         r"((\d{2})+)",
+        # ASSERT / ASSERT_NOT (lookahead and lookbehind)
+        r"(?=abc)",
+        r"(?!abc)",
+        r"(?<=abc)",
+        r"(?<!abc)",
+        r"\w+(?<!\s)",
+        r"(?=\d)\w+",
+        # GROUPREF (backreference)
+        r"(foo)\1",
+        r"([a-z])\1+",
+        # GROUPREF_EXISTS (conditional group)
+        r"(x)(?(1)a|b)",
+        # ATOMIC_GROUP
+        pytest.param("(?>abc)", marks=SKIP_BEFORE_PY11),
+        pytest.param("(?>\\d+)", marks=SKIP_BEFORE_PY11),
     ],
 )
 def test_serialize_roundtrip(pattern):
@@ -393,24 +413,6 @@ def test_serialize_possessive(pattern):
     serialized = _serialize(list(parsed))
     re.compile(serialized)
     assert _serialize(list(sre_parse.parse(serialized))) == serialized
-
-
-@pytest.mark.parametrize(
-    "pattern",
-    [
-        r"(?=foo)bar",
-        r"(?!foo)bar",
-        r"(?<=foo)bar",
-        r"(?<!foo)bar",
-        r"(foo)\1",
-        r"(x)(?(1)a|b)",
-        pytest.param("(?>abc)", marks=SKIP_BEFORE_PY11),
-    ],
-)
-def test_serialize_unsupported_opcodes(pattern):
-    parsed = sre_parse.parse(pattern)
-    with pytest.raises(InternalError, match="Unsupported sre opcode"):
-        _serialize(list(parsed))
 
 
 @pytest.mark.parametrize("char", list(string.printable))
