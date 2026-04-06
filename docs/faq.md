@@ -134,7 +134,9 @@ This helps catch authentication bypass vulnerabilities where APIs accept request
 
 ## Can I use Schemathesis with Allure?
 
-Yes, through JUnit XML export. Allure can generate rich visual reports from Schemathesis test results.
+Yes, either through JUnit XML export (see below) or via [our Allure Integration](guides/allure.md).
+
+Allure can generate rich visual reports from Schemathesis test results.
 
 ```bash
 # 1. Run Schemathesis with JUnit output  
