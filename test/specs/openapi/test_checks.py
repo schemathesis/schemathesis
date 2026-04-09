@@ -713,6 +713,63 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
     assert result is None
 
 
+def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, response_factory):
+    # See GH-3697
+    # Multi-element arrays in query parameters serialize as repeated keys: [True, 1] -> ?page_size=True&page_size=1
+    # Some frameworks (e.g. Django/DRF) pick one value from repeated keys. If that value is a valid integer (1),
+    # the request is accepted and should NOT trigger negative_data_rejection.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/model-fk/user/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "page_size",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 100},
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "Success"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/api/model-fk/user/"]["GET"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+            description="Invalid type array (expected integer)",
+            parameter="page_size",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"page_size": [True, 1]},
+    )
+
+    response = response_factory.requests(status_code=200)
+
+    result = negative_data_rejection(
+        CheckContext(
+            override=None,
+            auth=None,
+            headers=None,
+            config=ChecksConfig(),
+            transport_kwargs=None,
+        ),
+        response,
+        case,
+    )
+
+    assert result is None
+
+
 def test_negative_data_rejection_path_string_numeric_serialization(ctx, response_factory):
     raw_schema = ctx.openapi.build_schema(
         {
