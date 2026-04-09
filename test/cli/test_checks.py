@@ -351,6 +351,58 @@ def test_negative_data_rejection_xml_body_string_type_no_false_positive(ctx, app
     )
 
 
+def test_negative_data_rejection_number_body_field_accepts_integer_no_false_positive(ctx, app_runner, cli):
+    # See GH-3697
+    # `type: number` in JSON Schema accepts integers — any integer is a valid number.
+    # Sending an integer (e.g., score=3) for a `type: number` field must NOT trigger
+    # AcceptedNegativeData because the server is correct to accept it.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["score"],
+                                    "properties": {
+                                        "score": {"type": "number"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/data", methods=["POST"])
+    def data():
+        body = request.get_json(silent=True, force=True)
+        if not isinstance(body, dict):
+            return jsonify({"error": "invalid body"}), 422
+        score = body.get("score")
+        # Accept integers and floats; reject booleans (bool is a subclass of int in Python)
+        if isinstance(score, bool) or not isinstance(score, (int, float)):
+            return jsonify({"error": "score must be a number"}), 422
+        return jsonify({"ok": True}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--max-examples=200",
+        exit_code=ExitCode.OK,
+    )
+
+
 def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_runner, cli, snapshot_cli):
     # See GH-2913
     app, raw_schema = ctx.openapi.make_flask_app(
