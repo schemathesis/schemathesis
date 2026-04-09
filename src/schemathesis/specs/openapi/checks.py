@@ -293,22 +293,18 @@ def _body_negation_becomes_valid_after_serialization(case: Case) -> bool:
 
 
 def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
-    """Check if single-element array negation becomes valid after serialization.
+    """Check if an array value for a scalar parameter becomes valid after serialization.
 
-    In query/header/cookie parameters, single-element arrays serialize to the same
-    string as scalar values:
-    - Array: [67] -> serialized: "67"
-    - Scalar: 67 -> serialized: "67"
+    In query/header/cookie parameters, arrays are serialized as repeated keys:
+    - Single-element [67] -> "?page=67" (identical to scalar 67)
+    - Multi-element [True, 1] -> "?page_size=True&page_size=1"
 
-    This makes single-element arrays indistinguishable from scalars after serialization.
-    If the schema expects a scalar type (integer, string, etc.), the serialized value
-    is actually valid.
+    For single-element arrays, the serialized form is indistinguishable from a scalar,
+    so the server will accept any value valid for the original schema.
 
-    Example:
-    - Schema: {"type": "integer"}
-    - Generated negative: [67] (array, should be invalid)
-    - Serialized: "67" (valid for integer after parsing)
-    - API correctly accepts it -> should not trigger negative_data_rejection
+    For multi-element arrays, some frameworks pick one value from repeated keys (e.g.
+    the last one). If any element in the array is valid for the original scalar schema,
+    the server may accept the request, making it an unreliable negative test.
 
     """
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
@@ -341,8 +337,7 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
                 # This is an additional property, not a schema-defined parameter
                 continue
 
-            # Check if this is a single-element array
-            if not isinstance(param_value, list) or len(param_value) != 1:
+            if not isinstance(param_value, list) or not param_value:
                 continue
 
             # Get the parameter definition
@@ -357,11 +352,18 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             # Get the expected type(s) from the schema
             expected_types = get_type(schema)
 
-            # If the schema expects a scalar type (not array), then the single-element
-            # array will serialize to a valid scalar value
-            if "array" not in expected_types and expected_types:
-                # This is a single-element array for a scalar parameter
-                # After serialization, it becomes indistinguishable from a scalar
+            if "array" in expected_types or not expected_types:
+                continue
+
+            # Single-element arrays serialize identically to a scalar
+            if len(param_value) == 1:
+                return True
+
+            # Multi-element arrays serialize as repeated keys. If any element is valid
+            # for the full original schema (including enum, minimum, pattern, etc.),
+            # some frameworks may accept the request by picking that element.
+            validator = param.adapter.jsonschema_validator_cls(schema)
+            if any(validator.is_valid(element) for element in param_value):
                 return True
 
     return False
