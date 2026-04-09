@@ -528,11 +528,16 @@ class Template:
             if container_name in ("headers", "cookies") and isinstance(value, dict):
                 value = _stringify_value(value, container_name)
             if serializer is not None:
+                # Shallow-copy dict containers before serializing to avoid mutating
+                # self._template through shared references in shallow-copy kwargs
+                if isinstance(value, dict):
+                    value = dict(value)
                 value = serializer(value)
             if container_name == "query" and isinstance(value, dict):
                 value = _stringify_value(value, container_name)
             if container_name == "path_parameters" and isinstance(value, dict):
-                value = _stringify_value(quote_all(value), container_name)
+                # dict() copy prevents quote_all from mutating self._template
+                value = _stringify_value(quote_all(dict(value)), container_name)
             output[container_name] = value
         return output
 
