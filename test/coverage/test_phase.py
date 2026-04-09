@@ -1,3 +1,4 @@
+import json
 import re
 import uuid
 from dataclasses import dataclass
@@ -3453,3 +3454,48 @@ def test_map_case_hook_applied_in_coverage_phase(ctx):
     assert all(c.query is None or c.query.get("injected") == "yes" for c in cases), (
         "map_case hook should have injected 'injected' into every query"
     )
+
+
+def test_content_json_query_params_single_encoding_in_coverage(ctx):
+    # See GH-3701
+    schema = build_schema(
+        ctx,
+        parameters=[
+            {
+                "name": "filters",
+                "in": "query",
+                "required": True,
+                "content": {"application/json": {"schema": {"type": "array", "example": []}}},
+            },
+        ],
+        request_body={
+            "required": True,
+            "content": {"application/json": {"schema": {"type": "array", "items": {"type": "string"}}}},
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema)
+    config = ProjectConfig()
+    operation = loaded["/foo"]["post"]
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=config.phases.coverage.unexpected_methods,
+            generation_config=config.generation,
+        )
+    )
+
+    assert len(cases) >= 2
+    for case in cases:
+        if case.query is None:
+            continue
+        raw = case.query.get("filters")
+        if raw is None:
+            continue
+        assert isinstance(raw, str), f"Expected JSON string, got {type(raw).__name__}: {raw!r}"
+        parsed = json.loads(raw)
+        assert isinstance(parsed, list), "filters should decode to a list after single JSON encoding"
