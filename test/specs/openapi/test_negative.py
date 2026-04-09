@@ -101,6 +101,31 @@ def test_top_level_strategy(data, location, schema):
         assert is_valid_header(instance)
 
 
+@given(data=st.data())
+@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=100)
+def test_number_type_excludes_integer_from_type_mutations(data):
+    # See GH-3697
+    schema = {
+        "type": "object",
+        "properties": {
+            "score": {"type": "number"},
+            "label": {"type": "string"},
+        },
+        "required": ["score", "label"],
+    }
+
+    ctx = MutationContext(
+        keywords=schema,
+        non_keywords={},
+        location=ParameterLocation.BODY,
+        media_type="application/json",
+        allow_extra_parameters=False,
+    )
+    result, metadata = change_properties(ctx, data.draw, schema)
+    if result == MutationResult.SUCCESS and metadata is not None:
+        assert metadata.description != "Invalid type integer (expected number)"
+
+
 @pytest.mark.parametrize(
     ("mutation", "schema", "location", "validate"),
     [

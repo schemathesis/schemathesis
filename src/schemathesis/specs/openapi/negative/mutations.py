@@ -365,6 +365,9 @@ def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     if "integer" in types and "number" in candidates:
         # Do not change "integer" to "number" as any integer is also a number
         candidates.remove("number")
+    if "number" in types and "integer" in candidates:
+        # Do not change "number" to "integer" as any integer is also a number
+        candidates.remove("integer")
     return candidates
 
 

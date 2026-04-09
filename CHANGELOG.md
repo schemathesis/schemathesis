@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.15.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for `type: number` body fields in fuzzing. [#3697](https://github.com/schemathesis/schemathesis/issues/3697)
+
 ## [4.15.0](https://github.com/schemathesis/schemathesis/compare/v4.14.3...v4.15.0) - 2026-04-05
 
 ### :rocket: Added
