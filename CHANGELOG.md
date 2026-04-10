@@ -30,6 +30,10 @@
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 
+### :racing_car: Performance
+
+- Up to 2x faster schema processing on large specs (Stripe, VMware, OSIsoft) and ~40% faster CLI startup.
+
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 
 ### :rocket: Added

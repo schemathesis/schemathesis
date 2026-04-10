@@ -2,8 +2,8 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
+from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.specs.openapi.adapter.security import extract_security_definitions_v3
-from schemathesis.specs.openapi.references import ReferenceResolver
 
 
 def test_ref_resolving():
@@ -15,7 +15,7 @@ def test_ref_resolving():
         "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
         "components": {"securitySchemes": {"$ref": "#/components/HTTPSchema"}, "HTTPSchema": http_schema},
     }
-    resolver = ReferenceResolver("", schema)
+    resolver = make_root_resolver(schema)
     assert extract_security_definitions_v3(schema, resolver) == http_schema
 
 
@@ -31,7 +31,7 @@ def test_ref_resolving_nested():
             "HTTPSchema": http_schema,
         },
     }
-    resolver = ReferenceResolver("", schema)
+    resolver = make_root_resolver(schema)
     assert extract_security_definitions_v3(schema, resolver) == {"basic_auth": http_schema}
 
 
