@@ -103,3 +103,5 @@ class SpecificationAdapter(Protocol):
 
     # JSON Schema validator class appropriate for this specification version
     jsonschema_validator_cls: type[jsonschema_rs.Validator]
+    # Whether this spec version allows sibling keywords alongside $ref (true for OAS 3.1+)
+    ref_siblings: bool

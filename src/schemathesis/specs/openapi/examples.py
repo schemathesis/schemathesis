@@ -190,6 +190,7 @@ def extract_top_level(
 
     assert isinstance(operation.schema, OpenApiSchema)
 
+    merge_ref_siblings = operation.schema.adapter.ref_siblings
     responses = list(operation.responses.iter_examples())
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
@@ -201,7 +202,10 @@ def extract_top_level(
                 *[
                     expanded_schema
                     for expanded_schema, _ in _expand_subschemas(
-                        schema=schema, resolver=resolver, reference_path=reference_path
+                        schema=schema,
+                        resolver=resolver,
+                        reference_path=reference_path,
+                        merge_ref_siblings=merge_ref_siblings,
                     )
                 ],
             ]
@@ -226,7 +230,10 @@ def extract_top_level(
             resolver = RefResolver.from_schema(schema)
             reference_path = ()
             for expanded_schema, _ in _expand_subschemas(
-                schema=schema, resolver=resolver, reference_path=reference_path
+                schema=schema,
+                resolver=resolver,
+                reference_path=reference_path,
+                merge_ref_siblings=merge_ref_siblings,
             ):
                 if (
                     isinstance(expanded_schema, dict)
@@ -249,7 +256,10 @@ def extract_top_level(
                 *[
                     expanded_schema
                     for expanded_schema, _ in _expand_subschemas(
-                        schema=schema, resolver=resolver, reference_path=reference_path
+                        schema=schema,
+                        resolver=resolver,
+                        reference_path=reference_path,
+                        merge_ref_siblings=merge_ref_siblings,
                     )
                 ],
             ]
@@ -270,7 +280,10 @@ def extract_top_level(
             resolver = RefResolver.from_schema(schema)
             reference_path = ()
             for expanded_schema, _ in _expand_subschemas(
-                schema=schema, resolver=resolver, reference_path=reference_path
+                schema=schema,
+                resolver=resolver,
+                reference_path=reference_path,
+                merge_ref_siblings=merge_ref_siblings,
             ):
                 if isinstance(expanded_schema, dict) and body.adapter.examples_container_keyword in expanded_schema:
                     for value in expanded_schema[body.adapter.examples_container_keyword]:
@@ -279,18 +292,22 @@ def extract_top_level(
 
 @overload
 def _resolve_bundled(
-    schema: dict[str, Any], resolver: RefResolver, reference_path: tuple[str, ...]
+    schema: dict[str, Any], resolver: RefResolver, reference_path: tuple[str, ...], *, merge_ref_siblings: bool
 ) -> tuple[dict[str, Any], tuple[str, ...]]: ...
 
 
 @overload
 def _resolve_bundled(
-    schema: bool, resolver: RefResolver, reference_path: tuple[str, ...]
+    schema: bool, resolver: RefResolver, reference_path: tuple[str, ...], *, merge_ref_siblings: bool
 ) -> tuple[bool, tuple[str, ...]]: ...
 
 
 def _resolve_bundled(
-    schema: dict[str, Any] | bool, resolver: RefResolver, reference_path: tuple[str, ...]
+    schema: dict[str, Any] | bool,
+    resolver: RefResolver,
+    reference_path: tuple[str, ...],
+    *,
+    merge_ref_siblings: bool,
 ) -> tuple[dict[str, Any] | bool, tuple[str, ...]]:
     """Resolve $ref if present."""
     if isinstance(schema, dict):
@@ -301,8 +318,8 @@ def _resolve_bundled(
                 # Real infinite recursive references are caught at the bundling stage.
                 # This recursion happens because of how the example phase generates data - it explores everything,
                 # so it is the easiest way to break such cycles
-                cycle = list(reference_path[reference_path.index(reference) :])
-                raise InfiniteRecursiveReference(reference, cycle)
+                cycle_path = list(reference_path[reference_path.index(reference) :])
+                raise InfiniteRecursiveReference(reference, cycle_path)
 
             new_path = reference_path + (reference,)
 
@@ -311,17 +328,29 @@ def _resolve_bundled(
             except RefResolutionError as exc:
                 raise UnresolvableReference(reference) from exc
 
+            # In OAS 3.1 (JSON Schema draft 2020-12), sibling keywords alongside $ref
+            # are valid and apply independently. Merge them into the resolved schema so
+            # constraints like minLength or explicit examples are not silently dropped.
+            if merge_ref_siblings and isinstance(resolved_schema, dict):
+                siblings = {k: v for k, v in schema.items() if k != "$ref"}
+                if siblings:
+                    resolved_schema = {**resolved_schema, **siblings}
+
             return resolved_schema, new_path
 
     return schema, reference_path
 
 
 def _expand_subschemas(
-    *, schema: dict[str, Any] | bool, resolver: RefResolver, reference_path: tuple[str, ...]
+    *,
+    schema: dict[str, Any] | bool,
+    resolver: RefResolver,
+    reference_path: tuple[str, ...],
+    merge_ref_siblings: bool,
 ) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...]], None, None]:
     """Expand schema and all its subschemas."""
     try:
-        schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+        schema, current_path = _resolve_bundled(schema, resolver, reference_path, merge_ref_siblings=merge_ref_siblings)
     except InfiniteRecursiveReference:
         return
 
@@ -339,7 +368,9 @@ def _expand_subschemas(
         if schema.get("allOf"):
             subschema = deepclone(schema["allOf"][0])
             try:
-                subschema, expanded_path = _resolve_bundled(subschema, resolver, current_path)
+                subschema, expanded_path = _resolve_bundled(
+                    subschema, resolver, current_path, merge_ref_siblings=merge_ref_siblings
+                )
             except InfiniteRecursiveReference:
                 return
             # Clone after resolving to avoid mutating the original schema when merging
@@ -349,7 +380,7 @@ def _expand_subschemas(
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
                     try:
-                        sub, _ = _resolve_bundled(sub, resolver, current_path)
+                        sub, _ = _resolve_bundled(sub, resolver, current_path, merge_ref_siblings=merge_ref_siblings)
                     except InfiniteRecursiveReference:
                         return
                     for key, value in sub.items():
@@ -433,6 +464,10 @@ def extract_from_schemas(
     operation: APIOperation[OpenApiParameter, OpenApiResponses, OpenApiSecurityParameters],
 ) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
+    from .schemas import OpenApiSchema
+
+    assert isinstance(operation.schema, OpenApiSchema)
+    merge_ref_siblings = operation.schema.adapter.ref_siblings
     for parameter in operation.iter_parameters():
         try:
             schema = parameter.optimized_schema
@@ -452,6 +487,7 @@ def extract_from_schemas(
             resolver=resolver,
             reference_path=reference_path,
             bundle_storage=bundle_storage,
+            merge_ref_siblings=merge_ref_siblings,
         ):
             yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
@@ -475,6 +511,7 @@ def extract_from_schemas(
                 resolver=resolver,
                 reference_path=reference_path,
                 bundle_storage=bundle_storage,
+                merge_ref_siblings=merge_ref_siblings,
             ):
                 yield BodyExample(value=value, media_type=body.media_type)
 
@@ -488,6 +525,7 @@ def _yield_examples_from_properties(
     resolver: RefResolver,
     current_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
+    merge_ref_siblings: bool,
 ) -> Generator[Any, None, None]:
     variants: dict[str, list[Any]] = {}
     to_generate: dict[str, Any] = {}
@@ -495,7 +533,10 @@ def _yield_examples_from_properties(
     for name, subschema in properties.items():
         values: list[Any] = []
         for expanded_schema, expanded_path in _expand_subschemas(
-            schema=subschema, resolver=resolver, reference_path=current_path
+            schema=subschema,
+            resolver=resolver,
+            reference_path=current_path,
+            merge_ref_siblings=merge_ref_siblings,
         ):
             if isinstance(expanded_schema, bool):
                 to_generate[name] = expanded_schema
@@ -518,6 +559,7 @@ def _yield_examples_from_properties(
                     resolver=resolver,
                     reference_path=expanded_path,
                     bundle_storage=bundle_storage,
+                    merge_ref_siblings=merge_ref_siblings,
                 )
             )
 
@@ -555,6 +597,7 @@ def _yield_examples_per_branch(
     resolver: RefResolver,
     current_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
+    merge_ref_siblings: bool,
 ) -> Generator[Any, None, None]:
     # Identify which properties are claimed by at least one branch
     branch_prop_sets: list[set[str]] = []
@@ -588,6 +631,7 @@ def _yield_examples_per_branch(
             resolver=resolver,
             current_path=current_path,
             bundle_storage=bundle_storage,
+            merge_ref_siblings=merge_ref_siblings,
         )
 
 
@@ -600,11 +644,12 @@ def extract_from_schema(
     resolver: RefResolver,
     reference_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
+    merge_ref_siblings: bool,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
     # This implementation supports only `properties` and `items`
     try:
-        schema, current_path = _resolve_bundled(schema, resolver, reference_path)
+        schema, current_path = _resolve_bundled(schema, resolver, reference_path, merge_ref_siblings=merge_ref_siblings)
     except InfiniteRecursiveReference:
         return
 
@@ -614,7 +659,9 @@ def extract_from_schema(
 
     if "allOf" in schema and "properties" in schema:
         # Get the merged allOf schema which includes properties from all allOf items
-        for expanded_schema, _ in _expand_subschemas(schema=schema, resolver=resolver, reference_path=current_path):
+        for expanded_schema, _ in _expand_subschemas(
+            schema=schema, resolver=resolver, reference_path=current_path, merge_ref_siblings=merge_ref_siblings
+        ):
             if expanded_schema is not schema and isinstance(expanded_schema, dict):
                 # This is the merged allOf result with combined properties
                 if "properties" in expanded_schema:
@@ -640,6 +687,7 @@ def extract_from_schema(
                 resolver=resolver,
                 current_path=current_path,
                 bundle_storage=bundle_storage,
+                merge_ref_siblings=merge_ref_siblings,
             )
         else:
             yield from _yield_examples_from_properties(
@@ -650,6 +698,7 @@ def extract_from_schema(
                 resolver=resolver,
                 current_path=current_path,
                 bundle_storage=bundle_storage,
+                merge_ref_siblings=merge_ref_siblings,
             )
 
     elif "items" in schema and isinstance(schema["items"], dict):
@@ -662,6 +711,7 @@ def extract_from_schema(
             resolver=resolver,
             reference_path=current_path,
             bundle_storage=bundle_storage,
+            merge_ref_siblings=merge_ref_siblings,
         ):
             yield [value]
 
