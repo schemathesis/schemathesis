@@ -2780,3 +2780,41 @@ def test_branch_required_yields_disjoint_sets(ctx, keyword):
 )
 def test_oneof_branch_isolation(ctx, body_schema, expected):
     assert _extract_json_body_examples(ctx, body_schema) == expected
+
+
+def test_oas31_ref_sibling_example_in_body_properties(ctx):
+    # In OAS 3.1, $ref siblings are valid and must be applied
+    # a sibling `example` on a property should be used as the example value
+    raw = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FooResponse"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+        components={
+            "schemas": {
+                "FooPropertySchema": {"type": "string"},
+                "FooResponse": {
+                    "type": "object",
+                    "required": ["foo", "bar"],
+                    "properties": {
+                        "foo": {
+                            "$ref": "#/components/schemas/FooPropertySchema",
+                            "example": "world",
+                        },
+                        "bar": {"type": "string", "example": "ex"},
+                    },
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    extracted = [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
+    assert extracted == [{"value": {"foo": "world", "bar": "ex"}, "media_type": "application/json"}]

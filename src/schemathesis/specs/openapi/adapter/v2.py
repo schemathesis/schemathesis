@@ -38,6 +38,7 @@ header_required_keyword = "x-required"
 links_keyword = "x-links"
 example_keyword = "x-example"
 examples_container_keyword = "x-examples"
+ref_siblings = False
 
 extract_parameter_schema: ExtractParameterSchema = parameters.extract_parameter_schema_v2
 extract_raw_response_schema: ExtractRawResponseSchema = responses.extract_raw_response_schema_v2
