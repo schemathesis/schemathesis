@@ -22,6 +22,10 @@ else:
     MAX_HEADER_CODEPOINT = 255
     DEFAULT_HEADER_EXCLUDE_CHARACTERS = "\n\r"
 
+# RFC 9110 Section 5.5: invalid field value chars are 0x00-0x08, 0x0A-0x1F, 0x7F
+# Note: 0x09 (HTAB) is valid per RFC, so excluded from this set
+INVALID_HEADER_CHARS = "".join(chr(i) for i in range(9)) + "".join(chr(i) for i in range(10, 32)) + "\x7f"
+
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
     r"""Register a custom Hypothesis strategy for generating string format data.
@@ -142,8 +146,8 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
 
     latin1_text = st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255))
 
-    # Define valid characters here to avoid filtering them out in `is_valid_header` later
-    header_value = header_values()
+    # Exclude RFC 9110 invalid chars so generated header values always pass `is_valid_header`
+    header_value = header_values(exclude_characters=INVALID_HEADER_CHARS)
 
     # st.emails() generates IDN domains with mixed-case `xn--` ACE prefix (e.g. `Xn--`, `XN--`)
     # which jsonschema_rs rejects per RFC 3490. Email domains are case-insensitive (RFC 5321),

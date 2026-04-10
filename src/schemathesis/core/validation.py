@@ -5,6 +5,8 @@ from schemathesis.core.errors import InvalidSchema
 
 # Adapted from http.client._is_illegal_header_value
 INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
+# RFC 9110 Section 5.5: invalid field value chars are 0x00-0x08, 0x0A-0x1F, 0x7F
+_RFC9110_INVALID_HEADER_VALUE_RE = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
 
 
 def has_invalid_characters(name: str, value: object) -> bool:
@@ -15,7 +17,7 @@ def has_invalid_characters(name: str, value: object) -> bool:
         return False
     try:
         check_header_validity((name, value))
-        return bool(INVALID_HEADER_RE.search(value))
+        return bool(INVALID_HEADER_RE.search(value)) or bool(_RFC9110_INVALID_HEADER_VALUE_RE.search(value))
     except InvalidHeader:
         return True
 

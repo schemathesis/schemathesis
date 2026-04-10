@@ -16,9 +16,9 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ✅  Examples (in 0.00s)
+ 🚫  Examples (in 0.00s)
 
-     ✅ 1 passed
+     🚫 1 error
 
  ❌  Coverage (in 0.00s)
 
@@ -28,6 +28,18 @@ Schemathesis dev
 
      ✅ 1 passed
 
+==================================== ERRORS ====================================
+________________________________ POST /failure _________________________________
+Schema Error
+
+Failed to generate test cases from examples for this API operation because of some header examples are invalid:
+
+  - 'X-Custom'='test\x00value'
+
+Ensure the header examples comply with RFC 7230, Section 3.2
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== FAILURES ===================================
 _________________________________ GET /failure _________________________________
 1. Test Case ID: <PLACEHOLDER>
@@ -59,13 +71,16 @@ API Operations:
   Tested: 1
 
 Test Phases:
-  ✅ Examples
+  🚫 Examples
   ❌ Coverage
   ✅ Fuzzing
   ⏭  Stateful (not applicable)
 
 Failures:
   ❌ Server error: 1
+
+Errors:
+  🚫 Schema Error: 1
 
 Warnings:
   ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
@@ -75,4 +90,4 @@ Test cases:
 
 Seed: 42
 
-======================== 1 failure, 1 warning in 1.00s =========================
+==================== 1 failure, 1 error, 1 warning in 1.00s ====================
