@@ -5,16 +5,16 @@ import enum
 from collections import defaultdict
 from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import Any, TypeAlias
+
+import jsonschema_rs
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
+from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies.naming import from_path, strip_version_prefix, to_pascal_case
 from schemathesis.specs.openapi.stateful.links import SCHEMATHESIS_LINK_EXTENSION
-
-if TYPE_CHECKING:
-    from schemathesis.core.compat import RefResolver
 
 
 @dataclass
@@ -413,7 +413,7 @@ def extract_fk_fields(fields: list[str]) -> list[FKField]:
 
 def extract_nested_fk_fields(
     schema: Mapping[str, Any],
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     pointer: str = "",
     max_depth: int = 5,
 ) -> list[NestedFKField]:
@@ -434,8 +434,6 @@ def extract_nested_fk_fields(
     """
     if max_depth <= 0:
         return []
-
-    from schemathesis.specs.openapi.adapter.references import maybe_resolve
 
     result: list[NestedFKField] = []
     properties = schema.get("properties", {})
@@ -463,7 +461,7 @@ def extract_nested_fk_fields(
             continue  # Don't recurse into FK fields
 
         # Resolve nested schema
-        _, resolved_field = maybe_resolve(field_schema, resolver, "")
+        _, resolved_field = maybe_resolve_with_resolver(field_schema, resolver)
         field_type = resolved_field.get("type")
 
         # Recurse into nested objects
@@ -474,7 +472,7 @@ def extract_nested_fk_fields(
         elif field_type == "array":
             items = resolved_field.get("items")
             if isinstance(items, dict):
-                _, resolved_items = maybe_resolve(items, resolver, "")
+                _, resolved_items = maybe_resolve_with_resolver(items, resolver)
                 if isinstance(resolved_items, dict):
                     # Use /0 to indicate first array element
                     items_pointer = f"{field_pointer}/0"

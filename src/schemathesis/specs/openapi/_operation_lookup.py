@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Collection, Iterator, Mapping
-from contextlib import contextmanager
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import OperationNotFound
+from schemathesis.core.jsonschema.resolver import resolve_reference
 
 if TYPE_CHECKING:
-    from schemathesis.specs.openapi.references import ReferenceResolver
+    import jsonschema_rs
+
     from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
@@ -18,9 +19,10 @@ class OperationLookupEntry:
     path: str
     method: str
     scope: str
+    resolver: jsonschema_rs.Resolver
     definition: dict[str, Any]
     shared_parameters: tuple[dict[str, Any], ...]
-    __slots__ = ("path", "method", "scope", "definition", "shared_parameters")
+    __slots__ = ("path", "method", "scope", "resolver", "definition", "shared_parameters")
 
 
 class OperationLookup:
@@ -75,13 +77,14 @@ class OperationLookup:
             self._operations_by_id = operations_by_id
             self._operations_by_reference = operations_by_reference
             return
-        resolve = self.schema.resolver.resolve
-        default_scope = self.schema.resolver.resolution_scope
+        root_resolver = self.schema.root_resolver
+        default_scope = root_resolver.base_uri
         for path, path_item in paths.items():
             if not isinstance(path_item, dict):
                 continue
             if "$ref" in path_item:
-                scope, resolved_path_item = resolve(path_item["$ref"])
+                resolved_resolver, resolved_path_item = resolve_reference(root_resolver, path_item["$ref"])
+                scope = resolved_resolver.base_uri
             else:
                 scope = default_scope
                 resolved_path_item = path_item
@@ -95,6 +98,7 @@ class OperationLookup:
                     path=path,
                     method=method,
                     scope=scope,
+                    resolver=resolved_resolver if "$ref" in path_item else root_resolver,
                     definition=definition,
                     shared_parameters=shared_parameters,
                 )
@@ -108,18 +112,19 @@ class OperationLookup:
 
     def _resolve_reference_entry(self, reference: str) -> OperationLookupEntry:
         try:
-            scope, definition = self.schema.resolver.resolve(reference)
+            resolved_resolver, definition = resolve_reference(self.schema.root_resolver, reference)
         except RefResolutionError:
             raise OperationNotFound(f"Operation '{reference}' not found", reference) from None
-        path, method = scope.rsplit("/", maxsplit=2)[-2:]
-        path = path.replace("~1", "/").replace("~0", "~")
+        scope = resolved_resolver.base_uri
+        path, method = _parse_reference_path_method(reference)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
-        _, path_item = self.schema.resolver.resolve(parent_ref)
+        _, path_item = resolve_reference(self.schema.root_resolver, parent_ref)
         shared_parameters = tuple(path_item.get("parameters", []))
         entry = OperationLookupEntry(
             path=path,
             method=method,
             scope=scope,
+            resolver=resolved_resolver,
             definition=definition,
             shared_parameters=shared_parameters,
         )
@@ -134,9 +139,10 @@ class OperationLookup:
         return entry
 
     def _make_operation(self, entry: OperationLookupEntry) -> APIOperation:
-        with _in_scope(self.schema.resolver, entry.scope):
-            parameters = self.schema._iter_parameters(entry.definition, entry.shared_parameters)
-        return self.schema.make_operation(entry.path, entry.method, parameters, entry.definition, entry.scope)
+        parameters = self.schema._iter_parameters(entry.definition, entry.shared_parameters, resolver=entry.resolver)
+        return self.schema.make_operation(
+            entry.path, entry.method, parameters, entry.definition, entry.scope, resolver=entry.resolver
+        )
 
     @staticmethod
     def _canonical_operation_reference(path: str, method: str) -> str:
@@ -144,10 +150,10 @@ class OperationLookup:
         return f"#/paths/{encoded_path}/{method}"
 
 
-@contextmanager
-def _in_scope(resolver: ReferenceResolver, scope: str) -> Iterator[None]:
-    resolver.push_scope(scope)
-    try:
-        yield
-    finally:
-        resolver.pop_scope()
+def _parse_reference_path_method(reference: str) -> tuple[str, str]:
+    marker = "#/paths/"
+    _, separator, suffix = reference.partition(marker)
+    if not separator:
+        raise OperationNotFound(f"Operation '{reference}' not found", reference)
+    encoded_path, method = suffix.rsplit("/", maxsplit=1)
+    return encoded_path.replace("~1", "/").replace("~0", "~"), method

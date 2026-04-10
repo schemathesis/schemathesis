@@ -10,6 +10,7 @@ from werkzeug.exceptions import InternalServerError
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.jsonschema.resolver import resolve_reference
 from schemathesis.core.result import Ok
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.stateful import dependencies
@@ -579,7 +580,7 @@ def test_complex_dereference(complex_schema):
 
 
 def test_remote_reference_to_yaml(swagger_20, schema_url):
-    scope, resolved = swagger_20.resolver.resolve(f"{schema_url}#/info/title")
+    scope, resolved = resolve_reference(swagger_20.root_resolver, f"{schema_url}#/info/title")
     assert scope.endswith("#/info/title")
     assert resolved == "Example API"
 

@@ -7,6 +7,8 @@ from .bundler import (
     BundleError,
     Bundler,
     bundle,
+    prepare_for_generation,
+    prepare_for_validation,
     unbundle,
     unbundle_path,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "Bundler",
     "BundleError",
     "FANCY_REGEX_OPTIONS",
+    "prepare_for_generation",
+    "prepare_for_validation",
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",
     "get_type",

@@ -52,14 +52,14 @@
         {
           "field_name": "warehouse_id",
           "is_array": false,
-          "pointer": "/shipping/warehouse_id",
+          "pointer": "/billing/warehouse_id",
           "target_field": "id",
           "target_resource": "Warehouse"
         },
         {
           "field_name": "warehouse_id",
           "is_array": false,
-          "pointer": "/billing/warehouse_id",
+          "pointer": "/shipping/warehouse_id",
           "target_field": "id",
           "target_resource": "Warehouse"
         }

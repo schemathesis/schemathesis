@@ -1,35 +1,31 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from schemathesis.core.compat import RefResolver
+import jsonschema_rs
+
+from schemathesis.core.jsonschema.resolver import resolve_reference
 
 
-def maybe_resolve(item: Mapping[str, Any], resolver: RefResolver, scope: str) -> tuple[str, Mapping[str, Any]]:
+def maybe_resolve_with_resolver(
+    item: Mapping[str, Any], resolver: jsonschema_rs.Resolver
+) -> tuple[jsonschema_rs.Resolver, Mapping[str, Any]]:
     reference = item.get("$ref")
     if reference is None:
-        return scope, item
+        return resolver, item
 
-    # Track seen references to detect circular $refs and resolve nested ones
     seen: set[str] = set()
-    current_scope = scope
+    current_resolver = resolver
     current_item = item
 
     while True:
         reference = current_item.get("$ref")
         if reference is None:
-            return current_scope, current_item
+            return current_resolver, current_item
 
-        # Detect circular references
         if reference in seen:
-            return current_scope, current_item
+            return current_resolver, current_item
         seen.add(reference)
 
-        # TODO: this one should be synchronized
-        resolver.push_scope(current_scope)
-        try:
-            current_scope, current_item = resolver.resolve(reference)
-        finally:
-            resolver.pop_scope()
+        current_resolver, current_item = resolve_reference(current_resolver, reference)

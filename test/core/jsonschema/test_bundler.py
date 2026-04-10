@@ -1,9 +1,11 @@
 import pytest
 
-from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle, prepare_for_generation, prepare_for_validation
+from schemathesis.core.jsonschema import bundler as bundler_mod
 from schemathesis.core.jsonschema.bundler import BundleError
+from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 
@@ -387,18 +389,18 @@ DEFINITIONS = {
     ],
 )
 def test_bundle(schema, store, expected):
-    resolver = RefResolver.from_schema(store)
+    resolver = make_root_resolver(store)
     assert bundle(schema, resolver, inline_recursive=True).schema == expected
 
 
 def test_unresolvable_pointer():
-    resolver = RefResolver.from_schema({})
+    resolver = make_root_resolver({})
     with pytest.raises(RefResolutionError):
         bundle({"$ref": "#/definitions/NonExistent"}, resolver, inline_recursive=True)
 
 
 def test_bundle_ref_resolves_to_none_error_message():
-    resolver = RefResolver.from_schema({"definitions": {"User": None}})
+    resolver = make_root_resolver({"definitions": {"User": None}})
     with pytest.raises(BundleError) as exc:
         bundle({"$ref": "#/definitions/User"}, resolver, inline_recursive=True)
     assert str(exc.value) == "Cannot bundle `#/definitions/User`: expected JSON Schema (object or boolean), got null"
@@ -418,7 +420,7 @@ def test_bundle_recursive_not_inlined():
         },
     }
 
-    resolver = RefResolver.from_schema(store)
+    resolver = make_root_resolver(store)
 
     assert bundle(schema, resolver, inline_recursive=False).schema == {
         "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
@@ -427,6 +429,60 @@ def test_bundle_recursive_not_inlined():
                 "type": "object",
                 "properties": {
                     "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},  # Self-reference preserved
+                },
+            }
+        },
+    }
+
+
+def test_prepare_for_generation_inlines_recursive_references():
+    schema = {"$ref": "#/definitions/Node"}
+    store = {
+        "definitions": {
+            "Node": {
+                "type": "object",
+                "properties": {
+                    "child": {"$ref": "#/definitions/Node"},
+                },
+            }
+        },
+    }
+
+    resolver = make_root_resolver(store)
+
+    assert prepare_for_generation(schema, resolver).schema == {
+        "type": "object",
+        "properties": {
+            "child": {
+                "properties": {},
+                "type": "object",
+            },
+        },
+    }
+
+
+def test_prepare_for_validation_preserves_recursive_references():
+    schema = {"$ref": "#/definitions/Node"}
+    store = {
+        "definitions": {
+            "Node": {
+                "type": "object",
+                "properties": {
+                    "child": {"$ref": "#/definitions/Node"},
+                },
+            }
+        },
+    }
+
+    resolver = make_root_resolver(store)
+
+    assert prepare_for_validation(schema, resolver).schema == {
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        BUNDLE_STORAGE_KEY: {
+            "schema1": {
+                "type": "object",
+                "properties": {
+                    "child": {"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"},
                 },
             }
         },
@@ -442,15 +498,27 @@ def test_bundle_non_recursive_inlined():
         },
     }
 
-    resolver = RefResolver.from_schema(store)
+    resolver = make_root_resolver(store)
 
     assert bundle(schema, resolver, inline_recursive=False).schema == {"type": "object"}
 
 
 @pytest.mark.parametrize("schema", [SWAGGER_20, OPENAPI_30, OPENAPI_31])
-def test_bundles_open_api_schemas(schema):
+def test_bundles_open_api_schemas(schema, monkeypatch):
     # This is a smoke test, they should be bundled without errors
-    resolver = RefResolver.from_schema(deepclone(schema))
+    original_resolve_reference = bundler_mod.resolve_reference
+
+    def fake_resolve_reference(resolver, reference):
+        if reference.startswith(("http://", "https://")):
+            return resolver, {}
+        return original_resolve_reference(resolver, reference)
+
+    monkeypatch.setattr(
+        bundler_mod,
+        "resolve_reference",
+        fake_resolve_reference,
+    )
+    resolver = make_root_resolver(deepclone(schema))
     bundle(deepclone(schema), resolver, inline_recursive=True)
 
 
@@ -476,7 +544,7 @@ def test_bundle_infinite_recursive_required_cycle_message():
         }
     }
 
-    resolver = RefResolver.from_schema(store)
+    resolver = make_root_resolver(store)
 
     with pytest.raises(InfiniteRecursiveReference) as exc:
         bundle(schema, resolver, inline_recursive=True)

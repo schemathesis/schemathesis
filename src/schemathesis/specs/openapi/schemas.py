@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
-from contextlib import contextmanager, suppress
+from contextlib import suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from functools import cached_property
@@ -10,7 +10,6 @@ from json import JSONDecodeError
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
-import jsonschema
 import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
@@ -29,6 +28,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX, BundleCache
+from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import get_template_fields
@@ -52,7 +52,6 @@ from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, 
 from ._hypothesis import openapi_cases
 from ._operation_lookup import OperationLookup
 from .examples import get_strategies_from_examples
-from .references import ReferenceResolver
 from .stateful import create_state_machine
 
 if TYPE_CHECKING:
@@ -108,7 +107,7 @@ class OpenApiSchema(BaseSchema):
 
     @cached_property
     def security(self) -> OpenApiSecurity:
-        return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.resolver)
+        return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.root_resolver)
 
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply OpenAPI-aware authentication to a test case.
@@ -158,11 +157,15 @@ class OpenApiSchema(BaseSchema):
         if paths is None:
             raise KeyError(path)
         path_item = paths[path]
-        with in_scope(self.resolver, self.location or ""):
-            scope, path_item = self._resolve_path_item(path_item)
+        if "$ref" in path_item:
+            path_resolver, path_item = resolve_reference(self.root_resolver, path_item["$ref"])
+            scope = path_resolver.base_uri
+        else:
+            path_resolver = self.root_resolver
+            scope = path_resolver.base_uri
         self.dispatch_hook("before_process_path", HookContext(), path, path_item)
         map = APIOperationMap(self, {})
-        map._data = MethodMap(map, scope, path, CaseInsensitiveDict(path_item))
+        map._data = MethodMap(map, path_resolver, scope, path, CaseInsensitiveDict(path_item))
         return map
 
     def find_operation_by_label(self, label: str) -> APIOperation | None:
@@ -215,10 +218,9 @@ class OpenApiSchema(BaseSchema):
         if paths is None:
             return statistic
 
-        resolve = self.resolver.resolve
-        resolve_path_item = self._resolve_path_item
         should_skip = self._should_skip
         links_keyword = self.adapter.links_keyword
+        root_resolver = self.root_resolver
 
         # For operationId lookup
         selected_operations_by_id: set[str] = set()
@@ -228,43 +230,43 @@ class OpenApiSchema(BaseSchema):
 
         for path, path_item in paths.items():
             try:
-                scope, path_item = resolve_path_item(path_item)
-                self.resolver.push_scope(scope)
-                try:
-                    for method, definition in path_item.items():
-                        if method not in HTTP_METHODS or not definition:
-                            continue
-                        statistic.operations.total += 1
-                        is_selected = not should_skip(path, method, definition)
-                        if is_selected:
-                            statistic.operations.selected += 1
-                            # Store both identifiers
-                            if "operationId" in definition:
-                                selected_operations_by_id.add(definition["operationId"])
-                            selected_operations_by_path.add((method, path))
-                        for response in definition.get("responses", {}).values():
-                            if "$ref" in response:
-                                _, response = resolve(response["$ref"])
-                            defined_links = response.get(links_keyword)
-                            if defined_links is not None:
-                                statistic.links.total += len(defined_links)
-                                if is_selected:
-                                    collected_links.extend(defined_links.values())
-                finally:
-                    self.resolver.pop_scope()
+                if "$ref" in path_item:
+                    path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
+                else:
+                    path_resolver = root_resolver
+                for method, definition in path_item.items():
+                    if method not in HTTP_METHODS or not definition:
+                        continue
+                    statistic.operations.total += 1
+                    is_selected = not should_skip(path, method, definition)
+                    if is_selected:
+                        statistic.operations.selected += 1
+                        # Store both identifiers
+                        if "operationId" in definition:
+                            selected_operations_by_id.add(definition["operationId"])
+                        selected_operations_by_path.add((method, path))
+                    for response in definition.get("responses", {}).values():
+                        if "$ref" in response:
+                            _, response = resolve_reference(path_resolver, response["$ref"])
+                        defined_links = response.get(links_keyword)
+                        if defined_links is not None:
+                            statistic.links.total += len(defined_links)
+                            if is_selected:
+                                collected_links.extend(defined_links.values())
             except SCHEMA_PARSING_ERRORS:
                 continue
 
         def is_link_selected(link: dict) -> bool:
             if "$ref" in link:
-                _, link = resolve(link["$ref"])
+                _, link = resolve_reference(root_resolver, link["$ref"])
 
             if "operationId" in link:
                 return link["operationId"] in selected_operations_by_id
             else:
                 try:
-                    scope, _ = resolve(link["operationRef"])
-                    path, method = scope.rsplit("/", maxsplit=2)[-2:]
+                    resolve_reference(root_resolver, link["operationRef"])
+                    _, _, suffix = link["operationRef"].partition("#/paths/")
+                    path, method = suffix.rsplit("/", maxsplit=1)
                     path = path.replace("~1", "/").replace("~0", "~")
                     return (method, path) in selected_operations_by_path
                 except Exception:
@@ -280,12 +282,12 @@ class OpenApiSchema(BaseSchema):
         paths = self._get_paths()
         if paths is None:
             return
-        resolve = self.resolver.resolve
+        root_resolver = self.root_resolver
         should_skip = self._should_skip
         for path, path_item in paths.items():
             try:
                 if "$ref" in path_item:
-                    _, path_item = resolve(path_item["$ref"])
+                    _, path_item = resolve_reference(root_resolver, path_item["$ref"])
                 for method, definition in path_item.items():
                     if should_skip(path, method, definition):
                         continue
@@ -319,34 +321,39 @@ class OpenApiSchema(BaseSchema):
         context = HookContext()
         # Optimization: local variables are faster than attribute access
         dispatch_hook = self.dispatch_hook
-        resolve_path_item = self._resolve_path_item
         should_skip = self._should_skip
         iter_parameters = self._iter_parameters
         make_operation = self.make_operation
+        root_resolver = self.root_resolver
         for path, path_item in paths.items():
             method = None
             try:
                 dispatch_hook("before_process_path", context, path, path_item)
-                scope, path_item = resolve_path_item(path_item)
-                with in_scope(self.resolver, scope):
-                    shared_parameters = path_item.get("parameters", [])
-                    for method, entry in path_item.items():
-                        if method not in HTTP_METHODS:
+                if "$ref" in path_item:
+                    path_resolver, path_item = resolve_reference(root_resolver, path_item["$ref"])
+                    scope = path_resolver.base_uri
+                else:
+                    path_resolver = root_resolver
+                    scope = path_resolver.base_uri
+                shared_parameters = path_item.get("parameters", [])
+                for method, entry in path_item.items():
+                    if method not in HTTP_METHODS:
+                        continue
+                    try:
+                        if should_skip(path, method, entry):
                             continue
-                        try:
-                            if should_skip(path, method, entry):
-                                continue
-                            parameters = iter_parameters(entry, shared_parameters)
-                            operation = make_operation(
-                                path,
-                                method,
-                                parameters,
-                                entry,
-                                scope,
-                            )
-                            yield Ok(operation)
-                        except SCHEMA_PARSING_ERRORS as exc:
-                            yield self._into_err(exc, path, method)
+                        parameters = iter_parameters(entry, shared_parameters, resolver=path_resolver)
+                        operation = make_operation(
+                            path,
+                            method,
+                            parameters,
+                            entry,
+                            scope,
+                            resolver=path_resolver,
+                        )
+                        yield Ok(operation)
+                    except SCHEMA_PARSING_ERRORS as exc:
+                        yield self._into_err(exc, path, method)
             except SCHEMA_PARSING_ERRORS as exc:
                 yield self._into_err(exc, path, method)
 
@@ -388,41 +395,43 @@ class OpenApiSchema(BaseSchema):
         self.adapter.validate_schema(self.raw_schema)
 
     def _iter_parameters(
-        self, definition: dict[str, Any], shared_parameters: Sequence[dict[str, Any]]
+        self,
+        definition: dict[str, Any],
+        shared_parameters: Sequence[dict[str, Any]],
+        resolver: jsonschema_rs.Resolver | None = None,
     ) -> list[OperationParameter]:
         return list(
             self.adapter.iter_parameters(
                 definition,
                 shared_parameters,
                 self.default_media_types,
-                self.resolver,
+                self.root_resolver if resolver is None else resolver,
                 self.adapter,
                 self._bundler,
                 self._bundle_cache,
             )
         )
 
-    def _parse_responses(self, definition: dict[str, Any], scope: str) -> OpenApiResponses:
+    def _parse_responses(
+        self, definition: dict[str, Any], scope: str, resolver: jsonschema_rs.Resolver | None = None
+    ) -> OpenApiResponses:
         responses = definition.get("responses", {})
         return OpenApiResponses.from_definition(
-            definition=responses, resolver=self.resolver, scope=scope, adapter=self.adapter
-        )
-
-    def _parse_security(self, definition: dict[str, Any]) -> OpenApiSecurityParameters:
-        return OpenApiSecurityParameters.from_definition(
-            schema=self.raw_schema,
-            operation=definition,
-            resolver=self.resolver,
+            definition=responses,
+            resolver=self.root_resolver if resolver is None else resolver,
+            scope=scope,
             adapter=self.adapter,
         )
 
-    def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        # The path item could be behind a reference
-        # In this case, we need to resolve it to get the proper scope for reference inside the item.
-        # It is mostly for validating responses.
-        if "$ref" in methods:
-            return self.resolver.resolve(methods["$ref"])
-        return self.resolver.resolution_scope, methods
+    def _parse_security(
+        self, definition: dict[str, Any], resolver: jsonschema_rs.Resolver | None = None
+    ) -> OpenApiSecurityParameters:
+        return OpenApiSecurityParameters.from_definition(
+            schema=self.raw_schema,
+            operation=definition,
+            resolver=self.root_resolver if resolver is None else resolver,
+            adapter=self.adapter,
+        )
 
     def make_operation(
         self,
@@ -431,11 +440,12 @@ class OpenApiSchema(BaseSchema):
         parameters: list[OperationParameter],
         definition: dict[str, Any],
         scope: str,
+        resolver: jsonschema_rs.Resolver | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
         base_url = self.get_base_url()
-        responses = self._parse_responses(definition, scope)
-        security = self._parse_security(definition)
+        responses = self._parse_responses(definition, scope, resolver=resolver)
+        security = self._parse_security(definition, resolver=resolver)
         operation: APIOperation[OperationParameter, ResponsesContainer, OpenApiSecurityParameters] = APIOperation(
             path=path,
             method=method,
@@ -478,10 +488,10 @@ class OpenApiSchema(BaseSchema):
         return operation
 
     @property
-    def resolver(self) -> ReferenceResolver:
-        if not hasattr(self, "_resolver"):
-            self._resolver = ReferenceResolver(self.location or "", self.raw_schema)
-        return self._resolver
+    def root_resolver(self) -> jsonschema_rs.Resolver:
+        if not hasattr(self, "_root_resolver"):
+            self._root_resolver = make_root_resolver(self.raw_schema, location=self.location)
+        return self._root_resolver
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         """Content types available for this API operation."""
@@ -848,15 +858,6 @@ def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
     raise FailureGroup(failures) from None
 
 
-@contextmanager
-def in_scope(resolver: jsonschema.RefResolver, scope: str) -> Generator[None, None, None]:
-    resolver.push_scope(scope)
-    try:
-        yield
-    finally:
-        resolver.pop_scope()
-
-
 @dataclass
 class MethodMap(Mapping):
     """Container for accessing API operations.
@@ -865,6 +866,7 @@ class MethodMap(Mapping):
     """
 
     _parent: APIOperationMap
+    _resolver: jsonschema_rs.Resolver
     # Reference resolution scope
     _scope: str
     # Methods are stored for this path
@@ -872,7 +874,7 @@ class MethodMap(Mapping):
     # Storage for definitions
     _path_item: CaseInsensitiveDict
 
-    __slots__ = ("_parent", "_scope", "_path", "_path_item")
+    __slots__ = ("_parent", "_resolver", "_scope", "_path", "_path_item")
 
     def __len__(self) -> int:
         return len(self._path_item)
@@ -885,13 +887,13 @@ class MethodMap(Mapping):
         operation = self._path_item[method]
         schema = cast(OpenApiSchema, self._parent._schema)
         path = self._path
-        scope = self._scope
-        with in_scope(schema.resolver, scope):
-            try:
-                parameters = schema._iter_parameters(operation, self._path_item.get("parameters", []))
-            except SCHEMA_PARSING_ERRORS as exc:
-                schema._raise_invalid_schema(exc, path, method)
-        return schema.make_operation(path, method, parameters, operation, scope)
+        try:
+            parameters = schema._iter_parameters(
+                operation, self._path_item.get("parameters", []), resolver=self._resolver
+            )
+        except SCHEMA_PARSING_ERRORS as exc:
+            schema._raise_invalid_schema(exc, path, method)
+        return schema.make_operation(path, method, parameters, operation, self._scope, resolver=self._resolver)
 
     def __getitem__(self, item: str) -> APIOperation:
         try:

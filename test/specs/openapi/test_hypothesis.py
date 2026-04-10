@@ -12,13 +12,13 @@ from jsonschema_rs import Draft4Validator
 
 import schemathesis
 from schemathesis.config import GenerationConfig
+from schemathesis.core.jsonschema.resolver import load_file
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.openapi.generation import filters
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
-from schemathesis.specs.openapi.references import load_file
 from test.utils import assert_requests_call
 
 

@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     import jsonschema_rs
 
     from schemathesis.core.adapter import OperationParameter
-    from schemathesis.core.compat import RefResolver
     from schemathesis.core.jsonschema.bundler import Bundle, BundleCache, Bundler
     from schemathesis.core.jsonschema.types import JsonSchema
     from schemathesis.core.transport import Response
@@ -20,15 +19,17 @@ if TYPE_CHECKING:
 
 IterResponseExamples = Callable[[Mapping[str, Any], str], Iterator[tuple[str, object]]]
 ExtractRawResponseSchema = Callable[[Mapping[str, Any]], Union["JsonSchema", None]]
-ExtractResponseSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], Union["Bundle", None]]
-PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "RefResolver", str, str], "Bundle"]
-ExtractHeaderSchema = Callable[[Mapping[str, Any], "RefResolver", str, str], "Bundle"]
+ExtractResponseSchema = Callable[[Mapping[str, Any], "jsonschema_rs.Resolver", str, str], Union["Bundle", None]]
+PrepareResponseMediaTypeSchema = Callable[["JsonSchema", "jsonschema_rs.Resolver", str, str], "Bundle"]
+ExtractHeaderSchema = Callable[[Mapping[str, Any], "jsonschema_rs.Resolver", str, str], "Bundle"]
 GetDefaultResponseMediaType = Callable[[Mapping[str, Any]], str | None]
 ResolveResponseMediaType = Callable[[Mapping[str, Any], str | None], str | None]
-ExtractSchemaForMediaType = Callable[[Mapping[str, Any], str | None, "RefResolver", str, str], Union["Bundle", None]]
+ExtractSchemaForMediaType = Callable[
+    [Mapping[str, Any], str | None, "jsonschema_rs.Resolver", str, str], Union["Bundle", None]
+]
 ExtractParameterSchema = Callable[[Mapping[str, Any]], "JsonSchema"]
 ExtractSecurityParameters = Callable[
-    [Mapping[str, Any], Mapping[str, Any], "RefResolver"],
+    [Mapping[str, Any], Mapping[str, Any], "jsonschema_rs.Resolver"],
     Iterator[Mapping[str, Any]],
 ]
 PrepareMultipart = Callable[
@@ -46,7 +47,7 @@ IterParameters = Callable[
         Mapping[str, Any],
         Sequence[Mapping[str, Any]],
         list[str],
-        "RefResolver",
+        "jsonschema_rs.Resolver",
         "SpecificationAdapter",
         "Bundler",
         "BundleCache",
@@ -54,7 +55,7 @@ IterParameters = Callable[
     Iterable["OperationParameter"],
 ]
 BuildPathParameter = Callable[[Mapping[str, Any]], "OperationParameter"]
-ExtractSecurityDefinitions = Callable[[Mapping[str, Any], "RefResolver"], Mapping[str, Mapping[str, Any]]]
+ExtractSecurityDefinitions = Callable[[Mapping[str, Any], "jsonschema_rs.Resolver"], Mapping[str, Mapping[str, Any]]]
 
 
 class SpecificationAdapter(Protocol):
