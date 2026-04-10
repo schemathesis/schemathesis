@@ -84,6 +84,27 @@ uvx schemathesis run https://api.example.com/openapi.json \
 pytest tests/ --alluredir=allure-results/pytest
 ```
 
+## Docker
+
+The Schemathesis Docker image has Allure support pre-installed — no extra setup needed. Mount a directory and pass `--report-allure-path` to write raw result files to your host:
+
+```bash
+docker run \
+  -v ./allure-results:/app/allure-results \
+  ghcr.io/schemathesis/schemathesis:stable \
+  run --report-allure-path /app/allure-results \
+  https://api.example.com/openapi.json
+```
+
+Then generate the report on your host using the [Allure CLI](https://allurereport.org/docs/install/):
+
+```bash
+allure generate allure-results -o allure-report
+allure open allure-report
+```
+
+The Allure CLI is not included in the image — it is a separate Java tool. Run it on your host or in a dedicated CI step.
+
 ## Configuration Reference
 
 See the [Reporting section](../reference/configuration.md#reporting) in the Configuration Options reference.

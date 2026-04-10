@@ -100,6 +100,11 @@ Used by teams at **[Spotify](https://github.com/backstage/backstage)**, **[WordP
 - Issues found with detailed categorization
 - Performance across different fuzzing strategies
 
+## Reporting
+
+- **[Allure](https://schemathesis.readthedocs.io/en/stable/guides/allure/)** — Rich visual reports with per-operation results, failure steps, and curl reproduction commands
+- **[JUnit XML](https://schemathesis.readthedocs.io/en/stable/guides/cicd/)** — For GitHub Actions, GitLab CI, Jenkins, and any CI tool that consumes JUnit
+
 ## Documentation
 
 📚 **[Documentation](https://schemathesis.readthedocs.io/en/stable/)** with guides, examples, and API reference.

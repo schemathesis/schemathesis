@@ -134,22 +134,25 @@ This helps catch authentication bypass vulnerabilities where APIs accept request
 
 ## Can I use Schemathesis with Allure?
 
-Yes, either through JUnit XML export (see below) or via [our Allure Integration](guides/allure.md).
-
-Allure can generate rich visual reports from Schemathesis test results.
+Yes. Use `--report-allure-path` to write Allure-compatible result files directly:
 
 ```bash
-# 1. Run Schemathesis with JUnit output  
-schemathesis run your_schema.yaml --report-junit-path=results.xml
-
-# 2. Set up Allure directory and move results
-mkdir allure-results
-mv results.xml allure-results/
-
-# 3. Generate and view Allure report
-allure generate allure-results --clean
-allure open
+schemathesis run your_schema.yaml --report-allure-path allure-results
+allure generate allure-results -o allure-report
+allure open allure-report
 ```
 
+See the [Allure Integration guide](guides/allure.md) for full details including Docker usage and pytest plugin support.
+
 !!! note "Prerequisites"
-    Install Allure from [their website](https://allurereport.org/docs/install/){target=_blank}
+    Install `schemathesis[allure]` and the [Allure CLI](https://allurereport.org/docs/install/){target=_blank}.
+
+??? note "Alternative: JUnit XML"
+    If you cannot install the `allure` extra, export JUnit XML and copy it into an Allure results directory:
+
+    ```bash
+    schemathesis run your_schema.yaml
+    cp schemathesis-report/*.xml allure-results/
+    allure generate allure-results
+    allure open
+    ```

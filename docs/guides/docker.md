@@ -52,3 +52,14 @@ docker run \
 ```
 
 `junit.xml` will appear in `./schemathesis-report/` on your host. See [CI/CD Integration](cicd.md) for how to consume this in GitHub Actions or GitLab CI.
+
+For Allure reports, Allure support is pre-installed in the image. Mount a directory and use `--report-allure-path`:
+
+```bash
+docker run \
+  -v ./allure-results:/app/allure-results \
+  ghcr.io/schemathesis/schemathesis:stable \
+  run -w auto --report-allure-path /app/allure-results https://api.example.com/openapi.json
+```
+
+Then run the Allure CLI on your host to generate the HTML report. See [Allure Integration](allure.md) for details.
