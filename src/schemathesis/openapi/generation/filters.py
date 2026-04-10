@@ -56,10 +56,10 @@ def is_invalid_path_parameter(value: Any, *, allow_encoded_slash: bool = False) 
         if "}" in decoded_value or "{" in decoded_value:
             return True
 
-        # Avoid situations when the path parameter contains only NULL bytes.
-        # Many webservers remove such bytes and as the result, the test can target a different API operation.
+        # Avoid NULL bytes in path parameters — many webservers strip or reject them,
+        # which can silently redirect the test to a different API operation.
         # Check decoded values as well to catch quoted forms like `%00`.
-        if len(decoded_value) == decoded_value.count("\x00"):
+        if "\x00" in decoded_value:
             return True
 
     return False

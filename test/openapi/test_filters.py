@@ -64,7 +64,24 @@ def test_invalid_query_fails_with_requests(invalid_params):
 
 
 @pytest.mark.parametrize(
-    "value", ["/", "%2F", "%2f", "foo%2Fbar", "{", "}", "%7B", "%7D", "\x00", "%00", "%00%00", "\udc9b"]
+    "value",
+    [
+        "/",
+        "%2F",
+        "%2f",
+        "foo%2Fbar",
+        "{",
+        "}",
+        "%7B",
+        "%7D",
+        "\x00",
+        "%00",
+        "%00%00",
+        "\udc9b",
+        "abc%00def",
+        "abc\x00def",
+        "prefix%00suffix",
+    ],
 )
 def test_filter_path_parameters(value):
     assert not is_valid_path({"foo": value})
