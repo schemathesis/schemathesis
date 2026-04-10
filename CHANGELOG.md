@@ -10,6 +10,7 @@
 - Sibling keywords on `$ref` properties ignored in examples phase for OAS 3.1 schemas. [#3698](https://github.com/schemathesis/schemathesis/issues/3698)
 - False positive `positive_data_acceptance` for headers with RFC 9110 control characters. [#3696](https://github.com/schemathesis/schemathesis/issues/3696)
 - False positive `positive_data_acceptance` for path parameters containing null bytes. [#3696](https://github.com/schemathesis/schemathesis/issues/3696)
+- JUnit XML missing `unsupported_method` failures from coverage phase. [#3699](https://github.com/schemathesis/schemathesis/issues/3699)
 
 ## [4.15.0](https://github.com/schemathesis/schemathesis/compare/v4.14.3...v4.15.0) - 2026-04-05
 

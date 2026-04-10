@@ -5,6 +5,7 @@ from xml.etree import ElementTree
 
 import pytest
 from _pytest.main import ExitCode
+from flask import jsonify
 
 
 @pytest.mark.operations("success")
@@ -222,3 +223,32 @@ def test_permission_denied(cli, tmp_path, schema_url, path):
     result = cli.run_and_assert(schema_url, f"--report-junit-path={xml_path}", exit_code=ExitCode.INTERRUPTED)
 
     assert "Permission denied" in result.stdout or "Permission denied" in result.stderr
+
+
+def test_coverage_unspecified_method_in_junit(cli, ctx, app_runner, tmp_path):
+    # See GH-3699
+    # When coverage phase triggers an `unsupported_method` failure via UNSPECIFIED_HTTP_METHOD,
+    # the failure must appear in JUnit XML
+    xml_path = tmp_path / "junit.xml"
+    app, _ = ctx.openapi.make_flask_app({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    # Server accepts all methods — returns 200 instead of 405 for undocumented methods
+    @app.route("/users", methods=["GET", "DELETE", "POST", "PUT", "PATCH", "HEAD"])
+    def users():
+        return jsonify([])
+
+    port = app_runner.run_flask_app(app)
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--phases=coverage",
+        f"--report-junit-path={xml_path}",
+        "--checks=unsupported_method",
+    )
+
+    # Exit code is 1: the check detected that undocumented methods were accepted
+    assert result.exit_code == 1
+
+    # JUnit must reflect that failure
+    tree = ElementTree.parse(xml_path)
+    root = tree.getroot()
+    assert int(root.attrib.get("failures", 0)) > 0
