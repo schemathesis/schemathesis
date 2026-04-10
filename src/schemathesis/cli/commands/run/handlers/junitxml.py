@@ -26,7 +26,19 @@ class JunitXMLHandler(EventHandler):
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
-            failures = list(ctx.statistic.failures.get(label, {}).values()) if event.status == Status.FAILURE else []
+            if event.status == Status.FAILURE:
+                # Look up failures by case_id across all labels — some coverage scenarios
+                # (e.g. UNSPECIFIED_HTTP_METHOD) store failures under a remapped label
+                # (the actual method+path tested) rather than the recorder label.
+                case_ids = set(event.recorder.cases.keys())
+                failures = [
+                    group
+                    for groups in ctx.statistic.failures.values()
+                    for case_id, group in groups.items()
+                    if case_id in case_ids
+                ]
+            else:
+                failures = []
             self.writer.record_scenario(
                 label=label,
                 elapsed_sec=event.elapsed_time,
