@@ -11,6 +11,8 @@ from .bundler import (
     BundleError,
     Bundler,
     bundle,
+    prepare_for_generation,
+    prepare_for_validation,
     unbundle,
     unbundle_path,
 )
@@ -95,6 +97,8 @@ __all__ = [
     "make_validator",
     "make_validator_for",
     "maybe_resolve_bundled",
+    "prepare_for_generation",
+    "prepare_for_validation",
     "schema_with_bundle",
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",
