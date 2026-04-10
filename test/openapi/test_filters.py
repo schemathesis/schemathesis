@@ -4,7 +4,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from schemathesis.core import NOT_SET
-from schemathesis.openapi.generation.filters import is_valid_path, is_valid_query, is_valid_urlencoded
+from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 
 @pytest.mark.parametrize(
@@ -154,3 +154,19 @@ def test_invalid_urlencoded_fails_with_requests(invalid_data):
     req = requests.Request("POST", "http://example.com", data=invalid_data)
     with pytest.raises((TypeError, ValueError)):
         req.prepare()
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        ({"X-Token": "valid"}, True),
+        # RFC 9110 Section 5.5: 0x00-0x08, 0x0A-0x1F, 0x7F are invalid field value chars
+        ({"Authorization": "Bearer \x16hW"}, False),  # 0x16 SYN — from issue #3696
+        ({"Authorization": "Bearer \x00null"}, False),  # 0x00 NUL
+        ({"Authorization": "Bearer \x7fDEL"}, False),  # 0x7F DEL
+        ({"Authorization": "Bearer \x01start"}, False),  # 0x01 SOH
+    ],
+    ids=["valid", "syn-0x16", "nul-0x00", "del-0x7f", "soh-0x01"],
+)
+def test_is_valid_header_rejects_rfc9110_control_chars(headers, expected):
+    assert is_valid_header(headers) == expected

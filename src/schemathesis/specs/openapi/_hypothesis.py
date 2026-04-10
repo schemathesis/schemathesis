@@ -47,6 +47,7 @@ from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from .formats import (
     DEFAULT_HEADER_EXCLUDE_CHARACTERS,
     HEADER_FORMAT,
+    INVALID_HEADER_CHARS,
     STRING_FORMATS,
     get_default_format_strategies,
     header_values,
@@ -59,9 +60,6 @@ from .negative.utils import can_negate
 SLASH = "/"
 # Probability of generating valid headers in negative mode
 VALID_HEADER_PROBABILITY = 0.95
-# RFC 9110 Section 5.5: Invalid header chars are 0x00-0x08, 0x0A-0x1F, 0x7F
-# Note: 0x09 (HTAB) is valid per RFC, so excluded from this set
-INVALID_HEADER_CHARS = "".join(chr(i) for i in range(9)) + "".join(chr(i) for i in range(10, 32)) + "\x7f"
 _PLAIN_HEADER_FORMATS = {HEADER_FORMAT} | set(KNOWN_HEADER_FORMATS.values())
 StrategyFactory = Callable[
     [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema_rs.Validator]],
