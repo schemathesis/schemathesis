@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.15.1...HEAD) - TBD
 
+### :wrench: Changed
+
+- Show compact path for body property violations instead of a verbose chain.
+
 ## [4.15.1](https://github.com/schemathesis/schemathesis/compare/v4.15.0...v4.15.1) - 2026-04-10
 
 ### :bug: Fixed

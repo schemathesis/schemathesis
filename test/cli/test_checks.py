@@ -1413,3 +1413,52 @@ def test_response_schema_conformance_reports_all_errors_in_cli(ctx, app_runner, 
         "--max-examples=1",
     )
     assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_nested_body_description(ctx, app_runner, cli, snapshot_cli):
+    # Schema with no type at root/intermediate levels so coverage only generates
+    # property constraint violations, surfacing the nested path in the description
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/payment": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "request": {
+                                            "properties": {
+                                                "payment": {
+                                                    "properties": {
+                                                        "SupplierAccount": {
+                                                            "minimum": 10,
+                                                        }
+                                                    },
+                                                }
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/payment", methods=["POST"])
+    def payment():
+        return jsonify({}), 200
+
+    port = app_runner.run_flask_app(app)
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=negative_data_rejection",
+        "--phases=coverage",
+    )
+    assert result == snapshot_cli

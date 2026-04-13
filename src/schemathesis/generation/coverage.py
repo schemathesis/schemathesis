@@ -1540,10 +1540,13 @@ def _negative_properties(
     for key, sub_schema in properties.items():
         with nctx.at(key):
             for value in cover_schema_iter(nctx, sub_schema):
+                inner = value.description or ""
+                # Build path notation: "a -> b: leaf" for nested, "a: leaf" for direct
+                description = f"{key} -> {inner}" if ": " in inner else f"{key}: {inner}"
                 yield NegativeValue(
                     {**template, key: value.value},
                     scenario=value.scenario,
-                    description=f"Object with invalid '{key}' value: {value.description}",
+                    description=description,
                     location=nctx.current_path,
                     parameter=key,
                 )
