@@ -550,7 +550,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
                 # Lowercase first letter of description for consistency
                 description = phase.data.description
                 if description:
-                    description = description[0].lower() + description[1:] if len(description) > 0 else description
+                    description = description[0].lower() + description[1:]
                 if parts:
                     parts.append(f"- {description}")
                 else:
