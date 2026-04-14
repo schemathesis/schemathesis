@@ -369,12 +369,17 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
     return False
 
 
-def _path_string_type_mutation_becomes_valid_after_serialization(case: Case) -> bool:
-    """Check if string type mutation for a numeric path parameter remains semantically valid.
+def _string_type_mutation_becomes_valid_after_serialization(case: Case, location: ParameterLocation) -> bool:
+    """Check if a type mutation for a numeric path/query parameter becomes valid after serialization.
 
-    Path parameters are sent as strings and URL-decoded by servers before routing/handling.
-    Therefore, a negative string mutation for an integer/number parameter can still be accepted
-    when the decoded value is parseable as that numeric type (e.g. `%2B1` -> `+1`).
+    Both path and query parameters are transmitted as strings on the wire, so a negative
+    type mutation for an integer/number parameter can still be accepted when the serialized
+    value is parseable as that numeric type.
+
+    - String mutations: the value is a string (e.g. "5") -> directly parseable.
+    - Object mutations for query: urlencode(doseq=True) iterates over dict keys, so a dict
+      like {"5": "x"} produces ?param=5, which is integer-parseable.
+    - Path parameters are additionally URL-decoded by servers (e.g. `%2B1` -> `+1`).
     """
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameter
 
@@ -382,65 +387,82 @@ def _path_string_type_mutation_becomes_valid_after_serialization(case: Case) -> 
     if meta is None:
         return False
 
-    path_component = meta.components.get(ParameterLocation.PATH)
-    if path_component is None or not path_component.mode.is_negative:
+    target_component = meta.components.get(location)
+    if target_component is None or not target_component.mode.is_negative:
         return False
 
     # If there are other negative components, we should still validate them.
-    for location in (
+    for other_location in (
+        ParameterLocation.PATH,
         ParameterLocation.QUERY,
         ParameterLocation.HEADER,
         ParameterLocation.COOKIE,
         ParameterLocation.BODY,
     ):
-        component = meta.components.get(location)
+        if other_location == location:
+            continue
+        component = meta.components.get(other_location)
         if component is not None and component.mode.is_negative:
             return False
 
     phase_data = meta.phase.data
     if (
         not isinstance(phase_data, FuzzingPhaseData)
-        or phase_data.parameter_location != ParameterLocation.PATH
+        or phase_data.parameter_location != location
         or not phase_data.description
-        or not phase_data.description.startswith("Invalid type string")
+        or not phase_data.description.startswith("Invalid type")
     ):
         return False
 
-    if not case.path_parameters:
+    container_name = location.container_name
+    case_container = getattr(case, container_name)
+    if not case_container:
         return False
 
-    names = [phase_data.parameter] if phase_data.parameter else list(case.path_parameters.keys())
+    operation_container = getattr(case.operation, container_name)
+    names = [phase_data.parameter] if phase_data.parameter else list(case_container.keys())
     for param_name in names:
-        if (
-            param_name is None
-            or param_name not in case.path_parameters
-            or param_name not in case.operation.path_parameters
-        ):
+        if param_name is None or param_name not in case_container or param_name not in operation_container:
             continue
 
-        value = case.path_parameters[param_name]
-        if not isinstance(value, str):
+        value = case_container[param_name]
+        parameter = operation_container.get(param_name)
+        if not isinstance(parameter, OpenApiParameter):
             continue
-
-        parameter = case.operation.path_parameters.get(param_name)
-        if parameter is None:
-            continue
-        assert isinstance(parameter, OpenApiParameter)
         expected_types = get_type(parameter.definition.get("schema", {}))
-        decoded = unquote(value)
 
-        if "integer" in expected_types:
-            try:
-                int(decoded)
-                return True
-            except ValueError:
-                continue
-        if "number" in expected_types:
-            try:
-                float(decoded)
-                return True
-            except ValueError:
-                continue
+        if isinstance(value, str):
+            # Path parameters are URL-encoded; decode before parsing.
+            parsed_value = unquote(value) if location == ParameterLocation.PATH else value
+            if "integer" in expected_types:
+                try:
+                    int(parsed_value)
+                    return True
+                except ValueError:
+                    continue
+            if "number" in expected_types:
+                try:
+                    float(parsed_value)
+                    return True
+                except ValueError:
+                    continue
+        elif location == ParameterLocation.QUERY and isinstance(value, dict):
+            # urlencode(doseq=True) iterates over dict keys, producing one query value per key.
+            # e.g. {"5": "x"} becomes ?page_size=5, which is integer-parseable.
+            for key in value:
+                key_str = str(key)
+                if "integer" in expected_types:
+                    try:
+                        int(key_str)
+                        return True
+                    except (ValueError, TypeError):
+                        pass
+                if "number" in expected_types:
+                    try:
+                        float(key_str)
+                        return True
+                    except (ValueError, TypeError):
+                        pass
 
     return False
 
@@ -525,7 +547,8 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not has_only_additional_properties_in_non_body_parameters(case)
         and not _body_negation_becomes_valid_after_serialization(case)
         and not _single_element_array_becomes_valid_after_serialization(case)
-        and not _path_string_type_mutation_becomes_valid_after_serialization(case)
+        and not _string_type_mutation_becomes_valid_after_serialization(case, ParameterLocation.PATH)
+        and not _string_type_mutation_becomes_valid_after_serialization(case, ParameterLocation.QUERY)
         and not _has_unverifiable_mutations(case)
         and not _non_body_negative_values_match_schema(case)
     ):
