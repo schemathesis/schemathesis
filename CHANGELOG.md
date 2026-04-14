@@ -6,6 +6,10 @@
 
 - Show compact path for body property violations instead of a verbose chain.
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for integer query parameters with type mutations. [#3712](https://github.com/schemathesis/schemathesis/issues/3712)
+
 ## [4.15.1](https://github.com/schemathesis/schemathesis/compare/v4.15.0...v4.15.1) - 2026-04-10
 
 ### :bug: Fixed

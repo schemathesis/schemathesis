@@ -403,6 +403,51 @@ def test_negative_data_rejection_number_body_field_accepts_integer_no_false_posi
     )
 
 
+def test_negative_data_rejection_query_integer_param_accepts_numeric_string_no_false_positive(ctx, app_runner, cli):
+    # See GH-3712
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/users": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "page_size",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/users")
+    def users():
+        values = request.args.getlist("page_size")
+        if len(values) > 1:
+            # Object/array mutations serialize to multiple repeated query params; reject them.
+            return jsonify({"error": "too many page_size values"}), 422
+        if values:
+            try:
+                int(values[0])
+            except (ValueError, TypeError):
+                return jsonify({"error": "invalid page_size"}), 422
+        return jsonify({"results": []}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--checks=negative_data_rejection",
+        "--mode=negative",
+        "--phases=fuzzing",
+        "--generation-database=none",
+        exit_code=ExitCode.OK,
+    )
+
+
 def test_negative_data_rejection_array_of_strings_boolean_collision(ctx, app_runner, cli, snapshot_cli):
     # See GH-2913
     app, raw_schema = ctx.openapi.make_flask_app(
