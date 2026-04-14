@@ -1405,14 +1405,26 @@ def _positive_array(
     ):
         # Ensure there is enough items to pass `minItems` if it is specified
         length = min_items or 1
-        for variant in schema["items"]["enum"]:
-            value = [variant] * length
-            if seen.insert(value):
-                yield PositiveValue(
-                    value,
-                    scenario=CoverageScenario.ENUM_VALUE_ITEMS_ARRAY,
-                    description="Enum value from available for items array",
-                )
+        enum_values = schema["items"]["enum"]
+        if schema.get("uniqueItems") and length > 1:
+            for i, variant in enumerate(enum_values):
+                others = [enum_values[j] for j in range(len(enum_values)) if j != i]
+                value = [variant] + others[: length - 1]
+                if seen.insert(value):
+                    yield PositiveValue(
+                        value,
+                        scenario=CoverageScenario.ENUM_VALUE_ITEMS_ARRAY,
+                        description="Enum value from available for items array",
+                    )
+        else:
+            for variant in enum_values:
+                value = [variant] * length
+                if seen.insert(value):
+                    yield PositiveValue(
+                        value,
+                        scenario=CoverageScenario.ENUM_VALUE_ITEMS_ARRAY,
+                        description="Enum value from available for items array",
+                    )
     elif min_items is None and max_items is None and "items" in schema and isinstance(schema["items"], dict):
         # Otherwise only an empty array is generated
         sub_schema = schema["items"]

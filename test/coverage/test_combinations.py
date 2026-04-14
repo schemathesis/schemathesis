@@ -2342,3 +2342,20 @@ def test_ref_to_additive_schema_inherits_parent_properties():
         {"id": 0, "name": ""},
         {"name": ""},
     ]
+
+
+def test_array_with_unique_items_enum_not_violated(pctx):
+    schema = {
+        "type": "array",
+        "items": {"enum": ["A", "B", "C"]},
+        "uniqueItems": True,
+        "minItems": 3,
+        "maxItems": 3,
+    }
+    covered = cover_schema(pctx, schema)
+    # All generated arrays must be valid (no duplicate elements)
+    assert_conform(covered, schema)
+    # Each enum variant must appear as the first element in at least one array,
+    # so every variant gets coverage
+    first_elements = {arr[0] for arr in covered if arr}
+    assert first_elements == {"A", "B", "C"}
