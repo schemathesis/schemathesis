@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for integer query parameters with type mutations. [#3712](https://github.com/schemathesis/schemathesis/issues/3712)
+- False positive `positive_data_acceptance` for arrays with `uniqueItems` and enum items.
 
 ## [4.15.1](https://github.com/schemathesis/schemathesis/compare/v4.15.0...v4.15.1) - 2026-04-10
 
