@@ -603,7 +603,10 @@ def _yield_examples_from_properties(
             if bundle_storage is not None:
                 subschema = dict(subschema)
                 subschema[BUNDLE_STORAGE_KEY] = bundle_storage
-            generated = _generate_single_example(subschema, config)
+            try:
+                generated = _generate_single_example(subschema, config)
+            except Exception:
+                continue
             variants[name] = [generated]
 
         total_combos = max(len(v) for v in variants.values())
