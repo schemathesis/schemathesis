@@ -5,7 +5,7 @@
 ### :bug: Fixed
 
 - False positive `positive_data_acceptance` for array body properties with `minItems` > 1 and object items in the examples phase.
-- False positive `positive_data_acceptance` when a property `example` violates its field's own type in the examples phase.
+- False positive `positive_data_acceptance` when a property `example` violates its field's own type in the examples & coverage phases.
 
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 

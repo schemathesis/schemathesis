@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
 
+from schemathesis.core.jsonschema import is_valid
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 
@@ -1086,11 +1087,17 @@ def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema_rs.Va
 def _get_properties(schema: JsonSchema) -> JsonSchema:
     if isinstance(schema, dict):
         if "example" in schema:
-            return {"const": schema["example"]}
+            example = schema["example"]
+            if is_valid(example, schema):
+                return {"const": example}
         if "default" in schema:
-            return {"const": schema["default"]}
+            default = schema["default"]
+            if is_valid(default, schema):
+                return {"const": default}
         if schema.get("examples"):
-            return {"enum": schema["examples"]}
+            valid = [ex for ex in schema["examples"] if is_valid(ex, schema)]
+            if valid:
+                return {"enum": valid}
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object")
         _schema = deepclone(schema)
@@ -1161,18 +1168,19 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
 
     if example or examples or default:
         has_valid_example = False
-        if example and ctx.is_valid_for_location(example) and seen_values.insert(example):
+        if example and is_valid(example, schema) and ctx.is_valid_for_location(example) and seen_values.insert(example):
             has_valid_example = True
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if ctx.is_valid_for_location(example) and seen_values.insert(example):
+                if is_valid(example, schema) and ctx.is_valid_for_location(example) and seen_values.insert(example):
                     has_valid_example = True
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and is_valid(default, schema)
             and ctx.is_valid_for_location(default)
             and seen_values.insert(default)
         ):
@@ -1275,16 +1283,17 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     seen = HashSet()
 
     if example or examples or default:
-        if example and seen.insert(example):
+        if example and is_valid(example, schema) and seen.insert(example):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if seen.insert(example):
+                if is_valid(example, schema) and seen.insert(example):
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and is_valid(default, schema)
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
@@ -1343,16 +1352,17 @@ def _positive_array(
     seen_constraints: set[tuple] = set()
 
     if example or examples or default:
-        if example and seen.insert(example):
+        if example and is_valid(example, schema) and seen.insert(example):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if seen.insert(example):
+                if is_valid(example, schema) and seen.insert(example):
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and is_valid(default, schema)
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
@@ -1444,15 +1454,17 @@ def _positive_object(
     default = schema.get("default")
 
     if example or examples or default:
-        if example:
+        if example and is_valid(example, schema):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
+                if is_valid(example, schema):
+                    yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and is_valid(default, schema)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
     elif template or not (

@@ -14,6 +14,7 @@ from hypothesis_jsonschema import from_schema
 from schemathesis.config import GenerationConfig
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
+from schemathesis.core.jsonschema import is_valid
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -528,13 +529,6 @@ def extract_from_schemas(
                 yield BodyExample(value=value, media_type=body.media_type)
 
 
-def _value_matches_schema(value: Any, schema: dict[str, Any]) -> bool:
-    try:
-        return jsonschema_rs.validator_for(schema).is_valid(value)
-    except Exception:
-        return True
-
-
 def _body_example_is_valid(value: Any, validator: jsonschema_rs.Validator | None) -> bool:
     if validator is None:
         return True
@@ -572,14 +566,14 @@ def _yield_examples_from_properties(
 
             if example_keyword in expanded_schema:
                 candidate = expanded_schema[example_keyword]
-                if _value_matches_schema(candidate, expanded_schema):
+                if is_valid(candidate, expanded_schema):
                     values.append(candidate)
 
             if examples_container_keyword in expanded_schema and isinstance(
                 expanded_schema[examples_container_keyword], list
             ):
                 for candidate in expanded_schema[examples_container_keyword]:
-                    if _value_matches_schema(candidate, expanded_schema):
+                    if is_valid(candidate, expanded_schema):
                         values.append(candidate)
 
             values.extend(

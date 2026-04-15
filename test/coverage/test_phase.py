@@ -726,6 +726,53 @@ def test_with_examples_openapi_2(ctx, first, second):
     assert_positive_coverage(schema, EXPECTED_EXAMPLES)
 
 
+def test_property_example_wrong_type_is_not_used(ctx):
+    # Schema where 'tags' declares type=string but its example is an array.
+    # The coverage phase must not use the invalid example as a const; it should
+    # fall back to generating a valid string so that every positive case passes
+    # schema validation.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "tags": {"type": "string", "example": ["tag1", "tag2"]},
+            },
+            "required": ["name"],
+        },
+        positive=True,
+    )
+
+
+def test_top_level_examples_list_filters_invalid_items(ctx):
+    # When the body schema itself has an `examples` list with mixed valid/invalid items,
+    # invalid items must be filtered and valid ones still yielded.
+    # Exercises _positive_number directly (body is integer, not a property within object).
+    collect_coverage_cases(
+        ctx,
+        {"type": "integer", "examples": ["not_a_number", 42]},
+        positive=True,
+    )
+
+
+def test_default_wrong_type_is_not_used(ctx):
+    # `default` annotations that violate the property's own type must be filtered.
+    # `name` provides a valid example to anchor assembly; `count` has an invalid default only.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "example": "Alice"},
+                "count": {"type": "integer", "default": "not_a_number"},
+            },
+            "required": ["name"],
+        },
+        positive=True,
+    )
+
+
 def test_mixed_type_keyword(ctx):
     schema = build_schema(
         ctx,

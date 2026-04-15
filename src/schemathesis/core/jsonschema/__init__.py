@@ -1,3 +1,5 @@
+from typing import Any
+
 import jsonschema_rs
 
 from .bundler import (
@@ -17,6 +19,19 @@ from .types import get_type
 # with a large size limit to handle schemas with large quantifiers (e.g., {1,51200})
 FANCY_REGEX_OPTIONS = jsonschema_rs.FancyRegexOptions(size_limit=1_000_000_000)
 
+
+def is_valid(value: Any, schema: dict[str, Any]) -> bool:
+    """Return True if value satisfies schema, False if it does not.
+
+    Returns True on any validation error so that values that cannot be checked
+    are passed through rather than silently dropped.
+    """
+    try:
+        return jsonschema_rs.validator_for(schema).is_valid(value)
+    except Exception:
+        return True
+
+
 __all__ = [
     "ALL_KEYWORDS",
     "bundle",
@@ -24,6 +39,7 @@ __all__ = [
     "Bundler",
     "BundleError",
     "FANCY_REGEX_OPTIONS",
+    "is_valid",
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",
     "get_type",
