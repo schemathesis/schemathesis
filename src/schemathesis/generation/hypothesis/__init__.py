@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import warnings
 from collections import OrderedDict
-from functools import lru_cache
 from typing import Any, Literal
 
 
@@ -17,12 +16,11 @@ def setup() -> None:
     from hypothesis_jsonschema import _canonicalise, _encode, _from_schema, _resolve
     from hypothesis_jsonschema._canonicalise import SCHEMA_KEYS, SCHEMA_OBJECT_KEYS
     from hypothesis_jsonschema._canonicalise import merged as _original_merged
-    from hypothesis_jsonschema._resolve import LocalResolver
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
     from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS, REFERENCE_TO_BUNDLE_PREFIX
     from schemathesis.core.jsonschema.types import _get_type
-    from schemathesis.core.transforms import deepclone
+    from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer
 
     if getattr(setup, "_is_patched", False):
         return
@@ -79,11 +77,6 @@ def setup() -> None:
 
     SCHEMA_KEYS = frozenset(SCHEMA_KEYS)
     SCHEMA_OBJECT_KEYS = frozenset(SCHEMA_OBJECT_KEYS)
-
-    @lru_cache
-    def get_resolver(cache_key: CacheableSchema) -> LocalResolver:
-        """LRU resolver cache."""
-        return LocalResolver.from_schema(cache_key.schema)
 
     # Cache for fully-resolved schema output, keyed by schema hash.
     # Avoids re-traversing schemas with the same JSON content.
@@ -200,6 +193,15 @@ def setup() -> None:
     _original_from_schema = _from_schema.__dict__["__from_schema"]
     _original_merged_as_strategies = _from_schema.merged_as_strategies
 
+    def _resolve_ref(root_schema: dict[str, Any], ref: str) -> Any:
+        if not ref:
+            return root_schema
+        if ref.startswith("#"):
+            resolved = resolve_pointer(root_schema, ref[1:])
+            if resolved is not UNRESOLVABLE:
+                return resolved
+        raise _canonicalise.HypothesisRefResolutionError(f"Could not resolve reference {ref!r}")
+
     def _cached_from_schema(schema: Any, *, alphabet: Any, custom_formats: Any) -> Any:
         try:
             key = (_schema_cache_key(schema), id(alphabet), id(custom_formats))
@@ -242,7 +244,7 @@ def setup() -> None:
     def resolve_all_refs(
         schema: Literal[True, False] | dict[str, Any],
         *,
-        resolver: LocalResolver | None = None,
+        root_schema: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         if schema is True:
             return {}
@@ -252,7 +254,7 @@ def setup() -> None:
             return schema
 
         _resolve_all_refs = resolve_all_refs
-        top_level = resolver is None
+        top_level = root_schema is None
         schema_hash: int | None = None
 
         if top_level:
@@ -263,24 +265,20 @@ def setup() -> None:
             schema_hash = cache_key.encoded
             if schema_hash in _resolve_result_cache:
                 return deepclone(_resolve_result_cache[schema_hash])
-            resolver = get_resolver(cache_key)
+            root_schema = schema
 
-        assert resolver is not None
+        assert root_schema is not None
 
         if "$ref" in schema:
             s = dict(schema)
             ref = s.pop("$ref")
-            url, resolved = resolver.resolve(ref)
-            resolver.push_scope(url)
-            try:
-                result = _merged(
-                    [
-                        _resolve_all_refs(s, resolver=resolver),
-                        _resolve_all_refs(deepclone(resolved), resolver=resolver),
-                    ]
-                )
-            finally:
-                resolver.pop_scope()
+            resolved = _resolve_ref(root_schema, ref)
+            result = _merged(
+                [
+                    _resolve_all_refs(s, root_schema=root_schema),
+                    _resolve_all_refs(deepclone(resolved), root_schema=root_schema),
+                ]
+            )
             if result is None:
                 msg = f"$ref:{ref!r} had incompatible base schema {s!r}"
                 raise _canonicalise.HypothesisRefResolutionError(msg)
@@ -291,12 +289,15 @@ def setup() -> None:
         for key, value in schema.items():
             if key in SCHEMA_KEYS:
                 if isinstance(value, list):
-                    schema[key] = [_resolve_all_refs(v, resolver=resolver) if isinstance(v, dict) else v for v in value]
+                    schema[key] = [
+                        _resolve_all_refs(v, root_schema=root_schema) if isinstance(v, dict) else v for v in value
+                    ]
                 elif isinstance(value, dict):
-                    schema[key] = _resolve_all_refs(value, resolver=resolver)
+                    schema[key] = _resolve_all_refs(value, root_schema=root_schema)
             if key in SCHEMA_OBJECT_KEYS:
                 schema[key] = {
-                    k: _resolve_all_refs(v, resolver=resolver) if isinstance(v, dict) else v for k, v in value.items()
+                    k: _resolve_all_refs(v, root_schema=root_schema) if isinstance(v, dict) else v
+                    for k, v in value.items()
                 }
         if schema_hash is not None:
             _resolve_result_cache[schema_hash] = deepclone(schema)

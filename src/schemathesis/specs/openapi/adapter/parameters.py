@@ -24,7 +24,7 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.resources import ExtraDataSource
 from schemathesis.schemas import APIOperation, ParameterSet
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
-from schemathesis.specs.openapi.adapter.references import maybe_resolve
+from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
@@ -32,7 +32,6 @@ from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
-    from schemathesis.core.compat import RefResolver
     from schemathesis.specs.openapi.extra_data_source import VariantUsageTracker
 
 
@@ -693,7 +692,7 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
 
 def _bundle_parameter(
     parameter: Mapping,
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     bundler: Bundler,
     bundle_cache: dict[int, tuple[dict[str, Any], dict[str, str]]],
 ) -> tuple[dict[str, Any], dict[str, str]]:
@@ -703,27 +702,24 @@ def _bundle_parameter(
         cached_definition, cached_name_to_uri = bundle_cache[param_id]
         return deepclone(cached_definition), dict(cached_name_to_uri)
 
-    scope, definition = maybe_resolve(parameter, resolver, "")
+    parameter_resolver, definition = maybe_resolve_with_resolver(parameter, resolver)
     schema = definition.get("schema")
     name_to_uri = {}
     if schema is not None:
         definition = dict(definition)
-        # Push the resolved scope so nested $refs are resolved relative to the parameter's location
-        resolver.push_scope(scope)
         try:
-            bundled = bundler.bundle(schema, resolver, inline_recursive=True)
+            bundled = bundler.prepare_for_generation(
+                schema,
+                parameter_resolver,
+            )
             definition["schema"] = bundled.schema
             name_to_uri.update(bundled.name_to_uri)
         except BundleError as exc:
             location = parameter.get("in", "")
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
-        finally:
-            resolver.pop_scope()
     elif "content" in definition:
         definition = dict(definition)
-        # Push the resolved scope so nested $refs are resolved relative to the parameter's location
-        resolver.push_scope(scope)
         try:
             updated_content: dict[str, Any] = {}
             for media_type, media_type_object in definition["content"].items():
@@ -733,7 +729,10 @@ def _bundle_parameter(
                 media_type_object = dict(media_type_object)
                 nested_schema = media_type_object.get("schema")
                 if isinstance(nested_schema, dict):
-                    bundled = bundler.bundle(nested_schema, resolver, inline_recursive=True)
+                    bundled = bundler.prepare_for_generation(
+                        nested_schema,
+                        parameter_resolver,
+                    )
                     media_type_object["schema"] = bundled.schema
                     name_to_uri.update(bundled.name_to_uri)
                 updated_content[media_type] = media_type_object
@@ -742,8 +741,6 @@ def _bundle_parameter(
             location = parameter.get("in", "")
             name = parameter.get("name", "<UNKNOWN>")
             raise InvalidSchema.from_bundle_error(exc, location, name) from exc
-        finally:
-            resolver.pop_scope()
 
     definition_ = cast(dict, definition)
     result = definition_, name_to_uri
@@ -759,7 +756,7 @@ def iter_parameters_v2(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     adapter: SpecificationAdapter,
     bundler: Bundler,
     bundle_cache: BundleCache,
@@ -790,7 +787,7 @@ def iter_parameters_v2(
             # Take the original definition & extract the resource_name from there
             resource_name = None
             for param in chain(definition.get("parameters", []), shared_parameters):
-                _, param = maybe_resolve(param, resolver, "")
+                _, param = maybe_resolve_with_resolver(param, resolver)
                 if param.get("in") == ParameterLocation.BODY:
                     if "$ref" in param["schema"]:
                         resource_name = resource_name_from_ref(param["schema"]["$ref"])
@@ -819,7 +816,7 @@ def iter_parameters_v3(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     adapter: SpecificationAdapter,
     bundler: Bundler,
     bundle_cache: BundleCache,
@@ -853,9 +850,9 @@ def iter_parameters_v3(
 
     request_body_or_ref = operation.get("requestBody")
     if request_body_or_ref is not None:
-        scope, request_body_or_ref = maybe_resolve(request_body_or_ref, resolver, "")
+        body_resolver, request_body_or_ref = maybe_resolve_with_resolver(request_body_or_ref, resolver)
         # It could be an object inside `requestBodies`, which could be a reference itself
-        body_scope, request_body = maybe_resolve(request_body_or_ref, resolver, scope)
+        body_resolver, request_body = maybe_resolve_with_resolver(request_body_or_ref, body_resolver)
 
         required = request_body.get("required", False)
         for media_type, content in request_body["content"].items():
@@ -866,17 +863,20 @@ def iter_parameters_v3(
                 content = dict(content)
                 if "$ref" in schema:
                     resource_name = resource_name_from_ref(schema["$ref"])
-                # Push the resolved scope so nested $refs are resolved relative to the requestBody's location
-                resolver.push_scope(body_scope)
+                else:
+                    items = schema.get("items")
+                    if isinstance(items, dict) and "$ref" in items:
+                        resource_name = resource_name_from_ref(items["$ref"])
                 try:
                     to_bundle = cast(dict[str, Any], schema)
-                    bundled = bundler.bundle(to_bundle, resolver, inline_recursive=True)
+                    bundled = bundler.prepare_for_generation(
+                        to_bundle,
+                        body_resolver,
+                    )
                     content["schema"] = bundled.schema
                     name_to_uri = bundled.name_to_uri
                 except BundleError as exc:
                     raise InvalidSchema.from_bundle_error(exc, "body") from exc
-                finally:
-                    resolver.pop_scope()
             yield OpenApiBody.from_definition(
                 definition=content,
                 is_required=required,

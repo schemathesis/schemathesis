@@ -33,7 +33,8 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
-from schemathesis.core.compat import RefResolutionError, RefResolver
+from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
@@ -218,7 +219,7 @@ class CoverageContext:
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema_rs.Validator]
-    _resolver: RefResolver | None
+    _resolver: jsonschema_rs.Resolver | None
     _schema_generation_cache: dict[tuple[Any, ...], Any]
     allow_extra_parameters: bool
 
@@ -247,7 +248,7 @@ class CoverageContext:
         path: list[str | int] | None = None,
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema_rs.Validator],
-        _resolver: RefResolver | None = None,
+        _resolver: jsonschema_rs.Resolver | None = None,
         _schema_generation_cache: dict[tuple[Any, ...], Any] | None = None,
         allow_extra_parameters: bool = True,
     ) -> None:
@@ -264,15 +265,15 @@ class CoverageContext:
         self.allow_extra_parameters = allow_extra_parameters
 
     @property
-    def resolver(self) -> RefResolver:
+    def resolver(self) -> jsonschema_rs.Resolver:
         """Lazy-initialized cached resolver."""
         if self._resolver is None:
-            self._resolver = RefResolver.from_schema(self.root_schema)
-        return cast(RefResolver, self._resolver)
+            self._resolver = make_root_resolver(self.root_schema)
+        return self._resolver
 
     def resolve_ref(self, ref: str) -> dict | bool:
         """Resolve a $ref to its schema definition."""
-        _, resolved = self.resolver.resolve(ref)
+        _, resolved = resolve_reference(self.resolver, ref)
         return resolved
 
     @contextmanager

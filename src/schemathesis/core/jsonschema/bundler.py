@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+import jsonschema_rs
 
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.references import sanitize
+from schemathesis.core.jsonschema.resolver import resolve_reference, resolve_reference_uri
 from schemathesis.core.jsonschema.types import JsonSchema, to_json_type_name
 from schemathesis.core.transforms import deepclone
-
-if TYPE_CHECKING:
-    from schemathesis.core.compat import RefResolver
-
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
@@ -46,7 +45,7 @@ class Bundler:
     def __init__(self) -> None:
         self.counter = 0
 
-    def bundle(self, schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> Bundle:
+    def bundle(self, schema: JsonSchema, resolver: jsonschema_rs.Resolver, *, inline_recursive: bool) -> Bundle:
         """Bundle a JSON Schema by embedding all references."""
         # Inlining recursive reference is required (for now) for data generation, but is unsound for data validation
         if not isinstance(schema, dict):
@@ -59,7 +58,6 @@ class Bundler:
         defs = {}
 
         has_recursive_references = False
-        resolve = resolver.resolve
         visit = visited.add
 
         def get_def_name(uri: str) -> str:
@@ -71,7 +69,11 @@ class Bundler:
                 uri_to_name[uri] = name
             return name
 
-        def bundle_recursive(current: JsonSchema | list[JsonSchema]) -> JsonSchema | list[JsonSchema]:
+        def bundle_recursive(
+            current: JsonSchema | list[JsonSchema],
+            current_resolver: jsonschema_rs.Resolver,
+            scope_stack: tuple[str, ...] = (),
+        ) -> JsonSchema | list[JsonSchema]:
             """Recursively process and bundle references in the current schema."""
             # Local lookup is cheaper and it matters for large schemas.
             # It works because this recursive call goes to every nested value
@@ -82,16 +84,19 @@ class Bundler:
                 if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
                     # Empty references resolve to the current scope and are not useful for test generation
                     if not reference.strip():
-                        return {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
-                    resolved_uri, resolved_schema = resolve(reference)
+                        return {
+                            key: _bundle_recursive(value, current_resolver, scope_stack)
+                            for key, value in current.items()
+                            if key != "$ref"
+                        }
+                    resolved_uri = resolve_reference_uri(current_resolver.base_uri, reference)
+                    next_resolver, resolved_schema = resolve_reference(current_resolver, reference)
 
                     if not isinstance(resolved_schema, dict | bool):
                         raise BundleError(reference, resolved_schema)
                     def_name = get_def_name(resolved_uri)
 
-                    scopes = resolver._scopes_stack
-
-                    is_recursive_reference = resolved_uri in scopes
+                    is_recursive_reference = resolved_uri in scope_stack
                     has_recursive_references |= is_recursive_reference
                     if inline_recursive and is_recursive_reference:
                         # This is a recursive reference! As of Sep 2025, `hypothesis-jsonschema` does not support
@@ -109,7 +114,7 @@ class Bundler:
                         if resolved_uri in inlining_for_recursion:
                             # Check if we're already trying to inline this schema
                             # If yes, it means we have an unbreakable cycle
-                            cycle = scopes[scopes.index(resolved_uri) :]
+                            cycle = list(scope_stack[scope_stack.index(resolved_uri) :])
                             raise InfiniteRecursiveReference(reference, cycle)
 
                         # Track that we're inlining this schema
@@ -119,8 +124,16 @@ class Bundler:
                             # Sanitize to remove optional recursive references
                             sanitize(cloned)
 
-                            result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
-                            bundled_clone = _bundle_recursive(cloned)
+                            result = {
+                                key: _bundle_recursive(value, current_resolver, scope_stack)
+                                for key, value in current.items()
+                                if key != "$ref"
+                            }
+                            bundled_clone = _bundle_recursive(
+                                cloned,
+                                next_resolver,
+                                (*scope_stack, resolved_uri),
+                            )
                             assert isinstance(bundled_clone, dict)
                             result.update(bundled_clone)
                             return result
@@ -131,18 +144,16 @@ class Bundler:
                         visit(resolved_uri)
 
                         # Recursively bundle the embedded schema too!
-                        resolver.push_scope(resolved_uri)
-                        try:
-                            bundled_resolved = _bundle_recursive(resolved_schema)
-                        finally:
-                            resolver.pop_scope()
+                        bundled_resolved = _bundle_recursive(
+                            resolved_schema, next_resolver, (*scope_stack, resolved_uri)
+                        )
 
                         defs[def_name] = bundled_resolved
 
                         return {
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
-                            else _bundle_recursive(value)
+                            else _bundle_recursive(value, current_resolver, scope_stack)
                             if isinstance(value, dict | list)
                             else value
                             for key, value in current.items()
@@ -152,22 +163,27 @@ class Bundler:
                         return {
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
-                            else _bundle_recursive(value)
+                            else _bundle_recursive(value, current_resolver, scope_stack)
                             if isinstance(value, dict | list)
                             else value
                             for key, value in current.items()
                         }
                 return {
-                    key: _bundle_recursive(value) if isinstance(value, dict | list) else value
+                    key: _bundle_recursive(value, current_resolver, scope_stack)
+                    if isinstance(value, dict | list)
+                    else value
                     for key, value in current.items()
                 }
             elif isinstance(current, list):
-                return [_bundle_recursive(item) if isinstance(item, dict | list) else item for item in current]  # type: ignore[misc]
+                return [
+                    _bundle_recursive(item, current_resolver, scope_stack) if isinstance(item, dict | list) else item
+                    for item in current
+                ]  # type: ignore[misc]
             # `isinstance` guards won't let it happen
             # Otherwise is present to make type checker happy
             return current  # pragma: no cover
 
-        bundled = bundle_recursive(schema)
+        bundled = bundle_recursive(schema, resolver)
 
         assert isinstance(bundled, dict)
 
@@ -183,10 +199,28 @@ class Bundler:
             bundled[BUNDLE_STORAGE_KEY] = defs
         return Bundle(schema=bundled, name_to_uri={v: k for k, v in uri_to_name.items()})
 
+    def prepare_for_generation(self, schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+        """Prepare schema for data generation by inlining recursive references."""
+        return self.bundle(schema, resolver, inline_recursive=True)
 
-def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool) -> Bundle:
+    def prepare_for_validation(self, schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+        """Prepare schema for validation while preserving recursive references."""
+        return self.bundle(schema, resolver, inline_recursive=False)
+
+
+def bundle(schema: JsonSchema, resolver: jsonschema_rs.Resolver, *, inline_recursive: bool) -> Bundle:
     """Bundle a JSON Schema by embedding all references."""
     return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
+
+
+def prepare_for_generation(schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+    """Prepare schema for data generation by inlining recursive references."""
+    return Bundler().prepare_for_generation(schema, resolver)
+
+
+def prepare_for_validation(schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+    """Prepare schema for validation while preserving recursive references."""
+    return Bundler().prepare_for_validation(schema, resolver)
 
 
 def unbundle_path(path: list, name_to_uri: dict[str, str]) -> list:

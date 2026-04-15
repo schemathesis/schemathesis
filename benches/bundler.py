@@ -1,7 +1,7 @@
 import pytest
 
-from schemathesis.core.compat import RefResolver
 from schemathesis.core.jsonschema import bundle
+from schemathesis.core.jsonschema.resolver import make_root_resolver
 
 
 @pytest.mark.benchmark(group="bundle-flat-references")
@@ -18,7 +18,7 @@ def test_bundle_many_flat_references(benchmark):
         "properties": {f"field{i}": {"$ref": f"#/definitions/Type{i}"} for i in range(50)},
     }
 
-    resolver = RefResolver.from_schema({"definitions": definitions})
+    resolver = make_root_resolver({"definitions": definitions})
 
     benchmark(bundle, schema, resolver, inline_recursive=True)
 
@@ -37,7 +37,7 @@ def test_bundle_deep_nested_references(benchmark):
 
     schema = {"$ref": "#/definitions/Level0"}
 
-    resolver = RefResolver.from_schema({"definitions": definitions})
+    resolver = make_root_resolver({"definitions": definitions})
 
     benchmark(bundle, schema, resolver, inline_recursive=True)
 
@@ -62,6 +62,6 @@ def test_bundle_duplicate_references(benchmark):
         "items": [{"$ref": "#/definitions/User"} for _ in range(50)],
     }
 
-    resolver = RefResolver.from_schema({"definitions": definitions})
+    resolver = make_root_resolver({"definitions": definitions})
 
     benchmark(bundle, schema, resolver, inline_recursive=True)

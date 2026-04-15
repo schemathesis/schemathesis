@@ -12,7 +12,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
-from schemathesis.specs.openapi.adapter.references import maybe_resolve
+from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     extract_inputs,
     merge_related_resources,
@@ -68,14 +68,14 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     operation=operation,
                     resources=resources,
                     updated_resources=updated_resources,
-                    resolver=schema.resolver,
+                    resolver=schema.root_resolver,
                     canonicalization_cache=canonicalization_cache,
                 )
                 outputs = extract_outputs(
                     operation=operation,
                     resources=resources,
                     updated_resources=updated_resources,
-                    resolver=schema.resolver,
+                    resolver=schema.root_resolver,
                     canonicalization_cache=canonicalization_cache,
                 )
                 operations[operation.label] = OperationNode(
@@ -137,7 +137,7 @@ def inject_links(schema: OpenApiSchema) -> int:
 
 def _normalize_link(link: Mapping[str, Any], schema: OpenApiSchema) -> NormalizedLink:
     """Normalize a link definition for comparison."""
-    _, link = maybe_resolve(link, schema.resolver, "")
+    _, link = maybe_resolve_with_resolver(link, schema.root_resolver)
     operation = _resolve_link_operation(link, schema)
 
     normalized_params = _normalize_parameter_keys(link.get("parameters", {}), operation)

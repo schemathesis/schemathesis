@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
+import jsonschema_rs
+
 from schemathesis.core import media_types
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
@@ -23,7 +25,6 @@ from schemathesis.specs.openapi.stateful.dependencies.models import (
 from schemathesis.specs.openapi.stateful.dependencies.resources import extract_resources_from_responses
 
 if TYPE_CHECKING:
-    from schemathesis.core.compat import RefResolver
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
     from schemathesis.specs.openapi.schemas import APIOperation
 
@@ -33,7 +34,7 @@ def extract_inputs(
     operation: APIOperation,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
@@ -74,7 +75,7 @@ def _resolve_parameter_dependency(
     operation: APIOperation,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> InputSlot | None:
     """Connect a parameter to its resource definition, creating placeholder if needed.
@@ -166,7 +167,7 @@ def _find_resource_in_responses(
     resource_name: str,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: RefResolver,
+    resolver: jsonschema_rs.Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> ResourceDefinition | None:
     """Search operation's successful responses for a specific resource definition.
@@ -267,14 +268,15 @@ def _resolve_body_dependencies(
     resolved = _maybe_resolve_bundled(schema, schema)
 
     # For `items`, we'll inject an array with extracted resource
-    items = resolved.get("items", {})
-    if items is not None:
-        resource_name = naming.from_path(operation.path)
+    items = resolved.get("items")
+    if isinstance(items, dict):
+        resource_name = body.resource_name or naming.from_path(operation.path)
 
         if "$ref" in items:
             schema_key = items["$ref"].split("/")[-1]
             original_ref = body.name_to_uri[schema_key]
             resource_name = resource_name_from_ref(original_ref)
+        if resource_name is not None:
             resource = resources.get(resource_name)
             if resource is None:
                 resource = ResourceDefinition.inferred_from_parameter(name=resource_name, parameter_name=None)

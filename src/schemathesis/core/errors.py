@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from textwrap import indent
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, NoReturn
+from urllib.parse import urldefrag
 
 from jsonschema_rs import ValidationError
 
@@ -471,10 +472,31 @@ class InfiniteRecursiveReference(SchemathesisError):
         self.cycle = cycle
 
     def __str__(self) -> str:
-        if len(self.cycle) == 1:
+        cycle = self._normalized_cycle()
+        if len(cycle) == 1:
             return f"Schema `{self.reference}` has a required reference to itself"
-        cycle_str = " ->\n  ".join(self.cycle + [self.cycle[0]])
+        cycle_str = " ->\n  ".join(cycle + [cycle[0]])
         return f"Schema `{self.reference}` has required references forming a cycle:\n\n  {cycle_str}"
+
+    def _normalized_cycle(self) -> list[str]:
+        normalized = [self._normalize_item(item) for item in self.cycle]
+        if not normalized:
+            return normalized
+
+        start = normalized[0]
+        result: list[str] = []
+        for idx, item in enumerate(normalized):
+            if idx > 0 and item == start:
+                break
+            result.append(item)
+        return result
+
+    @staticmethod
+    def _normalize_item(item: str) -> str:
+        _, fragment = urldefrag(item)
+        if fragment:
+            return f"#{fragment}"
+        return item
 
 
 class SerializationNotPossible(SerializationError):
