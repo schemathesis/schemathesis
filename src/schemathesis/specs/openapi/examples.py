@@ -247,6 +247,14 @@ def extract_top_level(
             yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
+        try:
+            body_schema = body.optimized_schema
+            body_validator: jsonschema_rs.Validator | None = (
+                None if isinstance(body_schema, bool) else jsonschema_rs.validator_for(body_schema)
+            )
+        except Exception:
+            body_validator = None
+
         if "schema" in body.definition:
             schema = body.definition["schema"]
             resolver = RefResolver.from_schema(schema)
@@ -266,15 +274,19 @@ def extract_top_level(
         else:
             definitions = [body.definition]
         for definition in definitions:
+            validator = body_validator if definition is body.definition else None
             # Open API 2 also supports `example`
             for example_keyword in {"example", body.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:
-                    yield BodyExample(value=definition[example_keyword], media_type=body.media_type)
+                    value = definition[example_keyword]
+                    if _body_example_is_valid(value, validator):
+                        yield BodyExample(value=value, media_type=body.media_type)
         if body.adapter.examples_container_keyword in body.definition:
             for value in extract_inner_examples(
                 body.definition[body.adapter.examples_container_keyword], operation.schema
             ):
-                yield BodyExample(value=value, media_type=body.media_type)
+                if _body_example_is_valid(value, body_validator):
+                    yield BodyExample(value=value, media_type=body.media_type)
         if "schema" in body.definition:
             schema = body.definition["schema"]
             resolver = RefResolver.from_schema(schema)
@@ -516,6 +528,22 @@ def extract_from_schemas(
                 yield BodyExample(value=value, media_type=body.media_type)
 
 
+def _value_matches_schema(value: Any, schema: dict[str, Any]) -> bool:
+    try:
+        return jsonschema_rs.validator_for(schema).is_valid(value)
+    except Exception:
+        return True
+
+
+def _body_example_is_valid(value: Any, validator: jsonschema_rs.Validator | None) -> bool:
+    if validator is None:
+        return True
+    try:
+        return validator.is_valid(value)
+    except Exception:
+        return True
+
+
 def _yield_examples_from_properties(
     *,
     operation: APIOperation,
@@ -543,12 +571,16 @@ def _yield_examples_from_properties(
                 continue
 
             if example_keyword in expanded_schema:
-                values.append(expanded_schema[example_keyword])
+                candidate = expanded_schema[example_keyword]
+                if _value_matches_schema(candidate, expanded_schema):
+                    values.append(candidate)
 
             if examples_container_keyword in expanded_schema and isinstance(
                 expanded_schema[examples_container_keyword], list
             ):
-                values.extend(expanded_schema[examples_container_keyword])
+                for candidate in expanded_schema[examples_container_keyword]:
+                    if _value_matches_schema(candidate, expanded_schema):
+                        values.append(candidate)
 
             values.extend(
                 extract_from_schema(

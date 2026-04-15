@@ -158,7 +158,7 @@ def test_get_examples(location, swagger_20):
             "in": location,
             "name": "name",
             "required": True,
-            "schema": {"type": "string"},
+            "schema": {"type": "object", "properties": {"name": {"type": "string"}}},
             "x-example": example,
         }
     else:

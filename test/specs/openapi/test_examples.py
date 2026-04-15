@@ -2875,3 +2875,161 @@ def test_array_body_property_with_min_items_generates_correct_length():
     # params must have 3 items (minItems=3), not just 1
     for ex in extracted:
         assert len(ex["value"]["params"]) == 3, f"Expected 3 params items, got {len(ex['value']['params'])}"
+
+
+def test_body_example_with_property_violating_type_is_skipped(ctx):
+    # When a property's `example` value violates that property's own type
+    # (e.g. type=string but example=["an", "array"]),
+    # the invalid property example must be filtered and not appear in any assembled body.
+    # `title` provides a valid example to anchor assembly; `editor_access` has only an invalid one.
+    schema = ctx.openapi.build_schema(
+        {
+            "/maps": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "title": {"type": "string", "example": "My map"},
+                                        "editor_access": {
+                                            "type": "string",
+                                            "example": ["can_edit", "can_view"],
+                                        },
+                                    },
+                                    "required": ["title"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/maps"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    examples_yielded = list(extract_from_schemas(operation))
+    assert examples_yielded, "Expected at least one body example to be assembled"
+    for example in examples_yielded:
+        assert isinstance(example, BodyExample)
+        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+
+
+def test_top_level_body_example_violating_schema_is_skipped(ctx):
+    # When a media-type-level `example` violates the body schema
+    # (e.g. a field typed as integer but given a string value),
+    # it must not be yielded by extract_top_level.
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "title": {"type": "string"},
+                                        "count": {"type": "integer"},
+                                    },
+                                    "required": ["title"],
+                                },
+                                "example": {"title": "My item", "count": "not-an-integer"},
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/items"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    for example in extract_top_level(operation):
+        if isinstance(example, BodyExample):
+            assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+
+
+def test_property_examples_list_filters_invalid_items(ctx):
+    # When a property schema carries a JSON Schema `examples` array (plural),
+    # items that violate the property's type must be dropped; valid items must still be yielded.
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "examples": [["invalid_array"], "valid_string"],
+                                        },
+                                    },
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/items"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    examples_yielded = list(extract_from_schemas(operation))
+    assert examples_yielded == [BodyExample(value={"status": "valid_string"}, media_type="application/json")]
+    assert validator.is_valid(examples_yielded[0].value)
+
+
+def test_top_level_body_examples_container_filters_invalid(ctx):
+    # When a media-type-level `examples` object contains values that violate the body schema,
+    # only schema-valid values must be yielded by extract_top_level.
+    schema = ctx.openapi.build_schema(
+        {
+            "/products": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "title": {"type": "string"},
+                                        "count": {"type": "integer"},
+                                    },
+                                    "required": ["title"],
+                                },
+                                "examples": {
+                                    "bad": {"value": {"title": "My item", "count": "not-an-integer"}},
+                                    "good": {"value": {"title": "My item", "count": 42}},
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/products"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    body_examples = [e for e in extract_top_level(operation) if isinstance(e, BodyExample)]
+    assert body_examples == [BodyExample(value={"title": "My item", "count": 42}, media_type="application/json")]
+    assert validator.is_valid(body_examples[0].value)
