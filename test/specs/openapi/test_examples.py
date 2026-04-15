@@ -3033,3 +3033,36 @@ def test_top_level_body_examples_container_filters_invalid(ctx):
     body_examples = [e for e in extract_top_level(operation) if isinstance(e, BodyExample)]
     assert body_examples == [BodyExample(value={"title": "My item", "count": 42}, media_type="application/json")]
     assert validator.is_valid(body_examples[0].value)
+
+
+def test_unsatisfiable_property_schema_does_not_crash(ctx):
+    # When one property has a valid example and another property has an unsatisfiable schema
+    schema = ctx.openapi.build_schema(
+        {
+            "/refunds": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "amount": {"type": "integer", "example": 150000},
+                                        "refund_amount_available": {"not": {}},
+                                    },
+                                    "required": ["amount"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/refunds"]["POST"]
+    assert list(extract_from_schemas(operation)) == [
+        BodyExample(value={"amount": 150000}, media_type="application/json")
+    ]
