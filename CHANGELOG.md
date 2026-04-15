@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.15.2...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `positive_data_acceptance` for array body properties with `minItems` > 1 and object items in the examples phase.
+
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 
 ### :wrench: Changed

@@ -702,7 +702,9 @@ def extract_from_schema(
             )
 
     elif "items" in schema and isinstance(schema["items"], dict):
-        # Each inner value should be wrapped in an array
+        # Each inner value should be wrapped in an array, respecting minItems
+        min_items = schema.get("minItems", 1)
+        length = max(min_items, 1)
         for value in extract_from_schema(
             operation=operation,
             schema=schema["items"],
@@ -713,7 +715,7 @@ def extract_from_schema(
             bundle_storage=bundle_storage,
             merge_ref_siblings=merge_ref_siblings,
         ):
-            yield [value]
+            yield [value] * length
 
 
 def _generate_single_example(

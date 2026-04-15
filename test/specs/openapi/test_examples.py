@@ -2818,3 +2818,60 @@ def test_oas31_ref_sibling_example_in_body_properties(ctx):
     schema = schemathesis.openapi.from_dict(raw)
     extracted = [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
     assert extracted == [{"value": {"foo": "world", "bar": "ex"}, "media_type": "application/json"}]
+
+
+def test_array_body_property_with_min_items_generates_correct_length():
+    # When a body property is an array with minItems > 1 and items is an object schema with examples,
+    # extract_from_schemas should generate arrays with at least minItems elements, not just 1
+    raw = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["params", "positions"],
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "params": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "required": ["enabled"],
+                                                "properties": {
+                                                    "enabled": {"type": "boolean", "example": True},
+                                                },
+                                            },
+                                            "minItems": 3,
+                                            "maxItems": 3,
+                                        },
+                                        "positions": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "enum": ["PRE_RMS_0", "PRE_RMS_1", "PRE_RMS_2"],
+                                            },
+                                            "minItems": 3,
+                                            "maxItems": 3,
+                                            "uniqueItems": True,
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    schema = schemathesis.openapi.from_dict(raw)
+    extracted = [example_to_dict(e) for e in extract_from_schemas(schema["/test"]["POST"])]
+    # params must have 3 items (minItems=3), not just 1
+    for ex in extracted:
+        assert len(ex["value"]["params"]) == 3, f"Expected 3 params items, got {len(ex['value']['params'])}"
