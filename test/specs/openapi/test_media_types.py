@@ -57,7 +57,7 @@ def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi
                     "requestBody": {
                         "content": {
                             "text/csv": {
-                                "schema": {"type": "string", "format": "binary"},
+                                "schema": {"type": "array", "items": {"type": "object"}},
                                 "example": [{"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 4, "c": 5}],
                             },
                         },
