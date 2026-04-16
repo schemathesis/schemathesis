@@ -14,6 +14,7 @@
 - False positive `positive_data_acceptance` for content-encoded header parameters with object examples in the examples phase.
 - False positive `positive_data_acceptance` when a parameter-level `example` value violates its declared schema type in the examples phase.
 - False positive `positive_data_acceptance` when a response-derived parameter example violates the parameter's schema constraints in the examples phase.
+- False positive `positive_data_acceptance` when a schema-level parameter `example` violates the parameter's own constraints (e.g. `pattern`) in the examples phase.
 
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 

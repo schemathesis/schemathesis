@@ -3142,6 +3142,35 @@ def test_response_derived_parameter_example_violating_schema_is_skipped(ctx):
     assert list(extract_top_level(operation)) == []
 
 
+def test_schema_level_parameter_example_violating_pattern_is_skipped(ctx):
+    # When the `example` field lives inside the parameter's `schema` object (not on the parameter
+    # definition itself), it is processed via an expanded subschema. The expanded subschema must
+    # still be validated against the full parameter schema — otherwise pattern violations slip through.
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "orderBy",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^-?\\w+(,-?\\w+)*$",
+                                "example": "-companyName,address.houseNumber",
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/items"]["GET"]
+    assert list(extract_top_level(operation)) == []
+
+
 def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx):
     # When a required property has an unsatisfiable schema (e.g. `not: {}`),
     # generation fails and that property is absent from the assembled body,
