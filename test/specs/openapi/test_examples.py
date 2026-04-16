@@ -3142,6 +3142,115 @@ def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx)
         assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
 
 
+def test_allof_example_violating_anyof_in_parameter_is_not_yielded(ctx):
+    # An allOf property example that mixes values from incompatible anyOf branches should not be yielded.
+    raw = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "filters",
+                            "in": "query",
+                            "schema": {
+                                "type": "array",
+                                "items": {"$ref": "#/components/schemas/Filter"},
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "StringFilter": {"additionalProperties": {"type": "string"}},
+                "IntFilter": {"additionalProperties": {"type": "integer"}},
+                "Filter": {
+                    "type": "object",
+                    "properties": {
+                        "field": {
+                            "allOf": [
+                                {
+                                    "anyOf": [
+                                        {"$ref": "#/components/schemas/StringFilter"},
+                                        {"$ref": "#/components/schemas/IntFilter"},
+                                    ]
+                                },
+                                # Example mixes string and integer values, violating both anyOf branches
+                                {"example": {"category": "online", "count": 42}},
+                            ]
+                        }
+                    },
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    operation = schema["/search"]["GET"]
+    param_schema = next(p.optimized_schema for p in operation.iter_parameters() if p.name == "filters")
+    validator = jsonschema_rs.validator_for(param_schema)
+    for example in extract_from_schemas(operation):
+        assert isinstance(example, ParameterExample)
+        assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
+
+
+def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
+    # When array items are assembled from property examples but each item violates the
+    # items schema (anyOf where assembled properties match no branch exclusively),
+    # no such parameter example should be yielded.
+    raw = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "filters",
+                            "in": "query",
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "filter": {
+                                            "type": "object",
+                                            "properties": {
+                                                "category": {"type": "string", "example": "online"},
+                                                "value": {"type": "integer", "example": 100},
+                                            },
+                                            # Branches are mutually exclusive by additionalProperties type:
+                                            # having both `category` (string) and `value` (integer) violates both.
+                                            "anyOf": [
+                                                {
+                                                    "required": ["category"],
+                                                    "additionalProperties": {"type": "string"},
+                                                },
+                                                {
+                                                    "required": ["value"],
+                                                    "additionalProperties": {"type": "integer"},
+                                                },
+                                            ],
+                                        }
+                                    },
+                                    "required": ["filter"],
+                                },
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    operation = schema["/search"]["GET"]
+    param_schema = next(p.optimized_schema for p in operation.iter_parameters() if p.name == "filters")
+    validator = jsonschema_rs.validator_for(param_schema)
+    for example in extract_from_schemas(operation):
+        assert isinstance(example, ParameterExample)
+        assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
+
+
 def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx):
     # When outer schema properties have examples but an allOf reference has
     # `additionalProperties: false` covering a different property set, assembled

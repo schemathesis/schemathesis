@@ -569,16 +569,21 @@ def _yield_examples_from_properties(
                 to_generate[name] = expanded_schema
                 continue
 
+            if bundle_storage is not None and BUNDLE_STORAGE_KEY not in expanded_schema:
+                validation_schema = {**expanded_schema, BUNDLE_STORAGE_KEY: bundle_storage}
+            else:
+                validation_schema = expanded_schema
+
             if example_keyword in expanded_schema:
                 candidate = expanded_schema[example_keyword]
-                if is_valid(candidate, expanded_schema):
+                if is_valid(candidate, validation_schema):
                     values.append(candidate)
 
             if examples_container_keyword in expanded_schema and isinstance(
                 expanded_schema[examples_container_keyword], list
             ):
                 for candidate in expanded_schema[examples_container_keyword]:
-                    if is_valid(candidate, expanded_schema):
+                    if is_valid(candidate, validation_schema):
                         values.append(candidate)
 
             values.extend(
