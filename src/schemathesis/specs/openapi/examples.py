@@ -212,20 +212,33 @@ def extract_top_level(
             ]
         else:
             definitions = [parameter.definition]
+        try:
+            param_schema = parameter.validation_schema
+            param_validator: jsonschema_rs.Validator | None = (
+                None if isinstance(param_schema, bool) else jsonschema_rs.validator_for(param_schema)
+            )
+        except Exception:
+            param_validator = None
         for definition in definitions:
+            validator = param_validator if definition is parameter.definition else None
             # Open API 2 also supports `example`
             for example_keyword in {"example", parameter.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:
-                    yield ParameterExample(
-                        container=parameter.location.container_name,
-                        name=parameter.name,
-                        value=definition[example_keyword],
-                    )
+                    value = definition[example_keyword]
+                    if _example_is_valid(value, validator):
+                        yield ParameterExample(
+                            container=parameter.location.container_name,
+                            name=parameter.name,
+                            value=value,
+                        )
         if parameter.adapter.examples_container_keyword in parameter.definition:
             for value in extract_inner_examples(
                 parameter.definition[parameter.adapter.examples_container_keyword], operation.schema
             ):
-                yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
+                if _example_is_valid(value, param_validator):
+                    yield ParameterExample(
+                        container=parameter.location.container_name, name=parameter.name, value=value
+                    )
         if "schema" in parameter.definition:
             schema = parameter.definition["schema"]
             resolver = RefResolver.from_schema(schema)
@@ -249,7 +262,7 @@ def extract_top_level(
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
         try:
-            body_schema = body.optimized_schema
+            body_schema = body.validation_schema
             body_validator: jsonschema_rs.Validator | None = (
                 None if isinstance(body_schema, bool) else jsonschema_rs.validator_for(body_schema)
             )
@@ -280,13 +293,13 @@ def extract_top_level(
             for example_keyword in {"example", body.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:
                     value = definition[example_keyword]
-                    if _body_example_is_valid(value, validator):
+                    if _example_is_valid(value, validator):
                         yield BodyExample(value=value, media_type=body.media_type)
         if body.adapter.examples_container_keyword in body.definition:
             for value in extract_inner_examples(
                 body.definition[body.adapter.examples_container_keyword], operation.schema
             ):
-                if _body_example_is_valid(value, body_validator):
+                if _example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
         if "schema" in body.definition:
             schema = body.definition["schema"]
@@ -530,11 +543,11 @@ def extract_from_schemas(
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
             ):
-                if _body_example_is_valid(value, body_validator):
+                if _example_is_valid(value, body_validator):
                     yield BodyExample(value=value, media_type=body.media_type)
 
 
-def _body_example_is_valid(value: Any, validator: jsonschema_rs.Validator | None) -> bool:
+def _example_is_valid(value: Any, validator: jsonschema_rs.Validator | None) -> bool:
     if validator is None:
         return True
     try:

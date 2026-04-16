@@ -1054,7 +1054,7 @@ def test(case):
                             "name": "SESSION",
                             "in": "header",
                             "required": True,
-                            "schema": {"type": "integer"},
+                            "schema": {"type": "string"},
                             "example": "test\ntest",
                         }
                     ],

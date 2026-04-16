@@ -12,6 +12,7 @@
 - False positive `positive_data_acceptance` when assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`) in the examples phase.
 - False positive `positive_data_acceptance` for property examples violating `anyOf`/`oneOf` constraints via bundled `$ref`s in the examples phase.
 - False positive `positive_data_acceptance` for content-encoded header parameters with object examples in the examples phase.
+- False positive `positive_data_acceptance` when a parameter-level `example` value violates its declared schema type in the examples phase.
 
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 

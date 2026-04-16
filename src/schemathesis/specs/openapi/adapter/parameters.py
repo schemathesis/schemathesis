@@ -263,6 +263,7 @@ class OpenApiComponent(ABC):
         "_optimized_schema",
         "_unoptimized_schema",
         "_raw_schema",
+        "_validation_schema",
         "_examples",
     )
 
@@ -270,6 +271,7 @@ class OpenApiComponent(ABC):
         self._optimized_schema: JsonSchema | NotSet = NOT_SET
         self._unoptimized_schema: JsonSchema | NotSet = NOT_SET
         self._raw_schema: JsonSchema | NotSet = NOT_SET
+        self._validation_schema: JsonSchema | NotSet = NOT_SET
         self._examples: list | NotSet = NOT_SET
 
     @property
@@ -295,6 +297,22 @@ class OpenApiComponent(ABC):
             self._raw_schema = self._get_raw_schema()
         assert not isinstance(self._raw_schema, NotSet)
         return self._raw_schema
+
+    @property
+    def validation_schema(self) -> JsonSchema:
+        """JSON schema for conformance validation — resolved but without generation-specific type injection."""
+        if self._validation_schema is NOT_SET:
+            self._validation_schema = to_json_schema(
+                self.raw_schema,
+                nullable_keyword=self.adapter.nullable_keyword,
+                update_quantifiers=False,
+                upgrade_legacy_exclusive_bounds=(
+                    self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
+                ),
+                name_to_uri=self.name_to_uri,
+            )
+        assert not isinstance(self._validation_schema, NotSet)
+        return self._validation_schema
 
     @abstractmethod
     def _get_raw_schema(self) -> JsonSchema:
@@ -468,6 +486,7 @@ class OpenApiBody(OpenApiComponent):
         "_optimized_schema",
         "_unoptimized_schema",
         "_raw_schema",
+        "_validation_schema",
         "_examples",
         "_positive_strategy_cache",
         "_negative_strategy_cache",
