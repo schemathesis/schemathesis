@@ -159,7 +159,7 @@ class RefreshableAuth:
     def __init__(self) -> None:
         self.refresh_token = None
 
-    def get(self, case: case.Case, ctx: schemathesis.AuthContext) -> str:
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         if self.refresh_token:
             return self.refresh_access_token()
         else:
