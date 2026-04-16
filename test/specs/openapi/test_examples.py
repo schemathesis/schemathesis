@@ -3102,3 +3102,40 @@ def test_assembled_body_missing_required_field_is_not_yielded(ctx):
     for example in extract_from_schemas(operation):
         assert isinstance(example, BodyExample)
         assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+
+
+def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx):
+    # When a required property has an unsatisfiable schema (e.g. `not: {}`),
+    # generation fails and that property is absent from the assembled body,
+    # making every assembled example schema-invalid. Such examples must not be yielded.
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string", "example": "Alice"},
+                                        "count": {"not": {}},
+                                    },
+                                    "required": ["name", "count"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/items"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    for example in extract_from_schemas(operation):
+        assert isinstance(example, BodyExample)
+        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
