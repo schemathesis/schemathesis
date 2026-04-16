@@ -652,7 +652,8 @@ def _cover_positive_for_type(
                     yield from cover_schema_iter(ctx, canonical)
         if enum is not NOT_SET:
             for value in enum:
-                yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
+                if is_valid(value, schema):
+                    yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
         elif const is not NOT_SET:
             yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
         elif ty is not None:
@@ -1424,7 +1425,8 @@ def _positive_array(
     ):
         # Ensure there is enough items to pass `minItems` if it is specified
         length = min_items or 1
-        enum_values = schema["items"]["enum"]
+        item_schema = schema["items"]
+        enum_values = [v for v in item_schema["enum"] if is_valid(v, item_schema)]
         if schema.get("uniqueItems") and length > 1:
             for i, variant in enumerate(enum_values):
                 others = [enum_values[j] for j in range(len(enum_values)) if j != i]
