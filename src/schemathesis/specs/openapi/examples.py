@@ -512,6 +512,10 @@ def extract_from_schemas(
             continue
         if isinstance(schema, bool):
             continue
+        try:
+            body_validator: jsonschema_rs.Validator | None = jsonschema_rs.validator_for(schema)
+        except Exception:
+            body_validator = None
         resolver = RefResolver.from_schema(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
         for example_keyword, examples_container_keyword in (("example", "examples"), ("x-example", "x-examples")):
@@ -526,7 +530,8 @@ def extract_from_schemas(
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
             ):
-                yield BodyExample(value=value, media_type=body.media_type)
+                if _body_example_is_valid(value, body_validator):
+                    yield BodyExample(value=value, media_type=body.media_type)
 
 
 def _body_example_is_valid(value: Any, validator: jsonschema_rs.Validator | None) -> bool:

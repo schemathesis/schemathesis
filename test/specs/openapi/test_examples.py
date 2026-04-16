@@ -852,16 +852,15 @@ def test_examples_in_any_of_in_schemas(ctx, key):
                                         "key": {
                                             key: [
                                                 {
+                                                    "enum": ["json-key-1-1", "json-key-1-2"],
                                                     "example": "json-key-1-1",
                                                     "examples": ["json-key-1-2"],
-                                                    "type": "string",
                                                 },
                                                 {
+                                                    "enum": ["json-key-2-1", "json-key-2-2"],
                                                     "example": "json-key-2-1",
                                                     "examples": ["json-key-2-2"],
-                                                    "type": "string",
                                                 },
-                                                True,
                                             ]
                                         }
                                     },
@@ -2770,9 +2769,11 @@ def test_branch_required_yields_disjoint_sets(ctx, keyword):
                 },
                 "oneOf": [{"required": ["shared_opt"]}, {"required": ["shared_opt", "extra"]}],
             },
+            # Branch 2 requires `shared_opt`, which is also required by branch 1.
+            # Any body satisfying branch 2 also satisfies branch 1, so branch 2 is
+            # unsatisfiable in this oneOf. The body validator correctly filters it out.
             [
                 {"media_type": "application/json", "value": {"base": "x", "shared_opt": 0}},
-                {"media_type": "application/json", "value": {"base": "x", "shared_opt": 0, "extra": False}},
             ],
         ),
     ],
@@ -3134,6 +3135,49 @@ def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx)
     )
     schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/items"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    for example in extract_from_schemas(operation):
+        assert isinstance(example, BodyExample)
+        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+
+
+def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx):
+    # When outer schema properties have examples but an allOf reference has
+    # `additionalProperties: false` covering a different property set, assembled
+    # bodies with the outer properties are schema-invalid and must not be yielded.
+    schema = ctx.openapi.build_schema(
+        {
+            "/gateways": {
+                "patch": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {"id": {"type": "string"}},
+                                            "additionalProperties": False,
+                                        }
+                                    ],
+                                    "properties": {
+                                        "etag": {"type": "string", "example": "abc"},
+                                        "location": {"type": "string", "example": "eastus"},
+                                    },
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/gateways"]["PATCH"]
     body_schema = operation.body[0].optimized_schema
     validator = jsonschema_rs.validator_for(body_schema)
     for example in extract_from_schemas(operation):

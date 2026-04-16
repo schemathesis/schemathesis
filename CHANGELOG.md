@@ -9,6 +9,7 @@
 - Crash in the examples phase when a property has an unsatisfiable schema (e.g. `not: {}`).
 - False positive `positive_data_acceptance` when `required` lists fields absent from `properties` in the examples phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
+- False positive `positive_data_acceptance` when assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`) in the examples phase.
 
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 
