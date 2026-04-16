@@ -161,3 +161,108 @@ def test_required_property_not_in_properties_is_generated(ctx):
     assert positive_bodies, "Expected at least one body case"
     for body in positive_bodies:
         assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+
+
+def test_invalid_enum_values_excluded_from_positive_cases(ctx):
+    # When a schema property has `type: string` but the enum contains a non-string value (false),
+    # coverage must not emit the invalid enum value in POSITIVE mode.
+    # Such values commonly arise from YAML deserialization (e.g. bare `NO` parsed as boolean false).
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "country": {
+                                            "type": "string",
+                                            # `false` is an invalid enum value for type:string
+                                            "enum": ["US", "GB", False],
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/items"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    positive_bodies = [c.body for c in cases if c.body is not None]
+    assert positive_bodies, "Expected at least one body case"
+    for body in positive_bodies:
+        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+
+
+def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
+    # When an array property's items schema has `type: string` but the enum contains
+    # a non-string value (false), coverage must not emit arrays with the invalid value.
+    # Such values commonly arise from YAML deserialization (e.g. bare `NO` parsed as boolean false).
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "countries": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                # `false` is an invalid enum value for type:string
+                                                "enum": ["US", "GB", False],
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/items"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    positive_bodies = [c.body for c in cases if c.body is not None]
+    assert positive_bodies, "Expected at least one body case"
+    for body in positive_bodies:
+        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
