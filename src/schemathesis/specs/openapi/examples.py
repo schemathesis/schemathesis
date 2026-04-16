@@ -220,7 +220,18 @@ def extract_top_level(
         except Exception:
             param_validator = None
         for definition in definitions:
-            validator = param_validator if definition is parameter.definition else None
+            if definition is parameter.definition:
+                validator = param_validator
+            else:
+                # Expanded subschema (schema itself or an anyOf/oneOf branch).
+                # Validate against the subschema's own constraints so that:
+                # - A schema-level `example` that violates the schema's own pattern is rejected.
+                # - A oneOf/anyOf branch example is validated against the branch (not the full
+                #   combined schema, which would reject strings valid for multiple branches).
+                try:
+                    validator = None if isinstance(definition, bool) else jsonschema_rs.validator_for(definition)
+                except Exception:
+                    validator = None
             # Open API 2 also supports `example`
             for example_keyword in {"example", parameter.adapter.example_keyword}:
                 if isinstance(definition, dict) and example_keyword in definition:
