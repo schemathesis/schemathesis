@@ -258,7 +258,8 @@ def extract_top_level(
                             container=parameter.location.container_name, name=parameter.name, value=value
                         )
         for value in find_matching_in_responses(responses, parameter.name):
-            yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
+            if _example_is_valid(value, param_validator):
+                yield ParameterExample(container=parameter.location.container_name, name=parameter.name, value=value)
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
         try:
@@ -496,7 +497,7 @@ def extract_from_schemas(
     merge_ref_siblings = operation.schema.adapter.ref_siblings
     for parameter in operation.iter_parameters():
         try:
-            schema = parameter.optimized_schema
+            schema = parameter.validation_schema
         except TypeError:
             # Invalid schema (e.g., non-string pattern value)
             continue
@@ -519,7 +520,7 @@ def extract_from_schemas(
     for alternative in operation.body:
         body = cast(OpenApiBody, alternative)
         try:
-            schema = body.optimized_schema
+            schema = body.validation_schema
         except TypeError:
             # Invalid schema (e.g., non-string pattern value)
             continue

@@ -3105,6 +3105,43 @@ def test_assembled_body_missing_required_field_is_not_yielded(ctx):
         assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
 
 
+def test_response_derived_parameter_example_violating_schema_is_skipped(ctx):
+    # When a response example contains a field that matches a request parameter name but
+    # violates that parameter's schema constraints
+    schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "page_size",
+                            "in": "query",
+                            "schema": {"type": "integer", "maximum": 300},
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"page_size": {"type": "integer"}},
+                                    },
+                                    "example": {"page_size": 80839828},
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/items"]["GET"]
+    assert list(extract_top_level(operation)) == []
+
+
 def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx):
     # When a required property has an unsatisfiable schema (e.g. `not: {}`),
     # generation fails and that property is absent from the assembled body,
