@@ -137,14 +137,14 @@ import schemathesis
 
 @schemathesis.auth()
 class TokenAuth:
-    def get(self, case, ctx):
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         response = requests.post(
             "http://localhost:8000/auth/token",
             json={"username": "demo", "password": "test"}
         )
         return response.json()["access_token"]
 
-    def set(self, case, data, ctx):
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
         case.headers = case.headers or {}
         case.headers["Authorization"] = f"Bearer {data}"
 ```
@@ -156,16 +156,16 @@ Schemathesis caches tokens for 300 seconds by default.
 ```python
 @schemathesis.auth(refresh_interval=600)  # Refresh every 10 minutes
 class RefreshableAuth:
-    def __init__(self):
+    def __init__(self) -> None:
         self.refresh_token = None
 
-    def get(self, case, ctx):
+    def get(self, case: case.Case, ctx: schemathesis.AuthContext) -> str:
         if self.refresh_token:
             return self.refresh_access_token()
         else:
             return self.login()
     
-    def login(self):
+    def login(self) -> str:
         response = requests.post(
             "http://localhost:8000/auth/login",
             json={"username": "demo", "password": "test"}
@@ -174,7 +174,7 @@ class RefreshableAuth:
         self.refresh_token = data["refresh_token"]
         return data["access_token"]
 
-    def refresh_access_token(self):
+    def refresh_access_token(self) -> str:
         response = requests.post(
             "http://localhost:8000/auth/refresh",
             headers={"Authorization": f"Bearer {self.refresh_token}"}
@@ -199,7 +199,7 @@ Cache different tokens based on specific criteria like OAuth scopes:
 ```python
 @schemathesis.auth(cache_by_key=lambda case, ctx: get_required_scopes(ctx))
 class ScopedAuth:
-    def get(self, case, ctx):
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         scopes = get_required_scopes(ctx)
         response = requests.post(
             "http://localhost:8000/auth/token",
@@ -213,7 +213,7 @@ class ScopedAuth:
 
     # Define `set` as before ... 
 
-def get_required_scopes(ctx):
+def get_required_scopes(ctx: schemathesis.AuthContext) -> str:
     """Extract required OAuth scopes from operation security requirements"""
     security = ctx.operation.definition.raw.get("security", [])
     if not security:
@@ -240,7 +240,7 @@ Apply authentication only to specific endpoints:
 ```python
 @schemathesis.auth().apply_to(path="/users/").skip_for(method="POST")
 class UserAuth:
-    def get(self, case, ctx):
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         response = requests.post(
             "http://localhost:8000/auth/user-token",
             json={"username": "demo", "password": "test"}
@@ -251,7 +251,7 @@ class UserAuth:
 
 @schemathesis.auth().apply_to(path="/admin/")
 class AdminAuth:
-    def get(self, case, ctx):
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         response = requests.post(
             "http://localhost:8000/auth/admin-token",
             json={"username": "admin", "password": "admin-pass"}
@@ -349,7 +349,7 @@ from requests.auth import HTTPDigestAuth
 schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
 
 @schema.parametrize()
-def test_api(case):
+def test_api(case: schemathesis.Case) -> None:
     # HTTP Basic
     case.call_and_validate(auth=("user", "password"))
 
@@ -367,17 +367,17 @@ Register auth at the schema level for all tests:
 ```python
 @schema.auth()
 class APITokenAuth:
-    def get(self, case, ctx):
+    def get(self, case: schemathesis.Case, ctx: schemathesis.AuthContext) -> str:
         # Same implementation as CLI examples above
         response = requests.post("http://localhost:8000/auth/token", ...)
         return response.json()["access_token"]
 
-    def set(self, case, data, ctx):
+    def set(self, case: schemathesis.Case, data: str, ctx: schemathesis.AuthContext) -> None:
         case.headers = case.headers or {}
         case.headers["Authorization"] = f"Bearer {data}"
 
 @schema.parametrize()
-def test_api(case):
+def test_api(case: schemathesis.Case) -> None:
     # Auth applied automatically
     case.call_and_validate()
 ```
@@ -387,7 +387,7 @@ Or register for specific tests only:
 ```python
 @schema.auth(MyAuth)
 @schema.parametrize() 
-def test_protected_endpoints(case):
+def test_protected_endpoints(case: schemathesis.Case) -> None:
     case.call_and_validate()
 ```
 
@@ -399,7 +399,7 @@ For persistent sessions or custom client configuration:
 import requests
 
 @schema.parametrize()
-def test_with_session(case):
+def test_with_session(case: schemathesis.Case) -> None:
     with requests.Session() as session:
         session.auth = ("user", "password")
         case.call_and_validate(session=session)
