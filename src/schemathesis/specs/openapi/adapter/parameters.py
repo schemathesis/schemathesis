@@ -442,6 +442,11 @@ class OpenApiParameter(OpenApiComponent):
 
     def _get_default_type(self) -> str | None:
         """Return default type if parameter is in string-type location."""
+        # Content-encoded parameters (`content:` instead of `schema:`) carry a
+        # pre-serialization schema (e.g. object) — not the wire type.  Don't
+        # inject `type: string` for them; their schema already describes the value.
+        if "schema" not in self.definition:
+            return None
         return "string" if self.location.is_in_header else None
 
 

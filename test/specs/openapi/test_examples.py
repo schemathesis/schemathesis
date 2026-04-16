@@ -3292,3 +3292,47 @@ def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx
     for example in extract_from_schemas(operation):
         assert isinstance(example, BodyExample)
         assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
+
+
+def test_content_encoded_header_parameter_example_is_valid(ctx):
+    # When a header parameter uses `content:` with a nested $ref
+    raw = ctx.openapi.build_schema(
+        {
+            "/files": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "x-metadata",
+                            "in": "header",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Metadata"},
+                                }
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "ParentId": {"type": "string", "example": "1234"},
+                "Metadata": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "example": "Documents"},
+                        "parent_id": {"$ref": "#/components/schemas/ParentId"},
+                    },
+                    "required": ["name"],
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    operation = schema["/files"]["POST"]
+    param = next(p for p in operation.iter_parameters() if p.name == "x-metadata")
+    validator = jsonschema_rs.validator_for(param.optimized_schema)
+    for example in extract_from_schemas(operation):
+        assert isinstance(example, ParameterExample)
+        assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
