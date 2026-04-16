@@ -607,6 +607,8 @@ def _yield_examples_from_properties(
                 generated = _generate_single_example(subschema, config)
             except Exception:
                 continue
+            if not is_valid(generated, subschema):
+                continue
             variants[name] = [generated]
 
         total_combos = max(len(v) for v in variants.values())
@@ -698,10 +700,14 @@ def extract_from_schema(
                 break
 
     # Required fields absent from `properties` have no annotated example; add them
-    # with an unconstrained schema so that a value is generated for each.
-    required_missing = [f for f in schema.get("required", []) if f not in properties_to_process]
+    # with a non-null schema so that a value is generated for each.
+    required = set(schema.get("required", []))
+    required_missing = [f for f in required if f not in properties_to_process]
     if required_missing:
-        properties_to_process = {**properties_to_process, **{f: {} for f in required_missing}}
+        properties_to_process = {
+            **properties_to_process,
+            **{f: {"not": {"type": "null"}} for f in required_missing},
+        }
 
     if properties_to_process:
         # Detect top-level oneOf/anyOf branches for per-branch generation
@@ -713,7 +719,7 @@ def extract_from_schema(
                 break
 
         if branches:
-            yield from _yield_examples_per_branch(
+            for value in _yield_examples_per_branch(
                 operation=operation,
                 parent_properties=properties_to_process,
                 branches=branches,
@@ -723,9 +729,11 @@ def extract_from_schema(
                 current_path=current_path,
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
-            )
+            ):
+                if all(f in value for f in required):
+                    yield value
         else:
-            yield from _yield_examples_from_properties(
+            for value in _yield_examples_from_properties(
                 operation=operation,
                 properties=properties_to_process,
                 example_keyword=example_keyword,
@@ -734,7 +742,9 @@ def extract_from_schema(
                 current_path=current_path,
                 bundle_storage=bundle_storage,
                 merge_ref_siblings=merge_ref_siblings,
-            )
+            ):
+                if all(f in value for f in required):
+                    yield value
 
     elif "items" in schema and isinstance(schema["items"], dict):
         # Each inner value should be wrapped in an array, respecting minItems
