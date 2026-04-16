@@ -215,7 +215,9 @@ def extract_top_level(
         try:
             param_schema = parameter.validation_schema
             param_validator: jsonschema_rs.Validator | None = (
-                None if isinstance(param_schema, bool) else jsonschema_rs.validator_for(param_schema)
+                None
+                if isinstance(param_schema, bool)
+                else jsonschema_rs.validator_for(param_schema, validate_formats=True)
             )
         except Exception:
             param_validator = None
@@ -229,7 +231,11 @@ def extract_top_level(
                 # - A oneOf/anyOf branch example is validated against the branch (not the full
                 #   combined schema, which would reject strings valid for multiple branches).
                 try:
-                    validator = None if isinstance(definition, bool) else jsonschema_rs.validator_for(definition)
+                    validator = (
+                        None
+                        if isinstance(definition, bool)
+                        else jsonschema_rs.validator_for(definition, validate_formats=True)
+                    )
                 except Exception:
                     validator = None
             # Open API 2 also supports `example`

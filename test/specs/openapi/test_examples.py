@@ -3171,6 +3171,42 @@ def test_schema_level_parameter_example_violating_pattern_is_skipped(ctx):
     assert list(extract_top_level(operation)) == []
 
 
+def test_response_derived_parameter_example_violating_format_is_skipped(ctx):
+    # When a response-body example provides a value for a path/query parameter whose schema
+    # declares a `format` constraint (e.g. uuid), an example that doesn't satisfy the format
+    # must be rejected rather than emitted as a POSITIVE case.
+    schema = ctx.openapi.build_schema(
+        {
+            "/sensors/{sensorId}": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "sensorId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"type": "object"},
+                                    "example": {"sensorId": "not-a-uuid-xyzg"},
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/sensors/{sensorId}"]["GET"]
+    assert list(extract_top_level(operation)) == []
+
+
 def test_assembled_body_with_unsatisfiable_required_property_is_not_yielded(ctx):
     # When a required property has an unsatisfiable schema (e.g. `not: {}`),
     # generation fails and that property is absent from the assembled body,
