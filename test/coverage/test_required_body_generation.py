@@ -1,3 +1,5 @@
+import jsonschema_rs
+
 import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
@@ -109,3 +111,53 @@ def test_numeric_pattern_value(ctx):
 
     # Cases should be generated despite the invalid pattern value
     assert len(cases) > 0
+
+
+def test_required_property_not_in_properties_is_generated(ctx):
+    # When a schema's `required` array names a property that has no entry in
+    # `properties`, coverage must still emit a value for that key so the
+    # generated body satisfies the `required` constraint and is schema-valid.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/listeners": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    # `host` is required but has no definition in properties
+                                    "required": ["name", "host"],
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "port": {"type": "integer"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/listeners"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    positive_bodies = [c.body for c in cases if c.body is not None]
+    assert positive_bodies, "Expected at least one body case"
+    for body in positive_bodies:
+        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"

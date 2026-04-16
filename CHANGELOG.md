@@ -8,6 +8,7 @@
 - False positive `positive_data_acceptance` when a property `example` violates its field's own type in the examples & coverage phases.
 - Crash in the examples phase when a property has an unsatisfiable schema (e.g. `not: {}`).
 - False positive `positive_data_acceptance` when `required` lists fields absent from `properties` in the examples phase.
+- Schema-invalid body when `required` names a property absent from `properties` in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
 - False positive `positive_data_acceptance` when assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`) in the examples phase.
 - False positive `positive_data_acceptance` for property examples violating `anyOf`/`oneOf` constraints via bundled `$ref`s in the examples phase.
