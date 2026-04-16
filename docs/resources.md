@@ -44,6 +44,12 @@ This page collects articles, papers, videos, tutorials, and integrations about S
 
 ## Articles
 
+- [Stop Writing API Tests Manually — Let Your OpenAPI Spec Do the Work](https://www.davidmello.com/software-testing/test-automation/automated-api-testing-with-schemathesis) by **David Mello**
+
+    - **Description**: End-to-end walkthrough covering CLI usage, authentication hooks, stateful testing, and CI integration — with real examples against PetStore and RESTful Booker.
+
+    - **Date**: 15 Apr 2026
+
 - [Introduction to Schemathesis: A Tool for Automatic Test Data Generation for Web APIs](https://gihyo.jp/article/2025/07/monthly-python-2507) (in Japanese) by **@ryu22e**
 
     - **Description**: A great introduction to Schemathesis 4 that covers both CLI usage and pytest integration with many practical examples.
