@@ -804,7 +804,7 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
                             "name": "SESSION",
                             "in": "header",
                             "required": True,
-                            "schema": {"type": "integer"},
+                            "schema": {"type": "string"},
                             "example": "test\ntest",
                         }
                     ],

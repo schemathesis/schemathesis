@@ -3251,6 +3251,32 @@ def test_assembled_parameter_example_violating_schema_is_not_yielded(ctx):
         assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
 
 
+def test_parameter_example_with_wrong_type_is_not_yielded(ctx):
+    raw = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "version",
+                            "in": "query",
+                            "example": 2,
+                            "schema": {
+                                "type": "string",
+                                "enum": ["2", "3", "4"],
+                                "default": "2",
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    assert list(extract_top_level(schema["/search"]["GET"])) == []
+
+
 def test_assembled_body_violating_allof_additional_properties_is_not_yielded(ctx):
     # When outer schema properties have examples but an allOf reference has
     # `additionalProperties: false` covering a different property set, assembled
