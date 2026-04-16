@@ -1110,11 +1110,20 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str) -> JsonSchemaObject:
     if ty == "object":
         properties = schema.get("properties")
         if properties is not None:
+            required = schema.get("required", [])
+            if schema.get("additionalProperties") is not False:
+                extra: dict[str, JsonSchemaObject] = {k: {} for k in required if k not in properties}
+            else:
+                extra = {}
+            all_properties = {
+                **{k: _get_properties(v) for k, v in properties.items()},
+                **extra,
+            }
             return {
                 **schema,
-                "required": list(properties),
+                "required": list(all_properties),
                 "type": ty,
-                "properties": {k: _get_properties(v) for k, v in properties.items()},
+                "properties": all_properties,
             }
     return {**schema, "type": ty}
 
