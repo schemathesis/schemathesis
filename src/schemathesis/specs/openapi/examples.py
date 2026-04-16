@@ -697,6 +697,12 @@ def extract_from_schema(
                     properties_to_process = expanded_schema["properties"]
                 break
 
+    # Required fields absent from `properties` have no annotated example; add them
+    # with an unconstrained schema so that a value is generated for each.
+    required_missing = [f for f in schema.get("required", []) if f not in properties_to_process]
+    if required_missing:
+        properties_to_process = {**properties_to_process, **{f: {} for f in required_missing}}
+
     if properties_to_process:
         # Detect top-level oneOf/anyOf branches for per-branch generation
         branches: list[dict[str, Any]] | None = None

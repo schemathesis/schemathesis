@@ -3066,3 +3066,39 @@ def test_unsatisfiable_property_schema_does_not_crash(ctx):
     assert list(extract_from_schemas(operation)) == [
         BodyExample(value={"amount": 150000}, media_type="application/json")
     ]
+
+
+def test_assembled_body_missing_required_field_is_not_yielded(ctx):
+    # When `required` lists a field absent from `properties`, no property-level example
+    # can provide it; every assembled body will be schema-invalid and must not be yielded.
+    schema = ctx.openapi.build_schema(
+        {
+            "/listener": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string", "example": "proxy"},
+                                        "port": {"type": "integer", "example": 8080},
+                                    },
+                                    "required": ["name", "port", "listener_key"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/listener"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    for example in extract_from_schemas(operation):
+        assert isinstance(example, BodyExample)
+        assert validator.is_valid(example.value), f"Invalid body example yielded: {example.value!r}"
