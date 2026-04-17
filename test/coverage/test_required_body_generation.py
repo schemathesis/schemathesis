@@ -368,6 +368,65 @@ def test_allof_with_explicit_type_object_includes_required_fields(ctx):
         assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
 
 
+def test_format_invalid_default_not_used_as_const(ctx):
+    # When a schema property has format: duration with a default that is NOT a valid
+    # ISO 8601 duration (e.g. Azure's "7.00:00:00" instead of "P7D"), the coverage
+    # generator must NOT emit the invalid default as a const value.  Doing so produces
+    # a body that passes is_valid() (no format validation) but is rejected by the
+    # conformance validator which uses validate_formats=True.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/jobs": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "constraints": {
+                                            "type": "object",
+                                            "properties": {
+                                                "maxWallClockTime": {
+                                                    "type": "string",
+                                                    "format": "duration",
+                                                    # Azure uses "7.00:00:00" — not valid ISO 8601
+                                                    "default": "7.00:00:00",
+                                                }
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/jobs"]["PUT"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+    positive_bodies = [c.body for c in cases if c.body is not None]
+    assert positive_bodies, "Expected at least one body case"
+    for body in positive_bodies:
+        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+
+
 def test_swagger2_array_query_param_with_top_level_enum(ctx):
     # When a Swagger 2.0 array parameter has both top-level `enum` and `items` (a contradictory
     # codegen artifact), coverage must still emit the required parameter with a valid array value.

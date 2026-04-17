@@ -21,6 +21,7 @@
 - False positive `positive_data_acceptance` when a response-derived parameter example violates the parameter's schema constraints in the examples phase.
 - False positive `positive_data_acceptance` when a schema-level parameter `example` violates the parameter's own constraints (e.g. `pattern`) in the examples phase.
 - False positive `positive_data_acceptance` when a response-derived parameter example violates the parameter's `format` constraint in the examples phase.
+- Schema-invalid POSITIVE body when a schema property's `default` or `example` fails `format` validation (e.g. `"7.00:00:00"` for `format: duration`) in the coverage phase.
 
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 
