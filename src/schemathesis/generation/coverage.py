@@ -640,8 +640,15 @@ def _cover_positive_for_type(
                         # Additive constraint — merge parent context so sub-schema knows field definitions
                         yield from cover_schema_iter(ctx, _merge_with_parent_context(schema, effective))
         all_of = schema.get("allOf")
+        # Set when canonicalish is used for allOf: the canonical schema covers the full merged
+        # constraints, so the outer schema's type/properties generation must be skipped to avoid
+        # producing cases that violate allOf's required fields.
+        allof_handles_all = False
         if all_of is not None:
-            if len(all_of) == 1:
+            # When the outer schema also has its own properties or required fields, those constraints
+            # must be merged with allOf to avoid generating cases that violate allOf's required fields.
+            outer_has_properties = bool(schema.get("properties") or schema.get("required"))
+            if len(all_of) == 1 and not outer_has_properties:
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
                 with suppress(jsonschema_rs.ValidationError):
@@ -650,29 +657,35 @@ def _cover_positive_for_type(
                             all_of[idx] = ctx.resolve_ref(sub_schema["$ref"])
                     canonical = canonicalish(schema)
                     yield from cover_schema_iter(ctx, canonical)
-        if enum is not NOT_SET:
-            for value in enum:
-                if is_valid(value, schema):
-                    yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
-        elif const is not NOT_SET:
-            yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
-        elif ty is not None:
-            if ty == "null":
-                yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
-            elif ty == "boolean":
-                yield PositiveValue(True, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
-                yield PositiveValue(False, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value")
-            elif ty == "string":
-                yield from _positive_string(ctx, schema)
-            elif ty == "integer" or ty == "number":
-                yield from _positive_number(ctx, schema)
-            elif ty == "array":
-                yield from _positive_array(ctx, schema, cast(list, template))
-            elif ty == "object":
+                allof_handles_all = True
+        if not allof_handles_all:
+            if enum is not NOT_SET:
+                for value in enum:
+                    if is_valid(value, schema):
+                        yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
+            elif const is not NOT_SET:
+                yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
+            elif ty is not None:
+                if ty == "null":
+                    yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
+                elif ty == "boolean":
+                    yield PositiveValue(
+                        True, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value"
+                    )
+                    yield PositiveValue(
+                        False, scenario=CoverageScenario.VALID_BOOLEAN, description="Valid boolean value"
+                    )
+                elif ty == "string":
+                    yield from _positive_string(ctx, schema)
+                elif ty == "integer" or ty == "number":
+                    yield from _positive_number(ctx, schema)
+                elif ty == "array":
+                    yield from _positive_array(ctx, schema, cast(list, template))
+                elif ty == "object":
+                    yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
+            elif "properties" in schema or "required" in schema:
                 yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
-        elif "properties" in schema or "required" in schema:
-            yield from _positive_object(ctx, _with_effective_required(schema), cast(dict, template))
-        elif "not" in schema and isinstance(schema["not"], dict | bool):
+        if "not" in schema and isinstance(schema["not"], dict | bool):
             # For 'not' schemas: generate negative cases of inner schema (violations)
             # These violations are positive for the outer schema, so flip the mode
             nctx = ctx.with_negative()
