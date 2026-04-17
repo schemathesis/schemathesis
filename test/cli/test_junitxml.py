@@ -264,7 +264,7 @@ def test_group_by_phase_separate_suites(cli, tmp_path, schema_url):
         f"--report-junit-path={xml_path}",
         "--seed=1",
         "--checks=all",
-        config={"reports": {"junit": {"group-by": "phase"}}},
+        config={"reports": {"group-by": "phase"}},
     )
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
@@ -288,7 +288,7 @@ def test_group_by_phase_skip_isolation(cli, tmp_path, schema_url):
         f"--report-junit-path={xml_path}",
         "--seed=1",
         "--checks=all",
-        config={"reports": {"junit": {"group-by": "phase"}}},
+        config={"reports": {"group-by": "phase"}},
     )
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
@@ -338,7 +338,7 @@ def test_group_by_phase_via_config_file(cli, tmp_path, schema_url):
         "--seed=1",
         "--phases=examples,coverage",
         "--checks=all",
-        config={"reports": {"junit": {"group-by": "phase"}}},
+        config={"reports": {"group-by": "phase"}},
     )
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()

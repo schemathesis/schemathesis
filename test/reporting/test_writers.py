@@ -9,7 +9,7 @@ import pytest
 
 from schemathesis.config import ProjectConfig
 from schemathesis.config._output import OutputConfig
-from schemathesis.config._report import JunitGroupBy
+from schemathesis.config._report import ReportGroupBy
 from schemathesis.reporting import HarWriter, JunitXmlWriter, NdjsonWriter, VcrWriter
 
 
@@ -71,7 +71,7 @@ class TestJunitXmlWriterOperationMode:
         """Default mode produces a single testsuite named 'schemathesis'."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.OPERATION) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.OPERATION) as writer:
             writer.record_scenario(label="GET /users", elapsed_sec=1.0, failures=[], skip_reason=None, config=config)
         root = _parse_junit(stream)
         assert root.tag == "testsuites"
@@ -83,7 +83,7 @@ class TestJunitXmlWriterOperationMode:
         """When examples phase skips and coverage phase succeeds, skip is cleared."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.OPERATION) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.OPERATION) as writer:
             # Examples phase: skip
             writer.record_scenario(
                 label="GET /users",
@@ -107,7 +107,7 @@ class TestJunitXmlWriterOperationMode:
         """If a success is recorded before a skip, the skip is ignored."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.OPERATION) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.OPERATION) as writer:
             # Coverage phase: success (runs first in this scenario)
             writer.record_scenario(
                 label="GET /users", elapsed_sec=0.5, failures=[], skip_reason=None, config=config, phase="Coverage"
@@ -131,7 +131,7 @@ class TestJunitXmlWriterOperationMode:
         """When only examples phase runs and it skips, the skip is preserved."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.OPERATION) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.OPERATION) as writer:
             writer.record_scenario(
                 label="GET /users",
                 elapsed_sec=0.0,
@@ -151,7 +151,7 @@ class TestJunitXmlWriterOperationMode:
         """When an error is recorded for a label, any prior skip is cleared."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.OPERATION) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.OPERATION) as writer:
             writer.record_scenario(
                 label="GET /users",
                 elapsed_sec=0.0,
@@ -191,7 +191,7 @@ class TestJunitXmlWriterPhaseMode:
         """Phase mode creates one testsuite per phase."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.PHASE) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.PHASE) as writer:
             writer.record_scenario(
                 label="GET /users",
                 elapsed_sec=0.0,
@@ -219,7 +219,7 @@ class TestJunitXmlWriterPhaseMode:
         """In phase mode, skip in examples does not affect coverage suite."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.PHASE) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.PHASE) as writer:
             writer.record_scenario(
                 label="GET /users",
                 elapsed_sec=0.0,
@@ -244,7 +244,7 @@ class TestJunitXmlWriterPhaseMode:
         """Phase mode handles multiple operations in the same phase."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.PHASE) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.PHASE) as writer:
             writer.record_scenario(
                 label="GET /users", elapsed_sec=0.5, failures=[], skip_reason=None, config=config, phase="Coverage"
             )
@@ -263,7 +263,7 @@ class TestJunitXmlWriterPhaseMode:
     def test_phase_error_in_correct_suite(self):
         """Errors are placed in the correct phase suite."""
         stream = StringIO()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.PHASE) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.PHASE) as writer:
             writer.record_error(label="GET /users", message="Timeout", phase="Coverage")
         root = _parse_junit(stream)
         suites = list(root)
@@ -277,7 +277,7 @@ class TestJunitXmlWriterPhaseMode:
         """When no phase is provided in phase mode, uses 'other' suite."""
         stream = StringIO()
         config = OutputConfig()
-        with JunitXmlWriter(output=stream, group_by=JunitGroupBy.PHASE) as writer:
+        with JunitXmlWriter(output=stream, group_by=ReportGroupBy.PHASE) as writer:
             writer.record_scenario(label="GET /users", elapsed_sec=0.5, failures=[], skip_reason=None, config=config)
         root = _parse_junit(stream)
         suites = list(root)
@@ -285,39 +285,36 @@ class TestJunitXmlWriterPhaseMode:
         assert suites[0].attrib["name"] == "schemathesis - other"
 
 
-class TestJunitReportConfig:
-    """Tests for JUnit report configuration parsing."""
+class TestReportGroupByConfig:
+    """Tests for report group-by configuration parsing."""
 
     def test_default_group_by(self):
-        from schemathesis.config._report import JunitReportConfig
+        from schemathesis.config._report import ReportsConfig
 
-        config = JunitReportConfig.from_dict({})
-        assert config.group_by == JunitGroupBy.OPERATION
-        assert config.enabled is False
+        config = ReportsConfig.from_dict({})
+        assert config.group_by == ReportGroupBy.OPERATION
 
     def test_group_by_phase(self):
-        from schemathesis.config._report import JunitReportConfig
+        from schemathesis.config._report import ReportsConfig
 
-        config = JunitReportConfig.from_dict({"enabled": True, "group-by": "phase"})
-        assert config.group_by == JunitGroupBy.PHASE
-        assert config.enabled is True
+        config = ReportsConfig.from_dict({"group-by": "phase"})
+        assert config.group_by == ReportGroupBy.PHASE
 
     def test_group_by_operation_explicit(self):
-        from schemathesis.config._report import JunitReportConfig
+        from schemathesis.config._report import ReportsConfig
 
-        config = JunitReportConfig.from_dict({"enabled": True, "group-by": "operation"})
-        assert config.group_by == JunitGroupBy.OPERATION
+        config = ReportsConfig.from_dict({"group-by": "operation"})
+        assert config.group_by == ReportGroupBy.OPERATION
 
-    def test_path_enables_report(self):
-        from schemathesis.config._report import JunitReportConfig
+    def test_group_by_with_junit_enabled(self):
+        from schemathesis.config._report import ReportsConfig
 
-        config = JunitReportConfig.from_dict({"path": "/tmp/junit.xml", "group-by": "phase"})
-        assert config.enabled is True
-        assert config.path == Path("/tmp/junit.xml")
-        assert config.group_by == JunitGroupBy.PHASE
+        config = ReportsConfig.from_dict({"group-by": "phase", "junit": {"enabled": True}})
+        assert config.group_by == ReportGroupBy.PHASE
+        assert config.junit.enabled is True
 
     def test_invalid_group_by(self):
-        from schemathesis.config._report import JunitReportConfig
+        from schemathesis.config._report import ReportsConfig
 
         with pytest.raises(ValueError):
-            JunitReportConfig.from_dict({"group-by": "invalid"})
+            ReportsConfig.from_dict({"group-by": "invalid"})

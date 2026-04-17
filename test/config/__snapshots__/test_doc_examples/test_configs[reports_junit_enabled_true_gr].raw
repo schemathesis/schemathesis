@@ -1,1 +1,0 @@
-SchemathesisConfig(reports=ReportsConfig(junit=JunitReportConfig(enabled=True, group_by=<JunitGroupBy.PHASE: 'phase'>)))

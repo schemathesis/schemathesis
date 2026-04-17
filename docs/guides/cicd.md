@@ -104,10 +104,12 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 continue-on-failure = true
 
 # Generate reports
+# Optionally, split results by phase for clearer CI reporting
+# [reports]
+# group-by = "phase"
+
 [reports.junit]
 enabled = true
-# Optionally, split results by phase for clearer CI reporting
-# group-by = "phase"
 ```
 
 Then run with just:

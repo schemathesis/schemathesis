@@ -11,10 +11,10 @@ import jsonschema_rs
 import pytest
 
 from schemathesis.config import (
-    JunitReportConfig,
     OutputConfig,
     ReportConfig,
     ReportFormat,
+    ReportGroupBy,
     ReportsConfig,
     SanitizationConfig,
 )
@@ -268,6 +268,7 @@ def _serialize_writer_config(schema: BaseSchema) -> dict:
         "seed": schema.config.seed,
         "command": " ".join(sys.argv),
         "preserve_bytes": reports.preserve_bytes,
+        "group_by": reports.group_by.value,
         "sanitization": dataclasses.asdict(schema.config.output.sanitization),
         "directory": str(reports.directory),
         "paths": paths,
@@ -303,12 +304,10 @@ def _open_writers_from_config(
     reports = ReportsConfig(
         directory=writer_config["directory"],
         preserve_bytes=writer_config["preserve_bytes"],
+        group_by=ReportGroupBy(writer_config.get("group_by", "operation")),
         vcr=_rc(ReportFormat.VCR),
         har=_rc(ReportFormat.HAR),
-        junit=JunitReportConfig(
-            enabled=ReportFormat.JUNIT.value in paths,
-            path=Path(paths[ReportFormat.JUNIT.value]) if paths.get(ReportFormat.JUNIT.value) else None,
-        ),
+        junit=_rc(ReportFormat.JUNIT),
         allure=_rc(ReportFormat.ALLURE),
     )
 
@@ -332,7 +331,11 @@ def _open_writers_from_config(
             writers.append(har_writer)
         if ReportFormat.JUNIT.value in paths:
             writers.append(
-                JunitXmlWriter(output=reports.get_stable_path(ReportFormat.JUNIT, suffix=suffix), config=output)
+                JunitXmlWriter(
+                    output=reports.get_stable_path(ReportFormat.JUNIT, suffix=suffix),
+                    config=output,
+                    group_by=reports.group_by,
+                )
             )
         if ReportFormat.ALLURE.value in paths:
             from schemathesis.reporting.allure import AllureWriter

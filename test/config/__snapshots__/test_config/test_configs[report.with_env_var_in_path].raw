@@ -1,1 +1,1 @@
-SchemathesisConfig(reports=ReportsConfig(junit=JunitReportConfig(enabled=True, path=Path('foo'))))
+SchemathesisConfig(reports=ReportsConfig(junit=ReportConfig(enabled=True, path=Path('foo'))))

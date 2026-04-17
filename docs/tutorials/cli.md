@@ -87,12 +87,14 @@ This creates a `junit.xml` file in the `schemathesis-report` directory containin
 - Test case details and execution times
 - Failure descriptions with reproduction steps
 
-By default, all execution phases (Examples, Coverage, Fuzzing) contribute to a single test case per API operation. If you want each phase in its own `<testsuite>` — for example, to clearly see which phases skipped versus which produced results — use the [`group-by`](../reference/configuration.md#reportsjunitgroup-by) option:
+By default, all execution phases (Examples, Coverage, Fuzzing) contribute to a single test case per API operation. If you want each phase in its own `<testsuite>` — for example, to clearly see which phases skipped versus which produced results — use the [`group-by`](../reference/configuration.md#reportsgroup-by) option:
 
 ```toml
+[reports]
+group-by = "phase"
+
 [reports.junit]
 enabled = true
-group-by = "phase"
 ```
 
 Import it into any JUnit-compatible reporting tool to track failures over time — see [CI/CD Integration](../guides/cicd.md) for ready-made pipeline examples.

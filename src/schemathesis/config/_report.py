@@ -54,57 +54,34 @@ class ReportConfig(DiffBase):
         return cls(enabled=enabled, path=path)
 
 
-class JunitGroupBy(str, Enum):
-    """How to group test cases in JUnit XML output."""
+class ReportGroupBy(str, Enum):
+    """How to group test cases in report output."""
 
     OPERATION = "operation"
     PHASE = "phase"
 
 
 @dataclass(repr=False)
-class JunitReportConfig(DiffBase):
-    enabled: bool
-    path: Path | None
-    group_by: JunitGroupBy
-
-    __slots__ = ("enabled", "path", "group_by")
-
-    def __init__(
-        self, *, enabled: bool = False, path: Path | None = None, group_by: JunitGroupBy = JunitGroupBy.OPERATION
-    ) -> None:
-        self.enabled = enabled
-        self.path = path
-        self.group_by = group_by
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> JunitReportConfig:
-        path = resolve(data.get("path"))
-        group_by = JunitGroupBy(data.get("group-by", "operation"))
-        if path is not None:
-            return cls(enabled=True, path=Path(path), group_by=group_by)
-        enabled = data.get("enabled", False)
-        return cls(enabled=enabled, path=path, group_by=group_by)
-
-
-@dataclass(repr=False)
 class ReportsConfig(DiffBase):
     directory: Path
     preserve_bytes: bool
-    junit: JunitReportConfig
+    group_by: ReportGroupBy
+    junit: ReportConfig
     vcr: ReportConfig
     har: ReportConfig
     ndjson: ReportConfig
     allure: ReportConfig
     _timestamp: str
 
-    __slots__ = ("directory", "preserve_bytes", "junit", "vcr", "har", "ndjson", "allure", "_timestamp")
+    __slots__ = ("directory", "preserve_bytes", "group_by", "junit", "vcr", "har", "ndjson", "allure", "_timestamp")
 
     def __init__(
         self,
         *,
         directory: str | None = None,
         preserve_bytes: bool = False,
-        junit: JunitReportConfig | None = None,
+        group_by: ReportGroupBy = ReportGroupBy.OPERATION,
+        junit: ReportConfig | None = None,
         vcr: ReportConfig | None = None,
         har: ReportConfig | None = None,
         ndjson: ReportConfig | None = None,
@@ -112,7 +89,8 @@ class ReportsConfig(DiffBase):
     ) -> None:
         self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
         self.preserve_bytes = preserve_bytes
-        self.junit = junit or JunitReportConfig()
+        self.group_by = group_by
+        self.junit = junit or ReportConfig()
         self.vcr = vcr or ReportConfig()
         self.har = har or ReportConfig()
         self.ndjson = ndjson or ReportConfig()
@@ -124,7 +102,8 @@ class ReportsConfig(DiffBase):
         return cls(
             directory=data.get("directory"),
             preserve_bytes=data.get("preserve-bytes", False),
-            junit=JunitReportConfig.from_dict(data.get("junit", {})),
+            group_by=ReportGroupBy(data.get("group-by", "operation")),
+            junit=ReportConfig.from_dict(data.get("junit", {})),
             vcr=ReportConfig.from_dict(data.get("vcr", {})),
             har=ReportConfig.from_dict(data.get("har", {})),
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),
@@ -142,6 +121,7 @@ class ReportsConfig(DiffBase):
         allure_path: str | None = None,
         directory: Path = DEFAULT_REPORT_DIRECTORY,
         preserve_bytes: bool | None = None,
+        group_by: ReportGroupBy | None = None,
     ) -> None:
         formats = formats or []
         if junit_path is not None or ReportFormat.JUNIT in formats:
@@ -163,6 +143,8 @@ class ReportsConfig(DiffBase):
             self.directory = directory
         if preserve_bytes:
             self.preserve_bytes = preserve_bytes
+        if group_by is not None:
+            self.group_by = group_by
 
     def get_path(self, format: ReportFormat) -> Path:
         """Get the final path for a specific format."""

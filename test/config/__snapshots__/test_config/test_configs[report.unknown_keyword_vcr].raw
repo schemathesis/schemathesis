@@ -3,4 +3,4 @@ Error in [reports.junit] section:
 
   - 'foo'
 
-Valid properties for [reports.junit] are: 'enabled', 'path', 'group-by'.
+Valid properties for [reports.junit] are: 'enabled', 'path'.

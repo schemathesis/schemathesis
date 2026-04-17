@@ -40,10 +40,9 @@ from schemathesis.config._phases import (
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig, get_workers_count
 from schemathesis.config._report import (
     DEFAULT_REPORT_DIRECTORY,
-    JunitGroupBy,
-    JunitReportConfig,
     ReportConfig,
     ReportFormat,
+    ReportGroupBy,
     ReportsConfig,
 )
 from schemathesis.config._warnings import SchemathesisWarning, WarningsConfig
@@ -57,11 +56,10 @@ __all__ = [
     "SchemathesisConfig",
     "ConfigError",
     "HealthCheck",
-    "JunitGroupBy",
-    "JunitReportConfig",
     "ReportConfig",
     "ReportsConfig",
     "ReportFormat",
+    "ReportGroupBy",
     "DEFAULT_REPORT_DIRECTORY",
     "GenerationConfig",
     "OutputConfig",

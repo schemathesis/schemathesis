@@ -13,7 +13,7 @@ from schemathesis.core.failures import format_failures
 
 if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
-    from schemathesis.config._report import JunitGroupBy
+    from schemathesis.config._report import ReportGroupBy
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.statistic import GroupedFailures
 
@@ -25,13 +25,13 @@ class JunitXmlWriter:
     """Accumulates test results and writes JUnit XML on close."""
 
     def __init__(
-        self, output: TextOutput, config: OutputConfig | None = None, group_by: JunitGroupBy | None = None
+        self, output: TextOutput, config: OutputConfig | None = None, group_by: ReportGroupBy | None = None
     ) -> None:
-        from schemathesis.config._report import JunitGroupBy
+        from schemathesis.config._report import ReportGroupBy
 
         self._output = output
         self._config = config
-        self._group_by = group_by or JunitGroupBy.OPERATION
+        self._group_by = group_by or ReportGroupBy.OPERATION
         # Used when group_by == OPERATION: one TestCase per operation label
         self._test_cases: dict[str, TestCase] = {}
         # Track labels that received non-skip results so later skip events are ignored
@@ -49,10 +49,10 @@ class JunitXmlWriter:
         phase: str | None = None,
     ) -> None:
         """Record a finished test scenario."""
-        from schemathesis.config._report import JunitGroupBy
+        from schemathesis.config._report import ReportGroupBy
 
         failures = list(failures)
-        if self._group_by == JunitGroupBy.PHASE:
+        if self._group_by == ReportGroupBy.PHASE:
             self._record_phase(label, elapsed_sec, failures, skip_reason, config, phase or "other")
         else:
             self._record_operation(label, elapsed_sec, failures, skip_reason, config)
@@ -148,9 +148,9 @@ class JunitXmlWriter:
 
     def record_error(self, label: str, message: str, phase: str | None = None) -> None:
         """Record a non-fatal error for a label."""
-        from schemathesis.config._report import JunitGroupBy
+        from schemathesis.config._report import ReportGroupBy
 
-        if self._group_by == JunitGroupBy.PHASE:
+        if self._group_by == ReportGroupBy.PHASE:
             test_case = self._get_or_create_for_phase(phase or "other", label)
         else:
             test_case = self._get_or_create(label)
@@ -161,9 +161,9 @@ class JunitXmlWriter:
 
     def close(self) -> None:
         """Write the JUnit XML report and close the output."""
-        from schemathesis.config._report import JunitGroupBy
+        from schemathesis.config._report import ReportGroupBy
 
-        if self._group_by == JunitGroupBy.PHASE:
+        if self._group_by == ReportGroupBy.PHASE:
             test_suites = [
                 TestSuite(f"schemathesis - {phase_name}", test_cases=list(cases.values()), hostname=platform.node())
                 for phase_name, cases in self._phase_test_cases.items()

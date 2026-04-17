@@ -10,7 +10,7 @@ from schemathesis.reporting.junitxml import JunitXmlWriter
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
-    from schemathesis.config._report import JunitReportConfig
+    from schemathesis.config._report import ReportGroupBy
     from schemathesis.engine.recorder import ScenarioRecorder
 
 
@@ -21,9 +21,9 @@ class JunitXMLHandler(EventHandler):
 
     __slots__ = ("output", "writer")
 
-    def __init__(self, output: TextOutput, config: JunitReportConfig | None = None) -> None:
+    def __init__(self, output: TextOutput, group_by: ReportGroupBy | None = None) -> None:
         self.output = output
-        self.writer = JunitXmlWriter(output, group_by=config.group_by if config is not None else None)
+        self.writer = JunitXmlWriter(output, group_by=group_by)
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):

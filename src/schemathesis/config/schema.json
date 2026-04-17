@@ -37,8 +37,15 @@
         "preserve-bytes": {
           "type": "boolean"
         },
+        "group-by": {
+          "enum": [
+            "operation",
+            "phase"
+          ],
+          "default": "operation"
+        },
         "junit": {
-          "$ref": "#/$defs/JunitReportConfig"
+          "$ref": "#/$defs/ReportConfig"
         },
         "har": {
           "$ref": "#/$defs/ReportConfig"
@@ -171,25 +178,6 @@
         },
         "path": {
           "type": "string"
-        }
-      }
-    },
-    "JunitReportConfig": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "path": {
-          "type": "string"
-        },
-        "group-by": {
-          "enum": [
-            "operation",
-            "phase"
-          ],
-          "default": "operation"
         }
       }
     },

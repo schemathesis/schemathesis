@@ -1,1 +1,1 @@
-SchemathesisConfig(reports=ReportsConfig(junit=JunitReportConfig(enabled=True)))
+SchemathesisConfig(reports=ReportsConfig(junit=ReportConfig(enabled=True)))
