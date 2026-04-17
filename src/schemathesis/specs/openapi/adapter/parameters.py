@@ -686,7 +686,17 @@ OPENAPI_20_EXCLUDE_KEYS = frozenset(["required", "name", "in", "title", "descrip
 
 def extract_parameter_schema_v2(parameter: Mapping[str, Any]) -> JsonSchemaObject:
     # In Open API 2.0, schema for non-body parameters lives directly in the parameter definition
-    return {key: value for key, value in parameter.items() if key not in OPENAPI_20_EXCLUDE_KEYS}
+    schema = {key: value for key, value in parameter.items() if key not in OPENAPI_20_EXCLUDE_KEYS}
+    # `type: array` + `enum: [item-strings]` + `items` is a contradictory schema (likely a codegen artifact).
+    # Drop the top-level enum only when enum values are scalars, not arrays themselves.
+    if (
+        schema.get("type") == "array"
+        and "enum" in schema
+        and "items" in schema
+        and all(not isinstance(v, list) for v in schema["enum"])
+    ):
+        del schema["enum"]
+    return schema
 
 
 def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:

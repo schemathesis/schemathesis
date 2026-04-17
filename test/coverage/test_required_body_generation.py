@@ -266,3 +266,50 @@ def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
     assert positive_bodies, "Expected at least one body case"
     for body in positive_bodies:
         assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+
+
+def test_swagger2_array_query_param_with_top_level_enum(ctx):
+    # When a Swagger 2.0 array parameter has both top-level `enum` and `items` (a contradictory
+    # codegen artifact), coverage must still emit the required parameter with a valid array value.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/collection/purpose": {
+                "put": {
+                    "parameters": [
+                        {
+                            "name": "purposes",
+                            "in": "query",
+                            "required": True,
+                            "type": "array",
+                            "collectionFormat": "multi",
+                            # enum at array level is a Swagger 2.0 quirk — item-level constraint
+                            "enum": ["FEATURES", "LANDMARKS", "ATTRIBUTES"],
+                            "items": {
+                                "type": "string",
+                                "enum": ["FEATURES", "LANDMARKS", "ATTRIBUTES"],
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/collection/purpose"]["PUT"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    query_cases = [c for c in cases if c.query and "purposes" in c.query]
+    assert query_cases, "Expected at least one case with 'purposes' in query"
+    for c in query_cases:
+        assert isinstance(c.query["purposes"], list), f"Expected list, got: {c.query['purposes']!r}"
