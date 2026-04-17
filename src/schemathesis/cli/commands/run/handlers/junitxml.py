@@ -28,7 +28,7 @@ class JunitXMLHandler(EventHandler):
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
-            phase = event.phase.value if event.phase is not None else None
+            phase: str | None = event.phase.value
             if event.status == Status.FAILURE:
                 # Look up failures by case_id across all labels — some coverage scenarios
                 # (e.g. UNSPECIFIED_HTTP_METHOD) store failures under a remapped label

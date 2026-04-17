@@ -24,7 +24,9 @@ TextOutput = IO[str] | StringIO | Path
 class JunitXmlWriter:
     """Accumulates test results and writes JUnit XML on close."""
 
-    def __init__(self, output: TextOutput, config: OutputConfig | None = None, group_by: JunitGroupBy | None = None) -> None:
+    def __init__(
+        self, output: TextOutput, config: OutputConfig | None = None, group_by: JunitGroupBy | None = None
+    ) -> None:
         from schemathesis.config._report import JunitGroupBy
 
         self._output = output

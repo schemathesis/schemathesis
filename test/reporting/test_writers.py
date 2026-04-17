@@ -72,9 +72,7 @@ class TestJunitXmlWriterOperationMode:
         stream = StringIO()
         config = OutputConfig()
         with JunitXmlWriter(output=stream, group_by=JunitGroupBy.OPERATION) as writer:
-            writer.record_scenario(
-                label="GET /users", elapsed_sec=1.0, failures=[], skip_reason=None, config=config
-            )
+            writer.record_scenario(label="GET /users", elapsed_sec=1.0, failures=[], skip_reason=None, config=config)
         root = _parse_junit(stream)
         assert root.tag == "testsuites"
         suites = list(root)
@@ -176,9 +174,7 @@ class TestJunitXmlWriterOperationMode:
         stream = StringIO()
         config = OutputConfig()
         with JunitXmlWriter(output=stream) as writer:
-            writer.record_scenario(
-                label="GET /users", elapsed_sec=1.0, failures=[], skip_reason=None, config=config
-            )
+            writer.record_scenario(label="GET /users", elapsed_sec=1.0, failures=[], skip_reason=None, config=config)
             writer.record_error(label="POST /items", message="error")
         root = _parse_junit(stream)
         suites = list(root)
@@ -282,9 +278,7 @@ class TestJunitXmlWriterPhaseMode:
         stream = StringIO()
         config = OutputConfig()
         with JunitXmlWriter(output=stream, group_by=JunitGroupBy.PHASE) as writer:
-            writer.record_scenario(
-                label="GET /users", elapsed_sec=0.5, failures=[], skip_reason=None, config=config
-            )
+            writer.record_scenario(label="GET /users", elapsed_sec=0.5, failures=[], skip_reason=None, config=config)
         root = _parse_junit(stream)
         suites = list(root)
         assert len(suites) == 1

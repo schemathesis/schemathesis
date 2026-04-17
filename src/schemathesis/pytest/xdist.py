@@ -10,7 +10,14 @@ from typing import TYPE_CHECKING
 import jsonschema_rs
 import pytest
 
-from schemathesis.config import OutputConfig, ReportConfig, ReportFormat, ReportsConfig, SanitizationConfig
+from schemathesis.config import (
+    JunitReportConfig,
+    OutputConfig,
+    ReportConfig,
+    ReportFormat,
+    ReportsConfig,
+    SanitizationConfig,
+)
 from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.transport import Response
 
@@ -298,7 +305,10 @@ def _open_writers_from_config(
         preserve_bytes=writer_config["preserve_bytes"],
         vcr=_rc(ReportFormat.VCR),
         har=_rc(ReportFormat.HAR),
-        junit=_rc(ReportFormat.JUNIT),
+        junit=JunitReportConfig(
+            enabled=ReportFormat.JUNIT.value in paths,
+            path=Path(paths[ReportFormat.JUNIT.value]) if paths.get(ReportFormat.JUNIT.value) else None,
+        ),
         allure=_rc(ReportFormat.ALLURE),
     )
 
