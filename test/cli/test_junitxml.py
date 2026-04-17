@@ -252,3 +252,97 @@ def test_coverage_unspecified_method_in_junit(cli, ctx, app_runner, tmp_path):
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
     assert int(root.attrib.get("failures", 0)) > 0
+
+
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_group_by_phase_separate_suites(cli, tmp_path, schema_url):
+    """When group-by=phase, the JUnit report contains separate test suites per phase."""
+    xml_path = tmp_path / "junit.xml"
+    cli.run(
+        schema_url,
+        f"--report-junit-path={xml_path}",
+        "--seed=1",
+        "--checks=all",
+        config={"reports": {"junit": {"group-by": "phase"}}},
+    )
+    tree = ElementTree.parse(xml_path)
+    root = tree.getroot()
+    suites = list(root)
+    suite_names = {s.attrib["name"] for s in suites}
+    # At minimum, examples and coverage should produce suites
+    assert any("Examples" in name for name in suite_names)
+    # Each suite should contain a testcase for the operation
+    for suite in suites:
+        testcases = list(suite)
+        assert len(testcases) > 0
+
+
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_group_by_phase_skip_isolation(cli, tmp_path, schema_url):
+    """In phase mode, examples skip does not leak into coverage/fuzzing suites."""
+    xml_path = tmp_path / "junit.xml"
+    cli.run(
+        schema_url,
+        f"--report-junit-path={xml_path}",
+        "--seed=1",
+        "--checks=all",
+        config={"reports": {"junit": {"group-by": "phase"}}},
+    )
+    tree = ElementTree.parse(xml_path)
+    root = tree.getroot()
+    for suite in root:
+        name = suite.attrib["name"]
+        for testcase in suite:
+            skipped_elements = testcase.findall("skipped")
+            if "Examples" in name:
+                # Examples suite may have skipped entries
+                pass
+            else:
+                # Non-examples suites should NOT have skipped entries
+                assert len(skipped_elements) == 0, (
+                    f"Suite '{name}' testcase '{testcase.attrib['name']}' should not be skipped"
+                )
+
+
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_group_by_operation_skip_cleared_by_success(cli, tmp_path, schema_url):
+    """Default operation mode: skip from examples is cleared when later phases succeed."""
+    xml_path = tmp_path / "junit.xml"
+    # Run with all default phases (examples will skip, coverage/fuzzing will succeed)
+    cli.run(
+        schema_url,
+        f"--report-junit-path={xml_path}",
+        "--seed=1",
+        "--checks=all",
+    )
+    tree = ElementTree.parse(xml_path)
+    root = tree.getroot()
+    testsuite = root[0]
+    testcase = testsuite.find("testcase[@name='GET /success']")
+    assert testcase is not None
+    skipped = testcase.findall("skipped")
+    assert len(skipped) == 0, "Skip from examples phase should be cleared when coverage/fuzzing succeeds"
+
+
+@pytest.mark.operations("success")
+@pytest.mark.openapi_version("3.0")
+def test_group_by_phase_via_config_file(cli, tmp_path, schema_url):
+    """The group-by option works when specified in the TOML config file."""
+    xml_path = tmp_path / "junit.xml"
+    cli.run(
+        schema_url,
+        f"--report-junit-path={xml_path}",
+        "--seed=1",
+        "--phases=examples,coverage",
+        "--checks=all",
+        config={"reports": {"junit": {"group-by": "phase"}}},
+    )
+    tree = ElementTree.parse(xml_path)
+    root = tree.getroot()
+    suites = list(root)
+    suite_names = {s.attrib["name"] for s in suites}
+    assert "schemathesis - Examples" in suite_names
+    assert "schemathesis - Coverage" in suite_names

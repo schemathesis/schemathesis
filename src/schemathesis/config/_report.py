@@ -54,11 +54,43 @@ class ReportConfig(DiffBase):
         return cls(enabled=enabled, path=path)
 
 
+class JunitGroupBy(str, Enum):
+    """How to group test cases in JUnit XML output."""
+
+    OPERATION = "operation"
+    PHASE = "phase"
+
+
+@dataclass(repr=False)
+class JunitReportConfig(DiffBase):
+    enabled: bool
+    path: Path | None
+    group_by: JunitGroupBy
+
+    __slots__ = ("enabled", "path", "group_by")
+
+    def __init__(
+        self, *, enabled: bool = False, path: Path | None = None, group_by: JunitGroupBy = JunitGroupBy.OPERATION
+    ) -> None:
+        self.enabled = enabled
+        self.path = path
+        self.group_by = group_by
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> JunitReportConfig:
+        path = resolve(data.get("path"))
+        group_by = JunitGroupBy(data.get("group-by", "operation"))
+        if path is not None:
+            return cls(enabled=True, path=Path(path), group_by=group_by)
+        enabled = data.get("enabled", False)
+        return cls(enabled=enabled, path=path, group_by=group_by)
+
+
 @dataclass(repr=False)
 class ReportsConfig(DiffBase):
     directory: Path
     preserve_bytes: bool
-    junit: ReportConfig
+    junit: JunitReportConfig
     vcr: ReportConfig
     har: ReportConfig
     ndjson: ReportConfig
@@ -72,7 +104,7 @@ class ReportsConfig(DiffBase):
         *,
         directory: str | None = None,
         preserve_bytes: bool = False,
-        junit: ReportConfig | None = None,
+        junit: JunitReportConfig | None = None,
         vcr: ReportConfig | None = None,
         har: ReportConfig | None = None,
         ndjson: ReportConfig | None = None,
@@ -80,7 +112,7 @@ class ReportsConfig(DiffBase):
     ) -> None:
         self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
         self.preserve_bytes = preserve_bytes
-        self.junit = junit or ReportConfig()
+        self.junit = junit or JunitReportConfig()
         self.vcr = vcr or ReportConfig()
         self.har = har or ReportConfig()
         self.ndjson = ndjson or ReportConfig()
@@ -92,7 +124,7 @@ class ReportsConfig(DiffBase):
         return cls(
             directory=data.get("directory"),
             preserve_bytes=data.get("preserve-bytes", False),
-            junit=ReportConfig.from_dict(data.get("junit", {})),
+            junit=JunitReportConfig.from_dict(data.get("junit", {})),
             vcr=ReportConfig.from_dict(data.get("vcr", {})),
             har=ReportConfig.from_dict(data.get("har", {})),
             ndjson=ReportConfig.from_dict(data.get("ndjson", {})),

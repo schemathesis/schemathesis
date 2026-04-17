@@ -38,7 +38,7 @@
           "type": "boolean"
         },
         "junit": {
-          "$ref": "#/$defs/ReportConfig"
+          "$ref": "#/$defs/JunitReportConfig"
         },
         "har": {
           "$ref": "#/$defs/ReportConfig"
@@ -171,6 +171,25 @@
         },
         "path": {
           "type": "string"
+        }
+      }
+    },
+    "JunitReportConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "group-by": {
+          "enum": [
+            "operation",
+            "phase"
+          ],
+          "default": "operation"
         }
       }
     },

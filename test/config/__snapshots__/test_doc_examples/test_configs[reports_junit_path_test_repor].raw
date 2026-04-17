@@ -1,1 +1,1 @@
-SchemathesisConfig(reports=ReportsConfig(junit=ReportConfig(enabled=True, path=Path('test-reports/schemathesis-results.xml'))))
+SchemathesisConfig(reports=ReportsConfig(junit=JunitReportConfig(enabled=True, path=Path('test-reports/schemathesis-results.xml'))))

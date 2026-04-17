@@ -243,6 +243,45 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     path = "./test-reports/schemathesis-results.xml"
     ```
 
+#### `reports.junit.group-by`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `"operation"`  
+    **Possible values**: `"operation"`, `"phase"`  
+
+    Controls how test cases are grouped in the JUnit XML report.
+
+    - **`operation`** (default): All phases contribute to a single test case per API operation. A single `<testsuite>` is generated.
+    - **`phase`**: Each execution phase (Examples, Coverage, Fuzzing) produces its own `<testsuite>`, with independent test cases per operation.
+
+    Phase grouping is useful when your schema has no inline examples — the Examples phase would mark test cases as skipped, while Coverage and Fuzzing phases run normally. With the default `operation` mode, skip results from one phase are automatically cleared when a later phase produces real results. With `phase` mode, each phase is fully isolated:
+
+    ```toml
+    [reports.junit]
+    enabled = true
+    group-by = "phase"
+    ```
+
+    **Example output with `group-by = "phase"`:**
+
+    ```xml
+    <testsuites>
+      <testsuite name="schemathesis - Examples">
+        <testcase name="GET /users">
+          <skipped type="skipped">No examples in schema</skipped>
+        </testcase>
+      </testsuite>
+      <testsuite name="schemathesis - Coverage">
+        <testcase name="GET /users" time="0.5"/>
+      </testsuite>
+      <testsuite name="schemathesis - Fuzzing">
+        <testcase name="GET /users" time="1.2"/>
+      </testsuite>
+    </testsuites>
+    ```
+
 ### Output
 
 #### `output.sanitization.enabled`

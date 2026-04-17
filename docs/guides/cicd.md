@@ -106,6 +106,8 @@ continue-on-failure = true
 # Generate reports
 [reports.junit]
 enabled = true
+# Optionally, split results by phase for clearer CI reporting
+# group-by = "phase"
 ```
 
 Then run with just:
