@@ -268,6 +268,106 @@ def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
         assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
 
 
+def test_allof_with_outer_properties_includes_required_fields(ctx):
+    # When a body schema combines allOf (which declares required fields) with additional outer-level properties
+    # Coverage must include the required fields in every generated case
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/resources": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "required": ["name"],
+                                            "properties": {"name": {"type": "string"}},
+                                        }
+                                    ],
+                                    # outer properties beyond allOf - no explicit type or required
+                                    "properties": {"details": {"properties": {"key": {"type": "string"}}}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/resources"]["PUT"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    positive_bodies = [c.body for c in cases if c.body is not None]
+    assert positive_bodies, "Expected at least one body case"
+    for body in positive_bodies:
+        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+
+
+def test_allof_with_explicit_type_object_includes_required_fields(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/resources": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "required": ["name"],
+                                            "properties": {"name": {"type": "string"}},
+                                        }
+                                    ],
+                                    "properties": {"details": {"properties": {"key": {"type": "string"}}}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/resources"]["PUT"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    positive_bodies = [c.body for c in cases if c.body is not None]
+    assert positive_bodies, "Expected at least one body case"
+    for body in positive_bodies:
+        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+
+
 def test_swagger2_array_query_param_with_top_level_enum(ctx):
     # When a Swagger 2.0 array parameter has both top-level `enum` and `items` (a contradictory
     # codegen artifact), coverage must still emit the required parameter with a valid array value.
