@@ -289,7 +289,12 @@ class Case:
         Recursively hashes nested dicts/lists/tuples and primitives to detect modifications.
         """
         if isinstance(value, Mapping):
-            return hash((type(value), tuple(sorted((k, self._hash_container(v)) for k, v in value.items()))))
+            return hash(
+                (
+                    type(value),
+                    tuple(sorted(((k, self._hash_container(v)) for k, v in value.items()), key=lambda x: str(x[0]))),
+                )
+            )
         elif isinstance(value, list | tuple):
             return hash((type(value), tuple(self._hash_container(item) for item in value)))
         elif isinstance(value, NotSet):

@@ -1485,8 +1485,7 @@ def _positive_object(
 
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
-    optional = list(set(properties) - required)
-    optional.sort()
+    optional = sorted(set(properties) - required, key=str)
 
     # Generate combinations with required properties and one optional property
     for name in optional:
