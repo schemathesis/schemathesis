@@ -3546,3 +3546,44 @@ def test_content_json_query_params_single_encoding_in_coverage(ctx):
         assert isinstance(raw, str), f"Expected JSON string, got {type(raw).__name__}: {raw!r}"
         parsed = json.loads(raw)
         assert isinstance(parsed, list), "filters should decode to a list after single JSON encoding"
+
+
+def test_coverage_body_with_boolean_property_key(ctx):
+    # YAML parses bare `on:` as boolean True, so schemas loaded from YAML can have bool keys in `properties`.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/hooks": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        # True is a bool key - YAML artifact from bare `on:` field
+                                        True: {"type": "string"},
+                                        "name": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/hooks"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0

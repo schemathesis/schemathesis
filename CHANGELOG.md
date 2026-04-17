@@ -10,6 +10,7 @@
 - False positive `positive_data_acceptance` when `required` lists fields absent from `properties` in the examples phase.
 - Schema-invalid body when `required` names a property absent from `properties` in the coverage phase.
 - False positive `positive_data_acceptance` when an enum contains values violating the declared `type` (e.g. YAML-parsed `false` for `type: string`) in the coverage phase.
+- Crash when a schema has boolean property keys (YAML artifact from bare `on:` fields) in the coverage phase.
 - Schema-invalid body when a Swagger 2.0 array parameter has `enum` at the array level with `items` also defined in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
 - False positive `positive_data_acceptance` when assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`) in the examples phase.
