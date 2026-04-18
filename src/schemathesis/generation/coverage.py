@@ -724,7 +724,20 @@ def cover_schema_iter(
         try:
             resolved = ctx.resolve_ref(reference)
             if isinstance(resolved, dict):
-                schema = {**resolved, **{k: v for k, v in schema.items() if k != "$ref"}}
+                merged = {**resolved}
+                for k, v in schema.items():
+                    if k == "$ref":
+                        continue
+                    if k == "properties" and isinstance(v, dict) and isinstance(merged.get("properties"), dict):
+                        # Deep-merge: resolved's properties take lower priority than sibling properties,
+                        # but both must be present so that 'required' fields from the resolved schema
+                        # are included in the merged properties dict.
+                        merged["properties"] = {**merged["properties"], **v}
+                    elif k == "required" and isinstance(v, list) and isinstance(merged.get("required"), list):
+                        merged["required"] = list(dict.fromkeys(merged["required"] + v))
+                    else:
+                        merged[k] = v
+                schema = merged
                 yield from cover_schema_iter(ctx, schema, seen)
             else:
                 yield from cover_schema_iter(ctx, resolved, seen)

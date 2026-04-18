@@ -3674,6 +3674,60 @@ def test_coverage_positive_pattern_skipped_for_non_string_type(ctx):
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
 
 
+def test_coverage_positive_allof_ref_property_merge(ctx):
+    # Multi-level allOf chain (Child -> Intermediate -> Base) where Base defines 'location'.
+    # canonicalish leaves an unresolved $ref inside the merged schema; cover_schema_iter must
+    # deep-merge 'properties' from the resolved ref, not overwrite, so 'location' stays present.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/resources/{name}": {
+                "put": {
+                    "parameters": [
+                        {"name": "name", "in": "path", "required": True, "type": "string"},
+                        {"name": "body", "in": "body", "required": True, "schema": {"$ref": "#/definitions/Child"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+        definitions={
+            "Base": {
+                "properties": {
+                    "location": {"type": "string"},
+                    "id": {"type": "string", "readOnly": True},
+                }
+            },
+            "Intermediate": {
+                "allOf": [{"$ref": "#/definitions/Base"}],
+                "properties": {"tags": {"type": "object", "additionalProperties": {"type": "string"}}},
+                "required": ["location"],
+            },
+            "Child": {
+                "allOf": [{"$ref": "#/definitions/Intermediate"}],
+                "properties": {"extra": {"type": "string"}},
+            },
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/resources/{name}"]["put"]
+
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    positive_cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in positive_cases:
+        assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
 def test_coverage_body_with_boolean_property_key_negative(ctx):
     # YAML parses bare `on:` as boolean True, so schemas loaded from YAML can have bool keys in `properties`.
     schema_dict = ctx.openapi.build_schema(
