@@ -3775,3 +3775,47 @@ def test_coverage_body_with_boolean_property_key_negative(ctx):
         )
     )
     assert len(cases) > 0
+
+
+def test_coverage_form_urlencoded_binary_format_negative(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["file", "name"],
+                                    "properties": {
+                                        "file": {"type": "string", "format": "binary"},
+                                        "name": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/upload"]["POST"]
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        assert case.meta.phase.name == TestPhase.COVERAGE
