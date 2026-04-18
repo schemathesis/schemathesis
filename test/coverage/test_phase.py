@@ -3819,3 +3819,53 @@ def test_coverage_form_urlencoded_binary_format_negative(ctx):
     assert len(cases) > 0
     for case in cases:
         assert case.meta.phase.name == TestPhase.COVERAGE
+
+
+def test_coverage_positive_object_type_with_items(ctx):
+    # Schema property with type:"object" and "items" (a schema inconsistency) must not
+    # cause generate_from_schema to produce a list — the items/type fast path must only
+    # trigger for type:"array", not type:"object".
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/register": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["value"],
+                                    "properties": {
+                                        "ids": {
+                                            "type": "object",
+                                            "items": {"type": "string"},
+                                        },
+                                        "value": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/register"]["post"]
+
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    positive_cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in positive_cases:
+        assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
