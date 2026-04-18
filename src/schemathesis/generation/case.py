@@ -19,6 +19,7 @@ from schemathesis.generation.meta import CaseMetadata, ComponentInfo
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
+from schemathesis.transport.serialization import Binary
 
 if TYPE_CHECKING:
     import httpx
@@ -41,8 +42,8 @@ _NOTSET_HASH = 0x7F3A9B2C
 
 
 def _contains_bytes(value: Any) -> bool:
-    """Check if value contains bytes anywhere in nested structure."""
-    if isinstance(value, bytes):
+    """Check if value contains bytes or Binary wrappers anywhere in nested structure."""
+    if isinstance(value, bytes | Binary):
         return True
     if isinstance(value, dict):
         return any(_contains_bytes(v) for v in value.values())
