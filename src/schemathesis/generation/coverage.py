@@ -35,7 +35,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError, RefResolver
-from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.media_types import is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -817,34 +817,13 @@ def cover_schema_iter(
                         if seen.insert(value_.value):
                             yield value_
                 elif key == "minLength" and 0 < value < INTERNAL_BUFFER_SIZE:
-                    if value == 1:
-                        # In this case, the only possible negative string is an empty one
-                        # The `pattern` value may require an non-empty one and the generation will fail
-                        # However, it is fine to violate `pattern` here as it is negative string generation anyway
-                        value = ""
-                        if ctx.is_valid_for_location(value) and seen.insert(value):
-                            yield NegativeValue(
-                                value,
-                                scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
-                                description="String smaller than minLength",
-                                location=ctx.current_path,
-                            )
-                    else:
-                        with suppress(InvalidArgument):
-                            min_length = max_length = value - 1
-                            new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
-                            new_schema.setdefault("type", "string")
-                            if "pattern" in new_schema:
-                                new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
-                                if new_schema["pattern"] == schema["pattern"]:
-                                    # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
-                                    del new_schema["minLength"]
-                                    del new_schema["maxLength"]
-                                    value = ctx.generate_from_schema(new_schema)[:max_length]
-                                else:
-                                    value = ctx.generate_from_schema(new_schema)
-                            else:
-                                value = ctx.generate_from_schema(new_schema)
+                    # minLength only constrains strings; skip when schema explicitly excludes string type
+                    if "string" in get_type(schema):
+                        if value == 1:
+                            # In this case, the only possible negative string is an empty one
+                            # The `pattern` value may require an non-empty one and the generation will fail
+                            # However, it is fine to violate `pattern` here as it is negative string generation anyway
+                            value = ""
                             if ctx.is_valid_for_location(value) and seen.insert(value):
                                 yield NegativeValue(
                                     value,
@@ -852,36 +831,61 @@ def cover_schema_iter(
                                     description="String smaller than minLength",
                                     location=ctx.current_path,
                                 )
-                elif key == "maxLength" and value < INTERNAL_BUFFER_SIZE:
-                    try:
-                        min_length = max_length = value + 1
-                        new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
-                        new_schema.setdefault("type", "string")
-                        if "pattern" in new_schema:
-                            if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
-                                # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
-                                del new_schema["pattern"]
-                                value = ctx.generate_from_schema(new_schema)
-                            else:
-                                new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
-                                if new_schema["pattern"] == schema["pattern"]:
-                                    # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
-                                    del new_schema["minLength"]
-                                    del new_schema["maxLength"]
-                                    value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
+                        else:
+                            with suppress(InvalidArgument):
+                                min_length = max_length = value - 1
+                                new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                                new_schema.setdefault("type", "string")
+                                if "pattern" in new_schema:
+                                    new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                                    if new_schema["pattern"] == schema["pattern"]:
+                                        # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
+                                        del new_schema["minLength"]
+                                        del new_schema["maxLength"]
+                                        value = ctx.generate_from_schema(new_schema)[:max_length]
+                                    else:
+                                        value = ctx.generate_from_schema(new_schema)
                                 else:
                                     value = ctx.generate_from_schema(new_schema)
-                        else:
-                            value = ctx.generate_from_schema(new_schema)
-                        if seen.insert(value):
-                            yield NegativeValue(
-                                value,
-                                scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
-                                description="String larger than maxLength",
-                                location=ctx.current_path,
-                            )
-                    except (InvalidArgument, Unsatisfiable):
-                        pass
+                                if ctx.is_valid_for_location(value) and seen.insert(value):
+                                    yield NegativeValue(
+                                        value,
+                                        scenario=CoverageScenario.STRING_BELOW_MIN_LENGTH,
+                                        description="String smaller than minLength",
+                                        location=ctx.current_path,
+                                    )
+                elif key == "maxLength" and value < INTERNAL_BUFFER_SIZE:
+                    # maxLength only constrains strings; skip when schema explicitly excludes string type
+                    if "string" in get_type(schema):
+                        try:
+                            min_length = max_length = value + 1
+                            new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                            new_schema.setdefault("type", "string")
+                            if "pattern" in new_schema:
+                                if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
+                                    # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
+                                    del new_schema["pattern"]
+                                    value = ctx.generate_from_schema(new_schema)
+                                else:
+                                    new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                                    if new_schema["pattern"] == schema["pattern"]:
+                                        # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
+                                        del new_schema["minLength"]
+                                        del new_schema["maxLength"]
+                                        value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
+                                    else:
+                                        value = ctx.generate_from_schema(new_schema)
+                            else:
+                                value = ctx.generate_from_schema(new_schema)
+                            if seen.insert(value):
+                                yield NegativeValue(
+                                    value,
+                                    scenario=CoverageScenario.STRING_ABOVE_MAX_LENGTH,
+                                    description="String larger than maxLength",
+                                    location=ctx.current_path,
+                                )
+                        except (InvalidArgument, Unsatisfiable):
+                            pass
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
