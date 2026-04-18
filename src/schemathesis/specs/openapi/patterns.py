@@ -547,6 +547,18 @@ def _transform_repeat(op: int, value: _RepeatValue, min_l: int | None, max_l: in
     if final_min > final_max:
         return None
 
+    # Bounds unchanged + finite max + variable-length inner content means the
+    # outer repetition count alone can't encode maxLength (inner quantifiers can
+    # still expand the string further). Signal no-op so the caller keeps the
+    # length constraints on the schema instead of silently discarding them.
+    if (
+        final_min == min_repeat
+        and final_max == max_repeat
+        and max_repeat != MAXREPEAT
+        and _has_variable_length(list(subpattern))
+    ):
+        return None
+
     return (sre.MAX_REPEAT, (final_min, final_max, subpattern))
 
 
@@ -741,6 +753,24 @@ def _calculate_min_repetition_length(subpattern: list[_Node]) -> int:
             inner_min = _calculate_min_repetition_length(inner_pattern)
             total += min_repeat * inner_min
     return total
+
+
+def _has_variable_length(nodes: list[_Node]) -> bool:
+    """Return True if the nodes can produce strings of variable length (contain *, +, ?, {n,m}, or branches)."""
+    for op, value in nodes:
+        if op in REPEATS:
+            min_r, max_r, inner = value
+            if min_r != max_r:
+                return True
+            if _has_variable_length(list(inner)):
+                return True
+        elif op == sre.SUBPATTERN:
+            _, _, _, inner = value
+            if _has_variable_length(list(inner)):
+                return True
+        elif op == sre.BRANCH:
+            return True
+    return False
 
 
 def _build_quantifier(minimum: int | None, maximum: int | None) -> str:
