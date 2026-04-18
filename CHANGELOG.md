@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False positive `negative_data_rejection` when a schema has 15 or more `properties` and exactly 2 required fields in the coverage phase.
 - False positive `negative_data_rejection` for body properties with `type: integer` and inapplicable `minLength`/`maxLength` constraints in the coverage phase.
 - False positive `positive_data_acceptance` for array body properties with `minItems` > 1 and object items in the examples phase.
 - False positive `positive_data_acceptance` when a property `example` violates its field's own type in the examples & coverage phases.

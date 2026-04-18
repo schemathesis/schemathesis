@@ -522,3 +522,49 @@ def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     negative_bodies = [c.body for c in cases if c.body is not None]
     for body in negative_bodies:
         assert not validator.is_valid(body), f"NEGATIVE body is schema-valid (false positive): {body!r}"
+
+
+def test_required_enforced_when_properties_at_threshold(ctx):
+    # When a schema has exactly 15 properties (at the jsonschema_rs SmallProperties threshold)
+    # and required lists exactly 2 of them, NEGATIVE cases must still be schema-invalid.
+    properties = {f"field{i}": {"type": "string"} for i in range(15)}
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/things": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["field0", "field1"],
+                                    "properties": properties,
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/things"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    negative_bodies = [c.body for c in cases if c.body is not None]
+    assert negative_bodies, "Expected at least one negative body case"
+    for body in negative_bodies:
+        assert not validator.is_valid(body), f"NEGATIVE body is schema-valid (false positive): {body!r}"
