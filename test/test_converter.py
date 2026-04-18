@@ -107,6 +107,21 @@ def test_prefix_items_to_items_array(schema, expected):
                 "pattern": r"^[abc\d]{1,3}$",
             },
         ),
+        pytest.param(
+            {
+                "maxLength": 10,
+                "minLength": 0,
+                "pattern": r"^(?:[A-Z0-9](?:[A-Z0-9][- ]?)*[A-Z0-9])?$",
+                "type": "string",
+            },
+            {
+                "maxLength": 10,
+                "minLength": 0,
+                "pattern": r"^(?:[A-Z0-9](?:[A-Z0-9][- ]?)*[A-Z0-9])?$",
+                "type": "string",
+            },
+            id="complex_pattern_preserves_max_length_when_not_encoded",
+        ),
     ],
 )
 def test_to_jsonschema_recursive(schema, expected):

@@ -3589,6 +3589,54 @@ def test_coverage_body_with_boolean_property_key(ctx):
     assert len(cases) > 0
 
 
+def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
+    # When a pattern's outer '?' is rewritten to '{0,1}' without encoding maxLength
+    # into the inner quantifiers, maxLength must survive in optimized_schema so the
+    # conformance checker can flag over-long strings as schema-invalid.
+    body_schema = {
+        "type": "string",
+        "maxLength": 10,
+        "minLength": 0,
+        "pattern": r"^(?:[A-Z0-9](?:[A-Z0-9][- ]?)*[A-Z0-9])?$",
+    }
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/zipcode": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/zipcode"]["post"]
+
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    assert "maxLength" in optimized_schema, f"maxLength must be preserved in optimized_schema; got: {optimized_schema}"
+
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    max_length_cases = [
+        case
+        for case in _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+        if isinstance(case.body, str) and len(case.body) > 10
+    ]
+    assert max_length_cases, "Expected at least one NEGATIVE case with a body string longer than maxLength=10"
+    for case in max_length_cases:
+        assert not validator.is_valid(case.body), (
+            f"NEGATIVE body longer than maxLength is schema-valid per optimized_schema: {case.body!r}"
+        )
+
+
 def test_coverage_body_with_boolean_property_key_negative(ctx):
     # YAML parses bare `on:` as boolean True, so schemas loaded from YAML can have bool keys in `properties`.
     schema_dict = ctx.openapi.build_schema(
