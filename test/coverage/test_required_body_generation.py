@@ -472,3 +472,53 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
     assert query_cases, "Expected at least one case with 'purposes' in query"
     for c in query_cases:
         assert isinstance(c.query["purposes"], list), f"Expected list, got: {c.query['purposes']!r}"
+
+
+def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
+    # When a schema property has type:integer but also specifies minLength/maxLength
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/cache": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "ttl": {
+                                            "type": "integer",
+                                            # minLength/maxLength are string-only constraints;
+                                            # applying them to an integer field likely is a schema bug
+                                            "minLength": 30,
+                                            "maxLength": 3600,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/cache"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+    negative_bodies = [c.body for c in cases if c.body is not None]
+    for body in negative_bodies:
+        assert not validator.is_valid(body), f"NEGATIVE body is schema-valid (false positive): {body!r}"
