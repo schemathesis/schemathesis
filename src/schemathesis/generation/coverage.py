@@ -397,7 +397,7 @@ class CoverageContext:
         if keys == ["multipleOf", "type"] and schema["type"] in ("integer", "number"):
             step = schema["multipleOf"]
             return cached_draw(st.integers().map(step.__mul__))
-        if "pattern" in schema:
+        if "pattern" in schema and "string" in get_type(schema):
             pattern = schema["pattern"]
             try:
                 re.compile(pattern)
