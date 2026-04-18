@@ -18,6 +18,7 @@
 - False positive `negative_data_rejection` when `pattern` with nested quantifiers caused `maxLength`/`minLength` to be silently dropped from the schema.
 - False positive `positive_data_acceptance` when a schema has `pattern` alongside a non-string `type` (e.g. `number`) in the coverage phase.
 - False positive `positive_data_acceptance` when a multi-level `allOf` chain causes required properties from a base schema to be generated as `null` in the coverage phase.
+- False positive `positive_data_acceptance` when a property has `type: object` alongside `items` in the coverage phase.
 - Schema-invalid body when a Swagger 2.0 array parameter has `enum` at the array level with `items` also defined in the coverage phase.
 - Schema-invalid POSITIVE body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.

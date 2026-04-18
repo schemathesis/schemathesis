@@ -415,7 +415,11 @@ class CoverageContext:
             elif max_length is not None:
                 strategy = strategy.filter(lambda s: len(s) <= max_length)
             return cached_draw(strategy)
-        if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
+        if (
+            (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
+            and isinstance(schema["items"], dict)
+            and "array" in get_type(schema)
+        ):
             items = schema["items"]
             min_items = schema.get("minItems", 0)
             if "enum" in items:
