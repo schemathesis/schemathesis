@@ -3587,3 +3587,52 @@ def test_coverage_body_with_boolean_property_key(ctx):
         )
     )
     assert len(cases) > 0
+
+
+def test_coverage_body_with_boolean_property_key_negative(ctx):
+    # YAML parses bare `on:` as boolean True, so schemas loaded from YAML can have bool keys in `properties`.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/hooks": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-Hook-Key",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        # True is a bool key - YAML artifact from bare `on:` field
+                                        True: {"type": "string"},
+                                        "name": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/hooks"]["POST"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0

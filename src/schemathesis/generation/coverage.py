@@ -517,11 +517,11 @@ def _encode(o: Any) -> str:
 
 
 def _convert_bytes_for_hashing(value: Any) -> Any:
-    """Convert bytes to a hashable string representation for JSON encoding."""
+    """Convert bytes/non-string keys to a hashable string representation for JSON encoding."""
     if isinstance(value, bytes):
         return f"__bytes__:{value.hex()}"
     if isinstance(value, dict):
-        return {k: _convert_bytes_for_hashing(v) for k, v in value.items()}
+        return {(k if isinstance(k, str) else str(k)): _convert_bytes_for_hashing(v) for k, v in value.items()}
     if isinstance(value, list):
         return [_convert_bytes_for_hashing(v) for v in value]
     return value
