@@ -3637,6 +3637,43 @@ def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
         )
 
 
+def test_coverage_positive_pattern_skipped_for_non_string_type(ctx):
+    # When a schema has 'pattern' alongside a non-string 'type', the coverage
+    # phase must not generate string values as POSITIVE cases — they violate 'type'
+    # and are schema-invalid, causing false positive_data_acceptance failures.
+    body_schema = {"type": "number", "pattern": "[0-9]{4}"}
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/pin": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/pin"]["post"]
+
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    positive_cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in positive_cases:
+        assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
+
+
 def test_coverage_body_with_boolean_property_key_negative(ctx):
     # YAML parses bare `on:` as boolean True, so schemas loaded from YAML can have bool keys in `properties`.
     schema_dict = ctx.openapi.build_schema(

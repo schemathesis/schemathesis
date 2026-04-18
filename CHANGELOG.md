@@ -15,6 +15,7 @@
 - Crash when a schema has boolean property keys (YAML artifact from bare `on:` fields) in the coverage phase.
 - Crash in the coverage phase when a body with boolean property keys is serialized for deduplication in negative mode.
 - False positive `negative_data_rejection` when `pattern` with nested quantifiers caused `maxLength`/`minLength` to be silently dropped from the schema.
+- False positive `positive_data_acceptance` when a schema has `pattern` alongside a non-string `type` (e.g. `number`) in the coverage phase.
 - Schema-invalid body when a Swagger 2.0 array parameter has `enum` at the array level with `items` also defined in the coverage phase.
 - Schema-invalid POSITIVE body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
