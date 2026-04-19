@@ -382,12 +382,19 @@ class CoverageContext:
             or keys == ["properties"]
         ):
             obj = {}
-            for key, sub_schema in schema["properties"].items():
+            properties = schema["properties"]
+            for key, sub_schema in properties.items():
                 if isinstance(sub_schema, dict) and "const" in sub_schema:
                     obj[key] = sub_schema["const"]
                 else:
                     try:
                         obj[key] = self.generate_from_schema(sub_schema)
+                    except Unsatisfiable:
+                        pass
+            for key in schema.get("required", []):
+                if key not in properties:
+                    try:
+                        obj[key] = self.generate_from_schema({})
                     except Unsatisfiable:
                         pass
             return obj
