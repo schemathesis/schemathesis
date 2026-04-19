@@ -25,6 +25,7 @@
 - Schema-invalid POSITIVE body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
 - False positive `negative_data_rejection` when a string property has both `enum` and `maxLength`/`minLength` in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
+- False positive `positive_data_acceptance` when `enum` contains values violating the declared `type` in template body generation in the coverage phase.
 - False positive `positive_data_acceptance` when assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`) in the examples phase.
 - False positive `positive_data_acceptance` for property examples violating `anyOf`/`oneOf` constraints via bundled `$ref`s in the examples phase.
 - False positive `positive_data_acceptance` for content-encoded header parameters with object examples in the examples phase.
