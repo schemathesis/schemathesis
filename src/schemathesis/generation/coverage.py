@@ -427,6 +427,9 @@ class CoverageContext:
                 strategy = strategy.filter(lambda s: len(s) >= min_length)
             elif max_length is not None:
                 strategy = strategy.filter(lambda s: len(s) <= max_length)
+            if (fmt := schema.get("format")) in VALIDATED_FORMATS:
+                validator = jsonschema_rs.validator_for({"type": "string", "format": fmt}, validate_formats=True)
+                strategy = strategy.filter(validator.is_valid)
             return cached_draw(strategy)
         if (
             (keys == ["items", "type"] or keys == ["items", "minItems", "type"])
@@ -496,8 +499,8 @@ class CoverageContext:
             and (fmt := schema.get("format")) in VALIDATED_FORMATS
             and _supports_format_generation(fmt, self.custom_formats)
         ):
-            fmt_validator = _get_format_validator(fmt, self.validator_cls)
-            strategy = strategy.filter(lambda v, fv=fmt_validator: not isinstance(v, str) or fv.is_valid(v))
+            validator = _get_format_validator(fmt, self.validator_cls)
+            strategy = strategy.filter(lambda v: not isinstance(v, str) or validator.is_valid(v))
         generated = self.generate_from(strategy)
         self._schema_generation_cache[cache_key] = (
             deepclone(generated) if isinstance(generated, dict | list) else generated

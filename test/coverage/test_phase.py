@@ -3927,6 +3927,60 @@ def test_coverage_negative_pattern_with_control_chars_uses_schema_validator(ctx)
             )
 
 
+def test_coverage_positive_body_uuid_format_with_uppercase_pattern(ctx):
+    # A property schema with format:uuid AND a pattern that restricts to uppercase hex
+    # must generate a POSITIVE value that is valid for BOTH constraints - i.e. an
+    # uppercase UUID with hyphens.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/docs": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "templateId": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "pattern": "^[0-9A-F]{8}[-]?[0-9A-F]{4}[-]?[0-9A-F]{4}[-]?[0-9A-F]{4}[-]?[0-9A-F]{12}$",
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/docs"]["post"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        if case.body is not None:
+            assert validator.is_valid(case.body), (
+                f"POSITIVE body must be schema-valid, got schema-invalid body: {case.body!r}"
+            )
+
+
 def test_coverage_positive_body_skips_properties_with_no_valid_enum_values(ctx):
     # A property schema like {enum: ["MALE", "FEMALE"], maxLength: 1} has contradictory
     # constraints — all enum values violate maxLength. The coverage phase must not pick
