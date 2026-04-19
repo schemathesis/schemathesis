@@ -1666,9 +1666,25 @@ def _negative_properties(
     ctx: CoverageContext, template: dict, properties: dict
 ) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
+    is_form = ctx.location == ParameterLocation.BODY and ctx.media_type == ("application", "x-www-form-urlencoded")
+    is_xml = ctx.location == ParameterLocation.BODY and ctx.media_type is not None and is_xml_parts(ctx.media_type)
     for key, sub_schema in properties.items():
+        validator: jsonschema_rs.Validator | None = None
+        if (is_form or is_xml) and isinstance(sub_schema, dict):
+            try:
+                validator = ctx.validator_cls(sub_schema)
+            except Exception:
+                pass
         with nctx.at(key):
             for value in cover_schema_iter(nctx, sub_schema):
+                if validator is not None:
+                    v = value.value
+                    # Primitives stringify on the wire (form-urlencoded values, XML text content)
+                    if (is_form or is_xml) and isinstance(v, (bool, int, float)) and validator.is_valid(str(v)):
+                        continue
+                    # Empty dict/None both serialize to empty string in XML
+                    if is_xml and (v == {} or v is None) and validator.is_valid(""):
+                        continue
                 inner = value.description or ""
                 # Build path notation: "a -> b: leaf" for nested, "a: leaf" for direct
                 description = f"{key} -> {inner}" if ": " in inner else f"{key}: {inner}"

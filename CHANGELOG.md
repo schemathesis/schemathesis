@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False positive `negative_data_rejection` for `application/x-www-form-urlencoded` and `application/xml` body properties where type mutations are wire-identical (e.g. `integer` stringifies to a valid string).
 - Crash generating curl command when a NEGATIVE coverage case has a primitive body (e.g. `integer` form-urlencoded schema).
 - False positive `positive_data_acceptance` for string fields with `format: uuid` and optional-hyphen `pattern` in the coverage phase.
 - False positive `positive_data_acceptance` for body properties where all `enum` values violate a sibling constraint (e.g. `maxLength`) in the coverage phase.
