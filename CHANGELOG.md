@@ -30,6 +30,7 @@
 - Schema-invalid POSITIVE body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
 - False positive `positive_data_acceptance` when a property has a boolean `false` schema in the coverage phase.
 - False positive `negative_data_rejection` for nullable string properties with `maxLength`, `minLength`, or `format` constraints in the coverage phase.
+- Runtime error in `negative_data_rejection` when a parameter schema has a `pattern` that jsonschema_rs rejects (e.g. `{,3}` as an incomplete quantifier).
 - False positive `negative_data_rejection` when a string property has both `enum` and `maxLength`/`minLength` in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
 - False positive `positive_data_acceptance` when `enum` contains values violating the declared `type` in template body generation in the coverage phase.
