@@ -4264,6 +4264,57 @@ def test_coverage_positive_template_required_property_absent_from_properties(ctx
         assert validator.is_valid(case.body), f"POSITIVE template body is schema-invalid: {case.body!r}"
 
 
+def test_coverage_positive_template_skips_false_schema_property(ctx):
+    # A property with boolean `false` schema means no value is valid — skip it rather than
+    # assigning `0`, which would make the POSITIVE body schema-invalid.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items/{id}": {
+                "patch": {
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "extra": False,
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/items/{id}"]["patch"]
+
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    negative_cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in negative_cases:
+        if case.body is None or case.meta is None:
+            continue
+        body_info = case.meta.components.get(ParameterLocation.BODY)
+        if body_info is None or body_info.mode != GenerationMode.POSITIVE:
+            continue
+        assert validator.is_valid(case.body), f"POSITIVE template body is schema-invalid: {case.body!r}"
+
+
 def test_coverage_negative_string_length_nullable(ctx):
     # STRING_ABOVE_MAX_LENGTH / STRING_BELOW_MIN_LENGTH must produce a string, not `None`,
     # when the schema has `type: ["string", "null"]`.

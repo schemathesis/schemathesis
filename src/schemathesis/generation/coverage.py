@@ -364,6 +364,8 @@ class CoverageContext:
             # Deep clone to avoid circular references in Python objects
             schema = deepclone(self.resolve_ref(reference))
         if isinstance(schema, bool):
+            if not schema:
+                raise Unsatisfiable
             return 0
         keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example", "examples"]])
         if keys == ["type"]:
