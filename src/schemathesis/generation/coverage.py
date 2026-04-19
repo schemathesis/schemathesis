@@ -651,16 +651,32 @@ def _cover_positive_for_type(
         for key in ("anyOf", "oneOf"):
             sub_schemas = schema.get(key)
             if sub_schemas is not None:
-                for sub_schema in sub_schemas:
+                if key == "oneOf":
+                    resolved_schemas = [
+                        ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in sub_schemas
+                    ]
+                    one_of_validators: list[jsonschema_rs.Validator] | None = [
+                        jsonschema_rs.Draft7Validator(rs) for rs in resolved_schemas
+                    ]
+                else:
+                    one_of_validators = None
+                for idx, sub_schema in enumerate(sub_schemas):
                     effective = _resolve_sub_schema(ctx, sub_schema)
                     if isinstance(effective, dict) and "properties" in effective:
                         # See GH-3584
                         # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties
-                        yield from cover_schema_iter(ctx, effective)
+                        gen = cover_schema_iter(ctx, effective)
                     else:
                         # See GH-3520
                         # Additive constraint — merge parent context so sub-schema knows field definitions
-                        yield from cover_schema_iter(ctx, _merge_with_parent_context(schema, effective))
+                        gen = cover_schema_iter(ctx, _merge_with_parent_context(schema, effective))
+                    if one_of_validators is not None:
+                        # Only yield values valid for exactly this one branch
+                        for v in gen:
+                            if not is_valid_for_others(v.value, idx, one_of_validators):
+                                yield v
+                    else:
+                        yield from gen
         all_of = schema.get("allOf")
         # Set when canonicalish is used for allOf: the canonical schema covers the full merged
         # constraints, so the outer schema's type/properties generation must be skipped to avoid

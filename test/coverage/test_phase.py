@@ -4477,6 +4477,63 @@ def test_coverage_negative_string_property_xml_not_wire_identical(ctx):
                 )
 
 
+def test_coverage_positive_oneof_body_valid_for_whole_schema(ctx):
+    # oneOf where both branches allow the same set of values (no additionalProperties: false).
+    # POSITIVE coverage must not yield bodies that are invalid for the whole oneOf (i.e. valid
+    # for multiple branches simultaneously).
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/modify": {
+                "patch": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {"email": {"type": "string", "example": "a@b.com"}},
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "email": {"type": "string"},
+                                                "code": {"type": "string"},
+                                            },
+                                        },
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"204": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/modify"]["PATCH"]
+    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    for case in cases:
+        if case.media_type != "application/json" or not case.meta:
+            continue
+        comp = case.meta.components.get(ParameterLocation.BODY)
+        if comp and comp.mode == GenerationMode.POSITIVE:
+            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid for oneOf: {case.body!r}"
+
+
 def test_coverage_negative_format_nullable(ctx):
     # INVALID_FORMAT must produce a non-null string when the schema has `type: ["string", "null"]`.
     raw_schema = ctx.openapi.build_schema(
