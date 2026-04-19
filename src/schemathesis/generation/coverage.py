@@ -1736,12 +1736,19 @@ def _negative_pattern(
         compiled = re.compile(pattern)
     except re.error:
         return
+    try:
+        validator: jsonschema_rs.Validator | None = ctx.validator_cls({"type": "string", "pattern": pattern})
+    except Exception:
+        validator = None
+    strategy = (
+        st.text(min_size=min_length or 0, max_size=max_length)
+        .filter(partial(_not_matching_pattern, pattern=compiled))
+        .filter(ctx.is_valid_for_location)
+    )
+    if validator is not None:
+        strategy = strategy.filter(lambda v, _v=validator: not _v.is_valid(v))
     yield NegativeValue(
-        ctx.generate_from(
-            st.text(min_size=min_length or 0, max_size=max_length)
-            .filter(partial(_not_matching_pattern, pattern=compiled))
-            .filter(ctx.is_valid_for_location)
-        ),
+        ctx.generate_from(strategy),
         scenario=CoverageScenario.INVALID_PATTERN,
         description=f"Value not matching the '{pattern}' pattern",
         location=ctx.current_path,

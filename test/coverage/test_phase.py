@@ -3873,6 +3873,60 @@ def test_coverage_negative_empty_dict_additional_properties_not_treated_as_false
         )
 
 
+def test_coverage_negative_pattern_with_control_chars_uses_schema_validator(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "pattern": r"^.{0,99}\S$",
+                                            "minLength": 1,
+                                            "maxLength": 100,
+                                        }
+                                    },
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/items"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        info = case.meta.components.get(ParameterLocation.BODY)
+        if info is not None and info.mode == GenerationMode.NEGATIVE and case.body is not None:
+            assert not validator.is_valid(case.body), (
+                f"NEGATIVE body must be schema-invalid, got schema-valid body: {case.body!r}"
+            )
+
+
 def test_coverage_positive_object_type_with_items(ctx):
     # Schema property with type:"object" and "items" (a schema inconsistency) must not
     # cause generate_from_schema to produce a list — the items/type fast path must only
