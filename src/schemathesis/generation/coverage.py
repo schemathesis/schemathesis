@@ -393,7 +393,10 @@ class CoverageContext:
         ) and schema["type"] == "integer":
             return cached_draw(st.integers(min_value=schema.get("minimum"), max_value=schema.get("maximum")))
         if "enum" in schema:
-            return cached_draw(st.sampled_from(schema["enum"]))
+            enum_values = [v for v in schema["enum"] if is_valid(v, schema)]
+            if not enum_values:
+                enum_values = schema["enum"]
+            return cached_draw(st.sampled_from(enum_values))
         if keys == ["multipleOf", "type"] and schema["type"] in ("integer", "number"):
             step = schema["multipleOf"]
             return cached_draw(st.integers().map(step.__mul__))
