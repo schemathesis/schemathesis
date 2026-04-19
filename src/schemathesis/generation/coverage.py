@@ -870,7 +870,7 @@ def cover_schema_iter(
                                 new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                                 new_schema.pop("enum", None)
                                 new_schema.pop("const", None)
-                                new_schema.setdefault("type", "string")
+                                new_schema["type"] = "string"
                                 if "pattern" in new_schema:
                                     new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
                                     if new_schema["pattern"] == schema["pattern"]:
@@ -897,7 +897,7 @@ def cover_schema_iter(
                             new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                             new_schema.pop("enum", None)
                             new_schema.pop("const", None)
-                            new_schema.setdefault("type", "string")
+                            new_schema["type"] = "string"
                             if "pattern" in new_schema:
                                 if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
                                     # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
@@ -1820,7 +1820,7 @@ def _negative_format(
         return
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
-    without_format.setdefault("type", "string")
+    without_format["type"] = "string"
     if ctx.location == "path":
         # Empty path parameters are invalid
         without_format["minLength"] = 1
