@@ -4613,3 +4613,63 @@ def test_coverage_form_urlencoded_primitive_body_negative_no_crash(ctx):
     assert len(cases) > 0
     for case in cases:
         case.as_curl_command()
+
+
+def test_coverage_negative_string_above_max_length_invalid_when_pattern_quantifier_merged(ctx):
+    # An unanchored quantifier like `{1,50}` doesn't prevent a 51-char string from passing
+    # JSON Schema validation (partial match). The optimizer must anchor the pattern.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "pattern": "[^/:|\\x00-\\x1f]+",
+                                            "minLength": 1,
+                                            "maxLength": 50,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/items"]["POST"]
+    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    above_max_cases = [
+        case
+        for case in cases
+        if case.meta is not None
+        and case.meta.phase.data is not None
+        and case.meta.phase.data.scenario == CoverageScenario.STRING_ABOVE_MAX_LENGTH
+        and case.media_type == "application/json"
+    ]
+    assert len(above_max_cases) > 0
+    for case in above_max_cases:
+        assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"

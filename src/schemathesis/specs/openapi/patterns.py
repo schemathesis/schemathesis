@@ -449,19 +449,38 @@ def _serialize_branch(value: _BranchValue) -> str:
     return "|".join(_serialize(alt) for alt in alternatives)
 
 
+_AT_BEGINNING: _Node = (sre.AT, sre.AT_BEGINNING)
+_AT_END: _Node = (sre.AT, sre.AT_END)
+
+
 def _transform(parsed: list[_Node], min_length: int | None, max_length: int | None) -> list[_Node] | None:
     """Top-level transformer. Dispatches by pattern structure."""
     nodes = list(parsed)
     match _classify_structure(nodes):
+        # For cases without full anchoring: JSON Schema `pattern` is a substring match,
+        # so `{1,50}` alone doesn't reject strings longer than 50 chars. Add the missing
+        # anchor(s) whenever max_length is being encoded into the quantifier.
         case ("single", content):
             result = _transform_node(content, min_length, max_length)
-            return [result] if result is not None else None
+            if result is None:
+                return None
+            if max_length is not None:
+                return [_AT_BEGINNING, result, _AT_END]
+            return [result]
         case ("leading_anchor", anchor, content):
             result = _transform_node(content, min_length, max_length)
-            return [anchor, result] if result is not None else None
+            if result is None:
+                return None
+            if max_length is not None:
+                return [anchor, result, _AT_END]
+            return [anchor, result]
         case ("trailing_anchor", content, anchor):
             result = _transform_node(content, min_length, max_length)
-            return [result, anchor] if result is not None else None
+            if result is None:
+                return None
+            if max_length is not None:
+                return [_AT_BEGINNING, result, anchor]
+            return [result, anchor]
 
         case ("both_anchors", leading, content, trailing):
             return _transform_anchored_single(leading, content, trailing, min_length, max_length)
