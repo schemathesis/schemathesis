@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False positive `negative_data_rejection` for body objects with `additionalProperties: {}` in the coverage phase.
 - Crash in the coverage phase for `application/x-www-form-urlencoded` requests with `format: binary` body fields in negative mode.
 - False positive `negative_data_rejection` when a schema has 15 or more `properties` and exactly 2 required fields in the coverage phase.
 - False positive `negative_data_rejection` for body properties with `type: integer` and inapplicable `minLength`/`maxLength` constraints in the coverage phase.

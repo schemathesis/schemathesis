@@ -3821,6 +3821,58 @@ def test_coverage_form_urlencoded_binary_format_negative(ctx):
         assert case.meta.phase.name == TestPhase.COVERAGE
 
 
+def test_coverage_negative_empty_dict_additional_properties_not_treated_as_false(ctx):
+    # `additionalProperties: {}` is equivalent to `true` — any extra property is valid.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/search": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "params": {
+                                            "type": "object",
+                                            "additionalProperties": {},
+                                        },
+                                        "query": {"type": "string"},
+                                    },
+                                    "required": ["query"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/search"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        assert not validator.is_valid(case.body), (
+            f"NEGATIVE body must be schema-invalid, got schema-valid body: {case.body!r}"
+        )
+
+
 def test_coverage_positive_object_type_with_items(ctx):
     # Schema property with type:"object" and "items" (a schema inconsistency) must not
     # cause generate_from_schema to produce a list — the items/type fast path must only

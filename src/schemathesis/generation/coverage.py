@@ -972,7 +972,7 @@ def cover_schema_iter(
                     except (InvalidArgument, Unsatisfiable):
                         pass
                 elif key == "additionalProperties" and schema.get("type") in ["object", None]:
-                    if not value and "pattern" not in schema:
+                    if value is False and "pattern" not in schema:
                         # additionalProperties: false - add unexpected property
                         if not ctx.allow_extra_parameters and ctx.location in (
                             ParameterLocation.QUERY,
