@@ -4,6 +4,7 @@
 
 ### :bug: Fixed
 
+- False positive `positive_data_acceptance` for string fields with `format: uuid` and optional-hyphen `pattern` in the coverage phase.
 - False positive `positive_data_acceptance` for body properties where all `enum` values violate a sibling constraint (e.g. `maxLength`) in the coverage phase.
 - False positive `negative_data_rejection` for `pattern` fields ending with `\x1c`–`\x1f` control characters in the coverage phase.
 - False positive `negative_data_rejection` for body objects with `additionalProperties: {}` in the coverage phase.
