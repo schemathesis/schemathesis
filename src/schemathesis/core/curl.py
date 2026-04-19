@@ -39,7 +39,7 @@ def generate(
     *,
     method: str,
     url: str,
-    body: str | bytes | None,
+    body: Any,
     verify: bool,
     headers: dict[str, Any],
     known_generated_headers: dict[str, Any] | None,
@@ -61,9 +61,11 @@ def generate(
         command += f" -H {escaped_header}"
 
     # Process body with shell-aware escaping
-    if body:
+    if body is not None:
         if isinstance(body, bytes):
             body = body.decode("utf-8", errors="replace")
+        elif not isinstance(body, str):
+            body = str(body)
 
         escaped_body = _escape_and_quote(body, warnings, "Request body")
         command += f" -d {escaped_body}"

@@ -4406,3 +4406,38 @@ def test_coverage_negative_format_nullable(ctx):
         if body_info is None or body_info.mode != GenerationMode.NEGATIVE:
             continue
         assert not validator.is_valid(case.body), f"NEGATIVE body is schema-valid: {case.body!r}"
+
+
+def test_coverage_form_urlencoded_primitive_body_negative_no_crash(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/convert": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {"schema": {"type": "integer", "format": "int32"}}
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/convert"]["POST"]
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        case.as_curl_command()
