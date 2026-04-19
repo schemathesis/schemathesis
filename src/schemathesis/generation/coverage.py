@@ -852,6 +852,8 @@ def cover_schema_iter(
                             with suppress(InvalidArgument):
                                 min_length = max_length = value - 1
                                 new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                                new_schema.pop("enum", None)
+                                new_schema.pop("const", None)
                                 new_schema.setdefault("type", "string")
                                 if "pattern" in new_schema:
                                     new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
@@ -877,6 +879,8 @@ def cover_schema_iter(
                         try:
                             min_length = max_length = value + 1
                             new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                            new_schema.pop("enum", None)
+                            new_schema.pop("const", None)
                             new_schema.setdefault("type", "string")
                             if "pattern" in new_schema:
                                 if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:

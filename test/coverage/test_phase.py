@@ -3921,3 +3921,56 @@ def test_coverage_positive_object_type_with_items(ctx):
     )
     for case in positive_cases:
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
+
+
+def test_coverage_negative_string_length_with_enum(ctx):
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/submit": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["version"],
+                                    "properties": {
+                                        "version": {
+                                            "type": "string",
+                                            "enum": ["1.2", "1.3"],
+                                            "minLength": 3,
+                                            "maxLength": 3,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+    operation = loaded["/submit"]["post"]
+
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    negative_cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in negative_cases:
+        if case.body is None or case.meta is None:
+            continue
+        body_info = case.meta.components.get(ParameterLocation.BODY)
+        if body_info is None or body_info.mode != GenerationMode.NEGATIVE:
+            continue
+        assert not validator.is_valid(case.body), f"NEGATIVE body is schema-valid: {case.body!r}"
