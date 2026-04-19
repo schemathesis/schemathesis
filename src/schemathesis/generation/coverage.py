@@ -386,7 +386,10 @@ class CoverageContext:
                 if isinstance(sub_schema, dict) and "const" in sub_schema:
                     obj[key] = sub_schema["const"]
                 else:
-                    obj[key] = self.generate_from_schema(sub_schema)
+                    try:
+                        obj[key] = self.generate_from_schema(sub_schema)
+                    except Unsatisfiable:
+                        pass
             return obj
         if (
             keys == ["maximum", "minimum", "type"] or keys == ["maximum", "type"] or keys == ["minimum", "type"]
@@ -395,7 +398,7 @@ class CoverageContext:
         if "enum" in schema:
             enum_values = [v for v in schema["enum"] if is_valid(v, schema)]
             if not enum_values:
-                enum_values = schema["enum"]
+                raise Unsatisfiable
             return cached_draw(st.sampled_from(enum_values))
         if keys == ["multipleOf", "type"] and schema["type"] in ("integer", "number"):
             step = schema["multipleOf"]

@@ -3927,6 +3927,62 @@ def test_coverage_negative_pattern_with_control_chars_uses_schema_validator(ctx)
             )
 
 
+def test_coverage_positive_body_skips_properties_with_no_valid_enum_values(ctx):
+    # A property schema like {enum: ["MALE", "FEMALE"], maxLength: 1} has contradictory
+    # constraints — all enum values violate maxLength. The coverage phase must not pick
+    # an invalid enum value as the positive body template, causing POSITIVE body failures.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "gender": {
+                                            "type": "string",
+                                            "enum": ["MALE", "FEMALE", "UNKNOWN"],
+                                            "maxLength": 1,
+                                        },
+                                    },
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/users"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        if case.body is not None:
+            assert validator.is_valid(case.body), (
+                f"POSITIVE body must be schema-valid, got schema-invalid body: {case.body!r}"
+            )
+
+
 def test_coverage_positive_object_type_with_items(ctx):
     # Schema property with type:"object" and "items" (a schema inconsistency) must not
     # cause generate_from_schema to produce a list — the items/type fast path must only
