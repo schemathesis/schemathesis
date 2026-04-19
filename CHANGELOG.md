@@ -25,6 +25,7 @@
 - False positive `positive_data_acceptance` when a property has `type: object` alongside `items` in the coverage phase.
 - Schema-invalid body when a Swagger 2.0 array parameter has `enum` at the array level with `items` also defined in the coverage phase.
 - Schema-invalid POSITIVE body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
+- False positive `positive_data_acceptance` when a property has a boolean `false` schema in the coverage phase.
 - False positive `negative_data_rejection` for nullable string properties with `maxLength`, `minLength`, or `format` constraints in the coverage phase.
 - False positive `negative_data_rejection` when a string property has both `enum` and `maxLength`/`minLength` in the coverage phase.
 - False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
