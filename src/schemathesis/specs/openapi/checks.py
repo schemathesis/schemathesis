@@ -523,9 +523,14 @@ def _non_body_negative_values_match_schema(case: Case) -> bool:
         if not container:
             continue
         v = dict(value) if location == ParameterLocation.HEADER else value
-        if not container.get_strict_validator().is_valid(v):
-            # At least one parameter is invalid
-            return False
+        try:
+            if not container.get_strict_validator().is_valid(v):
+                # At least one parameter is invalid
+                return False
+        except Exception:
+            # Schema rejected by jsonschema_rs (e.g. `{,3}` as an incomplete quantifier)
+            # — can't determine validity, so skip this location
+            continue
 
     return has_negative
 
@@ -744,9 +749,15 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
                 continue
 
             value_without_additional_properties = {k: v for k, v in value.items() if k in container}
-            if not validator_cls(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(
-                value_without_additional_properties
-            ):
+            try:
+                is_valid = validator_cls(schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(
+                    value_without_additional_properties
+                )
+            except Exception:
+                # Schema has an invalid pattern (e.g., valid Python regex but invalid ECMA 262)
+                # — can't determine validity, so skip this location
+                continue
+            if not is_valid:
                 # Other types of negation found
                 return False
     # Only additional properties are added

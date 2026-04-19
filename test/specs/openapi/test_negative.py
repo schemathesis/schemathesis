@@ -1103,3 +1103,38 @@ def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, app
         )
         == snapshot_cli
     )
+
+
+def test_query_param_invalid_ecma262_pattern_no_runtime_error(ctx, app_runner, cli):
+    # `{,3}` is valid in Python, but jsonschema_rs rejects it as an incomplete quantifier when meta-validating the schema.
+    # The `negative_data_rejection` check must not crash on such user-provided schemas.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "filter",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": "[A-Z]{,3}"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items")
+    def items():
+        return jsonify({}), 200
+
+    port = app_runner.run_flask_app(app)
+    cli.run_and_assert(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--phases=coverage",
+        "--mode=negative",
+        "--checks=negative_data_rejection",
+        exit_code=ExitCode.OK,
+    )
