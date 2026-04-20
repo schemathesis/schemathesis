@@ -4725,6 +4725,57 @@ def test_coverage_negative_max_length_preserved_when_pattern_has_inner_quantifie
         assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
 
 
+def test_coverage_negative_max_length_preserved_when_outer_optional_group_has_variable_inner(ctx):
+    # Optional group with variable inner: minLength absorbed (? to {1}) but maxLength unrepresentable.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["key"],
+                                    "properties": {
+                                        "key": {
+                                            "type": "string",
+                                            "pattern": r"^([a-zA-Z0-9!_.*'()-][/a-zA-Z0-9!_.*'()-]*)?$",
+                                            "minLength": 1,
+                                            "maxLength": 5,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items"]["POST"]
+    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
+
+
 def test_coverage_negative_missing_required_with_additional_properties_schema(ctx):
     raw_schema = ctx.openapi.build_schema(
         {
