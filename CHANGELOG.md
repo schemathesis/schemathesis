@@ -15,6 +15,7 @@
 - False positive `negative_data_rejection` for string fields with `pattern` + `maxLength` where `maxLength` was silently lost into an unanchored regex quantifier.
 - False positive `negative_data_rejection` for string fields where `pattern` has an inner quantifier (e.g. `^[a-z]([-a-z]*[a-z])?$`) and `maxLength` is present.
 - False positive `negative_data_rejection` when a `pattern` optional group wraps variable-length content and `maxLength` is present in the coverage phase.
+- False positive `positive_data_acceptance` when `propertyNames` restricts object keys and `additionalProperties` is present in the coverage phase. [#3771](https://github.com/schemathesis/schemathesis/issues/3771)
 - False positive `positive_data_acceptance` for `oneOf` body schemas where generated values satisfy multiple branches simultaneously.
 - False positive `negative_data_rejection` for `application/x-www-form-urlencoded` and `application/xml` body properties where type mutations are wire-identical (e.g. `integer` stringifies to a valid string).
 - Crash generating curl command when a NEGATIVE coverage case has a primitive body (e.g. `integer` form-urlencoded schema).
