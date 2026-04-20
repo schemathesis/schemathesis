@@ -727,9 +727,7 @@ def _cover_positive_for_type(
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
                 with suppress(jsonschema_rs.ValidationError):
-                    for idx, sub_schema in enumerate(all_of):
-                        if isinstance(sub_schema, dict) and "$ref" in sub_schema:
-                            all_of[idx] = ctx.resolve_ref(sub_schema["$ref"])
+                    _inline_allof_refs(schema, ctx)
                     canonical = canonicalish(schema)
                     yield from cover_schema_iter(ctx, canonical)
                 allof_handles_all = True
@@ -765,6 +763,24 @@ def _cover_positive_for_type(
             # These violations are positive for the outer schema, so flip the mode
             nctx = ctx.with_negative()
             yield from _flip_generation_mode_for_not(cover_schema_iter(nctx, schema["not"], seen))
+
+
+def _inline_allof_refs(schema: dict, ctx: CoverageContext, seen: frozenset[str] = frozenset()) -> None:
+    # canonicalish merges two $ref-only siblings by keeping the first and dropping the second,
+    # losing required fields from the dropped ref.  Resolving refs first gives it concrete schemas.
+    all_of = schema.get("allOf")
+    if not all_of:
+        return
+    for idx, sub_schema in enumerate(all_of):
+        if isinstance(sub_schema, dict) and "$ref" in sub_schema:
+            ref = sub_schema["$ref"]
+            if ref not in seen:
+                resolved = deepclone(ctx.resolve_ref(ref))
+                all_of[idx] = resolved
+                if isinstance(resolved, dict):
+                    _inline_allof_refs(resolved, ctx, seen | {ref})
+        elif isinstance(sub_schema, dict):
+            _inline_allof_refs(sub_schema, ctx, seen)
 
 
 @contextmanager
