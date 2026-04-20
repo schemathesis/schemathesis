@@ -678,7 +678,30 @@ def _cover_positive_for_type(
                     effective = _resolve_sub_schema(ctx, sub_schema)
                     if isinstance(effective, dict) and "properties" in effective:
                         # See GH-3584
-                        # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties
+                        # Sub-schema defines its own properties — treat as a complete type, do not inject parent properties.
+                        # Exception: required fields absent from the branch but defined in the parent must be injected
+                        # so they are generated with the correct constraints.
+                        parent_props = schema.get("properties", {}) if isinstance(schema, dict) else {}
+                        if parent_props:
+                            branch_props = effective.get("properties", {})
+                            branch_required: list = effective.get("required", [])
+                            parent_required: list = schema.get("required", []) if isinstance(schema, dict) else []
+                            to_inject = {
+                                f: parent_props[f]
+                                for f in set(branch_required) | set(parent_required)
+                                if f not in branch_props and f in parent_props
+                            }
+                            if to_inject:
+                                all_required = list(
+                                    dict.fromkeys(
+                                        list(branch_required) + [f for f in parent_required if f not in branch_required]
+                                    )
+                                )
+                                effective = {
+                                    **effective,
+                                    "properties": {**branch_props, **to_inject},
+                                    "required": all_required,
+                                }
                         gen = cover_schema_iter(ctx, effective)
                     else:
                         # See GH-3520
