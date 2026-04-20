@@ -566,16 +566,8 @@ def _transform_repeat(op: int, value: _RepeatValue, min_l: int | None, max_l: in
     if final_min > final_max:
         return None
 
-    # Bounds unchanged + finite max + variable-length inner content means the
-    # outer repetition count alone can't encode maxLength (inner quantifiers can
-    # still expand the string further). Signal no-op so the caller keeps the
-    # length constraints on the schema instead of silently discarding them.
-    if (
-        final_min == min_repeat
-        and final_max == max_repeat
-        and max_repeat != MAXREPEAT
-        and _has_variable_length(list(subpattern))
-    ):
+    # Outer bound unchanged (ext_max >= max_repeat) with variable inner: maxLength unrepresentable.
+    if final_max == max_repeat and max_repeat != MAXREPEAT and _has_variable_length(list(subpattern)):
         return None
 
     return (sre.MAX_REPEAT, (final_min, final_max, subpattern))

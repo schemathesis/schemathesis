@@ -198,6 +198,8 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # Outer bound already finite and unchanged; inner content is variable-length
         # — maxLength cannot be encoded through the outer repetition count alone.
         (r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", 1, 63, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"),
+        # Optional group with variable inner: minLength absorbed but maxLength unrepresentable.
+        (r"^([a-z][a-z]*)?$", 1, 5, r"^([a-z][a-z]*)?$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
