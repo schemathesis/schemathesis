@@ -494,7 +494,10 @@ class CoverageContext:
             return deepclone(cached) if isinstance(cached, dict | list) else cached
 
         # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
-        strategy = from_schema(deepclone(schema), custom_formats=self.custom_formats)
+        cloned = deepclone(schema)
+        if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in cloned:
+            _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY])
+        strategy = from_schema(cloned, custom_formats=self.custom_formats)
         # Keep generation consistent with the validator draft semantics used by this operation.
         # This avoids producing positive values that the validator for the same schema would reject.
         if (
@@ -509,6 +512,16 @@ class CoverageContext:
             deepclone(generated) if isinstance(generated, dict | list) else generated
         )
         return generated
+
+
+def _apply_pattern_optimizations(obj: Any) -> None:
+    if isinstance(obj, dict):
+        update_pattern_in_schema(obj)
+        for value in obj.values():
+            _apply_pattern_optimizations(value)
+    elif isinstance(obj, list):
+        for item in obj:
+            _apply_pattern_optimizations(item)
 
 
 def _schema_generation_cache_key(schema: JsonSchema) -> tuple[Any, ...]:

@@ -4538,6 +4538,60 @@ def test_coverage_positive_oneof_body_valid_for_whole_schema(ctx):
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid for oneOf: {case.body!r}"
 
 
+def test_coverage_positive_body_ref_with_pattern_and_length_constraints(ctx):
+    # POSITIVE bodies must satisfy the anchored pattern even when the object body uses
+    # `additionalProperties: false` alongside `$ref` properties with pattern/length constraints.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/tasks": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TaskRequest"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "TaskRequest": {
+                    "type": "object",
+                    "required": ["TaskId"],
+                    "properties": {"TaskId": {"$ref": "#/components/schemas/BatchLoadTaskId"}},
+                    "additionalProperties": False,
+                },
+                "BatchLoadTaskId": {
+                    "type": "string",
+                    "pattern": "[A-Z0-9]+",
+                    "minLength": 3,
+                    "maxLength": 32,
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/tasks"]["POST"]
+    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    for case in cases:
+        if case.media_type != "application/json" or not case.meta:
+            continue
+        comp = case.meta.components.get(ParameterLocation.BODY)
+        if comp and comp.mode == GenerationMode.POSITIVE:
+            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
 def test_coverage_negative_format_nullable(ctx):
     # INVALID_FORMAT must produce a non-null string when the schema has `type: ["string", "null"]`.
     raw_schema = ctx.openapi.build_schema(
