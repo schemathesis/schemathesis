@@ -362,7 +362,10 @@ def _single_element_array_becomes_valid_after_serialization(case: Case) -> bool:
             # Multi-element arrays serialize as repeated keys. If any element is valid
             # for the full original schema (including enum, minimum, pattern, etc.),
             # some frameworks may accept the request by picking that element.
-            validator = param.adapter.jsonschema_validator_cls(schema)
+            try:
+                validator = param.adapter.jsonschema_validator_cls(schema, pattern_options=FANCY_REGEX_OPTIONS)
+            except Exception:
+                return True
             if any(validator.is_valid(element) for element in param_value):
                 return True
 
@@ -617,7 +620,7 @@ def _additional_properties_hint(case: Case) -> str | None:
             return None
 
         stripped = {k: v for k, v in case.body.items() if k not in extra}
-        if not validator_cls(alternative.optimized_schema).is_valid(stripped):
+        if not validator_cls(alternative.optimized_schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(stripped):
             return None
 
         count = len(extra)

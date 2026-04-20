@@ -9,6 +9,7 @@ import jsonschema_rs
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.bundler import Bundle, bundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.specs.openapi import types
@@ -105,7 +106,7 @@ class OpenApiResponse:
         return ResolvedSchema(schema=cached.schema, media_type=resolved_media_type, name_to_uri=cached.name_to_uri)
 
     def _build_validator(self, schema: JsonSchema) -> jsonschema_rs.Validator:
-        return self.adapter.jsonschema_validator_cls(schema, validate_formats=True)
+        return self.adapter.jsonschema_validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS)
 
     def get_validator(self, resolved_media_type: str | None, schema: JsonSchema) -> jsonschema_rs.Validator | None:
         """Get or build a cached JSON Schema validator for a non-SSE media type."""
@@ -538,7 +539,9 @@ class OpenApiResponseHeader:
     def validator(self) -> jsonschema_rs.Validator:
         """JSON Schema validator for this header."""
         if self._validator is NOT_SET:
-            self._validator = self.adapter.jsonschema_validator_cls(self.schema, validate_formats=True)
+            self._validator = self.adapter.jsonschema_validator_cls(
+                self.schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
+            )
         assert not isinstance(self._validator, NotSet)
         return self._validator
 

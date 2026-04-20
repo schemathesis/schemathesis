@@ -11,6 +11,7 @@ from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
@@ -277,12 +278,14 @@ class Case:
                 if _contains_bytes(value):
                     return False
                 if alternative.media_type == self.media_type:
-                    return validator_cls(alternative.optimized_schema).is_valid(value)
+                    return validator_cls(alternative.optimized_schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(
+                        value
+                    )
         # Validate other locations against container schema
         container = getattr(self.operation, location.container_name)
         if isinstance(value, CaseInsensitiveDict):
             value = dict(value)
-        return validator_cls(container.schema).is_valid(value)
+        return validator_cls(container.schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(value)
 
     def _hash_container(self, value: Any) -> int:
         """Create a hash representing the current state of a container.

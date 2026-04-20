@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
 
-from schemathesis.core.jsonschema import is_valid
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 
@@ -81,7 +81,9 @@ def _get_format_validator(format: str, validator_cls: type[jsonschema_rs.Validat
     """Get or create a cached validator for checking a specific format."""
     key = (format, validator_cls)
     if key not in _FORMAT_VALIDATORS:
-        _FORMAT_VALIDATORS[key] = validator_cls({"type": "string", "format": format}, validate_formats=True)
+        _FORMAT_VALIDATORS[key] = validator_cls(
+            {"type": "string", "format": format}, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS
+        )
     return _FORMAT_VALIDATORS[key]
 
 
@@ -1714,7 +1716,7 @@ def _negative_properties(
         validator: jsonschema_rs.Validator | None = None
         if (is_form or is_xml) and isinstance(sub_schema, dict):
             try:
-                validator = ctx.validator_cls(sub_schema)
+                validator = ctx.validator_cls(sub_schema, pattern_options=FANCY_REGEX_OPTIONS)
             except Exception:
                 pass
         with nctx.at(key):
@@ -1813,7 +1815,9 @@ def _negative_pattern(
     except re.error:
         return
     try:
-        validator: jsonschema_rs.Validator | None = ctx.validator_cls({"type": "string", "pattern": pattern})
+        validator: jsonschema_rs.Validator | None = ctx.validator_cls(
+            {"type": "string", "pattern": pattern}, pattern_options=FANCY_REGEX_OPTIONS
+        )
     except Exception:
         validator = None
     strategy = (
@@ -2044,7 +2048,7 @@ def _negative_type(
     schema = _remove_examples(schema)
 
     try:
-        validator = ctx.validator_cls(schema, validate_formats=True)
+        validator = ctx.validator_cls(schema, validate_formats=True, pattern_options=FANCY_REGEX_OPTIONS)
         is_valid = validator.is_valid
         is_valid(None)
         apply_validation = True
