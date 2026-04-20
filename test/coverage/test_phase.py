@@ -4888,3 +4888,21 @@ def test_coverage_positive_pattern_with_branch_group_not_corrupted(ctx):
             f"POSITIVE value {case.query['name']!r} failed optimized_schema validation — "
             f"pattern was likely corrupted by update_quantifier"
         )
+
+
+def test_coverage_positive_property_names_enum_respected(ctx):
+    # propertyNames with an enum must constrain generated keys; x-schemathesis-additional violates it.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "propertyNames": {"enum": ["red", "blue"]},
+            "additionalProperties": {
+                "type": "object",
+                "required": ["value"],
+                "properties": {"value": {"type": "integer"}},
+            },
+        },
+        positive=True,
+        version="3.1.0",
+    )

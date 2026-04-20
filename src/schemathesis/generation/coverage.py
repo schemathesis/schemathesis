@@ -151,7 +151,6 @@ ADDITIONAL_PROPERTY_KEY_BASE = "x-schemathesis-additional"
 
 
 def _generate_additional_property_key(existing_keys: set[str]) -> str:
-    """Generate a key for additional properties that doesn't conflict with existing keys."""
     key = ADDITIONAL_PROPERTY_KEY_BASE
     counter = 0
     while key in existing_keys:
@@ -751,6 +750,27 @@ def _ignore_unfixable(
             raise
 
 
+def _pick_property_name(schema: dict, existing_keys: set[str], ctx: CoverageContext) -> str | None:
+    """Return a key valid under propertyNames, or fall back to a synthetic key.
+
+    Returns None if a conforming key can't be found or propertyNames forbids all keys.
+    """
+    property_names = schema.get("propertyNames")
+    if property_names is False:
+        # No property name can satisfy `false` — adding any key would be invalid.
+        return None
+    if isinstance(property_names, dict):
+        try:
+            key = ctx.generate_from_schema(property_names)
+            # Degenerate schemas (e.g. `{}`) may yield non-strings; skip rather than corrupt.
+            if isinstance(key, str) and key not in existing_keys:
+                return key
+            return None
+        except Exception:
+            return None
+    return _generate_additional_property_key(existing_keys)
+
+
 def cover_schema_iter(
     ctx: CoverageContext, schema: JsonSchema, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
@@ -1030,7 +1050,9 @@ def cover_schema_iter(
                         # additionalProperties with schema - generate invalid values for the schema
                         template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                         existing_keys = set(schema.get("properties", {}).keys()) | set(template.keys())
-                        additional_key = _generate_additional_property_key(existing_keys)
+                        additional_key = _pick_property_name(schema, existing_keys, ctx)
+                        if additional_key is None:
+                            continue
                         nctx = ctx.with_negative()
                         with nctx.at(additional_key):
                             for invalid in cover_schema_iter(nctx, value, seen):
@@ -1051,7 +1073,9 @@ def cover_schema_iter(
                     needed = value + 1 - len(existing_keys)
                     if needed > 0:
                         for _ in range(needed):
-                            new_key = _generate_additional_property_key(existing_keys)
+                            new_key = _pick_property_name(schema, existing_keys, ctx)
+                            if new_key is None:
+                                break
                             existing_keys.add(new_key)
                             # Generate value based on additionalProperties schema, or use a default
                             if isinstance(additional_properties, dict):
@@ -1643,7 +1667,9 @@ def _positive_object(
     additional_properties = schema.get("additionalProperties")
     if isinstance(additional_properties, dict):
         existing_keys = set(properties.keys()) | set(template.keys())
-        additional_key = _generate_additional_property_key(existing_keys)
+        additional_key = _pick_property_name(schema, existing_keys, ctx)
+        if additional_key is None:
+            return
         for new in cover_schema_iter(ctx, additional_properties):
             if seen.insert(new.value):
                 yield PositiveValue(
