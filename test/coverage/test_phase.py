@@ -15,9 +15,12 @@ from requests import Request
 from requests.models import RequestEncodingMixin
 
 import schemathesis
+from schemathesis.checks import CheckContext
+from schemathesis.config import ChecksConfig
 from schemathesis.config._projects import ProjectConfig
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.failures import AcceptedNegativeData
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
@@ -30,6 +33,7 @@ from schemathesis.generation.hypothesis.builder import (
     generate_coverage_cases,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.specs.openapi.checks import negative_data_rejection
 from test.utils import assert_requests_call
 
 
@@ -4906,3 +4910,48 @@ def test_coverage_positive_property_names_enum_respected(ctx):
         positive=True,
         version="3.1.0",
     )
+
+
+def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_factory):
+    # \S{1,8192} exceeds jsonschema_rs's default DFA size limit; FANCY_REGEX_OPTIONS must be
+    # passed when building the multi-element-array validator inside the check.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/configuration": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "configuration_token",
+                            "required": True,
+                            "schema": {"type": "string", "pattern": r"\S{1,8192}"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/configuration"]["GET"]
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    response = response_factory.requests(status_code=200)
+    ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    for case in cases:
+        try:
+            negative_data_rejection(ctx_check, response, case)
+        except AcceptedNegativeData:
+            pass

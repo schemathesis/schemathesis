@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Runtime error in `negative_data_rejection` when a query, header, or cookie parameter `pattern` produces a large DFA (e.g. `\S{1,8192}`).
 - False positive `negative_data_rejection` when `additionalProperties` is a schema object and `required` has exactly 2 fields.
 
 - False positive `positive_data_acceptance` when an object schema-level `example` has a property violating a nested `format` constraint (e.g. `date-time` without timezone).
