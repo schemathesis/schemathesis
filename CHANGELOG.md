@@ -4,6 +4,8 @@
 
 ### :bug: Fixed
 
+- False positive `negative_data_rejection` when `additionalProperties` is a schema object and `required` has exactly 2 fields.
+
 - False positive `positive_data_acceptance` when an object schema-level `example` has a property violating a nested `format` constraint (e.g. `date-time` without timezone).
 - False positive `positive_data_acceptance` for string parameters with `pattern` containing alternation inside a quantified group (e.g. `([a-z]|-[a-z])*`) in the coverage phase.
 - False positive `negative_data_rejection` for string fields with `pattern` + `maxLength` where `maxLength` was silently lost into an unanchored regex quantifier.

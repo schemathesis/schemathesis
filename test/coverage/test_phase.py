@@ -4675,6 +4675,53 @@ def test_coverage_negative_string_above_max_length_invalid_when_pattern_quantifi
         assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
 
 
+def test_coverage_negative_missing_required_with_additional_properties_schema(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {"type": "string"},
+                                        "linkedServiceName": {"type": "object"},
+                                    },
+                                    "additionalProperties": {"type": "object"},
+                                    "required": ["type", "linkedServiceName"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items"]["POST"]
+    body_schema = operation.body[0].optimized_schema
+    validator = jsonschema_rs.validator_for(body_schema)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    assert len(cases) > 0
+    for case in cases:
+        assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
+
+
 def test_positive_object_example_with_invalid_format_not_yielded(ctx):
     # Schema-level example with a property value that violates format: date-time (missing timezone).
     # The invalid example must not appear as a POSITIVE coverage case.
