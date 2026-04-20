@@ -4673,3 +4673,19 @@ def test_coverage_negative_string_above_max_length_invalid_when_pattern_quantifi
     assert len(above_max_cases) > 0
     for case in above_max_cases:
         assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
+
+
+def test_positive_object_example_with_invalid_format_not_yielded(ctx):
+    # Schema-level example with a property value that violates format: date-time (missing timezone).
+    # The invalid example must not appear as a POSITIVE coverage case.
+    collect_coverage_cases(
+        ctx,
+        {
+            "type": "object",
+            "properties": {
+                "entryDate": {"type": "string", "format": "date-time"},
+            },
+            "example": {"entryDate": "2017-01-01T00:00:00"},
+        },
+        positive=True,
+    )

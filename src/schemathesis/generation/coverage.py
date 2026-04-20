@@ -637,10 +637,10 @@ def _cover_positive_for_type(
         return
 
     if ty == "object" or ty == "array":
-        template_schema = _get_template_schema(schema, ty)
+        template_schema = _get_template_schema(schema, ty, ctx)
         template = ctx.generate_from_schema(template_schema)
     elif "properties" in schema or "required" in schema:
-        template_schema = _get_template_schema(schema, "object")
+        template_schema = _get_template_schema(schema, "object", ctx)
         template = ctx.generate_from_schema(template_schema)
     else:
         template = None
@@ -655,9 +655,9 @@ def _cover_positive_for_type(
                     resolved_schemas = [
                         ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in sub_schemas
                     ]
-                    one_of_validators: list[jsonschema_rs.Validator] | None = [
-                        jsonschema_rs.Draft7Validator(rs) for rs in resolved_schemas
-                    ]
+                    one_of_validators: list[jsonschema_rs.Validator] | None = _make_branch_validators(
+                        resolved_schemas, ctx
+                    )
                 else:
                     one_of_validators = None
                 for idx, sub_schema in enumerate(sub_schemas):
@@ -817,10 +817,10 @@ def cover_schema_iter(
                 elif key == "type":
                     yield from _negative_type(ctx, value, seen, schema)
                 elif key == "properties":
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                     yield from _negative_properties(ctx, template, value)
                 elif key == "patternProperties":
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                     yield from _negative_pattern_properties(ctx, template, value)
                 elif key == "items" and isinstance(value, dict):
                     yield from _negative_items(ctx, value)
@@ -944,7 +944,7 @@ def cover_schema_iter(
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                     yield from _negative_required(ctx, template, value)
                 elif key == "maxItems" and isinstance(value, int) and value < INTERNAL_BUFFER_SIZE:
                     if value > NEGATIVE_MODE_MAX_ITEMS:
@@ -1019,7 +1019,7 @@ def cover_schema_iter(
                             ParameterLocation.BODY,
                         ):
                             continue
-                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                         yield NegativeValue(
                             {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
                             scenario=CoverageScenario.OBJECT_UNEXPECTED_PROPERTIES,
@@ -1028,7 +1028,7 @@ def cover_schema_iter(
                         )
                     elif isinstance(value, dict):
                         # additionalProperties with schema - generate invalid values for the schema
-                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                        template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                         existing_keys = set(schema.get("properties", {}).keys()) | set(template.keys())
                         additional_key = _generate_additional_property_key(existing_keys)
                         nctx = ctx.with_negative()
@@ -1045,7 +1045,7 @@ def cover_schema_iter(
                     # Skip if additionalProperties is false - can't add more properties cleanly
                     if additional_properties is False:
                         continue
-                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object", ctx))
                     obj_value = dict(template)
                     existing_keys = set(obj_value.keys())
                     needed = value + 1 - len(existing_keys)
@@ -1094,12 +1094,10 @@ def cover_schema_iter(
                             yield from cover_schema_iter(nctx, canonical, seen)
                 elif key == "anyOf":
                     nctx = ctx.with_negative()
-                    # Resolve refs before creating validators
                     resolved_schemas = [
                         ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
                     ]
-                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems -> items)
-                    validators = [jsonschema_rs.Draft7Validator(sub_schema) for sub_schema in resolved_schemas]
+                    validators = _make_branch_validators(resolved_schemas, ctx)
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -1109,12 +1107,10 @@ def cover_schema_iter(
                                 yield value
                 elif key == "oneOf":
                     nctx = ctx.with_negative()
-                    # Resolve refs before creating validators
                     resolved_schemas = [
                         ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
                     ]
-                    # Use Draft7 for validation since schemas are converted to Draft7 format (prefixItems -> items)
-                    validators = [jsonschema_rs.Draft7Validator(sub_schema) for sub_schema in resolved_schemas]
+                    validators = _make_branch_validators(resolved_schemas, ctx)
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
@@ -1157,44 +1153,54 @@ def is_invalid_for_oneOf(value: Any, idx: int, validators: list[jsonschema_rs.Va
     return valid_count == 0
 
 
-def _is_format_valid(value: Any, schema: JsonSchema) -> bool:
-    """Return True if value passes format validation, or if the schema has no format constraint."""
-    if not isinstance(schema, dict) or "format" not in schema:
+def _is_valid_with_formats(value: Any, schema: JsonSchema, ctx: CoverageContext) -> bool:
+    """Return True if value satisfies schema including format constraints at all nesting levels."""
+    if not isinstance(schema, dict):
         return True
     try:
-        return jsonschema_rs.validator_for(schema, validate_formats=True).is_valid(value)
+        full_schema: JsonSchema = schema
+        if BUNDLE_STORAGE_KEY in ctx.root_schema:
+            full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
+        return jsonschema_rs.validator_for(full_schema, validate_formats=True).is_valid(value)
     except Exception:
         return True
 
 
-def _get_properties(schema: JsonSchema) -> JsonSchema:
+def _make_branch_validators(schemas: list[JsonSchema], ctx: CoverageContext) -> list[jsonschema_rs.Validator]:
+    bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY)
+    result = []
+    for schema in schemas:
+        if bundle is not None and isinstance(schema, dict):
+            schema = {**schema, BUNDLE_STORAGE_KEY: bundle}
+        result.append(jsonschema_rs.validator_for(schema, validate_formats=True))
+    return result
+
+
+def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
     if isinstance(schema, dict):
         if "example" in schema:
             example = schema["example"]
-            if is_valid(example, schema) and _is_format_valid(example, schema):
+            if _is_valid_with_formats(example, schema, ctx):
                 return {"const": example}
         if "default" in schema:
             default = schema["default"]
-            if is_valid(default, schema) and _is_format_valid(default, schema):
+            if _is_valid_with_formats(default, schema, ctx):
                 return {"const": default}
         if schema.get("examples"):
-            valid = [ex for ex in schema["examples"] if is_valid(ex, schema) and _is_format_valid(ex, schema)]
+            valid = [ex for ex in schema["examples"] if _is_valid_with_formats(ex, schema, ctx)]
             if valid:
                 return {"enum": valid}
         if schema.get("type") == "object":
-            return _get_template_schema(schema, "object")
+            return _get_template_schema(schema, "object", ctx)
         _schema = deepclone(schema)
         update_pattern_in_schema(_schema)
-        # Strip format-invalid hints so hypothesis-jsonschema does not use them as
-        # generation seeds.  When format validation is disabled in is_valid() but
-        # enabled in the conformance checker, an invalid default/example would end
-        # up in the generated body and fail the conformance check.
-        if "default" in _schema and not _is_format_valid(_schema["default"], _schema):
+        # Strip format-invalid hints so hypothesis-jsonschema does not use them as generation seeds.
+        if "default" in _schema and not _is_valid_with_formats(_schema["default"], _schema, ctx):
             del _schema["default"]
-        if "example" in _schema and not _is_format_valid(_schema["example"], _schema):
+        if "example" in _schema and not _is_valid_with_formats(_schema["example"], _schema, ctx):
             del _schema["example"]
         if "examples" in _schema:
-            valid_examples = [ex for ex in _schema["examples"] if _is_format_valid(ex, _schema)]
+            valid_examples = [ex for ex in _schema["examples"] if _is_valid_with_formats(ex, _schema, ctx)]
             if valid_examples:
                 _schema["examples"] = valid_examples
             else:
@@ -1203,7 +1209,7 @@ def _get_properties(schema: JsonSchema) -> JsonSchema:
     return schema
 
 
-def _get_template_schema(schema: JsonSchemaObject, ty: str) -> JsonSchemaObject:
+def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext) -> JsonSchemaObject:
     if ty == "object":
         properties = schema.get("properties")
         if properties is not None:
@@ -1213,7 +1219,7 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str) -> JsonSchemaObject:
             else:
                 extra = {}
             all_properties = {
-                **{k: _get_properties(v) for k, v in properties.items()},
+                **{k: _get_properties(v, ctx) for k, v in properties.items()},
                 **extra,
             }
             return {
@@ -1276,8 +1282,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         has_valid_example = False
         if (
             example
-            and is_valid(example, schema)
-            and _is_format_valid(example, schema)
+            and _is_valid_with_formats(example, schema, ctx)
             and ctx.is_valid_for_location(example)
             and seen_values.insert(example)
         ):
@@ -1286,8 +1291,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
         if examples:
             for example in examples:
                 if (
-                    is_valid(example, schema)
-                    and _is_format_valid(example, schema)
+                    _is_valid_with_formats(example, schema, ctx)
                     and ctx.is_valid_for_location(example)
                     and seen_values.insert(example)
                 ):
@@ -1297,8 +1301,7 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
-            and is_valid(default, schema)
-            and _is_format_valid(default, schema)
+            and _is_valid_with_formats(default, schema, ctx)
             and ctx.is_valid_for_location(default)
             and seen_values.insert(default)
         ):
@@ -1401,18 +1404,17 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     seen = HashSet()
 
     if example or examples or default:
-        if example and is_valid(example, schema) and _is_format_valid(example, schema) and seen.insert(example):
+        if example and _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if is_valid(example, schema) and _is_format_valid(example, schema) and seen.insert(example):
+                if _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
-            and is_valid(default, schema)
-            and _is_format_valid(default, schema)
+            and _is_valid_with_formats(default, schema, ctx)
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
@@ -1471,18 +1473,17 @@ def _positive_array(
     seen_constraints: set[tuple] = set()
 
     if example or examples or default:
-        if example and is_valid(example, schema) and _is_format_valid(example, schema) and seen.insert(example):
+        if example and _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if is_valid(example, schema) and _is_format_valid(example, schema) and seen.insert(example):
+                if _is_valid_with_formats(example, schema, ctx) and seen.insert(example):
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
-            and is_valid(default, schema)
-            and _is_format_valid(default, schema)
+            and _is_valid_with_formats(default, schema, ctx)
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
@@ -1575,18 +1576,17 @@ def _positive_object(
     default = schema.get("default")
 
     if example or examples or default:
-        if example and is_valid(example, schema) and _is_format_valid(example, schema):
+        if example and _is_valid_with_formats(example, schema, ctx):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if examples:
             for example in examples:
-                if is_valid(example, schema) and _is_format_valid(example, schema):
+                if _is_valid_with_formats(example, schema, ctx):
                     yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
-            and is_valid(default, schema)
-            and _is_format_valid(default, schema)
+            and _is_valid_with_formats(default, schema, ctx)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
     elif template or not (
