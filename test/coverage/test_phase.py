@@ -4689,3 +4689,54 @@ def test_positive_object_example_with_invalid_format_not_yielded(ctx):
         },
         positive=True,
     )
+
+
+def test_coverage_positive_pattern_with_branch_group_not_corrupted(ctx):
+    # A pattern like `([a-z0-9]|-[a-z0-9])*` contains alternation inside a quantified group.
+    # POSITIVE values such as "a-project-name" must pass optimized_schema validation.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "get": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "name",
+                            "required": True,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^[a-z0-9]([a-z0-9]|-[a-z0-9])*$",
+                                "minLength": 1,
+                                "maxLength": 100,
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/items"]["GET"]
+    query_param = next(p for p in operation.query if p.name == "name")
+    optimized = query_param.optimized_schema
+    validator = jsonschema_rs.validator_for(optimized)
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    positive_cases = [c for c in cases if c.query and "name" in c.query]
+    assert len(positive_cases) > 0
+    for case in positive_cases:
+        assert validator.is_valid(case.query["name"]), (
+            f"POSITIVE value {case.query['name']!r} failed optimized_schema validation — "
+            f"pattern was likely corrupted by update_quantifier"
+        )

@@ -771,6 +771,10 @@ def _calculate_min_repetition_length(subpattern: list[_Node]) -> int:
             min_repeat, _, inner_pattern = value
             inner_min = _calculate_min_repetition_length(inner_pattern)
             total += min_repeat * inner_min
+        elif op == sre.BRANCH:
+            _, alternatives = value
+            branch_min = min(_calculate_min_repetition_length(list(alt)) for alt in alternatives)
+            total += branch_min
     return total
 
 

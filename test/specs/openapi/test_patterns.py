@@ -123,7 +123,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # Multiple fixed parts
         ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc[0-9]{1}def[a-z]{2}ghi$"),
         # Others
-        ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,6000}$"),
+        ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, r"^(((?:DB|BR)[\-a-zA-Z0-9_]{1,}),{0,1}){1,2000}$"),
         (r"^geo:\w*\*?$", 5, 200, r"^geo:\w{1,196}\*{0}$"),
         (r"^[\w\W]$", 1, 3, r"^.{1}$"),
         (r"^[\w\W]+$", 1, 3, r"^.{1,3}$"),
@@ -177,7 +177,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"(\d{3})+", 1, 2, r"(\d{3})+"),
         (r"(\d{3})+", 7, 7, r"(\d{3})+"),
         (r"(\d{3})+", 0, 0, r"(\d{3})+"),
-        (r"(a|bb)+", 4, 8, r"(a|bb)+"),
+        (r"(a|bb)+", 4, 8, r"^(a|bb){4,8}$"),
         # Anchored multi-part with multi-char groups
         (r"^(abc)+(def)+$", 6, 6, r"^(abc){1}(def){1}$"),
         (r"^(abc)+(def)+$", 9, 9, r"^(abc){1}(def){2}$"),
@@ -192,6 +192,9 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^([a-z]+(?!\s))+$", 1, 5, r"^([a-z]{1,}(?!\s)){1,5}$"),
         (r"^([a-z]+(?<=\s))+$", 1, 5, r"^([a-z]{1,}(?<=\s)){1,5}$"),
         (r"^([a-z]+(?=\s))+$", 1, 5, r"^([a-z]{1,}(?=\s)){1,5}$"),
+        # Alternation inside a quantified group
+        (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,99}$"),
+        (r"^(foo|bar)+$", 3, 12, r"^(foo|bar){1,4}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
