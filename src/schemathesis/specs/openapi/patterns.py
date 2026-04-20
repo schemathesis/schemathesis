@@ -649,6 +649,16 @@ def _transform_anchored_multi(
     if not distribution:
         return None
 
+    # An unchanged finite outer bound with variable-length inner content cannot
+    # enforce maxLength — each outer tick may exceed rep_len chars.
+    if adj_max is not None:
+        for dist_idx, (_, new_max) in enumerate(distribution):
+            if new_max != MAXREPEAT:
+                part_idx = quantified_indices[dist_idx]
+                _, (_, orig_max, inner_subpattern) = parts[part_idx]
+                if orig_max != MAXREPEAT and new_max == orig_max and _has_variable_length(list(inner_subpattern)):
+                    return None
+
     # Apply distribution directly to AST nodes
     new_parts = list(parts)
     for dist_idx, part_idx in enumerate(quantified_indices):

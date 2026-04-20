@@ -13,6 +13,7 @@
 - False positive `positive_data_acceptance` when an object schema-level `example` has a property violating a nested `format` constraint (e.g. `date-time` without timezone).
 - False positive `positive_data_acceptance` for string parameters with `pattern` containing alternation inside a quantified group (e.g. `([a-z]|-[a-z])*`) in the coverage phase.
 - False positive `negative_data_rejection` for string fields with `pattern` + `maxLength` where `maxLength` was silently lost into an unanchored regex quantifier.
+- False positive `negative_data_rejection` for string fields where `pattern` has an inner quantifier (e.g. `^[a-z]([-a-z]*[a-z])?$`) and `maxLength` is present.
 - False positive `positive_data_acceptance` for `oneOf` body schemas where generated values satisfy multiple branches simultaneously.
 - False positive `negative_data_rejection` for `application/x-www-form-urlencoded` and `application/xml` body properties where type mutations are wire-identical (e.g. `integer` stringifies to a valid string).
 - Crash generating curl command when a NEGATIVE coverage case has a primitive body (e.g. `integer` form-urlencoded schema).

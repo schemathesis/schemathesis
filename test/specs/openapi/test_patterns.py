@@ -195,6 +195,9 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         # Alternation inside a quantified group
         (r"^[a-z0-9]([a-z0-9]|-[a-z0-9])*$", 1, 100, r"^[a-z0-9]([a-z0-9]|-[a-z0-9]){0,99}$"),
         (r"^(foo|bar)+$", 3, 12, r"^(foo|bar){1,4}$"),
+        # Outer bound already finite and unchanged; inner content is variable-length
+        # — maxLength cannot be encoded through the outer repetition count alone.
+        (r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", 1, 63, r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
