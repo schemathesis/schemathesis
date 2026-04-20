@@ -33,6 +33,7 @@
 - False positive `positive_data_acceptance` when `required` lists fields absent from `properties` in the examples phase.
 - Schema-invalid body when `required` names a property absent from `properties` in the coverage phase.
 - False positive `positive_data_acceptance` for body schemas with `$ref` + `additionalProperties: false` and `pattern`/`minLength`/`maxLength` constraints in the coverage phase.
+- False positive `positive_data_acceptance` for `oneOf` body schemas where a branch requires fields only defined in the parent schema.
 - False positive `positive_data_acceptance` when an enum contains values violating the declared `type` (e.g. YAML-parsed `false` for `type: string`) in the coverage phase.
 - Crash when a schema has boolean property keys (YAML artifact from bare `on:` fields) in the coverage phase.
 - Crash in the coverage phase when a body with boolean property keys is serialized for deduplication in negative mode.

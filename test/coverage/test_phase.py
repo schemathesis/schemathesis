@@ -4592,6 +4592,71 @@ def test_coverage_positive_body_ref_with_pattern_and_length_constraints(ctx):
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
 
 
+def test_coverage_positive_body_oneof_branch_required_field_missing_from_branch_properties(ctx):
+    # POSITIVE bodies must satisfy the full schema when a oneOf branch requires a field
+    # that is defined only in the parent schema's properties, not in the branch's own properties.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/runs": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "additionalProperties": True,
+                                            "properties": {"status": {"enum": ["completed"]}},
+                                            "required": ["status", "conclusion"],
+                                        },
+                                        {
+                                            "additionalProperties": True,
+                                            "properties": {"status": {"enum": ["queued"]}},
+                                        },
+                                    ],
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "head_sha": {"type": "string"},
+                                        "status": {"enum": ["queued", "completed"], "type": "string"},
+                                        "conclusion": {
+                                            "enum": ["success", "failure"],
+                                            "type": "string",
+                                        },
+                                    },
+                                    "required": ["name", "head_sha"],
+                                    "type": "object",
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    operation = schema["/runs"]["POST"]
+    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+    for case in cases:
+        if case.media_type != "application/json" or not case.meta:
+            continue
+        comp = case.meta.components.get(ParameterLocation.BODY)
+        if comp and comp.mode == GenerationMode.POSITIVE:
+            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
 def test_coverage_negative_format_nullable(ctx):
     # INVALID_FORMAT must produce a non-null string when the schema has `type: ["string", "null"]`.
     raw_schema = ctx.openapi.build_schema(
