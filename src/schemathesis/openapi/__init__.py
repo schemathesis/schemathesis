@@ -1,5 +1,5 @@
 from schemathesis.openapi.loaders import from_asgi, from_dict, from_file, from_path, from_url, from_wsgi
-from schemathesis.specs.openapi import format, media_type
+from schemathesis.specs.openapi import format, media_type, require_security_scheme
 
 __all__ = [
     "from_url",
@@ -10,4 +10,5 @@ __all__ = [
     "from_dict",
     "format",
     "media_type",
+    "require_security_scheme",
 ]

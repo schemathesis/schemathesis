@@ -191,6 +191,7 @@ Reference for Schemathesis public Python API.
       members:
       - format
       - media_type
+      - require_security_scheme
 
 ## GraphQL Extensions
 

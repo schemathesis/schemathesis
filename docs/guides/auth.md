@@ -279,6 +279,14 @@ class AdminAuth:
 
 **Available filters:** `path`, `method`, `name`, `tag`, `operation_id` (add `_regex` for regex matching)
 
+To apply auth only to operations that require a specific OpenAPI security scheme:
+
+```python
+schemathesis.auth.register()(SessionAuth).apply_to(
+    schemathesis.openapi.require_security_scheme("session")
+)
+```
+
 ## Applying Different Auth to Different Operations
 
 When different operations require different credentials, use multiple `[[operations]]` blocks in `schemathesis.toml`:

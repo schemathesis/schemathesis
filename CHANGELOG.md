@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.15.2...HEAD) - TBD
 
+### :rocket: Added
+
+- `schemathesis.openapi.require_security_scheme()` for scoping auth providers to specific OpenAPI security schemes. [#3745](https://github.com/schemathesis/schemathesis/issues/3745)
+
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` when `additionalProperties` is a schema object and `required` has exactly 2 fields.
