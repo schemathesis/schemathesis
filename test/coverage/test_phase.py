@@ -5076,6 +5076,74 @@ def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_f
             pass
 
 
+def test_negative_data_rejection_no_false_positive_for_nullable_binary_multipart(ctx, response_factory):
+    # `nullable: true` on a binary field converts to anyOf[{string/binary}, {null}].
+    # Negating the null branch generates type mutations (dict, int, bool, etc.) that get
+    # serialized to strings in multipart (str({}) -> "{}"), making them valid for the binary
+    # field. is_valid_for_others must account for wire serialization so these aren't yielded.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["data"],
+                                    "properties": {
+                                        "data": {
+                                            "type": "string",
+                                            "format": "binary",
+                                            "nullable": True,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/upload"]["POST"]
+
+    cases = list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+    )
+
+    response = response_factory.requests(status_code=200)
+    ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+
+    for case in cases:
+        body = case.body
+        if not isinstance(body, dict) or "data" not in body:
+            continue
+        data_val = body["data"]
+        if isinstance(data_val, (str, bytes)):
+            continue
+        # Non-string value for binary field: str(data_val) is a valid binary string in multipart,
+        # so the API will accept it — negative_data_rejection must not fire (false positive).
+        assert negative_data_rejection(ctx_check, response, case) is None, (
+            f"False positive: body {body!r} with data={data_val!r} ({type(data_val).__name__}) "
+            f"becomes a valid binary string after multipart serialization"
+        )
+
+
 def test_coverage_positive_body_nested_allof_inner_required_preserved(ctx):
     # Required fields from the second inner $ref (e.g. 'direction') must appear in POSITIVE bodies
     # when a oneOf branch resolves to allOf[{$ref: base}, {$ref: extension}].

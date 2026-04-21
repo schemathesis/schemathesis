@@ -1176,11 +1176,21 @@ def cover_schema_iter(
                         ctx.resolve_ref(s["$ref"]) if isinstance(s, dict) and "$ref" in s else s for s in value
                     ]
                     validators = _make_branch_validators(resolved_schemas, ctx)
+                    # Body fields in multipart/form-urlencoded are serialized as strings via str().
+                    # Query/path/header parameters are also stringified, but servers parse them
+                    # back to their declared type before validation, so str() doesn't make them
+                    # valid for explicitly string-typed branches in that case.
+                    stringify_body_fields = ctx.location == ParameterLocation.BODY and ctx.media_type in {
+                        ("multipart", "form-data"),
+                        ("application", "x-www-form-urlencoded"),
+                    }
                     for idx, sub_schema in enumerate(value):
                         with nctx.at(idx):
                             for value in cover_schema_iter(nctx, sub_schema, seen):
                                 # Negative value for this schema could be a positive value for another one
-                                if is_valid_for_others(value.value, idx, validators):
+                                if is_valid_for_others(
+                                    value.value, idx, validators, resolved_schemas, stringify_body_fields
+                                ):
                                     continue
                                 yield value
                 elif key == "oneOf":
@@ -1201,7 +1211,13 @@ def cover_schema_iter(
                     yield from _flip_generation_mode_for_not(cover_schema_iter(pctx, value, seen))
 
 
-def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema_rs.Validator]) -> bool:
+def is_valid_for_others(
+    value: Any,
+    idx: int,
+    validators: list[jsonschema_rs.Validator],
+    schemas: list[dict | bool] | None = None,
+    will_be_serialized_to_string: bool = False,
+) -> bool:
     if contains_binary(value):
         return False
     for vidx, validator in enumerate(validators):
@@ -1210,6 +1226,19 @@ def is_valid_for_others(value: Any, idx: int, validators: list[jsonschema_rs.Val
             continue
         if validator.is_valid(value):
             return True
+        # In serialized contexts (multipart, form-urlencoded, path/query/header), non-string
+        # values are converted via str() before transmission. Only skip if the other branch
+        # explicitly requires string type — schemas without a type constraint accept strings
+        # vacuously (e.g. `minimum` doesn't apply to strings), which would be a false match.
+        if will_be_serialized_to_string and not isinstance(value, str) and schemas is not None:
+            other = schemas[vidx]
+            if isinstance(other, dict):
+                explicit_type = other.get("type")
+                has_string = explicit_type == "string" or (
+                    isinstance(explicit_type, list) and "string" in explicit_type
+                )
+                if has_string and validator.is_valid(str(value)):
+                    return True
     return False
 
 
