@@ -729,7 +729,8 @@ def _cover_positive_for_type(
                 with suppress(jsonschema_rs.ValidationError):
                     _inline_allof_refs(schema, ctx)
                     canonical = canonicalish(schema)
-                    yield from cover_schema_iter(ctx, canonical)
+                    if "allOf" not in canonical:
+                        yield from cover_schema_iter(ctx, canonical)
                 allof_handles_all = True
         if not allof_handles_all:
             if enum is not NOT_SET:
