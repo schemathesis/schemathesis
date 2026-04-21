@@ -383,7 +383,7 @@ class CoverageContext:
             or keys == ["properties", "required"]
             or keys == ["properties", "type"]
             or keys == ["properties"]
-        ):
+        ) and schema.get("type", "object") == "object":
             obj = {}
             properties = schema["properties"]
             for key, sub_schema in properties.items():
