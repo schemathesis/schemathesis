@@ -5214,3 +5214,58 @@ def test_coverage_positive_body_nested_allof_inner_required_preserved(ctx):
         comp = case.meta.components.get(ParameterLocation.BODY)
         if comp and comp.mode == GenerationMode.POSITIVE:
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
+def test_coverage_positive_body_required_unsatisfiable_array_enum(ctx):
+    # POSITIVE bodies must satisfy `required` even when a property's schema is unsatisfiable.
+    # The query parameter gives the coverage phase something else to negate.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/clients": {
+                "post": {
+                    "parameters": [{"in": "query", "name": "version", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["clientName", "grantTypes"],
+                                    "properties": {
+                                        "clientName": {"type": "string"},
+                                        "grantTypes": {
+                                            "type": "array",
+                                            "enum": ["authorization_code", "refresh_token"],
+                                            "items": {"type": "string"},
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/clients"]["post"]
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    negative_cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in negative_cases:
+        if case.body is None or case.meta is None:
+            continue
+        body_info = case.meta.components.get(ParameterLocation.BODY)
+        if body_info is None or body_info.mode != GenerationMode.POSITIVE:
+            continue
+        assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"

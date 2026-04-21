@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- False positive `positive_data_acceptance` for required array properties with an unsatisfiable `enum` constraint in the coverage phase.
 - False positive `positive_data_acceptance` for `oneOf` branches with nested multi-`$ref` `allOf` in the coverage phase.
 - Runtime error in `negative_data_rejection` when a query, header, or cookie parameter `pattern` produces a large DFA (e.g. `\S{1,8192}`).
 - False positive `negative_data_rejection` when `additionalProperties` is a schema object and `required` has exactly 2 fields.

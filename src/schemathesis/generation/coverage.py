@@ -1682,6 +1682,13 @@ def _positive_object(
     examples = schema.get("examples")
     default = schema.get("default")
 
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+    optional = sorted(set(properties) - required, key=str)
+
+    # A required property absent from the template makes every derived combination schema-invalid.
+    template_complete = not (required - set(template))
+
     if example or examples or default:
         if example and _is_valid_with_formats(example, schema, ctx):
             yield PositiveValue(example, scenario=CoverageScenario.EXAMPLE_VALUE, description="Example value")
@@ -1696,14 +1703,16 @@ def _positive_object(
             and _is_valid_with_formats(default, schema, ctx)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    elif template or not (
-        ctx.is_required and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
+    elif template_complete and (
+        template
+        or not (
+            ctx.is_required and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
+        )
     ):
         yield PositiveValue(template, scenario=CoverageScenario.VALID_OBJECT, description="Valid object")
 
-    properties = schema.get("properties", {})
-    required = set(schema.get("required", []))
-    optional = sorted(set(properties) - required, key=str)
+    if not template_complete:
+        return
 
     # Generate combinations with required properties and one optional property
     for name in optional:
