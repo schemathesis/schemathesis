@@ -400,6 +400,8 @@ class CoverageContext:
                         obj[key] = self.generate_from_schema({})
                     except Unsatisfiable:
                         pass
+            if any(key not in obj for key in schema.get("required", [])):
+                raise Unsatisfiable
             return obj
         if (
             keys == ["maximum", "minimum", "type"] or keys == ["maximum", "type"] or keys == ["minimum", "type"]
@@ -1318,6 +1320,10 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
     return schema
 
 
+_FAST_PATH_KEYS = frozenset({"properties", "required", "type"})
+_GENERATE_EXCLUDED_KEYS = frozenset({"description", "example", "examples"})
+
+
 def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext) -> JsonSchemaObject:
     if ty == "object":
         properties = schema.get("properties")
@@ -1331,9 +1337,18 @@ def _get_template_schema(schema: JsonSchemaObject, ty: str, ctx: CoverageContext
                 **{k: _get_properties(v, ctx) for k, v in properties.items()},
                 **extra,
             }
+            # When the fast path fires, required is used to decide what's truly required;
+            # keep it at the schema's original required to avoid aborting on optional
+            # properties with unsatisfiable schemas.  Otherwise inflate to all_properties
+            # so every defined property appears in the generated template.
+            schema_keys = {k for k in schema if not k.startswith("x-") and k not in _GENERATE_EXCLUDED_KEYS}
+            if schema_keys <= _FAST_PATH_KEYS:
+                required_for_template = [k for k in required if k in all_properties]
+            else:
+                required_for_template = list(all_properties)
             return {
                 **schema,
-                "required": list(all_properties),
+                "required": required_for_template,
                 "type": ty,
                 "properties": all_properties,
             }

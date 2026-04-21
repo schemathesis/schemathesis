@@ -10,6 +10,7 @@
 
 - False positive `positive_data_acceptance` for `type: string` properties that also declare `properties: {}` in the coverage phase.
 - False positive `positive_data_acceptance` for required array properties with an unsatisfiable `enum` constraint in the coverage phase.
+- False positive `positive_data_acceptance` when a nested required field is unsatisfiable, making the parent object invalid in the coverage phase.
 - False positive `positive_data_acceptance` when an `anyOf` branch has `const: null` but a sibling `type` constraint excludes `null` in the coverage phase.
 - False positive `positive_data_acceptance` for `oneOf` branches with nested multi-`$ref` `allOf` in the coverage phase.
 - Runtime error in `negative_data_rejection` when a query, header, or cookie parameter `pattern` produces a large DFA (e.g. `\S{1,8192}`).
