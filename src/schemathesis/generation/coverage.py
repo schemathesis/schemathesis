@@ -738,7 +738,8 @@ def _cover_positive_for_type(
                     if is_valid(value, schema):
                         yield PositiveValue(value, scenario=CoverageScenario.ENUM_VALUE, description="Enum value")
             elif const is not NOT_SET:
-                yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
+                if is_valid(const, schema):
+                    yield PositiveValue(const, scenario=CoverageScenario.CONST_VALUE, description="Const value")
             elif ty is not None:
                 if ty == "null":
                     yield PositiveValue(None, scenario=CoverageScenario.NULL_VALUE, description="Value null value")
