@@ -5431,3 +5431,62 @@ def test_coverage_positive_body_anyof_const_null_excluded_by_sibling_type(ctx):
         bi = case.meta.components.get(ParameterLocation.BODY)
         if bi and bi.mode == GenerationMode.POSITIVE:
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
+def test_coverage_positive_body_nested_required_unsatisfiable_field(ctx):
+    # When a nested required field has an unsatisfiable schema (e.g. pattern+format contradiction),
+    # the parent template must not include the incomplete sub-object as a POSITIVE value.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["card"],
+                                    "properties": {
+                                        "card": {
+                                            "type": "object",
+                                            "required": ["name", "expiry"],
+                                            "properties": {
+                                                "name": {"type": "string"},
+                                                "expiry": {
+                                                    "type": "string",
+                                                    "format": "date",
+                                                    "pattern": "YYYY-MM",
+                                                },
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/items"]["post"]
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in cases:
+        if case.body is None or case.meta is None:
+            continue
+        bi = case.meta.components.get(ParameterLocation.BODY)
+        if bi and bi.mode == GenerationMode.POSITIVE:
+            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
