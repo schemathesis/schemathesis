@@ -5318,3 +5318,63 @@ def test_coverage_positive_body_required_unsatisfiable_array_enum(ctx):
         if body_info is None or body_info.mode != GenerationMode.POSITIVE:
             continue
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
+def test_coverage_no_recursion_for_allof_with_unmergeable_anyof_property(ctx):
+    # Coverage must not recurse infinitely when canonicalish cannot merge allOf entries
+    # (e.g. two object schemas with overlapping anyOf properties) and returns allOf with no type.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "required": ["count"],
+                                            "properties": {
+                                                "count": {
+                                                    "anyOf": [{"const": None}, {"type": "integer", "minimum": 0}]
+                                                },
+                                                "name": {"type": "string"},
+                                            },
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "count": {
+                                                    "anyOf": [
+                                                        {"const": None},
+                                                        {"type": "integer", "minimum": 0, "maximum": 100},
+                                                    ]
+                                                },
+                                                "value": {"type": "number"},
+                                            },
+                                        },
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="3.1.0",
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/items"]["post"]
+    # Must complete without RecursionError
+    list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.POSITIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
