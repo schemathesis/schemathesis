@@ -5216,6 +5216,55 @@ def test_coverage_positive_body_nested_allof_inner_required_preserved(ctx):
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
 
 
+def test_coverage_positive_body_string_type_with_empty_properties(ctx):
+    # A property with type:string and properties:{} must generate a string value, not {}.
+    # The properties keyword is irrelevant when type is not object.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items/{id}": {
+                "put": {
+                    "parameters": [{"in": "path", "name": "id", "required": True, "schema": {"type": "integer"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["content"],
+                                    "properties": {
+                                        "content": {"type": "string", "properties": {}},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/items/{id}"]["put"]
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+    for case in cases:
+        if case.body is None or not case.meta:
+            continue
+        bi = case.meta.components.get(ParameterLocation.BODY)
+        if bi and bi.mode == GenerationMode.POSITIVE:
+            assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
 def test_coverage_positive_body_required_unsatisfiable_array_enum(ctx):
     # POSITIVE bodies must satisfy `required` even when a property's schema is unsatisfiable.
     # The query parameter gives the coverage phase something else to negate.
