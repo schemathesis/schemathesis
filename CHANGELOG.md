@@ -8,62 +8,89 @@
 
 ### :bug: Fixed
 
-- False positive `positive_data_acceptance` for `type: string` properties that also declare `properties: {}` in the coverage phase.
-- False positive `positive_data_acceptance` for required array properties with an unsatisfiable `enum` constraint in the coverage phase.
-- False positive `positive_data_acceptance` when a nested required field is unsatisfiable, making the parent object invalid in the coverage phase.
-- False positive `positive_data_acceptance` when an `anyOf` branch has `const: null` but a sibling `type` constraint excludes `null` in the coverage phase.
-- False positive `positive_data_acceptance` for `oneOf` branches with nested multi-`$ref` `allOf` in the coverage phase.
-- Runtime error in `negative_data_rejection` when a query, header, or cookie parameter `pattern` produces a large DFA (e.g. `\S{1,8192}`).
-- False positive `negative_data_rejection` when `additionalProperties` is a schema object and `required` has exactly 2 fields.
+#### `positive_data_acceptance` false positives
 
-- False positive `positive_data_acceptance` when an object schema-level `example` has a property violating a nested `format` constraint (e.g. `date-time` without timezone).
-- False positive `positive_data_acceptance` for string parameters with `pattern` containing alternation inside a quantified group (e.g. `([a-z]|-[a-z])*`) in the coverage phase.
-- False positive `negative_data_rejection` for string fields with `pattern` + `maxLength` where `maxLength` was silently lost into an unanchored regex quantifier.
-- False positive `negative_data_rejection` for string fields where `pattern` has an inner quantifier (e.g. `^[a-z]([-a-z]*[a-z])?$`) and `maxLength` is present.
-- False positive `negative_data_rejection` when a `pattern` optional group wraps variable-length content and `maxLength` is present in the coverage phase.
-- False positive `positive_data_acceptance` when `propertyNames` restricts object keys and `additionalProperties` is present in the coverage phase. [#3771](https://github.com/schemathesis/schemathesis/issues/3771)
-- False positive `positive_data_acceptance` for `oneOf` body schemas where generated values satisfy multiple branches simultaneously.
-- False positive `negative_data_rejection` for `multipart/form-data` fields with `format: binary` and `nullable: true` in the coverage phase. [#3777](https://github.com/schemathesis/schemathesis/issues/3777)
-- False positive `negative_data_rejection` for `application/x-www-form-urlencoded` and `application/xml` body properties where type mutations are wire-identical (e.g. `integer` stringifies to a valid string).
-- Crash generating curl command when a NEGATIVE coverage case has a primitive body (e.g. `integer` form-urlencoded schema).
-- False positive `positive_data_acceptance` for string fields with `format: uuid` and optional-hyphen `pattern` in the coverage phase.
-- False positive `positive_data_acceptance` for body properties where all `enum` values violate a sibling constraint (e.g. `maxLength`) in the coverage phase.
-- False positive `negative_data_rejection` for `pattern` fields ending with `\x1c`–`\x1f` control characters in the coverage phase.
-- False positive `negative_data_rejection` for body objects with `additionalProperties: {}` in the coverage phase.
+- *`example` values violating constraints (examples phase):*
+  - When an object schema-level `example` has a property violating a nested `format` constraint (e.g. `date-time` without timezone).
+  - When a parameter-level `example` value violates its declared schema type.
+  - When a schema-level parameter `example` violates the parameter's own constraints (e.g. `pattern`).
+  - When a response-derived parameter example violates the parameter's schema constraints.
+  - When a response-derived parameter example violates the parameter's `format` constraint.
+  - When a property `example` violates its field's own type (also applies to the coverage phase).
+  - For content-encoded header parameters with object examples.
+  - For property examples violating `anyOf`/`oneOf` constraints via bundled `$ref`s.
+  - For array body properties with `minItems` > 1 and object items.
+  - When assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`).
+  - When a required property has an unsatisfiable schema.
+
+- *Composition (`allOf` / `oneOf` / `anyOf` / `$ref`) in the coverage phase:*
+  - For `oneOf` branches with nested multi-`$ref` `allOf`.
+  - For `oneOf` body schemas where generated values satisfy multiple branches simultaneously.
+  - For `oneOf` body schemas where a branch requires fields only defined in the parent schema.
+  - When an `anyOf` branch has `const: null` but a sibling `type` constraint excludes `null`.
+  - When a multi-level `allOf` chain causes required properties from a base schema to be generated as `null`.
+  - For body schemas with `$ref` + `additionalProperties: false` and `pattern`/`minLength`/`maxLength` constraints.
+
+- *`enum` vs sibling constraints (coverage phase):*
+  - For required array properties with an unsatisfiable `enum` constraint.
+  - For body properties where all `enum` values violate a sibling constraint (e.g. `maxLength`).
+  - When an enum contains values violating the declared `type` (e.g. YAML-parsed `false` for `type: string`).
+  - When `enum` contains values violating the declared `type` in template body generation.
+
+- *Structural `required` / `properties` mismatches:*
+  - When a nested required field is unsatisfiable, making the parent object invalid (coverage phase).
+  - When `required` lists fields absent from `properties` (examples phase).
+  - When a nested object schema has `required` properties absent from `properties` (coverage phase).
+  - When a property has `type: object` alongside `items` (coverage phase).
+  - When a property has a boolean `false` schema (coverage phase).
+  - For `type: string` properties that also declare `properties: {}` (coverage phase).
+
+- *Pattern / keyword combinations (coverage phase):*
+  - For string parameters with `pattern` containing alternation inside a quantified group (e.g. `([a-z]|-[a-z])*`).
+  - For string fields with `format: uuid` and optional-hyphen `pattern`.
+  - When a schema has `pattern` alongside a non-string `type` (e.g. `number`).
+  - When `propertyNames` restricts object keys and `additionalProperties` is present. [#3771](https://github.com/schemathesis/schemathesis/issues/3771)
+
+#### `negative_data_rejection` false positives
+
+- *`pattern` + length-constraint interaction:*
+  - For string fields with `pattern` + `maxLength` where `maxLength` was silently lost into an unanchored regex quantifier.
+  - For string fields where `pattern` has an inner quantifier (e.g. `^[a-z]([-a-z]*[a-z])?$`) and `maxLength` is present.
+  - When a `pattern` optional group wraps variable-length content and `maxLength` is present (coverage phase).
+  - When `pattern` with nested quantifiers caused `maxLength`/`minLength` to be silently dropped from the schema.
+  - For `pattern` fields ending with `\x1c`–`\x1f` control characters (coverage phase).
+
+- *Wire-identical type mutations:*
+  - For `application/x-www-form-urlencoded` and `application/xml` body properties where type mutations are wire-identical (e.g. `integer` stringifies to a valid string).
+
+- *Schema-shape edge cases (coverage phase):*
+  - When `additionalProperties` is a schema object and `required` has exactly 2 fields.
+  - When a schema has 15 or more `properties` and exactly 2 required fields.
+  - For body objects with `additionalProperties: {}`.
+  - For nullable string properties with `maxLength`, `minLength`, or `format` constraints.
+  - When a string property has both `enum` and `maxLength`/`minLength`.
+  - For body properties with `type: integer` and inapplicable `minLength`/`maxLength` constraints.
+  - For `multipart/form-data` fields with `format: binary` and `nullable: true`. [#3777](https://github.com/schemathesis/schemathesis/issues/3777)
+
+#### Runtime errors in `negative_data_rejection`
+
+- When a query, header, or cookie parameter `pattern` produces a large DFA (e.g. `\S{1,8192}`).
+- When a parameter schema has a `pattern` that jsonschema_rs rejects (e.g. `{,3}` as an incomplete quantifier).
+
+#### Crashes
+
+- Crash generating curl command when a negative coverage case has a primitive body (e.g. `integer` form-urlencoded schema).
 - Crash in the coverage phase for `application/x-www-form-urlencoded` requests with `format: binary` body fields in negative mode.
-- False positive `negative_data_rejection` when a schema has 15 or more `properties` and exactly 2 required fields in the coverage phase.
-- False positive `negative_data_rejection` for body properties with `type: integer` and inapplicable `minLength`/`maxLength` constraints in the coverage phase.
-- False positive `positive_data_acceptance` for array body properties with `minItems` > 1 and object items in the examples phase.
-- False positive `positive_data_acceptance` when a property `example` violates its field's own type in the examples & coverage phases.
 - Crash in the examples phase when a property has an unsatisfiable schema (e.g. `not: {}`).
-- False positive `positive_data_acceptance` when `required` lists fields absent from `properties` in the examples phase.
-- Schema-invalid body when `required` names a property absent from `properties` in the coverage phase.
-- False positive `positive_data_acceptance` for body schemas with `$ref` + `additionalProperties: false` and `pattern`/`minLength`/`maxLength` constraints in the coverage phase.
-- False positive `positive_data_acceptance` for `oneOf` body schemas where a branch requires fields only defined in the parent schema.
-- False positive `positive_data_acceptance` when an enum contains values violating the declared `type` (e.g. YAML-parsed `false` for `type: string`) in the coverage phase.
 - Crash when a schema has boolean property keys (YAML artifact from bare `on:` fields) in the coverage phase.
 - Crash in the coverage phase when a body with boolean property keys is serialized for deduplication in negative mode.
-- False positive `negative_data_rejection` when `pattern` with nested quantifiers caused `maxLength`/`minLength` to be silently dropped from the schema.
-- False positive `positive_data_acceptance` when a schema has `pattern` alongside a non-string `type` (e.g. `number`) in the coverage phase.
-- False positive `positive_data_acceptance` when a multi-level `allOf` chain causes required properties from a base schema to be generated as `null` in the coverage phase.
-- False positive `positive_data_acceptance` when a property has `type: object` alongside `items` in the coverage phase.
+
+#### Schema-invalid generated bodies (coverage phase)
+
+- Schema-invalid body when `required` names a property absent from `properties` in the coverage phase.
 - Schema-invalid body when a Swagger 2.0 array parameter has `enum` at the array level with `items` also defined in the coverage phase.
-- Schema-invalid POSITIVE body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
-- False positive `positive_data_acceptance` when a property has a boolean `false` schema in the coverage phase.
-- False positive `negative_data_rejection` for nullable string properties with `maxLength`, `minLength`, or `format` constraints in the coverage phase.
-- Runtime error in `negative_data_rejection` when a parameter schema has a `pattern` that jsonschema_rs rejects (e.g. `{,3}` as an incomplete quantifier).
-- False positive `negative_data_rejection` when a string property has both `enum` and `maxLength`/`minLength` in the coverage phase.
-- False positive `positive_data_acceptance` when a required property has an unsatisfiable schema in the examples phase.
-- False positive `positive_data_acceptance` when `enum` contains values violating the declared `type` in template body generation in the coverage phase.
-- False positive `positive_data_acceptance` when a nested object schema has `required` properties absent from `properties` in the coverage phase.
-- False positive `positive_data_acceptance` when assembled body violates the schema (e.g. `allOf` with `additionalProperties: false`) in the examples phase.
-- False positive `positive_data_acceptance` for property examples violating `anyOf`/`oneOf` constraints via bundled `$ref`s in the examples phase.
-- False positive `positive_data_acceptance` for content-encoded header parameters with object examples in the examples phase.
-- False positive `positive_data_acceptance` when a parameter-level `example` value violates its declared schema type in the examples phase.
-- False positive `positive_data_acceptance` when a response-derived parameter example violates the parameter's schema constraints in the examples phase.
-- False positive `positive_data_acceptance` when a schema-level parameter `example` violates the parameter's own constraints (e.g. `pattern`) in the examples phase.
-- False positive `positive_data_acceptance` when a response-derived parameter example violates the parameter's `format` constraint in the examples phase.
-- Schema-invalid POSITIVE body when a schema property's `default` or `example` fails `format` validation (e.g. `"7.00:00:00"` for `format: duration`) in the coverage phase.
+- Schema-invalid positive body when a schema combines `allOf` (with required fields) and outer-level `properties` in the coverage phase.
+- Schema-invalid positive body when a schema property's `default` or `example` fails `format` validation (e.g. `"7.00:00:00"` for `format: duration`) in the coverage phase.
 
 ## [4.15.2](https://github.com/schemathesis/schemathesis/compare/v4.15.1...v4.15.2) - 2026-04-14
 
