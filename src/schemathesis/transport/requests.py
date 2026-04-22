@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import binascii
 import inspect
+import json
 import os
 from collections.abc import Mapping, MutableMapping
 from io import BytesIO
@@ -10,8 +11,8 @@ from urllib.parse import urlencode, urlparse
 
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from schemathesis.core import NotSet
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core import NotSet, media_types
+from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
@@ -292,11 +293,56 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
+def _collect_encoded_fields(ctx: SerializationContext) -> dict[str, str]:
+    """Return multipart field names mapped to the content-type declared via `encoding`."""
+    operation = ctx.case.operation
+    selected = ctx.case.multipart_content_types or {}
+    result: dict[str, str] = {}
+    for body in operation.body:
+        main, sub = media_types.parse(body.media_type)
+        if main not in ("*", "multipart") or sub not in ("*", "form-data", "mixed"):
+            continue
+        for name in body.definition.get("encoding", {}):
+            content_type = selected.get(name) or body.get_property_content_type(name)
+            if isinstance(content_type, str):
+                result[name] = content_type
+        break
+    return result
+
+
+def _is_already_serialized(value: Any) -> bool:
+    """Whether the value is already in a form that can be sent as a multipart part."""
+    if isinstance(value, (bytes, str, Binary)):
+        return True
+    if isinstance(value, list):
+        return all(isinstance(item, (bytes, str, Binary)) for item in value)
+    return False
+
+
+def _serialize_part_value(ctx: SerializationContext, value: Any, content_type: str) -> Any:
+    """Serialize a multipart field value using the registered serializer for its content-type."""
+    if _is_already_serialized(value):
+        return value
+    pair = REQUESTS_TRANSPORT.get_first_matching_media_type(content_type)
+    if pair is None:
+        raise SerializationNotPossible.for_media_type(content_type)
+    _, serializer = pair
+    result = serializer(ctx, value)
+    if "data" in result:
+        return result["data"]
+    if "json" in result:
+        return json.dumps(result["json"]).encode()
+    return value
+
+
 @REQUESTS_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
 def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     if isinstance(value, dict):
+        for name, content_type in _collect_encoded_fields(ctx).items():
+            if name in value:
+                value[name] = _serialize_part_value(ctx, value[name], content_type)
         multipart = _prepare_form_data(value)
         files, data = ctx.case.operation.prepare_multipart(multipart, ctx.case.multipart_content_types)
         return {"files": files, "data": data}
