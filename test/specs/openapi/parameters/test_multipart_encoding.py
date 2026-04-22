@@ -1,9 +1,29 @@
+import json
+
+import pytest
+import yaml
 from hypothesis import given
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.generation import GenerationMode
+from schemathesis.transport.asgi import ASGI_TRANSPORT
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import Binary
+from schemathesis.transport.wsgi import WSGI_TRANSPORT
+
+
+@pytest.fixture
+def custom_part_serializer():
+    @schemathesis.serializer("application/x-part-custom")
+    def serialize_custom(ctx, value):
+        return b"CUSTOM:" + json.dumps(value).encode()
+
+    yield
+
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT, ASGI_TRANSPORT):
+        transport.unregister_serializer("application/x-part-custom")
 
 
 def test_multipart_with_custom_encoding():
@@ -758,6 +778,203 @@ def test_multipart_optional_encoding_not_always_present():
         # Required field must always be present
         assert "required_field" in case.body
         # Optional field may or may not be present - both are valid
+
+    test()
+
+
+def test_multipart_json_encoding_serializes_object_field():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["data"],
+                                        "properties": {
+                                            "data": {
+                                                "type": "object",
+                                                "properties": {"foo": {"type": "string"}},
+                                                "required": ["foo"],
+                                            },
+                                            "new_cert_path": {"type": "string", "format": "binary"},
+                                        },
+                                    },
+                                    "encoding": {"data": {"contentType": "application/json"}},
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+
+    @given(case=operation.as_strategy())
+    def test(case):
+        kwargs = case.as_transport_kwargs(base_url="http://example.com")
+        files = kwargs["files"]
+        assert files is not None
+        for name, payload in files:
+            if name == "data":
+                assert isinstance(payload, tuple) and len(payload) == 3, payload
+                _, value, content_type = payload
+                assert content_type == "application/json"
+                assert isinstance(value, (str, bytes)), (
+                    f"expected JSON-serialized value, got {type(value).__name__}: {value!r}"
+                )
+                assert isinstance(json.loads(value), dict)
+
+    test()
+
+
+def test_multipart_yaml_encoding_serializes_object_field():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["meta"],
+                                        "properties": {
+                                            "meta": {
+                                                "type": "object",
+                                                "properties": {"tag": {"type": "string"}},
+                                                "required": ["tag"],
+                                            },
+                                        },
+                                    },
+                                    "encoding": {"meta": {"contentType": "application/yaml"}},
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+
+    @given(case=operation.as_strategy())
+    def test(case):
+        kwargs = case.as_transport_kwargs(base_url="http://example.com")
+        files = kwargs["files"]
+        assert files is not None
+        for name, payload in files:
+            if name == "meta":
+                _, value, content_type = payload
+                assert content_type == "application/yaml"
+                assert isinstance(value, (str, bytes))
+                parsed = yaml.safe_load(value)
+                assert isinstance(parsed, dict) and "tag" in parsed
+
+    test()
+
+
+def test_multipart_custom_serializer_encoding(custom_part_serializer):
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["payload"],
+                                        "properties": {
+                                            "payload": {
+                                                "type": "object",
+                                                "properties": {"k": {"type": "string"}},
+                                                "required": ["k"],
+                                            },
+                                        },
+                                    },
+                                    "encoding": {"payload": {"contentType": "application/x-part-custom"}},
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+
+    @given(case=operation.as_strategy())
+    def test(case):
+        kwargs = case.as_transport_kwargs(base_url="http://example.com")
+        files = kwargs["files"]
+        assert files is not None
+        for name, payload in files:
+            if name == "payload":
+                _, value, content_type = payload
+                assert content_type == "application/x-part-custom"
+                assert value.startswith(b"CUSTOM:")
+
+    test()
+
+
+def test_multipart_encoding_with_unknown_content_type_fails():
+    schema = schemathesis.openapi.from_dict(
+        {
+            "openapi": "3.0.0",
+            "info": {"title": "Test", "version": "1.0"},
+            "paths": {
+                "/upload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "multipart/form-data": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["meta"],
+                                        "properties": {
+                                            "meta": {
+                                                "type": "object",
+                                                "properties": {"tag": {"type": "string"}},
+                                                "required": ["tag"],
+                                            },
+                                        },
+                                    },
+                                    "encoding": {"meta": {"contentType": "application/x-unknown-foo"}},
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+        }
+    )
+    operation = schema["/upload"]["POST"]
+
+    @given(case=operation.as_strategy())
+    def test(case):
+        with pytest.raises(SerializationNotPossible, match="application/x-unknown-foo"):
+            case.as_transport_kwargs(base_url="http://example.com")
 
     test()
 

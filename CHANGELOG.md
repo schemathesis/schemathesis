@@ -8,6 +8,8 @@
 
 ### :bug: Fixed
 
+- Use the matching registered serializer for multipart fields with `encoding.contentType`. [#3785](https://github.com/schemathesis/schemathesis/issues/3785)
+
 #### `positive_data_acceptance` false positives
 
 - *`example` values violating constraints (examples phase):*
