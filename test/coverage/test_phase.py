@@ -5490,3 +5490,66 @@ def test_coverage_positive_body_nested_required_unsatisfiable_field(ctx):
         bi = case.meta.components.get(ParameterLocation.BODY)
         if bi and bi.mode == GenerationMode.POSITIVE:
             assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
+
+
+def test_revalidation_preserves_negative_mode_for_format_violating_body(ctx):
+    # A NEGATIVE body with a format-violating value ('' for a uuid field) must stay
+    # NEGATIVE after body reassignment triggers _revalidate_metadata.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "iterationId": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "nullable": True,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/items"]["post"]
+
+    cases = list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=loaded.config.generation,
+        )
+    )
+
+    target = next(
+        (
+            case
+            for case in cases
+            if isinstance(case.body, dict)
+            and case.body.get("iterationId") == ""
+            and case.meta is not None
+            and case.meta.components.get(ParameterLocation.BODY) is not None
+            and case.meta.components[ParameterLocation.BODY].mode == GenerationMode.NEGATIVE
+        ),
+        None,
+    )
+    assert target is not None, "No NEGATIVE case with iterationId='' found"
+
+    # Simulates what the engine does when auth or overrides reassign the body.
+    target.body = target.body
+
+    assert target.meta is not None
+    assert target.meta.components[ParameterLocation.BODY].mode == GenerationMode.NEGATIVE
