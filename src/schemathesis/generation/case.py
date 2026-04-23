@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import jsonschema_rs
 from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
@@ -278,9 +279,11 @@ class Case:
                 if _contains_bytes(value):
                     return False
                 if alternative.media_type == self.media_type:
-                    return validator_cls(alternative.optimized_schema, pattern_options=FANCY_REGEX_OPTIONS).is_valid(
-                        value
-                    )
+                    return jsonschema_rs.validator_for(
+                        alternative.optimized_schema,
+                        validate_formats=True,
+                        pattern_options=FANCY_REGEX_OPTIONS,
+                    ).is_valid(value)
         # Validate other locations against container schema
         container = getattr(self.operation, location.container_name)
         if isinstance(value, CaseInsensitiveDict):

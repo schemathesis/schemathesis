@@ -52,6 +52,7 @@
   - For string fields with `format: uuid` and optional-hyphen `pattern`.
   - When a schema has `pattern` alongside a non-string `type` (e.g. `number`).
   - When `propertyNames` restricts object keys and `additionalProperties` is present. [#3771](https://github.com/schemathesis/schemathesis/issues/3771)
+  - For body properties with `format` constraints in negative mode.
 
 #### `negative_data_rejection` false positives
 
