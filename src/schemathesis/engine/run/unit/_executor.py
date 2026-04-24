@@ -162,7 +162,15 @@ def run_test(
         elif errors:
             status = Status.ERROR
         else:
-            status = Status.FAILURE
+            # Unrecoverable network errors (e.g. timeouts) are not appended to `errors`
+            # and are re-raised so Hypothesis sees the original exception; surface them
+            # here so a replay-induced `Flaky` is not misclassified as a check failure.
+            unrecoverable = state.unrecoverable_network_error
+            if unrecoverable is not None:
+                status = Status.ERROR
+                yield non_fatal_error(unrecoverable.error, code_sample=unrecoverable.code_sample)
+            else:
+                status = Status.FAILURE
     except BaseExceptionGroup as exc:
         status = Status.ERROR
         # Check for errors in the exception group
