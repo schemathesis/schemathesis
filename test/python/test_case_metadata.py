@@ -661,3 +661,53 @@ def test_case_without_metadata_no_crash():
     assert case.meta is None
     case.headers["X-Custom"] = "value"
     assert case.meta is None
+
+
+def test_revalidation_with_openapi_30_boolean_exclusive_minimum(ctx):
+    # OpenAPI 3.0 allows `exclusiveMinimum: true` (boolean form alongside `minimum`).
+    # Revalidation must accept such schemas using the OpenAPI-3.0 validator class
+    # rather than a newer JSON Schema draft that requires a numeric form.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "Pitch": {
+                                            "type": "number",
+                                            "minimum": 0,
+                                            "exclusiveMinimum": True,
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items"]["POST"]
+
+    meta = make_positive_meta(ParameterLocation.BODY)
+
+    case = Case(
+        operation=operation,
+        method="POST",
+        path="/items",
+        body={"Pitch": 5},
+        media_type="application/json",
+        meta=meta,
+    )
+
+    case.body = {"Pitch": 10}
+
+    assert case.meta.components[ParameterLocation.BODY].mode == GenerationMode.POSITIVE
