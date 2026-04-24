@@ -1838,8 +1838,12 @@ def _negative_properties(
             for value in cover_schema_iter(nctx, sub_schema):
                 if validator is not None:
                     v = value.value
-                    # Primitives stringify on the wire (form-urlencoded values, XML text content)
-                    if (is_form or is_xml) and isinstance(v, (bool, int, float)) and validator.is_valid(str(v)):
+                    # Form-urlencoded values are all stringified on the wire; any non-string
+                    # whose repr satisfies the property schema is a no-op mutation.
+                    if is_form and not isinstance(v, str) and validator.is_valid(str(v)):
+                        continue
+                    # XML text content stringifies primitives; objects/arrays keep structure.
+                    if is_xml and isinstance(v, (bool, int, float)) and validator.is_valid(str(v)):
                         continue
                     # Empty dict/None both serialize to empty string in XML
                     if is_xml and (v == {} or v is None) and validator.is_valid(""):

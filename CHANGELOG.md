@@ -67,6 +67,7 @@
 - *Wire-identical type mutations:*
   - For `application/x-www-form-urlencoded` and `application/xml` body properties where type mutations are wire-identical (e.g. `integer` stringifies to a valid string).
   - For `application/x-www-form-urlencoded` body properties whose schema contains `$ref` to bundled definitions.
+  - For `application/x-www-form-urlencoded` body properties with nested array/object mutations whose serialized form satisfies the schema.
 
 - *Schema-shape edge cases (coverage phase):*
   - When `additionalProperties` is a schema object and `required` has exactly 2 fields.
