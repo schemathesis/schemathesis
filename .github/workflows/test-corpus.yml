@@ -87,6 +87,25 @@ jobs:
 
       - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -n auto -k test_stateful --durations=20 --dist=worksteal
 
+  corpus-examples:
+    name: Corpus tests for the examples phase
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          cache-dependency-glob: "**/pyproject.toml"
+
+      - run: uvx --from=".[tests]" pytest test-corpus/test_corpus.py -n auto -k "example" --durations=20 --dist=worksteal
+
   corpus-graphql:
     name: GraphQL corpus tests
     runs-on: ubuntu-22.04

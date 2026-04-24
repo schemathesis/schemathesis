@@ -1039,7 +1039,16 @@ def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, fie
 
     port = app_runner.run_flask_app(app)
     schema_url = f"http://127.0.0.1:{port}/openapi.json"
-    assert cli.run(schema_url, "--phases=fuzzing", "--max-examples=5", "--checks=not_a_server_error") == snapshot_cli
+    assert (
+        cli.run(
+            schema_url,
+            "--phases=fuzzing",
+            "--max-examples=5",
+            "--mode=positive",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")

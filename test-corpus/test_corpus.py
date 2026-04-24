@@ -698,3 +698,14 @@ def test_graphql(filename):
     finally:
         for handler in handlers:
             handler.shutdown(ctx)
+
+
+def test_examples_phase(corpus, filename):
+    schema = _load_schema(corpus, filename)
+    schema.config.update(suppress_health_check=list(HealthCheck))
+    schema.config.phases.update(phases=["examples"])
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.Interrupted):
+            pytest.exit("Keyboard Interrupt")
+        assert_event(filename, event)
