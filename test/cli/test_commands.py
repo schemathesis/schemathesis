@@ -265,6 +265,33 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
     assert message in result.stdout
 
 
+def test_timeout_reclassified_as_error_on_flaky_replay(ctx, cli, app_runner):
+    # A timed-out request must be reported as a network error, never as a check failure.
+    counter = [0]
+    counter_lock = threading.Lock()
+
+    app, _ = ctx.openapi.make_flask_app({"/flaky": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/flaky")
+    def flaky():
+        with counter_lock:
+            counter[0] += 1
+            n = counter[0]
+        if n % 2 == 1:
+            time.sleep(0.2)
+        return jsonify({"ok": True})
+
+    port = app_runner.run_flask_app(app)
+    result = cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--request-timeout=0.08",
+        "--workers=1",
+        "--phases=fuzzing",
+    )
+    assert " 1 failed" not in result.stdout, result.stdout
+    assert "Network Error" in result.stdout, result.stdout
+
+
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", [1, 2])
 def test_connection_timeout(ctx, cli, schema_url, workers, snapshot_cli):

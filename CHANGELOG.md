@@ -10,6 +10,7 @@
 
 - Use the matching registered serializer for multipart fields with `encoding.contentType`. [#3785](https://github.com/schemathesis/schemathesis/issues/3785)
 - `before_call` hook setting a missing required header in the coverage phase had no effect. [#3784](https://github.com/schemathesis/schemathesis/issues/3784)
+- Request timeouts reported as a check failure when a replay made them flaky.
 
 #### `positive_data_acceptance` false positives
 
