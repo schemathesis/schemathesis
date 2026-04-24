@@ -5669,6 +5669,77 @@ def test_coverage_form_urlencoded_filters_primitives_with_bundled_ref(ctx):
         )
 
 
+def test_coverage_form_urlencoded_filters_nested_wire_identical_mutations(ctx):
+    # Every NEGATIVE form-urlencoded body must remain schema-invalid after string coercion.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/t": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "input": {
+                                            "anyOf": [
+                                                {
+                                                    "oneOf": [
+                                                        {"type": "string", "maxLength": 10000},
+                                                        {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "object",
+                                                                "required": ["role"],
+                                                                "properties": {
+                                                                    "role": {
+                                                                        "type": "string",
+                                                                        "enum": ["user", "assistant"],
+                                                                    }
+                                                                },
+                                                            },
+                                                        },
+                                                    ]
+                                                },
+                                                {"type": "null"},
+                                            ]
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/t"]["post"]
+    optimized_schema = next(
+        alt.optimized_schema for alt in operation.body if alt.media_type == "application/x-www-form-urlencoded"
+    )
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    for case in _iter_coverage_cases(
+        operation=operation,
+        generation_modes=[GenerationMode.NEGATIVE],
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=loaded.config.generation,
+    ):
+        if case.media_type != "application/x-www-form-urlencoded" or not isinstance(case.body, dict):
+            continue
+        bi = case.meta.components.get(ParameterLocation.BODY) if case.meta else None
+        if not bi or bi.mode != GenerationMode.NEGATIVE:
+            continue
+        wire = {k: str(v) for k, v in case.body.items()}
+        assert not validator.is_valid(wire), (
+            f"NEGATIVE form-urlencoded body becomes schema-valid after string coercion: {case.body!r} -> {wire!r}"
+        )
+
+
 def test_coverage_array_above_max_items_with_complex_items_schema(ctx):
     # Every NEGATIVE body must fail schema validation.
     raw_schema = ctx.openapi.build_schema(
