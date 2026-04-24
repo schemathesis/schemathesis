@@ -3431,6 +3431,50 @@ def test_missing_required_header_case_uses_invalid_template_body(ctx):
     )
 
 
+def test_missing_required_header_case_respects_before_call_hook_restoring_header(ctx):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "put": {
+                    "parameters": [
+                        {
+                            "name": "X-Required-Header",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items"]["put"]
+
+    missing_header_case = next(
+        case
+        for case in _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=schema.config.generation,
+        )
+        if case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
+        and case.meta.phase.data.parameter == "X-Required-Header"
+    )
+
+    assert missing_header_case.meta.generation.mode == GenerationMode.NEGATIVE
+
+    missing_header_case.headers["X-Required-Header"] = "restored"
+
+    assert missing_header_case.meta.generation.mode == GenerationMode.POSITIVE
+
+    kwargs = missing_header_case.as_transport_kwargs(base_url="http://127.0.0.1")
+    assert kwargs["headers"].get("X-Required-Header") == "restored"
+
+
 def test_filter_case_hook_applied_in_coverage_phase(ctx):
     raw_schema = build_schema(
         ctx,

@@ -45,22 +45,20 @@ def get_exclude_headers(case: Case) -> list[str]:
 
     phase_data = case.meta.phase.data
 
-    # Exclude headers that are intentionally missing
-
+    # Gate header exclusion on the current generation mode so that a `before_call`
+    # hook restoring the header (which flips the mode to positive via revalidation)
+    # stops the exclusion.
     if (
-        isinstance(phase_data, CoveragePhaseData)
-        and phase_data.scenario == CoverageScenario.MISSING_PARAMETER
-        and phase_data.parameter_location == ParameterLocation.HEADER
-        and phase_data.parameter is not None
+        not case.meta.generation.mode.is_negative
+        or phase_data.parameter_location != ParameterLocation.HEADER
+        or phase_data.parameter is None
     ):
+        return []
+
+    if isinstance(phase_data, CoveragePhaseData) and phase_data.scenario == CoverageScenario.MISSING_PARAMETER:
         return [phase_data.parameter]
 
-    if (
-        isinstance(phase_data, (FuzzingPhaseData | StatefulPhaseData))
-        and case.meta.generation.mode.is_negative
-        and phase_data.parameter_location == ParameterLocation.HEADER
-        and phase_data.parameter is not None
-    ):
+    if isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData)):
         return [phase_data.parameter]
 
     return []
