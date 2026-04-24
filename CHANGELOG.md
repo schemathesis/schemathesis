@@ -75,6 +75,7 @@
   - When a string property has both `enum` and `maxLength`/`minLength`.
   - For body properties with `type: integer` and inapplicable `minLength`/`maxLength` constraints.
   - For `multipart/form-data` fields with `format: binary` and `nullable: true`. [#3777](https://github.com/schemathesis/schemathesis/issues/3777)
+  - For `maxItems` array constraints with complex nested item schemas.
 
 #### Runtime errors in `negative_data_rejection`
 

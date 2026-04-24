@@ -1675,7 +1675,7 @@ def test_generate_empty_headers_too(ctx):
             },
             [
                 {
-                    "body": [],
+                    "body": [None] * 51,
                 },
                 {
                     "body": {},
@@ -5597,3 +5597,81 @@ def test_revalidation_preserves_negative_mode_for_format_violating_body(ctx):
 
     assert target.meta is not None
     assert target.meta.components[ParameterLocation.BODY].mode == GenerationMode.NEGATIVE
+
+
+def test_coverage_array_above_max_items_with_complex_items_schema(ctx):
+    # Every NEGATIVE body must fail schema validation.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "maxItems": 20,
+                                            "items": {
+                                                "oneOf": [
+                                                    {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": ["type", "role", "content"],
+                                                                "properties": {
+                                                                    "role": {
+                                                                        "type": "string",
+                                                                        "enum": ["user", "assistant"],
+                                                                    },
+                                                                    "content": {
+                                                                        "oneOf": [
+                                                                            {"type": "string"},
+                                                                            {"type": "array"},
+                                                                        ]
+                                                                    },
+                                                                    "type": {
+                                                                        "type": "string",
+                                                                        "enum": ["message"],
+                                                                    },
+                                                                },
+                                                            },
+                                                            {"properties": {"type": {"const": "EasyInputMessage"}}},
+                                                        ]
+                                                    }
+                                                ],
+                                                "discriminator": {"propertyName": "type"},
+                                            },
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+    )
+    loaded = schemathesis.openapi.from_dict(raw_schema)
+    operation = loaded["/items"]["post"]
+    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+
+    for case in _iter_coverage_cases(
+        operation=operation,
+        generation_modes=[GenerationMode.NEGATIVE],
+        generate_duplicate_query_parameters=False,
+        unexpected_methods=set(),
+        generation_config=loaded.config.generation,
+    ):
+        if case.body is None or case.meta is None:
+            continue
+        bi = case.meta.components.get(ParameterLocation.BODY)
+        if bi and bi.mode == GenerationMode.NEGATIVE:
+            assert not validator.is_valid(case.body), (
+                f"NEGATIVE body is schema-valid (mutation had no effect): {case.body!r}"
+            )
