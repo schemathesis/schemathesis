@@ -1824,11 +1824,14 @@ def _negative_properties(
     nctx = ctx.with_negative()
     is_form = ctx.location == ParameterLocation.BODY and ctx.media_type == ("application", "x-www-form-urlencoded")
     is_xml = ctx.location == ParameterLocation.BODY and ctx.media_type is not None and is_xml_parts(ctx.media_type)
+    bundle = ctx.root_schema.get(BUNDLE_STORAGE_KEY) if isinstance(ctx.root_schema, dict) else None
     for key, sub_schema in properties.items():
         validator: jsonschema_rs.Validator | None = None
         if (is_form or is_xml) and isinstance(sub_schema, dict):
+            # Include bundled definitions so $ref references in sub_schema resolve
+            validator_schema = sub_schema if bundle is None else {**sub_schema, BUNDLE_STORAGE_KEY: bundle}
             try:
-                validator = ctx.validator_cls(sub_schema, pattern_options=FANCY_REGEX_OPTIONS)
+                validator = ctx.validator_cls(validator_schema, pattern_options=FANCY_REGEX_OPTIONS)
             except Exception:
                 pass
         with nctx.at(key):
