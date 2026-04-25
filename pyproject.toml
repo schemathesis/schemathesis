@@ -92,6 +92,15 @@ st = "schemathesis.cli:schemathesis"
 [project.entry-points.pytest11]
 schemathesis = "schemathesis.pytest.plugin"
 
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/corpus",
+  "/test-corpus",
+  "/scripts",
+  "/img",
+  "/benches",
+]
+
 [tool.pytest.ini_options]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
