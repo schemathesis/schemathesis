@@ -60,6 +60,7 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                     yield to_json(name)
         else:
             # Simple serialization
+            location = definition["in"]
             style = definition.get("style")
             explode = definition.get("explode")
             schema = definition.get("schema", {})
@@ -67,13 +68,21 @@ def _serialize_openapi3(definitions: DefinitionList) -> Generator[Callable | Non
                 type_ = schema.get("type")
             else:
                 type_ = None
-            if definition["in"] == "path":
+            # Apply OpenAPI 3.0 defaults for `style` and `explode`. `style`
+            # defaults to `simple` for path/header and `form` for
+            # query/cookie. `explode` defaults to `true` for `form` and
+            # `false` for every other style.
+            if style is None:
+                style = "simple" if location in ("path", "header") else "form"
+            if explode is None:
+                explode = style == "form"
+            if location == "path":
                 yield from _serialize_path_openapi3(name, type_, style, explode)
-            elif definition["in"] == "query":
+            elif location == "query":
                 yield from _serialize_query_openapi3(name, type_, style, explode)
-            elif definition["in"] == "header":
+            elif location == "header":
                 yield from _serialize_header_openapi3(name, type_, explode)
-            elif definition["in"] == "cookie":
+            elif location == "cookie":
                 yield from _serialize_cookie_openapi3(name, type_, explode)
 
 

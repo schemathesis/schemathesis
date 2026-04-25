@@ -660,7 +660,7 @@ def test_examples_ref_missing_components(ctx):
     schema = schemathesis.openapi.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
     example = examples.generate_one(strategy)
-    assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
+    assert example.query == {"foo-1": "foo-11", "spam-1": {"inner": "example"}}
 
 
 @pytest.mark.parametrize("key", ["anyOf", "oneOf"])
@@ -976,8 +976,8 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
                             "required": True,
                             "schema": {
                                 "type": "object",
-                                "properties": {"foo": {"type": "string"}},
-                                "required": ["foo"],
+                                "properties": {"q1foo": {"type": "string"}},
+                                "required": ["q1foo"],
                                 "additionalProperties": False,
                             },
                         },
@@ -987,8 +987,8 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
                             "required": True,
                             "schema": {
                                 "type": "object",
-                                "properties": {"foo": {"type": "string", "format": "even_4_digits"}},
-                                "required": ["foo"],
+                                "properties": {"q2foo": {"type": "string", "format": "even_4_digits"}},
+                                "required": ["q2foo"],
                                 "additionalProperties": False,
                             },
                         },
@@ -1013,9 +1013,9 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
     @given(case=strategy)
     @settings(deadline=None, suppress_health_check=list(HealthCheck), phases=[Phase.generate])
     def test(case):
-        assert "\x00" not in case.query["q1"]["foo"]
-        assert len(case.query["q2"]["foo"]) == 4
-        assert int(case.query["q2"]["foo"]) % 2 == 0
+        assert "\x00" not in case.query["q1foo"]
+        assert len(case.query["q2foo"]) == 4
+        assert int(case.query["q2foo"]) % 2 == 0
 
     test()
 
