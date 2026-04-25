@@ -12,8 +12,30 @@ from flask import abort, jsonify, request
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
+from schemathesis.engine.pruning import PruningState, TransitionScore
 from schemathesis.engine.run import Phase, PhaseName, stateful
 from schemathesis.generation.modes import GenerationMode
+
+
+class PruningObserver(PruningState):
+    """PruningState subclass that captures a snapshot of `read` after each begin_iteration().
+
+    snapshots[i] contains what iteration i+1 will see in the read state.
+    After a single-iteration run: snapshots[0] = {} (read was empty before the first run).
+    Call begin_iteration() manually after the run to promote write->read and capture snapshots[-1].
+    """
+
+    __slots__ = ("snapshots",)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.snapshots: list[dict[str, TransitionScore]] = []
+
+    def begin_iteration(self) -> None:
+        super().begin_iteration()
+        self.snapshots.append(
+            {k: TransitionScore(successes=v.successes, failures=v.failures) for k, v in self.read.items()}
+        )
 
 
 @dataclass
@@ -541,3 +563,31 @@ def engine_factory(app_factory, app_runner, stop_event):
         )
 
     return _engine_factory
+
+
+@pytest.fixture
+def pruning_engine_factory(app_factory, app_runner, stop_event):
+    """Engine factory that injects a PruningObserver so tests can inspect observation accumulation."""
+
+    def _factory(app_kwargs=None, max_examples=15):
+        app = app_factory(**(app_kwargs or {}))
+        port = app_runner.run_flask_app(app)
+        config = SchemathesisConfig()
+        config.projects.override.phases.stateful.inference.algorithms = []
+        config.projects.override.generation.update(
+            modes=[GenerationMode.POSITIVE],
+            max_examples=max_examples,
+        )
+        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+        ctx = EngineContext(schema=schema, stop_event=stop_event)
+        observer = PruningObserver()
+        ctx.pruning = observer
+        list(
+            stateful.execute(
+                engine=ctx,
+                phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
+            )
+        )
+        return observer
+
+    return _factory

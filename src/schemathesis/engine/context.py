@@ -9,6 +9,7 @@ from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.observations import Observations
+from schemathesis.engine.pruning import PruningState
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
 
@@ -34,6 +35,7 @@ class EngineContext:
         "schema",
         "control",
         "outcome_cache",
+        "pruning",
         "start_time",
         "observations",
         "_thread_local",
@@ -59,6 +61,7 @@ class EngineContext:
             start_time=self.start_time,
         )
         self.outcome_cache = {}
+        self.pruning = PruningState(enabled=schema.config.phases.stateful.pruning)
         self.observations = observations
         self._thread_local = threading.local()
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}

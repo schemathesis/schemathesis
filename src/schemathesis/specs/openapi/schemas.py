@@ -33,6 +33,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import get_template_fields
 from schemathesis.core.transport import Response
+from schemathesis.engine.pruning import PruningState
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
@@ -557,11 +558,11 @@ class OpenApiSchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return self.adapter.get_parameter_serializer(definitions)
 
-    def as_state_machine(self) -> type[APIStateMachine]:
+    def as_state_machine(self, pruning: PruningState | None = None) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
             self.analysis.inject_links()
-        return create_state_machine(self)
+        return create_state_machine(self, pruning if pruning is not None else PruningState())
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")

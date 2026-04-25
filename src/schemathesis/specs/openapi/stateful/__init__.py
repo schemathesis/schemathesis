@@ -14,6 +14,7 @@ from schemathesis.core.errors import InvalidStateMachine, InvalidTransition
 from schemathesis.core.result import Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
+from schemathesis.engine.pruning import PruningState
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -69,7 +70,10 @@ class OpenAPIStateMachine(APIStateMachine):
 
 # The proportion of negative tests generated for "root" transitions
 NEGATIVE_TEST_CASES_THRESHOLD = 10
-# How often some transition is skipped
+
+# Base exploration rate when no pruning data is available.
+# Heuristics scale this per parameter type: path/required params explore less,
+# optional params explore more (values confirmed in prior experiments).
 BASE_EXPLORATION_RATE = 0.15
 
 
@@ -135,7 +139,7 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     return transitions
 
 
-def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
+def create_state_machine(schema: OpenApiSchema, pruning: PruningState) -> type[APIStateMachine]:
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
     transitions = collect_transitions(operations)
@@ -196,7 +200,7 @@ def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
                             name=name,
                             target=catch_all,
                             input=bundles[bundle_name].flatmap(
-                                into_step_input(target=target, link=link, modes=config.modes)
+                                into_step_input(target=target, link=link, modes=config.modes, pruning=pruning)
                             ),
                         )
                     )
@@ -269,7 +273,7 @@ def is_likely_root_transition(operation: APIOperation) -> bool:
 
 
 def into_step_input(
-    *, target: APIOperation, link: OpenApiLink, modes: list[GenerationMode]
+    *, target: APIOperation, link: OpenApiLink, modes: list[GenerationMode], pruning: PruningState
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
     """A single transition between API operations."""
 
@@ -286,6 +290,8 @@ def into_step_input(
 
             overrides: dict[str, Any] = {}
             applied_parameters = []
+            use_p = pruning.use_probability(transition.id)
+            calibrated = pruning.is_calibrated(transition.id)
             for container, data in transition.parameters.items():
                 overrides[container] = {}
 
@@ -296,22 +302,22 @@ def into_step_input(
 
                     param_key = f"{container}.{name}"
 
-                    # Calculate exploration rate based on parameter characteristics
-                    exploration_rate = BASE_EXPLORATION_RATE
-
-                    # Path parameters are critical for routing - use link values more often
-                    if container == "path_parameters":
-                        exploration_rate *= 0.5
-
-                    # Required parameters should follow links more often, optional ones explored more
-                    # Path params are always required, so they get both multipliers
-                    if extracted.is_required:
-                        exploration_rate *= 0.5
+                    if calibrated:
+                        p = use_p
                     else:
-                        # Explore optional parameters more to avoid only testing link-provided values
-                        exploration_rate *= 3.0
+                        # No data yet: use per-parameter heuristics.
+                        # Path parameters are critical for routing; required parameters
+                        # should follow links more; optional params get more exploration.
+                        exploration_rate = BASE_EXPLORATION_RATE
+                        if container == "path_parameters":
+                            exploration_rate *= 0.5
+                        if extracted.is_required:
+                            exploration_rate *= 0.5
+                        else:
+                            exploration_rate *= 3.0
+                        p = 1.0 - exploration_rate
 
-                    if biased_coin(1 - exploration_rate):
+                    if biased_coin(p):
                         overrides[container][name] = extracted.value.ok()
                         applied_parameters.append(param_key)
 
@@ -326,7 +332,7 @@ def into_step_input(
                 request_body = NOT_SET
 
             # Link suppose to replace the entire extracted body
-            if request_body is not NOT_SET and not link.merge_body and biased_coin(1 - BASE_EXPLORATION_RATE):
+            if request_body is not NOT_SET and not link.merge_body and biased_coin(use_p):
                 overrides["body"] = request_body
                 if isinstance(overrides["body"], dict):
                     applied_parameters.extend(f"body.{field}" for field in overrides["body"])
@@ -345,7 +351,7 @@ def into_step_input(
                         if field_value is UNRESOLVABLE:
                             continue
 
-                        if biased_coin(1 - BASE_EXPLORATION_RATE):
+                        if biased_coin(use_p):
                             selected_fields[field_name] = field_value
                             applied_parameters.append(f"body.{field_name}")
 
@@ -355,7 +361,7 @@ def into_step_input(
                         else:
                             # Can't merge into non-dict, replace entirely
                             case.body = selected_fields
-                elif biased_coin(1 - BASE_EXPLORATION_RATE):
+                elif biased_coin(use_p):
                     case.body = request_body
                     applied_parameters.append("body")
             return StepInput(case=case, transition=transition, applied_parameters=applied_parameters)

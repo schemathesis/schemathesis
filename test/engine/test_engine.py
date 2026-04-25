@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import platform
+import sys
 from dataclasses import asdict
 from typing import TYPE_CHECKING
 from unittest.mock import ANY
@@ -8,7 +9,6 @@ from unittest.mock import ANY
 import pytest
 from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
-from py import sys
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
