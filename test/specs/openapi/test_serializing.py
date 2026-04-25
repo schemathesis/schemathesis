@@ -214,6 +214,49 @@ def test_query_serialization_styles_openapi3(testdir, schema, explode, style, ex
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (OBJECT_SCHEMA, {"r": "100", "g": "200", "b": "150"}),
+        (ARRAY_SCHEMA, {"color": ["blue", "black", "brown"]}),
+    ],
+)
+def test_query_serialization_default_style_explode(testdir, schema, expected):
+    raw_schema = make_openapi_schema({"name": "color", "in": "query", "required": True, "schema": schema})
+    assert_generates(testdir, raw_schema, (expected,), "query")
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
+    ("schema", "expected"),
+    [
+        (OBJECT_SCHEMA, {"r": "100", "g": "200", "b": "150"}),
+        (ARRAY_SCHEMA, {"color": ["blue", "black", "brown"]}),
+    ],
+)
+def test_query_serialization_default_style_explode_via_ref(ctx, testdir, schema, expected):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/teapot": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "color",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"$ref": "#/components/schemas/Color"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"schemas": {"Color": schema}},
+    )
+    assert_generates(testdir, raw_schema, (expected,), "query")
+
+
+@pytest.mark.hypothesis_nested
+@pytest.mark.parametrize(
     ("schema", "explode", "expected"),
     [
         (ARRAY_SCHEMA, True, {"X-Api-Key": "blue,black,brown"}),

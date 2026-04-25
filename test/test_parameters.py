@@ -42,6 +42,12 @@ def test_(case):
 @pytest.mark.parametrize("type_", ["string", "integer", "array", "object", "boolean", "number"])
 def test_cookies(testdir, type_):
     # When parameter is specified for "cookie"
+    parameter = {"name": "token", "in": "cookie", "required": True, "schema": {"type": type_}}
+    # The default form-style `explode=true` collapses array/object cookies to no
+    # value (a single cookie name cannot carry repeated values), so for those
+    # types we use `explode=false` to get a serialized scalar cookie value.
+    if type_ in ("array", "object"):
+        parameter["explode"] = False
     testdir.make_test(
         """
 @schema.parametrize()
@@ -51,7 +57,7 @@ def test_(case):
     assert_requests_call(case)
         """,
         schema_name="simple_openapi.yaml",
-        **as_param({"name": "token", "in": "cookie", "required": True, "schema": {"type": type_}}),
+        **as_param(parameter),
         generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain it in its `cookies` attribute

@@ -8,6 +8,7 @@
 
 ### :bug: Fixed
 
+- Query parameters not serialized when `style`/`explode` are omitted from the spec, ignoring OpenAPI 3.0 defaults.
 - Use the matching registered serializer for multipart fields with `encoding.contentType`. [#3785](https://github.com/schemathesis/schemathesis/issues/3785)
 - `before_call` hook setting a missing required header in the coverage phase had no effect. [#3784](https://github.com/schemathesis/schemathesis/issues/3784)
 - Request timeouts reported as a check failure when a replay made them flaky.
