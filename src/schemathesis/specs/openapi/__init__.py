@@ -30,9 +30,11 @@ def require_security_scheme(name: str) -> MatcherFunc:
 
     Example::
 
-        schemathesis.auth.register()(SessionAuth).apply_to(
+        @schemathesis.auth().apply_to(
             schemathesis.openapi.require_security_scheme("session")
         )
+        class SessionAuth:
+            ...
 
     """
 

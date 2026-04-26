@@ -282,9 +282,11 @@ class AdminAuth:
 To apply auth only to operations that require a specific OpenAPI security scheme:
 
 ```python
-schemathesis.auth.register()(SessionAuth).apply_to(
+@schemathesis.auth().apply_to(
     schemathesis.openapi.require_security_scheme("session")
 )
+class SessionAuth:
+    ...
 ```
 
 ## Applying Different Auth to Different Operations
