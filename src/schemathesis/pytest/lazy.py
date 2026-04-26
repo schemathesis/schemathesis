@@ -10,6 +10,7 @@ from unittest import SkipTest
 import pytest
 from hypothesis.core import HypothesisHandle
 
+from schemathesis.auths import AuthStorage
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
@@ -89,16 +90,19 @@ def get_all_tests(
 class LazySchema:
     fixture_name: str
     filter_set: FilterSet
+    auth: AuthStorage
 
-    __slots__ = ("fixture_name", "filter_set")
+    __slots__ = ("fixture_name", "filter_set", "auth")
 
     def __init__(
         self,
         fixture_name: str,
         filter_set: FilterSet | None = None,
+        auth: AuthStorage | None = None,
     ) -> None:
         self.fixture_name = fixture_name
         self.filter_set = filter_set or FilterSet()
+        self.auth = auth if auth is not None else AuthStorage()
 
     def include(
         self,
@@ -130,7 +134,7 @@ class LazySchema:
             operation_id=operation_id,
             operation_id_regex=operation_id_regex,
         )
-        return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set)
+        return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set, auth=self.auth)
 
     def exclude(
         self,
@@ -168,7 +172,7 @@ class LazySchema:
             operation_id=operation_id,
             operation_id_regex=operation_id_regex,
         )
-        return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set)
+        return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set, auth=self.auth)
 
     def parametrize(self) -> Callable:
         def wrapper(test_func: Callable) -> Callable:
@@ -215,6 +219,8 @@ class LazySchema:
                     test_function=test_func,
                     filter_set=self.filter_set,
                 )
+                if self.auth.is_defined:
+                    schema.auth = AuthStorage(providers=list(self.auth.providers) + list(schema.auth.providers))
                 emit_openapi_auth_warnings(schema)
                 # Check if test function is a method and inject self from request.instance
                 sig = signature(test_func)

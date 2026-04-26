@@ -588,3 +588,145 @@ def test_api(case):
     result = testdir.runpytest("-W", "always")
     # The unused OpenAPI auth scheme warning should be emitted
     result.stdout.re_match_lines([r".*WRONG_MISSING_AUTH.*"])
+
+
+def test_lazy_schema_auth_decorator(testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+TOKEN = "Foo"
+
+@lazy_schema.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return TOKEN
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+@lazy_schema.parametrize()
+@settings(max_examples=2)
+def test(case):
+    assert case.headers is not None
+    assert case.headers["Authorization"] == f"Bearer {TOKEN}"
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_lazy_schema_auth_apply(testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+TOKEN = "Bar"
+
+class TokenAuth:
+    def get(self, case, context):
+        return TOKEN
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+@lazy_schema.parametrize()
+@lazy_schema.auth(TokenAuth)
+@settings(max_examples=2)
+def test(case):
+    assert case.headers is not None
+    assert case.headers["Authorization"] == f"Bearer {TOKEN}"
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_lazy_schema_auth_set_from_requests(testdir):
+    testdir.make_test(
+        """
+from requests.auth import HTTPBasicAuth
+
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+auth = HTTPBasicAuth("user", "pass")
+lazy_schema.auth.set_from_requests(auth)
+
+@lazy_schema.parametrize()
+@settings(max_examples=2)
+def test(case):
+    assert case.as_transport_kwargs().get("auth") is auth
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_lazy_schema_auth_takes_precedence_over_fixture_auth(testdir):
+    testdir.make_test(
+        """
+LAZY_TOKEN = "from-lazy"
+FIXTURE_TOKEN = "from-fixture"
+
+@pytest.fixture
+def api_schema(simple_schema):
+    @simple_schema.auth()
+    class FixtureAuth:
+        def get(self, case, context):
+            return FIXTURE_TOKEN
+
+        def set(self, case, data, context):
+            case.headers = case.headers or {}
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    return simple_schema
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
+
+@lazy_schema.auth()
+class LazyAuth:
+    def get(self, case, context):
+        return LAZY_TOKEN
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+@lazy_schema.parametrize()
+@settings(max_examples=2)
+def test(case):
+    assert case.headers["Authorization"] == f"Bearer {LAZY_TOKEN}"
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
+
+
+def test_lazy_schema_auth_does_not_leak_to_fixture_schema(testdir):
+    testdir.make_test(
+        """
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+
+TOKEN = "Baz"
+
+@lazy_schema.auth()
+class TokenAuth:
+    def get(self, case, context):
+        return TOKEN
+
+    def set(self, case, data, context):
+        case.headers = case.headers or {}
+        case.headers["Authorization"] = f"Bearer {data}"
+
+@lazy_schema.parametrize()
+@settings(max_examples=2)
+def test(case, simple_schema):
+    # The fixture's underlying schema must not have lazy-registered providers
+    assert simple_schema.auth.is_defined is False
+    assert case.headers["Authorization"] == f"Bearer {TOKEN}"
+"""
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(passed=1)
