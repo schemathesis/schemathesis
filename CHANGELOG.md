@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.16.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- `auth` API on `LazySchema` to match `BaseSchema`. [#3797](https://github.com/schemathesis/schemathesis/issues/3797)
+
 ## [4.16.0](https://github.com/schemathesis/schemathesis/compare/v4.15.2...v4.16.0) - 2026-04-26
 
 ### :rocket: Added
