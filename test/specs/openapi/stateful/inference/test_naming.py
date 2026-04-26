@@ -45,6 +45,35 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
         ("file_name", "/backups/{file_name}", "File"),
         ("recipe-name", "/recipes/{recipe-name}", "Recipe"),
         ("user_name", "/users/{user_name}", "User"),
+        # Bare "name" parameter - use path context if it's a path parameter
+        ("name", "/users/{name}", "User"),
+        ("name", "/files/{name}", "File"),
+        ("name", "/api/users", None),  # Not a path parameter, no placeholder
+        # Concatenated identifier suffix (no separator) - require path context to confirm
+        ("username", "/api/users/{username}/giveAdmin", "User"),
+        ("username", "/users/{username}", "User"),
+        ("userid", "/users/{userid}", "User"),
+        ("orderuuid", "/orders/{orderuuid}", "Order"),
+        ("petguid", "/pets/{petguid}", "Pet"),
+        ("recipeslug", "/recipes/{recipeslug}", "Recipe"),
+        ("userName", "/users/{userName}", "User"),
+        ("USERNAME", "/users/{USERNAME}", "User"),
+        # Common English words ending in identifier-like tokens - should NOT match
+        ("paid", "/items/{paid}", None),
+        ("rapid", "/transfers/{rapid}", None),
+        # Prefix doesn't align with the path-derived resource - should NOT match
+        ("custid", "/users/{custid}", None),
+        # Prefix too short
+        ("xid", "/items/{xid}", None),
+        # Concatenated suffix only fires for path parameters
+        ("username", "/users", None),
+        # API version prefixes alone don't qualify as a resource collection
+        ("name", "/v1/{name}", None),
+        ("name", "/api/v1/{name}", None),
+        ("username", "/v1/{username}", None),
+        # But version prefixes followed by a real collection still work
+        ("username", "/v1/users/{username}", "User"),
+        ("name", "/api/v2/users/{name}", "User"),
     ],
 )
 def test_from_parameter(parameter, path, expected):
@@ -263,6 +292,20 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         # No match cases
         pytest.param("random", "User", ["id", "name"], None, id="no-match"),
         pytest.param("the_name", "User", ["name"], None, id="no-match-resource-mismatch"),
+        # camelCase capital suffixes (no separator)
+        pytest.param(
+            "containerGroupName",
+            "ContainerGroup",
+            ["id", "name", "type"],
+            "name",
+            id="camel-name-resource-prefix",
+        ),
+        pytest.param("userName", "User", ["id", "username"], "username", id="camel-name-username-field"),
+        pytest.param("userSlug", "User", ["id", "slug"], "slug", id="camel-slug-resource-prefix"),
+        pytest.param("userUuid", "User", ["id", "uuid"], "uuid", id="camel-uuid-resource-prefix"),
+        pytest.param("userGuid", "User", ["id", "guid"], "guid", id="camel-guid-resource-prefix"),
+        # camel-Name with no matching field -> falls back to existing behavior
+        pytest.param("containerGroupName", "ContainerGroup", ["id", "type"], None, id="camel-name-no-name-field"),
     ],
 )
 def test_find_matching_field(parameter, resource, fields, expected):

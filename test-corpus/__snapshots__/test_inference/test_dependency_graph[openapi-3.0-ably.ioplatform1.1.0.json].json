@@ -388,7 +388,15 @@
       ]
     },
     "POST /keys/{keyName}/requestToken": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "keyName",
+          "resource": "Key",
+          "resource_field": "keyName"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -579,6 +587,12 @@
     "DeviceRegistration": {
       "fields": [
         "id"
+      ],
+      "types": {}
+    },
+    "Key": {
+      "fields": [
+        "keyName"
       ],
       "types": {}
     },

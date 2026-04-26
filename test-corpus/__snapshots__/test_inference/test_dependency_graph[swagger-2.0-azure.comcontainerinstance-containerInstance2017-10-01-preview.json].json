@@ -8,6 +8,20 @@
           "parameter_name": "subscriptionId",
           "resource": "Subscription",
           "resource_field": "subscriptionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceGroupName",
+          "resource": "ResourceGroup",
+          "resource_field": "resourceGroupName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "containerGroupName",
+          "resource": "ContainerGroup",
+          "resource_field": "name"
         }
       ],
       "outputs": [
@@ -60,6 +74,13 @@
           "parameter_name": "subscriptionId",
           "resource": "Subscription",
           "resource_field": "subscriptionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceGroupName",
+          "resource": "ResourceGroup",
+          "resource_field": "resourceGroupName"
         }
       ],
       "outputs": [
@@ -80,6 +101,20 @@
           "parameter_name": "subscriptionId",
           "resource": "Subscription",
           "resource_field": "subscriptionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceGroupName",
+          "resource": "ResourceGroup",
+          "resource_field": "resourceGroupName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "containerGroupName",
+          "resource": "ContainerGroup",
+          "resource_field": "name"
         }
       ],
       "outputs": [
@@ -100,6 +135,27 @@
           "parameter_name": "subscriptionId",
           "resource": "Subscription",
           "resource_field": "subscriptionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceGroupName",
+          "resource": "ResourceGroup",
+          "resource_field": "resourceGroupName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "containerGroupName",
+          "resource": "ContainerGroup",
+          "resource_field": "name"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "containerName",
+          "resource": "Container",
+          "resource_field": "containerName"
         }
       ],
       "outputs": [
@@ -120,6 +176,20 @@
           "parameter_name": "subscriptionId",
           "resource": "Subscription",
           "resource_field": "subscriptionId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceGroupName",
+          "resource": "ResourceGroup",
+          "resource_field": "resourceGroupName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "containerGroupName",
+          "resource": "ContainerGroup",
+          "resource_field": "name"
         }
       ],
       "outputs": [
@@ -141,6 +211,12 @@
     }
   },
   "resources": {
+    "Container": {
+      "fields": [
+        "containerName"
+      ],
+      "types": {}
+    },
     "ContainerGroup": {
       "fields": [
         "id",
@@ -213,6 +289,12 @@
           "string"
         ]
       }
+    },
+    "ResourceGroup": {
+      "fields": [
+        "resourceGroupName"
+      ],
+      "types": {}
     },
     "Subscription": {
       "fields": [
