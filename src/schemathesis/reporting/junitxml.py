@@ -13,6 +13,7 @@ from schemathesis.core.failures import format_failures
 
 if TYPE_CHECKING:
     from schemathesis.config import OutputConfig
+    from schemathesis.config._report import ReportGroupBy
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.statistic import GroupedFailures
 
@@ -23,10 +24,20 @@ TextOutput = IO[str] | StringIO | Path
 class JunitXmlWriter:
     """Accumulates test results and writes JUnit XML on close."""
 
-    def __init__(self, output: TextOutput, config: OutputConfig | None = None) -> None:
+    def __init__(
+        self, output: TextOutput, config: OutputConfig | None = None, group_by: ReportGroupBy | None = None
+    ) -> None:
+        from schemathesis.config._report import ReportGroupBy
+
         self._output = output
         self._config = config
+        self._group_by = group_by or ReportGroupBy.OPERATION
+        # Used when group_by == OPERATION: one TestCase per operation label
         self._test_cases: dict[str, TestCase] = {}
+        # Track labels that received non-skip results so later skip events are ignored
+        self._non_skip_labels: set[str] = set()
+        # Used when group_by == PHASE: one TestCase per (phase, label)
+        self._phase_test_cases: dict[str, dict[str, TestCase]] = {}
 
     def record_scenario(
         self,
@@ -35,11 +46,64 @@ class JunitXmlWriter:
         failures: Iterable[GroupedFailures],
         skip_reason: str | None,
         config: OutputConfig,
+        phase: str | None = None,
     ) -> None:
         """Record a finished test scenario."""
+        from schemathesis.config._report import ReportGroupBy
+
+        failures = list(failures)
+        if self._group_by == ReportGroupBy.PHASE:
+            self._record_phase(label, elapsed_sec, failures, skip_reason, config, phase or "other")
+        else:
+            self._record_operation(label, elapsed_sec, failures, skip_reason, config)
+
+    def _record_operation(
+        self,
+        label: str,
+        elapsed_sec: float,
+        failures: list[GroupedFailures],
+        skip_reason: str | None,
+        config: OutputConfig,
+    ) -> None:
+        """Record into a single suite grouped by operation label."""
         test_case = self._get_or_create(label)
         test_case.elapsed_sec += elapsed_sec
-        failures = list(failures)
+        if failures:
+            # Real results override any prior skip from an earlier phase
+            test_case.skipped = []
+            self._non_skip_labels.add(label)
+            messages = [
+                format_failures(
+                    case_id=f"{idx}. Test Case ID: {group.case_id}",
+                    response=group.response,
+                    failures=group.failures,
+                    curl=group.code_sample,
+                    config=config,
+                )
+                for idx, group in enumerate(failures, 1)
+            ]
+            test_case.add_failure_info(message="\n\n".join(messages))
+        elif skip_reason is not None:
+            # Only mark as skipped if no other phase already produced real results
+            if label not in self._non_skip_labels:
+                test_case.add_skipped_info(output=skip_reason)
+        else:
+            # Success — clear any prior skip from an earlier phase
+            test_case.skipped = []
+            self._non_skip_labels.add(label)
+
+    def _record_phase(
+        self,
+        label: str,
+        elapsed_sec: float,
+        failures: list[GroupedFailures],
+        skip_reason: str | None,
+        config: OutputConfig,
+        phase: str,
+    ) -> None:
+        """Record into per-phase suites."""
+        test_case = self._get_or_create_for_phase(phase, label)
+        test_case.elapsed_sec += elapsed_sec
         if failures:
             messages = [
                 format_failures(
@@ -82,13 +146,32 @@ class JunitXmlWriter:
             config=self._config,
         )
 
-    def record_error(self, label: str, message: str) -> None:
+    def record_error(self, label: str, message: str, phase: str | None = None) -> None:
         """Record a non-fatal error for a label."""
-        self._get_or_create(label).add_error_info(output=message)
+        from schemathesis.config._report import ReportGroupBy
+
+        if self._group_by == ReportGroupBy.PHASE:
+            test_case = self._get_or_create_for_phase(phase or "other", label)
+        else:
+            test_case = self._get_or_create(label)
+            # Error is a real result — clear any prior skip
+            test_case.skipped = []
+            self._non_skip_labels.add(label)
+        test_case.add_error_info(output=message)
 
     def close(self) -> None:
         """Write the JUnit XML report and close the output."""
-        test_suites = [TestSuite("schemathesis", test_cases=list(self._test_cases.values()), hostname=platform.node())]
+        from schemathesis.config._report import ReportGroupBy
+
+        if self._group_by == ReportGroupBy.PHASE:
+            test_suites = [
+                TestSuite(f"schemathesis - {phase_name}", test_cases=list(cases.values()), hostname=platform.node())
+                for phase_name, cases in self._phase_test_cases.items()
+            ]
+        else:
+            test_suites = [
+                TestSuite("schemathesis", test_cases=list(self._test_cases.values()), hostname=platform.node())
+            ]
         if isinstance(self._output, Path):
             with open(self._output, "w", encoding="utf-8") as fd:
                 to_xml_report_file(file_descriptor=fd, test_suites=test_suites, prettyprint=True, encoding="utf-8")
@@ -99,6 +182,10 @@ class JunitXmlWriter:
 
     def _get_or_create(self, label: str) -> TestCase:
         return self._test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
+
+    def _get_or_create_for_phase(self, phase: str, label: str) -> TestCase:
+        phase_cases = self._phase_test_cases.setdefault(phase, {})
+        return phase_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
 
     def __enter__(self) -> JunitXmlWriter:
         return self

@@ -421,7 +421,7 @@ These options control the reporting and output format of test results:
 
     **Type**: `String`  
 
-    Custom path for JUnit XML report.
+    Custom path for JUnit XML report. For additional options like `group-by`, use a [configuration file](../reference/configuration.md#reportsgroup-by).
 
     ```console
     $ st run openapi.yaml --report junit --report-junit-path ./custom-junit.xml

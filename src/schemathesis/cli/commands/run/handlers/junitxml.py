@@ -5,10 +5,12 @@ from typing import TYPE_CHECKING
 
 from schemathesis.cli.commands.run.handlers.base import EventHandler, TextOutput
 from schemathesis.engine import Status, events
+from schemathesis.engine.run import PhaseName
 from schemathesis.reporting.junitxml import JunitXmlWriter
 
 if TYPE_CHECKING:
     from schemathesis.cli.context import BaseExecutionContext
+    from schemathesis.config._report import ReportGroupBy
     from schemathesis.engine.recorder import ScenarioRecorder
 
 
@@ -19,13 +21,14 @@ class JunitXMLHandler(EventHandler):
 
     __slots__ = ("output", "writer")
 
-    def __init__(self, output: TextOutput) -> None:
+    def __init__(self, output: TextOutput, group_by: ReportGroupBy | None = None) -> None:
         self.output = output
-        self.writer = JunitXmlWriter(output)
+        self.writer = JunitXmlWriter(output, group_by=group_by)
 
     def handle_event(self, ctx: BaseExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
+            phase: str | None = event.phase.value
             if event.status == Status.FAILURE:
                 # Look up failures by case_id across all labels — some coverage scenarios
                 # (e.g. UNSPECIFIED_HTTP_METHOD) store failures under a remapped label
@@ -45,6 +48,7 @@ class JunitXMLHandler(EventHandler):
                 failures=failures,
                 skip_reason=event.skip_reason,
                 config=ctx.config.output,
+                phase=phase,
             )
         elif isinstance(event, events.FuzzScenarioFinished):
             if event.status in (Status.SUCCESS, Status.FAILURE):
@@ -56,6 +60,7 @@ class JunitXMLHandler(EventHandler):
                         failures=failures,
                         skip_reason=None,
                         config=ctx.config.output,
+                        phase=PhaseName.FUZZING.value,
                     )
             else:
                 self.writer.record_scenario(
@@ -64,9 +69,11 @@ class JunitXMLHandler(EventHandler):
                     failures=[],
                     skip_reason=None,
                     config=ctx.config.output,
+                    phase=PhaseName.FUZZING.value,
                 )
         elif isinstance(event, events.NonFatalError):
-            self.writer.record_error(label=event.label, message=event.info.format())
+            phase = event.phase.value if event.phase is not None else None
+            self.writer.record_error(label=event.label, message=event.info.format(), phase=phase)
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
         self.writer.close()

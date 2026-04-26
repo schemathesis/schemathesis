@@ -62,7 +62,7 @@ def initialize_report_handlers(
     if config.reports.junit.enabled:
         path = config.reports.get_path(ReportFormat.JUNIT)
         open_file(path)
-        handlers.append(JunitXMLHandler(path))
+        handlers.append(JunitXMLHandler(path, group_by=config.reports.group_by))
     if config.reports.vcr.enabled:
         path = config.reports.get_path(ReportFormat.VCR)
         open_file(path)

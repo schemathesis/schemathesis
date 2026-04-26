@@ -37,6 +37,13 @@
         "preserve-bytes": {
           "type": "boolean"
         },
+        "group-by": {
+          "enum": [
+            "operation",
+            "phase"
+          ],
+          "default": "operation"
+        },
         "junit": {
           "$ref": "#/$defs/ReportConfig"
         },

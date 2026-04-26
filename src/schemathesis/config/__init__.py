@@ -38,7 +38,13 @@ from schemathesis.config._phases import (
     StatefulPhaseConfig,
 )
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig, get_workers_count
-from schemathesis.config._report import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat, ReportsConfig
+from schemathesis.config._report import (
+    DEFAULT_REPORT_DIRECTORY,
+    ReportConfig,
+    ReportFormat,
+    ReportGroupBy,
+    ReportsConfig,
+)
 from schemathesis.config._warnings import SchemathesisWarning, WarningsConfig
 
 if sys.version_info < (3, 11):
@@ -53,6 +59,7 @@ __all__ = [
     "ReportConfig",
     "ReportsConfig",
     "ReportFormat",
+    "ReportGroupBy",
     "DEFAULT_REPORT_DIRECTORY",
     "GenerationConfig",
     "OutputConfig",
