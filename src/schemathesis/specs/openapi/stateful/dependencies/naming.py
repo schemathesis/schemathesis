@@ -86,9 +86,24 @@ def from_parameter(parameter: str, path: str) -> str | None:
         if len(prefix) >= 2:
             return to_pascal_case(prefix)
 
-    # Bare "slug" parameter - use path context if it's a path parameter
-    if lower == "slug" and f"{{{parameter}}}" in path:
-        return from_path(path, parameter_name=parameter)
+    # Bare "slug" / "name" parameter - use path context if it's a path parameter.
+    # Strip API version prefixes first so `/v1/{name}` doesn't infer a fictitious `V1`.
+    if lower in ("slug", "name") and f"{{{parameter}}}" in path:
+        return from_path(strip_version_prefix(path), parameter_name=parameter)
+
+    # Concatenated identifier suffix without separator (e.g., `username`, `userid`).
+    # Single-token parameters can't be split unambiguously by name alone, so require
+    # the path to confirm: the prefix must match the path-derived resource name.
+    # Longest suffix wins to avoid `userid` matching as `useri`+`d`.
+    if f"{{{parameter}}}" in path:
+        for suffix in ("uuid", "guid", "slug", "name", "id"):
+            if lower.endswith(suffix) and len(lower) > len(suffix):
+                prefix_lower = lower[: -len(suffix)]
+                if len(prefix_lower) >= 2:
+                    path_resource = from_path(strip_version_prefix(path), parameter_name=parameter)
+                    if path_resource is not None and path_resource.lower() == prefix_lower:
+                        return path_resource
+                break
 
     return None
 
@@ -549,14 +564,17 @@ def _split_parameter_name(parameter_name: str) -> tuple[str, str]:
     Examples:
         "channelId" -> ("channel", "Id")
         "userId" -> ("user", "Id")
+        "containerGroupName" -> ("containerGroup", "Name")
         "user_id" -> ("user", "_id")
         "id" -> ("", "id")
         "channel_id" -> ("channel", "_id")
         "league_id_or_slug" -> ("league", "_id_or_slug")
 
     """
-    if parameter_name.endswith("Id") and len(parameter_name) > 2:
-        return parameter_name[:-2], "Id"
+    # Capital-suffix camelCase variants - longest first so `Uuid` doesn't get caught by `Id`
+    for cap_suffix in ("Uuid", "Guid", "Name", "Slug", "Id"):
+        if parameter_name.endswith(cap_suffix) and len(parameter_name) > len(cap_suffix):
+            return parameter_name[: -len(cap_suffix)], cap_suffix
 
     # Composite suffixes first (longer patterns before shorter ones)
     if parameter_name.endswith("_id_or_slug") and len(parameter_name) > 11:

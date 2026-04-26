@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.16.1...HEAD) - TBD
 
+### :wrench: Changed
+
+- Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
+
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 
 ### :bug: Fixed
