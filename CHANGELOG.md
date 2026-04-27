@@ -2,6 +2,13 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.16.1...HEAD) - TBD
 
+### :rocket: Added
+
+- Capture path-parameter values from successful 2xx requests for reuse during fuzzing.
+- Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
+- Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
+- Dependency inference recognizes `GET /collection` returning an array of identifier strings.
+
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for body-level type mutations on `multipart/form-data` endpoints. [#3801](https://github.com/schemathesis/schemathesis/issues/3801)
@@ -12,12 +19,6 @@
 - Report malformed sub-schemas (e.g. `description: null`) as a clean schema error.
 - `Unsatisfiable` for arrays with `allOf` of multiple `contains` requiring distinct `const` values.
 - Operation scheduling respects RESTful method priority even when all operations collapse into one layer.
-
-### :wrench: Changed
-
-- Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
-- Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
-- Dependency inference recognizes `GET /collection` returning an array of identifier strings.
 
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 

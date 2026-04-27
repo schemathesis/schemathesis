@@ -350,6 +350,9 @@ def run_test(
             # Record response data for operations that produce resources
             if extra_data_source.should_record(operation=operation.label):
                 extra_data_source.record_response(operation=operation, response=response, case=case)
+            # Record request data so identifiers from path/body land in the same pool
+            if extra_data_source.should_record_request(operation=operation.label):
+                extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
 
     yield scenario_finished(status)
 

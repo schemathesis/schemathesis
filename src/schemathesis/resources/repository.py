@@ -4,13 +4,18 @@ import threading
 from collections import defaultdict, deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import jsonschema_rs
 
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import status_code_matches
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
+
+if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
+    from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot
 
 # Maximum number of resource instances cached per unique context within a resource type.
 # This ensures diversity across parent resources (e.g., pets from different owners).
@@ -99,6 +104,36 @@ class ResourceRepository:
                     context=context or {},
                 )
 
+    def record_request(
+        self,
+        *,
+        operation: str,
+        inputs: Sequence[InputSlot],
+        case: Case,
+        status_code: int,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        """Capture identifier values from a successful request.
+
+        Mirrors `record_response` but reads from the case (path parameters and
+        JSON body fields) instead of the response payload. Only fires on 2xx.
+        """
+        if not (200 <= status_code < 300):
+            return
+        for slot in inputs:
+            if slot.resource_field is None:
+                continue
+            value = _extract_request_value(slot, case)
+            if value is None:
+                continue
+            self._store(
+                resource_name=slot.resource.name,
+                data={slot.resource_field: value},
+                source_operation=operation,
+                status_code=status_code,
+                context=context or {},
+            )
+
     def _extract_payload(self, payload: Any, descriptor: ResourceDescriptor) -> Iterable[dict[str, Any]]:
         pointer = descriptor.pointer
         if pointer in ("", None, "/"):
@@ -137,11 +172,6 @@ class ResourceRepository:
         Maintains diversity by limiting instances per context and evicting
         oldest contexts when capacity is reached.
         """
-        context_buckets = self._resource_buckets.get(resource_name)
-        context_order = self._context_order.get(resource_name)
-        assert context_buckets is not None, "Buckets should be created for all resources"
-        assert context_order is not None, "Context order should be created for all resources"
-
         # Create a stable key for the context
         context_key = jsonschema_rs.canonical.json.to_string(context) if context else ""
 
@@ -150,6 +180,15 @@ class ResourceRepository:
         )
 
         with self._lock:
+            context_buckets = self._resource_buckets.get(resource_name)
+            if context_buckets is None:
+                # Resource was not registered via descriptors (e.g. a request-only resource
+                # captured from path/body slots whose response side has no extractable shape).
+                context_buckets = {}
+                self._resource_buckets[resource_name] = context_buckets
+                self._context_order[resource_name] = deque()
+            context_order = self._context_order[resource_name]
+
             # Get or create bucket for this context
             if context_key not in context_buckets:
                 # Check if we need to evict an old context
@@ -162,3 +201,21 @@ class ResourceRepository:
                 context_order.append(context_key)
 
             context_buckets[context_key].append(instance)
+
+
+def _extract_request_value(slot: InputSlot, case: Case) -> Any:
+    """Pull the value for an InputSlot out of a generated Case.
+
+    Returns None when the slot's location isn't supported (query, header,
+    body-array-index) or when the named field is absent from the case.
+    """
+    if slot.parameter_location == ParameterLocation.PATH:
+        return case.path_parameters.get(slot.parameter_name) if isinstance(slot.parameter_name, str) else None
+    if slot.parameter_location == ParameterLocation.BODY:
+        if not isinstance(slot.parameter_name, str):
+            return None
+        body = case.body
+        if not isinstance(body, dict):
+            return None
+        return body.get(slot.parameter_name)
+    return None

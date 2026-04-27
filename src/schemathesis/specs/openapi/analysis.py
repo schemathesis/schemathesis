@@ -9,7 +9,11 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.resources import ExtraDataSource, ResourceRepository
-from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, build_parameter_requirements
+from schemathesis.specs.openapi.extra_data_source import (
+    OpenApiExtraDataSource,
+    build_inputs_by_label,
+    build_parameter_requirements,
+)
 from schemathesis.specs.openapi.resources import build_descriptors
 from schemathesis.specs.openapi.stateful import dependencies
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
@@ -101,7 +105,12 @@ class OpenAPIAnalysis:
                 repository = ResourceRepository(descriptors)
                 self._populate_from_response_examples(repository)
                 requirements = build_parameter_requirements(self.dependency_graph)
-                self._extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
+                inputs_by_label = build_inputs_by_label(self.dependency_graph)
+                self._extra_data_source = OpenApiExtraDataSource(
+                    repository=repository,
+                    requirements=requirements,
+                    inputs_by_label=inputs_by_label,
+                )
         assert not isinstance(self._extra_data_source, NotSet)
         return self._extra_data_source
 
