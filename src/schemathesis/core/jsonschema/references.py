@@ -21,6 +21,9 @@ def sanitize(schema: JsonSchema) -> set[str]:
 
         _sanitize_properties(current)
 
+        if "patternProperties" in current:
+            _sanitize_pattern_properties(current)
+
         if "items" in current:
             _sanitize_items(current)
 
@@ -134,6 +137,23 @@ def _sanitize_properties(schema: JsonSchemaObject) -> None:
 
         if name not in required:
             del properties[name]
+
+
+def _sanitize_pattern_properties(schema: JsonSchemaObject) -> None:
+    """Drop `patternProperties` entries whose value contains a `$ref`.
+
+    Each entry is structurally optional: an object with no key matching the
+    regex satisfies the schema regardless of the entry's sub-schema. Removing
+    ref-bearing entries breaks recursive cycles without forcing the bundler
+    to inline another level. The original schema still applies at validation
+    time — schemathesis just won't generate matching keys itself.
+    """
+    pattern_properties = schema["patternProperties"]
+    if not isinstance(pattern_properties, dict):
+        return
+    for key, subschema in list(pattern_properties.items()):
+        if _has_ref(subschema):
+            del pattern_properties[key]
 
 
 def _sanitize_items(schema: JsonSchemaObject) -> None:

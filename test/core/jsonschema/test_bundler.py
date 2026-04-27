@@ -490,3 +490,60 @@ def test_bundle_infinite_recursive_required_cycle_message():
   #/definitions/C ->
   #/definitions/A"""
     )
+
+
+def test_bundle_self_recursion_through_pattern_properties_is_breakable():
+    # An object `{}` validates against `A`, so the cycle through `patternProperties`
+    # is structurally optional and should not raise.
+    schema = {"$ref": "#/definitions/A"}
+    store = {
+        "definitions": {
+            "A": {
+                "type": "object",
+                "patternProperties": {".*": {"$ref": "#/definitions/A"}},
+                "additionalProperties": False,
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    bundle(schema, resolver, inline_recursive=True)
+
+
+def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
+    # `KitNode -> KitContainer.children.patternProperties -> KitNode` is breakable:
+    # `oneOf` allows the non-recursive `KitItem` branch, and `children: {}` validates
+    # because `patternProperties` has no `minProperties`.
+    schema = {"$ref": "#/definitions/KitNode"}
+    store = {
+        "definitions": {
+            "KitNode": {
+                "oneOf": [
+                    {"$ref": "#/definitions/KitContainer"},
+                    {"$ref": "#/definitions/KitItem"},
+                ]
+            },
+            "KitContainer": {
+                "type": "object",
+                "required": ["children"],
+                "properties": {
+                    "children": {
+                        "type": "object",
+                        "patternProperties": {".*": {"$ref": "#/definitions/KitNode"}},
+                        "additionalProperties": False,
+                    },
+                },
+                "additionalProperties": False,
+            },
+            "KitItem": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "additionalProperties": False,
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    bundle(schema, resolver, inline_recursive=True)
