@@ -97,6 +97,10 @@ def _to_json_schema(
             translated = normalize_regex(pattern)
             if translated is not None:
                 schema["pattern"] = translated
+        # `format: regex` would otherwise route generation through the regex strategy and
+        # filter against `pattern`, exhausting whenever `pattern` excludes regex metachars.
+        if schema.get("format") == "regex":
+            schema.pop("format", None)
     if update_quantifiers:
         update_pattern_in_schema(schema)
     # Sometimes `required` is incorrectly has a boolean value
