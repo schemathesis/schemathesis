@@ -71,9 +71,13 @@ def compute_operation_weights(schema: BaseSchema, operations: list[APIOperation]
             weights[op.label] = 1
         else:
             node = graph.operations.get(op.label)
-            # Path-keyed outputs don't contribute response-body values to the
-            # resource pool, so they shouldn't bias fuzz scheduling weights.
-            out_degree = sum(1 for output in node.outputs if output.path_parameter is None) if node is not None else 0
+            # Path-keyed and body-keyed outputs don't contribute response-body
+            # values to the resource pool, so they shouldn't bias fuzz scheduling weights.
+            out_degree = (
+                sum(1 for output in node.outputs if output.path_parameter is None and output.body_field is None)
+                if node is not None
+                else 0
+            )
             weights[op.label] = 2 + out_degree
     return weights
 
