@@ -6,6 +6,7 @@
 
 - False positive `negative_data_rejection` for body-level type mutations on `multipart/form-data` endpoints. [#3801](https://github.com/schemathesis/schemathesis/issues/3801)
 - Crash on schemas with non-schema values inside `properties` (e.g. an integer where a sub-schema is expected).
+- Cascading generation failures after one schema corrupted shared `hypothesis-jsonschema` constants in the same process.
 
 ### :wrench: Changed
 
