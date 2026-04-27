@@ -2105,11 +2105,17 @@ def _negative_type(
         and ctx.media_type[1] != "json"
     ):
         return
-    # Form-urlencoded body-level type mutations serialize to empty body
+    # Form/multipart body-level type mutations don't yield reliable wire violations:
+    # form-urlencoded serializes to empty body; multipart renders as boundaries around
+    # str(value), which permissive servers accept as zero-part multipart.
     if (
         "object" in types
         and ctx.location == ParameterLocation.BODY
-        and ctx.media_type == ("application", "x-www-form-urlencoded")
+        and ctx.media_type
+        in (
+            ("application", "x-www-form-urlencoded"),
+            ("multipart", "form-data"),
+        )
     ):
         return
     strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
