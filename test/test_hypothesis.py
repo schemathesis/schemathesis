@@ -627,6 +627,49 @@ def test_invalid_schema_for_malformed_subschema(ctx):
         examples.generate_one(schema["/probe"]["POST"].as_strategy())
 
 
+def test_array_with_allof_of_multiple_contains(ctx):
+    # `allOf` of multiple `contains` schemas can't be merged; without help, generation
+    # falls back to filtering and exhausts before satisfying both consts.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/probe": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["type"],
+                                    "properties": {
+                                        "type": {
+                                            "type": "array",
+                                            "minItems": 1,
+                                            "uniqueItems": True,
+                                            "items": {"type": "string"},
+                                            "allOf": [
+                                                {"contains": {"const": "VerifiablePresentation"}},
+                                                {"contains": {"const": "KyaManifest"}},
+                                            ],
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+
+    case = examples.generate_one(schema["/probe"]["POST"].as_strategy())
+
+    assert "VerifiablePresentation" in case.body["type"]
+    assert "KyaManifest" in case.body["type"]
+
+
 @pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.build_schema(
