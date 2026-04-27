@@ -108,6 +108,16 @@ def iter_resources_from_response(
             yield primitive_resource
             return None
 
+    # Handle GET collections returning arrays of primitive identifiers.
+    # Example: GET /products returns ["foo", "bar"] - treat as a list of Product identifiers.
+    if method == "get" and schema_type == "array":
+        items = schema.get("items")
+        if isinstance(items, dict) and items.get("type") in ("string", "integer"):
+            primitive_array = _resource_from_primitive_array(path=path, resources=resources)
+            if primitive_array is not None:
+                yield primitive_array
+                return None
+
     # Push the response's scope so all nested $refs are resolved relative to the response's location
     resolver.push_scope(response.scope)
     try:
@@ -263,6 +273,27 @@ def _resource_from_primitive_response(*, path: str, resources: ResourceMap) -> E
     return ExtractedResource(
         resource=resource,
         cardinality=Cardinality.ONE,
+        pointer=ROOT_POINTER,
+        is_primitive_identifier=True,
+    )
+
+
+def _resource_from_primitive_array(*, path: str, resources: ResourceMap) -> ExtractedResource | None:
+    """Handle GET returning a bare array of primitive identifiers (e.g., ["foo", "bar"])."""
+    name = from_path(path)
+    if name is None:
+        return None
+
+    resource = resources.get(name)
+    if resource is None:
+        resource = ResourceDefinition.inferred_from_parameter(name=name, parameter_name="id")
+        resources[name] = resource
+    elif not resource.fields:
+        resource.fields = ["id"]
+
+    return ExtractedResource(
+        resource=resource,
+        cardinality=Cardinality.MANY,
         pointer=ROOT_POINTER,
         is_primitive_identifier=True,
     )

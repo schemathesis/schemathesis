@@ -10,6 +10,7 @@
 
 - Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
 - Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
+- Dependency inference recognizes `GET /collection` returning an array of identifier strings.
 
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 
