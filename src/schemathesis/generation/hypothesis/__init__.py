@@ -166,6 +166,29 @@ def setup() -> None:
         _canonicalise._get_validator_class(result)
         return result
 
+    def _distribute_anyof(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any] | None:
+        # `_original_merged` returns None for two distinct `anyOf` lists; distribute
+        # the intersection over their branches and drop empty results.
+        left_branches = left.get("anyOf")
+        right_branches = right.get("anyOf")
+        if not isinstance(left_branches, list) or not isinstance(right_branches, list):
+            return None
+        left_rest = {k: v for k, v in left.items() if k != "anyOf"}
+        right_rest = {k: v for k, v in right.items() if k != "anyOf"}
+        branches: list[dict[str, Any]] = []
+        for left_branch in left_branches:
+            for right_branch in right_branches:
+                left_combined = {**left_rest, **left_branch} if isinstance(left_branch, dict) else left_branch
+                right_combined = {**right_rest, **right_branch} if isinstance(right_branch, dict) else right_branch
+                branch = _original_merged([left_combined, right_combined])
+                if branch is not None and branch != _canonicalise.FALSEY:
+                    branches.append(branch)
+        if not branches:
+            return None
+        if len(branches) == 1:
+            return branches[0]
+        return {"anyOf": branches}
+
     def _merged(schemas: list[Any]) -> dict[str, Any] | None:
         if len(schemas) > 1:
             filtered = [schema for schema in schemas if not _is_trivial_truthy(schema)]
@@ -191,6 +214,8 @@ def setup() -> None:
                     return cached
 
             result = _original_merged(schemas)
+            if result is None and isinstance(schemas[0], dict) and isinstance(schemas[1], dict):
+                result = _distribute_anyof(schemas[0], schemas[1])
             if cache_key is not None:
                 _merge_cache_set(cache_key, result)
             return result

@@ -104,6 +104,57 @@ def test_merged_cache_returns_fresh_copy(left, right, mutation_path):
     assert second != first
 
 
+def test_ref_with_sibling_anyof_against_anyof_target(ctx):
+    body = {
+        "type": "object",
+        "properties": {
+            "loadStrategyClass": {
+                "$ref": "#/components/schemas/Strategy",
+                "anyOf": [
+                    {"const": "ai.starlake.IngestionNameStrategy"},
+                    {"const": "ai.starlake.IngestionTimeStrategy"},
+                ],
+            }
+        },
+    }
+    components = {
+        "schemas": {
+            "Strategy": {
+                "anyOf": [
+                    {"type": "string"},
+                    {"type": "boolean"},
+                    {"type": "number"},
+                    {"type": "integer"},
+                    {"type": "null"},
+                ],
+            }
+        }
+    }
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        components=components,
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    validator = jsonschema_rs.validator_for({**body, "components": components})
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=1, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        validator.validate(case.body)
+
+    test()
+
+
 @pytest.mark.parametrize(
     ("schema", "expected_module"),
     [
