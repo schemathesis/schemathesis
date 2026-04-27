@@ -200,7 +200,16 @@ def setup() -> None:
     _original_from_schema = _from_schema.__dict__["__from_schema"]
     _original_merged_as_strategies = _from_schema.merged_as_strategies
 
+    def _ensure_canonical_constants() -> None:
+        # hypothesis-jsonschema returns these by reference and downstream callers mutate them.
+        if _canonicalise.FALSEY != {"not": {}}:
+            _canonicalise.FALSEY.clear()
+            _canonicalise.FALSEY["not"] = {}
+        if _canonicalise.TRUTHY:
+            _canonicalise.TRUTHY.clear()
+
     def _cached_from_schema(schema: Any, *, alphabet: Any, custom_formats: Any) -> Any:
+        _ensure_canonical_constants()
         try:
             key = (_schema_cache_key(schema), id(alphabet), id(custom_formats))
         except (TypeError, ValueError):

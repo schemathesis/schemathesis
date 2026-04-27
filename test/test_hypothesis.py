@@ -5,6 +5,7 @@ import jsonschema_rs
 import pytest
 from hypothesis import HealthCheck, Phase, assume, find, given, settings
 from hypothesis import strategies as st
+from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.internal.observability import with_observability_callback
 from hypothesis_jsonschema import _canonicalise as canonicalise
 
@@ -141,6 +142,59 @@ def test_get_validator_class_falls_back_to_older_drafts_for_tuple_items():
     schema = {"type": "array", "items": [{"type": "string"}]}
 
     assert canonicalise._get_validator_class(schema) is jsonschema_rs.Draft7Validator
+
+
+def test_canonicalise_constants_restored_after_polluting_schema(ctx):
+    # hypothesis-jsonschema's FALSEY/TRUTHY are shared mutable globals that get
+    # clobbered during generation; schemathesis must restore them.
+    setup()
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/probe": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "routes": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/staticRoutes"},
+                                        }
+                                    },
+                                }
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "staticRoutes": {
+                    "type": "object",
+                    "if": {"properties": {"type": {"const": "uri"}}},
+                    "then": {"properties": {"source": {"type": "string"}}, "required": ["source"]},
+                    "else": {"properties": {"content": {"type": "string"}}, "required": ["content"]},
+                    "required": ["route", "type"],
+                    "additionalProperties": False,
+                }
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+
+    @given(schema["/probe"]["POST"].as_strategy())
+    @settings(max_examples=1, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        pass
+
+    test()
+
+    assert canonicalise.FALSEY == {"not": {}}
+    assert canonicalise.TRUTHY == {}
 
 
 @pytest.mark.parametrize("location", sorted(set(ParameterLocation) - {ParameterLocation.UNKNOWN}))
