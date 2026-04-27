@@ -3076,6 +3076,45 @@ def snapshot_json(snapshot):
             None,
             id="post-creates-resource-keyed-by-path-param",
         ),
+        pytest.param(
+            {
+                "/products": {
+                    "get": {
+                        "operationId": "listProducts",
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {
+                                    "application/json": {"schema": {"type": "array", "items": {"type": "string"}}}
+                                },
+                            }
+                        },
+                    },
+                },
+                "/products/{productName}/features/{featureName}": {
+                    "delete": {
+                        "operationId": "deleteFeature",
+                        "parameters": [
+                            {
+                                "name": "productName",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            },
+                            {
+                                "name": "featureName",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            },
+                        ],
+                        "responses": {"204": {"description": "Deleted"}},
+                    },
+                },
+            },
+            None,
+            id="primitive-array-collection-as-identifier-list",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

@@ -129,9 +129,12 @@ class DependencyGraph:
                             # request URL, not the response body (e.g. POST /products/{productName}).
                             value_expr = f"$request.path.{output_slot.path_parameter}"
                         elif output_slot.is_primitive_identifier:
-                            # Primitive identifier (e.g., string response from POST)
-                            # The whole response IS the identifier value
-                            value_expr = f"$response.body#{output_slot.pointer}"
+                            # Primitive identifier (e.g., string response from POST,
+                            # or an array of identifier strings from GET /collection).
+                            pointer = output_slot.pointer
+                            if output_slot.cardinality == Cardinality.MANY:
+                                pointer = pointer.rstrip("/") + "/0"
+                            value_expr = f"$response.body#{pointer}"
                         elif input_slot.resource_field is not None:
                             body_pointer = extend_pointer(
                                 output_slot.pointer, input_slot.resource_field, output_slot.cardinality

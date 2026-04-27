@@ -604,7 +604,15 @@
     },
     "GET /stats/categories": {
       "inputs": [],
-      "outputs": []
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": true,
+          "pointer": "/",
+          "resource": "Category",
+          "status_code": "200"
+        }
+      ]
     },
     "GET /stats/game/advanced": {
       "inputs": [],
@@ -795,6 +803,12 @@
           "object"
         ]
       }
+    },
+    "Category": {
+      "fields": [
+        "id"
+      ],
+      "types": {}
     },
     "Coach": {
       "fields": [

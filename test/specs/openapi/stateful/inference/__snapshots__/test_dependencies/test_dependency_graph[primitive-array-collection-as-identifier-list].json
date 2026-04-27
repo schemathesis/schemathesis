@@ -1,0 +1,49 @@
+{
+  "operations": {
+    "DELETE /products/{productName}/features/{featureName}": {
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "productName",
+          "resource": "Product",
+          "resource_field": "productName"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "featureName",
+          "resource": "Feature",
+          "resource_field": "featureName"
+        }
+      ],
+      "outputs": []
+    },
+    "GET /products": {
+      "inputs": [],
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": true,
+          "pointer": "/",
+          "resource": "Product",
+          "status_code": "200"
+        }
+      ]
+    }
+  },
+  "resources": {
+    "Feature": {
+      "fields": [
+        "featureName"
+      ],
+      "types": {}
+    },
+    "Product": {
+      "fields": [
+        "productName"
+      ],
+      "types": {}
+    }
+  }
+}

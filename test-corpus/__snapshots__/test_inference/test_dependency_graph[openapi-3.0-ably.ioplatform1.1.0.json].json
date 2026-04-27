@@ -199,7 +199,15 @@
     },
     "GET /push/channels": {
       "inputs": [],
-      "outputs": []
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": true,
+          "pointer": "/",
+          "resource": "Channel",
+          "status_code": "2XX"
+        }
+      ]
     },
     "GET /push/deviceRegistrations": {
       "inputs": [
@@ -303,7 +311,15 @@
     },
     "GET /time": {
       "inputs": [],
-      "outputs": []
+      "outputs": [
+        {
+          "cardinality": "MANY",
+          "is_primitive_identifier": true,
+          "pointer": "/",
+          "resource": "Time",
+          "status_code": "2XX"
+        }
+      ]
     },
     "PATCH /push/deviceRegistrations/{device_id}": {
       "inputs": [
@@ -492,6 +508,12 @@
     }
   },
   "resources": {
+    "Channel": {
+      "fields": [
+        "id"
+      ],
+      "types": {}
+    },
     "ChannelDetails": {
       "fields": [
         "channelId",
@@ -700,6 +722,12 @@
     },
     "Stat": {
       "fields": [],
+      "types": {}
+    },
+    "Time": {
+      "fields": [
+        "id"
+      ],
       "types": {}
     },
     "TokenDetails": {
