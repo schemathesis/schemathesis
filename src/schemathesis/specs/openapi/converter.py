@@ -65,8 +65,8 @@ def _to_json_schema(
     upgrade_legacy_exclusive_bounds: bool = False,
     name_to_uri: dict[str, str] | None = None,
 ) -> JsonSchema:
-    if isinstance(schema, bool):
-        return schema
+    if not isinstance(schema, dict):
+        return schema if isinstance(schema, bool) else {}
 
     if upgrade_legacy_exclusive_bounds:
         _upgrade_legacy_exclusive_bounds(schema)
@@ -305,13 +305,13 @@ def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, An
         schema.pop("properties", None)
 
 
-def is_write_only(schema: dict[str, Any] | bool) -> bool:
-    if isinstance(schema, bool):
+def is_write_only(schema: Any) -> bool:
+    if not isinstance(schema, dict):
         return False
     return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
 
 
-def is_read_only(schema: dict[str, Any] | bool) -> bool:
-    if isinstance(schema, bool):
+def is_read_only(schema: Any) -> bool:
+    if not isinstance(schema, dict):
         return False
     return schema.get("readOnly", False)

@@ -5,6 +5,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for body-level type mutations on `multipart/form-data` endpoints. [#3801](https://github.com/schemathesis/schemathesis/issues/3801)
+- Crash on schemas with non-schema values inside `properties` (e.g. an integer where a sub-schema is expected).
 
 ### :wrench: Changed
 
