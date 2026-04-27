@@ -11,6 +11,7 @@
 - `HypothesisRefResolutionError` when a `$ref` and its target both have distinct `anyOf` lists.
 - Report malformed sub-schemas (e.g. `description: null`) as a clean schema error.
 - `Unsatisfiable` for arrays with `allOf` of multiple `contains` requiring distinct `const` values.
+- Operation scheduling respects RESTful method priority even when all operations collapse into one layer.
 
 ### :wrench: Changed
 

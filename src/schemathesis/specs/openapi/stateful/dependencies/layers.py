@@ -5,23 +5,16 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from typing import TYPE_CHECKING
 
+from schemathesis.core.transport import restful_method_priority
+
 if TYPE_CHECKING:
     from .models import DependencyGraph
 
 
 def _restful_order_key(label: str) -> tuple[int, str]:
-    """Sort by HTTP method priority, then alphabetically.
-
-    Priority: POST/PUT (0) -> GET/PATCH/HEAD/OPTIONS/QUERY (1) -> DELETE/others (2)
-    """
-    method = label.split()[0].upper()
-    if method in ("POST", "PUT"):
-        priority = 0
-    elif method in ("GET", "PATCH", "HEAD", "OPTIONS", "QUERY"):
-        priority = 1
-    else:
-        priority = 2
-    return priority, label
+    """Sort by HTTP method priority, then alphabetically by full label."""
+    method = label.split(maxsplit=1)[0]
+    return restful_method_priority(method), label
 
 
 def compute_dependency_layers(graph: DependencyGraph) -> list[list[str]] | None:

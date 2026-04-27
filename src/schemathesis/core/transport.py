@@ -253,3 +253,19 @@ def status_code_matches(pattern: str, response_code: int) -> bool:
 
     """
     return pattern == str(response_code) or pattern == "default" or response_code in expand_status_code(pattern)
+
+
+# RESTful execution priority: producers (0) before readers (1); deleters/others last (2).
+_RESTFUL_METHOD_PRIORITY = {
+    "POST": 0,
+    "PUT": 0,
+    "GET": 1,
+    "PATCH": 1,
+    "HEAD": 1,
+    "OPTIONS": 1,
+    "QUERY": 1,
+}
+
+
+def restful_method_priority(method: str) -> int:
+    return _RESTFUL_METHOD_PRIORITY.get(method.upper(), 2)

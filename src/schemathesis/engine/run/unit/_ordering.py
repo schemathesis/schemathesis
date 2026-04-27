@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable
 from typing import TYPE_CHECKING
+
+from schemathesis.core.transport import restful_method_priority
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -51,23 +54,14 @@ def _compute_restful_layers(operations: Iterable[APIOperation]) -> list[list[API
         Empty layers are omitted.
 
     """
-    layer_0: list[APIOperation] = []  # POST, PUT
-    layer_1: list[APIOperation] = []  # GET, PATCH, HEAD, OPTIONS, QUERY
-    layer_2: list[APIOperation] = []  # DELETE + others (TRACE?)
-
+    by_priority: dict[int, list[APIOperation]] = defaultdict(list)
     for op in operations:
-        method_upper = op.method.upper()
-        if method_upper in ("POST", "PUT"):
-            layer_0.append(op)
-        elif method_upper in ("GET", "PATCH", "HEAD", "OPTIONS", "QUERY"):
-            layer_1.append(op)
-        else:
-            layer_2.append(op)
+        by_priority[restful_method_priority(op.method)].append(op)
 
     result: list[list[APIOperation]] = []
     # Sort each layer for so the execution order is deterministic
-    for layer in [layer_0, layer_1, layer_2]:
-        if layer:
-            layer.sort(key=lambda op: (op.path, op.method))
-            result.append(layer)
+    for priority in sorted(by_priority):
+        layer = by_priority[priority]
+        layer.sort(key=lambda op: (op.path, op.method))
+        result.append(layer)
     return result

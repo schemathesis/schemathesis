@@ -4,6 +4,9 @@ from queue import Queue
 import pytest
 
 import schemathesis
+from schemathesis.engine.context import EngineContext
+from schemathesis.engine.run import Phase, PhaseName
+from schemathesis.engine.run.unit import _create_scheduler
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._ordering import compute_operation_layers
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
@@ -564,3 +567,57 @@ def test_cycle_detection_inferred_dependencies(ctx, operations, expected_layers)
     assert len(layers) == len(expected_layers)
     for i, expected_layer in enumerate(expected_layers):
         assert set(layers[i]) == expected_layer
+
+
+def test_create_scheduler_respects_layer_order_for_single_layer(ctx):
+    # Methods listed GET-first to demonstrate that schema-iteration order does
+    # not happen to match the desired RESTful order. The scheduler should
+    # follow the layer's POST-first sort regardless of dict order.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/products/{productName}": {
+                "get": {
+                    "operationId": "getProduct",
+                    "parameters": [
+                        {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["name"],
+                                        "properties": {"name": {"type": "string"}},
+                                    }
+                                }
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                },
+                "post": {
+                    "operationId": "createProduct",
+                    "parameters": [
+                        {"name": "productName", "in": "path", "required": True, "schema": {"type": "string"}}
+                    ],
+                    "responses": {"201": {"description": "Created"}},
+                },
+            }
+        }
+    )
+    loaded = schemathesis.openapi.from_dict(schema_dict)
+
+    engine = EngineContext(schema=loaded, stop_event=threading.Event())
+    phase = Phase(name=PhaseName.FUZZING, is_supported=True, is_enabled=True)
+
+    scheduler = _create_scheduler(engine, phase)
+
+    dispatched: list[str] = []
+    while True:
+        result = scheduler.next_operation()
+        if result is None:
+            break
+        dispatched.append(result.ok().label)
+    assert dispatched == ["POST /products/{productName}", "GET /products/{productName}"]
