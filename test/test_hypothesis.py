@@ -11,6 +11,7 @@ from hypothesis_jsonschema import _canonicalise as canonicalise
 
 import schemathesis
 from schemathesis.core import NOT_SET
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples, setup
@@ -594,6 +595,36 @@ def test_as_strategy_example_resolves_bundled_refs(tmp_path):
     )
     result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, check=False)
     assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+
+
+def test_invalid_schema_for_malformed_subschema(ctx):
+    # `description: null` violates JSON Schema; surface it as InvalidSchema rather than a raw validator error.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/probe": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {"field": {"$ref": "#/components/schemas/Bad"}},
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={"schemas": {"Bad": {"type": "string", "description": None}}},
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+
+    with pytest.raises(InvalidSchema, match="description"):
+        examples.generate_one(schema["/probe"]["POST"].as_strategy())
 
 
 @pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])

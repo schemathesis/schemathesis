@@ -10,6 +10,7 @@
 - `Unsatisfiable` for string schemas combining `format: regex` with a `pattern` that excludes regex metacharacters.
 - Crash on `$ref` with sibling keywords when exploring the Python API outside the pytest runner.
 - `HypothesisRefResolutionError` when a `$ref` and its target both have distinct `anyOf` lists.
+- Report malformed sub-schemas (e.g. `description: null`) as a clean schema error.
 
 ### :wrench: Changed
 
