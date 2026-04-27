@@ -7,7 +7,6 @@
 - False positive `negative_data_rejection` for body-level type mutations on `multipart/form-data` endpoints. [#3801](https://github.com/schemathesis/schemathesis/issues/3801)
 - Crash on schemas with non-schema values inside `properties` (e.g. an integer where a sub-schema is expected).
 - Cascading generation failures after one schema corrupted shared `hypothesis-jsonschema` constants in the same process.
-- `Unsatisfiable` for string schemas combining `format: regex` with a `pattern` that excludes regex metacharacters.
 - Crash on `$ref` with sibling keywords when exploring the Python API outside the pytest runner.
 - `HypothesisRefResolutionError` when a `$ref` and its target both have distinct `anyOf` lists.
 - Report malformed sub-schemas (e.g. `description: null`) as a clean schema error.
