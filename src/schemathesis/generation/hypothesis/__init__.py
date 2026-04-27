@@ -9,6 +9,7 @@ from typing import Any, Literal
 def setup() -> None:
     import jsonschema_rs
     from hypothesis import core as root_core
+    from hypothesis.errors import InvalidArgument
     from hypothesis.internal.conjecture import engine
     from hypothesis.internal.entropy import deterministic_PRNG
     from hypothesis.internal.reflection import is_first_param_referenced_in_function
@@ -20,6 +21,7 @@ def setup() -> None:
     from hypothesis_jsonschema._resolve import LocalResolver
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
+    from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS, REFERENCE_TO_BUNDLE_PREFIX
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
@@ -247,7 +249,12 @@ def setup() -> None:
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="Overriding standard format", category=Warning)
-            strategy = _original_from_schema(schema, alphabet=alphabet, custom_formats=custom_formats)
+            try:
+                strategy = _original_from_schema(schema, alphabet=alphabet, custom_formats=custom_formats)
+            except InvalidArgument as exc:
+                if isinstance(schema, dict) and schema.get("$schema") == "http://json-schema.org/draft-03/schema#":
+                    raise InvalidSchema("Draft-03 JSON Schema is not supported") from exc
+                raise
 
         if key is not None:
             _from_schema_cache_set(key, strategy)
