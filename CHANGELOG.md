@@ -9,6 +9,7 @@
 ### :wrench: Changed
 
 - Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
+- Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
 
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 

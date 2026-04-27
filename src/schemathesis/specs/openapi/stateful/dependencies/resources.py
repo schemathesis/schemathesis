@@ -352,7 +352,7 @@ def _extract_resource_from_schema(
             return None
 
         properties = resolved.get("properties")
-        if properties:
+        if isinstance(properties, dict) and properties:
             fields = sorted(properties)
             types = {}
             for field, subschema in properties.items():

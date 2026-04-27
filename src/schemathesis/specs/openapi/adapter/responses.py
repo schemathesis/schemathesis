@@ -237,9 +237,15 @@ class OpenApiResponses:
 
     def iter_successful_responses(self) -> Iterator[OpenApiResponse]:
         """Iterate over all response definitions for successful responses."""
+        has_explicit_success = False
         for response in self._inner.values():
             if response.status_code.startswith("2"):
+                has_explicit_success = True
                 yield response
+        if not has_explicit_success:
+            default = self._inner.get("default")
+            if default is not None:
+                yield default
 
     def iter_examples(self) -> Iterator[tuple[str, object]]:
         """Iterate over all examples for all responses."""

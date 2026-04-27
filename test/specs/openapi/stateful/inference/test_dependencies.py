@@ -3036,6 +3036,46 @@ def snapshot_json(snapshot):
             None,
             id="cross-namespace-collision-bare-id",
         ),
+        pytest.param(
+            {
+                "/products/{productName}": {
+                    "post": {
+                        "operationId": "createProduct",
+                        "parameters": [
+                            {
+                                "name": "productName",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            }
+                        ],
+                        "responses": {"201": {"description": "Created"}},
+                    },
+                },
+                "/products/{productName}/features/{featureName}": {
+                    "delete": {
+                        "operationId": "deleteFeature",
+                        "parameters": [
+                            {
+                                "name": "productName",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            },
+                            {
+                                "name": "featureName",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            },
+                        ],
+                        "responses": {"204": {"description": "Deleted"}},
+                    },
+                },
+            },
+            None,
+            id="post-creates-resource-keyed-by-path-param",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):

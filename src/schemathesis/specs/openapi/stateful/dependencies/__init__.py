@@ -64,15 +64,18 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
         if isinstance(result, Ok):
             operation = result.ok()
             try:
-                inputs = extract_inputs(
-                    operation=operation,
-                    resources=resources,
-                    updated_resources=updated_resources,
-                    resolver=schema.resolver,
-                    canonicalization_cache=canonicalization_cache,
+                inputs = list(
+                    extract_inputs(
+                        operation=operation,
+                        resources=resources,
+                        updated_resources=updated_resources,
+                        resolver=schema.resolver,
+                        canonicalization_cache=canonicalization_cache,
+                    )
                 )
                 outputs = extract_outputs(
                     operation=operation,
+                    inputs=inputs,
                     resources=resources,
                     updated_resources=updated_resources,
                     resolver=schema.resolver,
@@ -81,7 +84,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                 operations[operation.label] = OperationNode(
                     method=operation.method,
                     path=operation.path,
-                    inputs=list(inputs),
+                    inputs=inputs,
                     outputs=list(outputs),
                 )
             except RefResolutionError:
