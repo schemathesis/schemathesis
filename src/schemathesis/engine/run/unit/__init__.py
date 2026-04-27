@@ -27,7 +27,8 @@ from schemathesis.core.errors import (
     InvalidSchema,
     is_regex_validation_error,
 )
-from schemathesis.core.result import Ok, Result
+from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.transport import restful_method_priority
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
@@ -86,9 +87,16 @@ def _create_scheduler(engine: EngineContext, phase: Phase) -> DefaultScheduler |
 
     layers = compute_operation_layers(engine.schema, successes)
 
-    # If only one layer or no layers, no coordination needed - use default scheduler
-    if len(layers) <= 1:
+    if not layers:
         return DefaultScheduler(operations=operations)
+
+    if len(layers) == 1:
+        # Stable-sort by RESTful priority so producers dispatch before consumers
+        # without reordering same-priority operations against each other.
+        ordered_successes = sorted(successes, key=lambda op: restful_method_priority(op.method))
+        ordered: list[Result[APIOperation, InvalidSchema]] = [Ok(op) for op in ordered_successes]
+        ordered.extend(Err(err) for err in errors)
+        return DefaultScheduler(operations=ordered)
 
     # Pass errors so they are reported after all successful operations are processed
     return LayeredScheduler(layers, errors=errors)
