@@ -21,6 +21,7 @@
 - Report malformed sub-schemas (e.g. `description: null`) as a clean schema error.
 - `Unsatisfiable` for arrays with `allOf` of multiple `contains` requiring distinct `const` values.
 - Operation scheduling respects RESTful method priority even when all operations collapse into one layer.
+- Draft-03 schemas surface as a clean `InvalidSchema` instead of a generic `InvalidArgument` from the strategy generator.
 
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 

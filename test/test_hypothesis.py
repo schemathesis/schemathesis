@@ -196,6 +196,36 @@ def test_get_validator_class_falls_back_to_older_drafts_for_tuple_items():
     assert canonicalise._get_validator_class(schema) is jsonschema_rs.Draft7Validator
 
 
+def test_draft_03_raises_invalid_schema(ctx):
+    body = {
+        "$schema": "http://json-schema.org/draft-03/schema#",
+        "type": "object",
+        "properties": {"name": {"type": "string"}},
+    }
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": body}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+
+    @given(schema["/data"]["POST"].as_strategy())
+    @settings(max_examples=1, deadline=None, database=InMemoryExampleDatabase())
+    def test(case):
+        pass
+
+    with pytest.raises(InvalidSchema, match="Draft-03"):
+        test()
+
+
 def test_canonicalise_constants_restored_after_polluting_schema(ctx):
     # hypothesis-jsonschema's FALSEY/TRUTHY are shared mutable globals that get
     # clobbered during generation; schemathesis must restore them.
