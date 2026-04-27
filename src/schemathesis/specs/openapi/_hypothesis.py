@@ -67,6 +67,18 @@ StrategyFactory = Callable[
 ]
 
 
+def _draw(draw: st.DrawFn, strategy: st.SearchStrategy, operation: APIOperation) -> Any:
+    try:
+        return draw(strategy)
+    except jsonschema_rs.ValidationError as exc:
+        raise InvalidSchema.from_jsonschema_error(
+            exc,
+            path=operation.path,
+            method=operation.method,
+            config=operation.schema.config.output,
+        ) from None
+
+
 @st.composite  # type: ignore[untyped-decorator]
 def openapi_cases(
     draw: st.DrawFn,
@@ -226,7 +238,7 @@ def openapi_cases(
                     ).filter(lambda x: is_valid_urlencoded_form(x.value if isinstance(x, GeneratedValue) else x))
                 else:
                     strategy = strategy.map(prepare_urlencoded_form).filter(is_valid_urlencoded_form)
-            body_result = draw(strategy)
+            body_result = _draw(draw, strategy, operation)
             body_metadata = None
             # Negative strategy returns GeneratedValue, positive returns just value
             if isinstance(body_result, GeneratedValue):
@@ -625,7 +637,7 @@ def get_parameters_value(
             mix_examples=mix_examples,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
-        result = draw(strategy)
+        result = _draw(draw, strategy, operation)
         # Negative strategy returns GeneratedValue, positive returns just value
         if isinstance(result, GeneratedValue):
             return result.value, result.meta
@@ -640,7 +652,7 @@ def get_parameters_value(
         mix_examples=mix_examples,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
-    new = draw(strategy)
+    new = _draw(draw, strategy, operation)
     metadata = None
     # Negative strategy returns GeneratedValue, positive returns just value
     if isinstance(new, GeneratedValue):
