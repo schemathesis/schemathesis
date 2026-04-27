@@ -116,8 +116,16 @@ class Bundler:
                         inlining_for_recursion.add(resolved_uri)
                         try:
                             cloned = deepclone(resolved_schema)
+
+                            def _is_recursive(ref: str, _resolver: RefResolver = resolver) -> bool:
+                                try:
+                                    target_uri, _ = _resolver.resolve(ref)
+                                except Exception:
+                                    return False
+                                return target_uri in inlining_for_recursion
+
                             # Sanitize to remove optional recursive references
-                            sanitize(cloned)
+                            sanitize(cloned, is_recursive_ref=_is_recursive)
 
                             result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
                             bundled_clone = _bundle_recursive(cloned)

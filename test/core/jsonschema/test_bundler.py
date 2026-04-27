@@ -511,6 +511,54 @@ def test_bundle_self_recursion_through_pattern_properties_is_breakable():
     bundle(schema, resolver, inline_recursive=True)
 
 
+def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
+    # `oneOf` with one branch terminating (`simpleConfigType`) and one self-referential
+    # is breakable — pick the terminating branch.
+    schema = {"$ref": "#/definitions/configItemsType"}
+    store = {
+        "definitions": {
+            "simpleConfigType": {"type": "string"},
+            "configItemsType": {
+                "type": "object",
+                "required": ["type"],
+                "properties": {
+                    "type": {
+                        "oneOf": [
+                            {"$ref": "#/definitions/simpleConfigType"},
+                            {"$ref": "#/definitions/configItemsType"},
+                        ]
+                    }
+                },
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    bundle(schema, resolver, inline_recursive=True)
+
+
+def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
+    # `allOf: [{$ref: self}, {properties: ...}]` — the self-ref entry is trivially
+    # satisfied (any X validating S also validates `{$ref: S}`), so it should be dropped.
+    schema = {"$ref": "#/definitions/Node"}
+    store = {
+        "definitions": {
+            "Node": {
+                "type": "object",
+                "allOf": [
+                    {"$ref": "#/definitions/Node"},
+                    {"properties": {"name": {"type": "string"}}},
+                ],
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    bundle(schema, resolver, inline_recursive=True)
+
+
 def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
     # `KitNode -> KitContainer.children.patternProperties -> KitNode` is breakable:
     # `oneOf` allows the non-recursive `KitItem` branch, and `children: {}` validates
