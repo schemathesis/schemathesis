@@ -3115,6 +3115,44 @@ def snapshot_json(snapshot):
             None,
             id="primitive-array-collection-as-identifier-list",
         ),
+        pytest.param(
+            {
+                "/products": {
+                    "post": {
+                        "operationId": "createProduct",
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "required": ["productName"],
+                                        "properties": {"productName": {"type": "string"}},
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"201": {"description": "Created"}},
+                    },
+                },
+                "/products/{productName}": {
+                    "get": {
+                        "operationId": "getProduct",
+                        "parameters": [
+                            {
+                                "name": "productName",
+                                "in": "path",
+                                "required": True,
+                                "schema": {"type": "string"},
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    },
+                },
+            },
+            None,
+            id="body-field-name-suffix-on-collection-path",
+        ),
     ],
 )
 def test_dependency_graph(request, ctx, paths, components, snapshot_json):
