@@ -52,7 +52,7 @@ def build_descriptors(schema: OpenApiSchema) -> Sequence[ResourceDescriptor]:
         )
         for label, operation in graph.operations.items()
         for output in operation.outputs
-        # Path-keyed outputs only inform link inference - they have no response
-        # body to extract resource instances from.
-        if output.path_parameter is None
+        # Path-keyed and body-keyed outputs only inform link inference - they
+        # have no response body to extract resource instances from.
+        if output.path_parameter is None and output.body_field is None
     )

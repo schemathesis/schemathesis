@@ -38,6 +38,8 @@ class DependencyGraph:
                 output["resource"] = output["resource"]["name"]
                 if output.get("path_parameter") is None:
                     output.pop("path_parameter", None)
+                if output.get("body_field") is None:
+                    output.pop("body_field", None)
 
         for resource in serialized["resources"].values():
             del resource["name"]
@@ -128,6 +130,10 @@ class DependencyGraph:
                             # Path-keyed producer: the resource value lives in the producer's
                             # request URL, not the response body (e.g. POST /products/{productName}).
                             value_expr = f"$request.path.{output_slot.path_parameter}"
+                        elif output_slot.body_field is not None:
+                            # Body-keyed producer: the resource value lives in the producer's
+                            # request body (e.g. POST /sessions with body {sessionId: ...}).
+                            value_expr = f"$request.body#/{output_slot.body_field}"
                         elif output_slot.is_primitive_identifier:
                             # Primitive identifier (e.g., string response from POST,
                             # or an array of identifier strings from GET /collection).
@@ -214,8 +220,8 @@ class DependencyGraph:
                 # Skip primitive identifiers (they don't have FK fields)
                 if output_slot.is_primitive_identifier:
                     continue
-                # Skip path-keyed outputs (no response body to extract FK fields from)
-                if output_slot.path_parameter is not None:
+                # Skip path-keyed and body-keyed outputs (no response body to extract FK fields from)
+                if output_slot.path_parameter is not None or output_slot.body_field is not None:
                     continue
 
                 resource = output_slot.resource
@@ -681,6 +687,10 @@ class OutputSlot:
     # than the response body (POST/PUT to `/products/{productName}` confirms
     # the product exists once the response is 2xx).
     path_parameter: str | None = None
+    # Set when the resource value comes from a request body field rather than
+    # the response body (POST `/sessions {sessionId: ...}` confirms the session
+    # exists once the response is 2xx).
+    body_field: str | None = None
 
 
 @dataclass(slots=True)

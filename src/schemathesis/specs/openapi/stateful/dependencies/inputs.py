@@ -142,14 +142,20 @@ def _resolve_parameter_dependency(
             field = parameter_name
     else:
         # Match parameter to resource field (`userId` -> `id`, `Id` -> `ChannelId`, etc.)
-        field = (
-            naming.find_matching_field(
-                parameter=parameter_name,
-                resource=resource_name,
-                fields=resource.fields,
-            )
-            or "id"
+        matched = naming.find_matching_field(
+            parameter=parameter_name,
+            resource=resource_name,
+            fields=resource.fields,
         )
+        if matched is not None:
+            field = matched
+        elif "id" in resource.fields:
+            # Conventional fallback: `<resource>Id` parameters point at the resource's `id` field.
+            field = "id"
+        else:
+            # Resource has no `id` field — use the parameter name itself so request-pool
+            # captures from peer operations land in the same field this slot will read.
+            field = parameter_name
 
     return InputSlot(
         resource=resource,

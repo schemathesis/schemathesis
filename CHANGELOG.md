@@ -5,8 +5,10 @@
 ### :rocket: Added
 
 - Capture path-parameter values from successful 2xx requests for reuse during fuzzing.
+- Capture request-body field values from successful 2xx requests for reuse during fuzzing.
 - Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
 - Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
+- Dependency inference treats `POST /collection {idField: ...}` as a producer when the response has no body.
 - Dependency inference recognizes `GET /collection` returning an array of identifier strings.
 
 ### :bug: Fixed

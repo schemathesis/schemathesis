@@ -458,6 +458,14 @@
           "pointer": "/push.recipient",
           "resource": "Recipient",
           "status_code": "2XX"
+        },
+        {
+          "body_field": "id",
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "",
+          "resource": "DeviceRegistration",
+          "status_code": "2XX"
         }
       ]
     },
