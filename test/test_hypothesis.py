@@ -453,6 +453,40 @@ def test_non_schema_property_value(ctx):
     test()
 
 
+def test_regex_format_with_restrictive_pattern(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "regex",
+                                    "pattern": "^[a-zA-Z0-9_-]+$",
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/data"]["POST"]
+
+    @given(operation.as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    test()
+
+
 @pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.build_schema(
