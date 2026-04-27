@@ -511,9 +511,68 @@ def test_bundle_self_recursion_through_pattern_properties_is_breakable():
     bundle(schema, resolver, inline_recursive=True)
 
 
+def test_bundle_self_cycle_through_dead_definitions_block():
+    # Self-referential `definitions` entries are unreachable once optional properties
+    # are pruned, so they should not surface as `InfiniteRecursiveReference`.
+    schema = {"$ref": "#/definitions/Meta"}
+    store = {
+        "definitions": {
+            "Meta": {
+                "type": "object",
+                "definitions": {
+                    "schemaArray": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {"$ref": "#/definitions/Meta"},
+                    },
+                },
+                "properties": {
+                    "allOf": {"$ref": "#/definitions/Meta/definitions/schemaArray"},
+                    "items": {"$ref": "#/definitions/Meta"},
+                },
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    bundle(schema, resolver, inline_recursive=True)
+
+
+def test_bundle_oneof_with_indirectly_recursive_branch_skips_it():
+    # An `oneOf` variant whose body cycles back through a deeper required path is
+    # breakable when at least one terminating variant remains.
+    schema = {"$ref": "#/definitions/Types"}
+    store = {
+        "definitions": {
+            "Types": {
+                "oneOf": [
+                    {"$ref": "#/definitions/PrimitiveType"},
+                    {"$ref": "#/definitions/Record"},
+                ]
+            },
+            "PrimitiveType": {"type": "string", "enum": ["int", "string"]},
+            "Record": {
+                "type": "object",
+                "required": ["fields"],
+                "properties": {
+                    "fields": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {"$ref": "#/definitions/Types"},
+                    }
+                },
+            },
+        }
+    }
+
+    resolver = RefResolver.from_schema(store)
+
+    bundle(schema, resolver, inline_recursive=True)
+
+
 def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
-    # `oneOf` with one branch terminating (`simpleConfigType`) and one self-referential
-    # is breakable — pick the terminating branch.
+    # `oneOf` with a non-recursive variant alongside a self-`$ref` is breakable.
     schema = {"$ref": "#/definitions/configItemsType"}
     store = {
         "definitions": {
@@ -539,8 +598,8 @@ def test_bundle_oneof_with_self_ref_picks_non_recursive_branch():
 
 
 def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
-    # `allOf: [{$ref: self}, {properties: ...}]` — the self-ref entry is trivially
-    # satisfied (any X validating S also validates `{$ref: S}`), so it should be dropped.
+    # A self-`$ref` in the schema's own top-level `allOf` is trivially satisfied,
+    # so it should not turn the schema into an unbreakable cycle.
     schema = {"$ref": "#/definitions/Node"}
     store = {
         "definitions": {
@@ -560,9 +619,8 @@ def test_bundle_allof_with_self_ref_drops_trivial_self_constraint():
 
 
 def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
-    # `KitNode -> KitContainer.children.patternProperties -> KitNode` is breakable:
-    # `oneOf` allows the non-recursive `KitItem` branch, and `children: {}` validates
-    # because `patternProperties` has no `minProperties`.
+    # Mutual cycle terminated by an empty object that satisfies `patternProperties`
+    # (no `minProperties`) and an `oneOf` branch that doesn't recurse.
     schema = {"$ref": "#/definitions/KitNode"}
     store = {
         "definitions": {

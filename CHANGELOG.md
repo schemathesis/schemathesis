@@ -25,7 +25,7 @@
 - Operation scheduling respects RESTful method priority even when all operations collapse into one layer.
 - Draft-03 schemas surface as a clean `InvalidSchema` instead of a generic `InvalidArgument` from the strategy generator.
 - False `InfiniteRecursiveReference` on cycles breakable through `patternProperties`.
-- False `InfiniteRecursiveReference` on cycles breakable through an `oneOf`/`anyOf` branch or a self-`$ref` in top-level `allOf`.
+- False `InfiniteRecursiveReference` on cycles breakable through `oneOf`/`anyOf`, top-level `allOf`, or unused `definitions`.
 
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 

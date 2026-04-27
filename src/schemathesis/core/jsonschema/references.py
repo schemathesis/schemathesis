@@ -28,6 +28,12 @@ def sanitize(schema: JsonSchema, *, is_recursive_ref: Callable[[str], bool] | No
         if not isinstance(current, dict):
             continue
 
+        # `definitions` / `$defs` are storage for ref targets, not validation constraints.
+        # Active refs still resolve through the resolver, so dropping these blocks avoids
+        # walking $refs that have already been pruned from optional positions.
+        current.pop("definitions", None)
+        current.pop("$defs", None)
+
         _sanitize_combinators(current, is_recursive_ref)
 
         _sanitize_properties(current)
