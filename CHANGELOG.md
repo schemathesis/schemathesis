@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.16.1...HEAD) - TBD
 
+### :bug: Fixed
+
+- False positive `negative_data_rejection` for body-level type mutations on `multipart/form-data` endpoints. [#3801](https://github.com/schemathesis/schemathesis/issues/3801)
+
 ### :wrench: Changed
 
 - Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
