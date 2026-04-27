@@ -295,7 +295,9 @@ def _detect_hal_embedded(schema: Mapping[str, Any]) -> str | None:
 
     Spring Data REST uses: {_embedded: {users: [...]}}
     """
-    properties = schema.get("properties", {})
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return None
     embedded = properties.get("_embedded")
 
     if not isinstance(embedded, dict):
@@ -316,9 +318,8 @@ def _is_pagination_wrapper(
     schema: Mapping[str, Any], path: str, parent_ref: str | None, resolver: RefResolver
 ) -> str | None:
     """Detect if schema is a pagination wrapper."""
-    properties = schema.get("properties", {})
-
-    if not properties:
+    properties = schema.get("properties")
+    if not isinstance(properties, dict) or not properties:
         return None
 
     metadata_fields = frozenset(["links", "errors"])
@@ -432,9 +433,8 @@ def _detect_externally_tagged_pattern(
         - GET /users -> {"Users": [...]} or {"users": [...]}
 
     """
-    properties = schema.get("properties", {})
-
-    if not properties:
+    properties = schema.get("properties")
+    if not isinstance(properties, dict) or not properties:
         return None
 
     resource_name = naming.from_path(path)

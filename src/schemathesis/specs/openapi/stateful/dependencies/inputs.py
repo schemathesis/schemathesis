@@ -290,7 +290,9 @@ def _resolve_body_dependencies(
             )
 
     # Inspect each property that could be a part of some other resource
-    properties = resolved.get("properties", {})
+    properties = resolved.get("properties")
+    if not isinstance(properties, dict):
+        return
     required = resolved.get("required", [])
     path = operation.path
     for property_name, subschema in properties.items():
@@ -366,7 +368,9 @@ def _extract_nested_body_fk_fields(
     if max_depth <= 0:
         return
 
-    properties = schema.get("properties", {})
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return
 
     for property_name, subschema in properties.items():
         if not isinstance(subschema, dict):

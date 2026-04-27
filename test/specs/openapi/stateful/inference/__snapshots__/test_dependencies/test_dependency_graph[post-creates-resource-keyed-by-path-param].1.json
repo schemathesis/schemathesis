@@ -1,0 +1,17 @@
+[
+  [
+    "201",
+    "#/paths/~1products~1{productName}/post",
+    {
+      "DeleteProduct": {
+        "operationRef": "#/paths/~1products~1{productName}~1features~1{featureName}/delete",
+        "parameters": {
+          "path.productName": "$request.path.productName"
+        },
+        "x-schemathesis": {
+          "is_inferred": true
+        }
+      }
+    }
+  ]
+]

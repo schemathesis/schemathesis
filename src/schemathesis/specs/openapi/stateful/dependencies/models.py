@@ -36,6 +36,8 @@ class DependencyGraph:
                 input["resource"] = input["resource"]["name"]
             for output in operation["outputs"]:
                 output["resource"] = output["resource"]["name"]
+                if output.get("path_parameter") is None:
+                    output.pop("path_parameter", None)
 
         for resource in serialized["resources"].values():
             del resource["name"]
@@ -122,31 +124,34 @@ class DependencyGraph:
                                 ):
                                     continue
 
-                        if output_slot.is_primitive_identifier:
+                        if output_slot.path_parameter is not None:
+                            # Path-keyed producer: the resource value lives in the producer's
+                            # request URL, not the response body (e.g. POST /products/{productName}).
+                            value_expr = f"$request.path.{output_slot.path_parameter}"
+                        elif output_slot.is_primitive_identifier:
                             # Primitive identifier (e.g., string response from POST)
                             # The whole response IS the identifier value
-                            body_pointer = output_slot.pointer
+                            value_expr = f"$response.body#{output_slot.pointer}"
                         elif input_slot.resource_field is not None:
                             body_pointer = extend_pointer(
                                 output_slot.pointer, input_slot.resource_field, output_slot.cardinality
                             )
+                            value_expr = f"$response.body#{body_pointer}"
                         else:
                             # No resource field means use the whole resource
-                            body_pointer = output_slot.pointer
+                            value_expr = f"$response.body#{output_slot.pointer}"
                         link_name = f"{consumer.method.capitalize()}{input_slot.resource.name}"
                         parameters = {}
                         request_body: dict[str, Any] | list = {}
                         # Data is extracted from response body
                         if input_slot.parameter_location == ParameterLocation.BODY:
                             if isinstance(input_slot.parameter_name, int):
-                                request_body = [f"$response.body#{body_pointer}"]
+                                request_body = [value_expr]
                             else:
-                                request_body = _build_nested_body(
-                                    input_slot.parameter_name, f"$response.body#{body_pointer}"
-                                )
+                                request_body = _build_nested_body(input_slot.parameter_name, value_expr)
                         else:
                             parameters = {
-                                f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": f"$response.body#{body_pointer}",
+                                f"{input_slot.parameter_location.value}.{input_slot.parameter_name}": value_expr,
                             }
                         existing = links.get(link_name)
                         if existing is not None:
@@ -205,6 +210,9 @@ class DependencyGraph:
             for output_slot in producer.outputs:
                 # Skip primitive identifiers (they don't have FK fields)
                 if output_slot.is_primitive_identifier:
+                    continue
+                # Skip path-keyed outputs (no response body to extract FK fields from)
+                if output_slot.path_parameter is not None:
                     continue
 
                 resource = output_slot.resource
@@ -438,7 +446,9 @@ def extract_nested_fk_fields(
     from schemathesis.specs.openapi.adapter.references import maybe_resolve
 
     result: list[NestedFKField] = []
-    properties = schema.get("properties", {})
+    properties = schema.get("properties")
+    if not isinstance(properties, dict):
+        return result
     for field_name, field_schema in properties.items():
         if not isinstance(field_schema, dict):
             continue
@@ -664,6 +674,10 @@ class OutputSlot:
     status_code: str
     # True when response is a bare primitive (string/int) rather than an object
     is_primitive_identifier: bool = False
+    # Set when the resource value comes from a request path parameter rather
+    # than the response body (POST/PUT to `/products/{productName}` confirms
+    # the product exists once the response is 2xx).
+    path_parameter: str | None = None
 
 
 @dataclass(slots=True)
