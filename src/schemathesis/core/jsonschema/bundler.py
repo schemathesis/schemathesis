@@ -71,12 +71,36 @@ class Bundler:
                 uri_to_name[uri] = name
             return name
 
+        def bundle_value(key: str, value: Any) -> Any:
+            """Walk a child value, with per-variant exception handling for `oneOf`/`anyOf`."""
+            if isinstance(value, list) and key in ("oneOf", "anyOf"):
+                survivors: list = []
+                last_error: InfiniteRecursiveReference | None = None
+                for item in value:
+                    if not isinstance(item, dict | list):
+                        survivors.append(item)
+                        continue
+                    try:
+                        survivors.append(bundle_recursive(item))
+                    except InfiniteRecursiveReference as exc:
+                        # The variant cycles back; drop it. Kept alternatives still
+                        # satisfy the original combinator. If none survive, re-raise —
+                        # the cycle is unbreakable.
+                        last_error = exc
+                if not survivors and last_error is not None:
+                    raise last_error
+                return survivors
+            if isinstance(value, dict | list):
+                return bundle_recursive(value)
+            return value
+
         def bundle_recursive(current: JsonSchema | list[JsonSchema]) -> JsonSchema | list[JsonSchema]:
             """Recursively process and bundle references in the current schema."""
             # Local lookup is cheaper and it matters for large schemas.
             # It works because this recursive call goes to every nested value
             nonlocal has_recursive_references
             _bundle_recursive = bundle_recursive
+            _bundle_value = bundle_value
             if isinstance(current, dict):
                 reference = current.get("$ref")
                 if isinstance(reference, str) and not reference.startswith(REFERENCE_TO_BUNDLE_PREFIX):
@@ -127,7 +151,7 @@ class Bundler:
                             # Sanitize to remove optional recursive references
                             sanitize(cloned, is_recursive_ref=_is_recursive)
 
-                            result = {key: _bundle_recursive(value) for key, value in current.items() if key != "$ref"}
+                            result = {key: _bundle_value(key, value) for key, value in current.items() if key != "$ref"}
                             bundled_clone = _bundle_recursive(cloned)
                             assert isinstance(bundled_clone, dict)
                             result.update(bundled_clone)
@@ -142,6 +166,12 @@ class Bundler:
                         resolver.push_scope(resolved_uri)
                         try:
                             bundled_resolved = _bundle_recursive(resolved_schema)
+                        except InfiniteRecursiveReference:
+                            # Undo `visit` so a sibling path can retry resolving this URI;
+                            # otherwise we'd emit `$ref: #/x-bundled/{def_name}` with no
+                            # entry in `defs`, leaving a dangling pointer in the bundle.
+                            visited.discard(resolved_uri)
+                            raise
                         finally:
                             resolver.pop_scope()
 
@@ -150,9 +180,7 @@ class Bundler:
                         return {
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
-                            else _bundle_recursive(value)
-                            if isinstance(value, dict | list)
-                            else value
+                            else _bundle_value(key, value)
                             for key, value in current.items()
                         }
                     else:
@@ -160,15 +188,10 @@ class Bundler:
                         return {
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
-                            else _bundle_recursive(value)
-                            if isinstance(value, dict | list)
-                            else value
+                            else _bundle_value(key, value)
                             for key, value in current.items()
                         }
-                return {
-                    key: _bundle_recursive(value) if isinstance(value, dict | list) else value
-                    for key, value in current.items()
-                }
+                return {key: _bundle_value(key, value) for key, value in current.items()}
             elif isinstance(current, list):
                 return [_bundle_recursive(item) if isinstance(item, dict | list) else item for item in current]  # type: ignore[misc]
             # `isinstance` guards won't let it happen
