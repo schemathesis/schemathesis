@@ -8,6 +8,7 @@
 - Crash on schemas with non-schema values inside `properties` (e.g. an integer where a sub-schema is expected).
 - Cascading generation failures after one schema corrupted shared `hypothesis-jsonschema` constants in the same process.
 - `Unsatisfiable` for string schemas combining `format: regex` with a `pattern` that excludes regex metacharacters.
+- Crash on `$ref` with sibling keywords when exploring the Python API outside the pytest runner.
 
 ### :wrench: Changed
 

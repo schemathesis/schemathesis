@@ -713,6 +713,9 @@ class APIOperation(Generic[P, R, S]):
             **kwargs: Extra arguments to the underlying strategy function.
 
         """
+        from schemathesis.generation.hypothesis import setup
+
+        setup()
         if self.schema.config.headers:
             headers = kwargs.setdefault("headers", {})
             headers.update(self.schema.config.headers)
