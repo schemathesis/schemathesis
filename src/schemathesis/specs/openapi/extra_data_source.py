@@ -12,7 +12,7 @@ from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.resources import ExtraDataSource
 from schemathesis.resources.repository import ResourceRepository
-from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph
+from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
 
 if TYPE_CHECKING:
     from random import Random
@@ -156,22 +156,39 @@ def build_parameter_requirements(graph: DependencyGraph) -> dict[RequirementKey,
     return requirements
 
 
+def build_inputs_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
+    """Index input slots by operation label for runtime lookup.
+
+    Only operations with at least one resource-bound slot are recorded; this
+    keeps the dict small and lets `should_record_request` short-circuit cheaply.
+    """
+    inputs_by_label: dict[str, list[InputSlot]] = {}
+    for label, operation in graph.operations.items():
+        slots = [slot for slot in operation.inputs if slot.resource_field is not None]
+        if slots:
+            inputs_by_label[label] = slots
+    return inputs_by_label
+
+
 @dataclass(slots=True)
 class OpenApiExtraDataSource(ExtraDataSource):
     """Provides extra data from captured API responses to augment parameter schemas."""
 
     repository: ResourceRepository
     requirements: dict[RequirementKey, ParameterRequirement]
+    inputs_by_label: dict[str, list[InputSlot]]
     usage_tracker: VariantUsageTracker
 
     def __init__(
         self,
         repository: ResourceRepository,
         requirements: dict[RequirementKey, ParameterRequirement],
+        inputs_by_label: dict[str, list[InputSlot]] | None = None,
         usage_tracker: VariantUsageTracker | None = None,
     ) -> None:
         self.repository = repository
         self.requirements = requirements
+        self.inputs_by_label = inputs_by_label if inputs_by_label is not None else {}
         self.usage_tracker = usage_tracker if usage_tracker is not None else VariantUsageTracker()
 
     def get_captured_variants(
@@ -280,6 +297,29 @@ class OpenApiExtraDataSource(ExtraDataSource):
     def should_record(self, *, operation: str) -> bool:
         """Check if responses should be recorded for this operation."""
         return bool(self.repository.descriptors_for_operation(operation))
+
+    def should_record_request(self, *, operation: str) -> bool:
+        """Check if request inputs should be captured for this operation."""
+        return operation in self.inputs_by_label
+
+    def record_request(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+        status_code: int,
+    ) -> None:
+        """Capture path-parameter and body-field values from a successful request."""
+        slots = self.inputs_by_label.get(operation.label)
+        if not slots:
+            return
+        self.repository.record_request(
+            operation=operation.label,
+            inputs=slots,
+            case=case,
+            status_code=status_code,
+            context=case.path_parameters or {},
+        )
 
     def record_response(
         self,

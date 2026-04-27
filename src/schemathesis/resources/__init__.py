@@ -18,6 +18,10 @@ class ExtraDataSource(Protocol):
         """Check if responses should be recorded for this operation."""
         ...  # pragma: no cover
 
+    def should_record_request(self, *, operation: str) -> bool:
+        """Check if request inputs should be captured for this operation."""
+        ...  # pragma: no cover
+
     def record_response(
         self,
         *,
@@ -26,6 +30,16 @@ class ExtraDataSource(Protocol):
         case: Case,
     ) -> None:
         """Record a response for later use in test generation."""
+        ...  # pragma: no cover
+
+    def record_request(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+        status_code: int,
+    ) -> None:
+        """Capture request inputs from a successful call."""
         ...  # pragma: no cover
 
     def record_successful_delete(
