@@ -487,6 +487,64 @@ def test_regex_format_with_restrictive_pattern(ctx):
     test()
 
 
+def test_as_strategy_example_resolves_bundled_refs(tmp_path):
+    # The public Python API path must work without prior CLI/pytest imports.
+    import subprocess
+    import sys
+    import textwrap
+
+    script = tmp_path / "probe.py"
+    script.write_text(
+        textwrap.dedent("""
+        import schemathesis
+
+        schema = {
+            "openapi": "3.0.0",
+            "info": {"title": "T", "version": "1.0.0"},
+            "paths": {
+                "/probe": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "outer": {
+                                                "$ref": "#/components/schemas/Outer",
+                                                "properties": {
+                                                    "inner": {"$ref": "#/components/schemas/Inner"}
+                                                },
+                                            }
+                                        },
+                                    }
+                                }
+                            },
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            "components": {
+                "schemas": {
+                    "Outer": {
+                        "type": "object",
+                        "properties": {"enabled": {"type": "boolean"}},
+                    },
+                    "Inner": {"type": "object", "properties": {"flag": {"type": "boolean"}}},
+                }
+            },
+        }
+        api = schemathesis.openapi.from_dict(schema)
+        case = api["/probe"]["POST"].as_strategy().example()
+        assert case is not None
+    """)
+    )
+    result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+
+
 @pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.build_schema(
