@@ -302,7 +302,7 @@ def _resolve_body_dependencies(
     required = resolved.get("required", [])
     path = operation.path
     for property_name, subschema in properties.items():
-        resource_name = naming.from_parameter(property_name, path)
+        resource_name = naming.from_parameter(property_name, path, body_field=True)
         if resource_name is not None:
             resource = resources.get(resource_name)
             if resource is None:

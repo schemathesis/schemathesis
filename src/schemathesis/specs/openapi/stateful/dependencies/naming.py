@@ -34,7 +34,7 @@ def strip_version_prefix(path: str) -> str:
     return "/" + "/".join(segments[start:])
 
 
-def from_parameter(parameter: str, path: str) -> str | None:
+def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> str | None:
     parameter = parameter.strip()
     lower = parameter.lower()
 
@@ -95,7 +95,9 @@ def from_parameter(parameter: str, path: str) -> str | None:
     # Single-token parameters can't be split unambiguously by name alone, so require
     # the path to confirm: the prefix must match the path-derived resource name.
     # Longest suffix wins to avoid `userid` matching as `useri`+`d`.
-    if f"{{{parameter}}}" in path:
+    # For body fields the prefix-match against the path-derived resource is the
+    # safety check, so the `{parameter}` template requirement is dropped.
+    if body_field or f"{{{parameter}}}" in path:
         for suffix in ("uuid", "guid", "slug", "name", "id"):
             if lower.endswith(suffix) and len(lower) > len(suffix):
                 prefix_lower = lower[: -len(suffix)]

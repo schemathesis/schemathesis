@@ -7,6 +7,7 @@
 - Capture path-parameter values from successful 2xx requests for reuse during fuzzing.
 - Capture request-body field values from successful 2xx requests for reuse during fuzzing.
 - Coverage phase records request identifiers into the runtime resource pool for reuse in later phases.
+- Dependency inference recognizes `<resource>Name`-style body fields on collection paths (e.g. `POST /products {productName: ...}`).
 - Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
 - Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
 - Dependency inference treats `POST /collection {idField: ...}` as a producer when the response has no body.

@@ -181,13 +181,29 @@
       ]
     },
     "POST /schemas": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "schemaName",
+          "resource": "Schema",
+          "resource_field": "schemaName"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CreateSchemaMapping",
+          "status_code": "200"
+        },
+        {
+          "body_field": "schemaName",
+          "cardinality": "ONE",
+          "is_primitive_identifier": false,
+          "pointer": "",
+          "resource": "Schema",
           "status_code": "200"
         }
       ]
@@ -706,6 +722,12 @@
           "string"
         ]
       }
+    },
+    "Schema": {
+      "fields": [
+        "schemaName"
+      ],
+      "types": {}
     },
     "StartMatchingJob": {
       "fields": [
