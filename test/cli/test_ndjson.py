@@ -170,6 +170,8 @@ def test_run_subprocess(testdir, ndjson_path, hypothesis_max_examples, schema_ur
     init_data = get_event_data(events[0])
     assert "st run" in init_data["command"]
     assert str(ndjson_path) in init_data["command"]
+    event_types = {get_event_type(e) for e in events}
+    assert "EngineFinished" in event_types, f"truncated stream: got only {sorted(event_types)}"
 
 
 @pytest.mark.parametrize("in_config", [True, False])
