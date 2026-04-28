@@ -610,3 +610,57 @@ def test_fuzz_chains_via_request_body_link(cli, ctx, app_runner, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+def test_fuzz_deadline_does_not_flake_strategy(cli, ctx, app_runner):
+    # Time limit tripping mid-scenario must not surface as a Runtime Error.
+    paths = {
+        "/products": {
+            "post": {
+                "operationId": "createProduct",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {"application/json": {"schema": {"type": "object", "properties": {}}}},
+                        "links": {
+                            "GetProduct": {
+                                "operationId": "getProduct",
+                                "parameters": {"productId": "$response.body#/productId"},
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "/products/{productId}": {
+            "get": {
+                "operationId": "getProduct",
+                "parameters": [
+                    {"name": "productId", "in": "path", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        return jsonify({}), 201
+
+    @app.route("/products/<product_id>", methods=["GET"])
+    def get_product(product_id):
+        return "", 404
+
+    port = app_runner.run_flask_app(app)
+    result = cli.main(
+        "fuzz",
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--max-time=5",
+        "--seed=42",
+        "-c",
+        "not_a_server_error",
+    )
+    assert "FlakyStrategyDefinition" not in result.stdout, result.stdout
+    assert "Runtime Error" not in result.stdout, result.stdout
+    assert result.exit_code == 0
