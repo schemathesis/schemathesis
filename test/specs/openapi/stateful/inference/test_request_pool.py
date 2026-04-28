@@ -143,7 +143,9 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, app_runner, snapshot_cli
 
     @app.route("/products", methods=["POST"])
     def create_product():
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return "", 400
         product_id = data.get("productId")
         if not isinstance(product_id, str):
             return "", 400
@@ -237,7 +239,9 @@ def test_request_pool_captures_body_fields(cli, app_runner, snapshot_cli, ctx):
 
     @app.route("/sessions", methods=["POST"])
     def create_session():
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return "", 400
         session_id = data.get("sessionId")
         if not isinstance(session_id, str):
             return "", 400

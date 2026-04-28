@@ -6262,3 +6262,79 @@ def test_coverage_negative_does_not_pollute_pool_with_invalid_values(cli, app_ru
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_pool_overlay_respects_stricter_destination_constraints(cli, app_runner, snapshot_cli, ctx):
+    # A loose endpoint contributes a value valid only for itself; a stricter consumer must not adopt it.
+    paths = {
+        "/clients": {
+            "post": {
+                "operationId": "createClient",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["clientId"],
+                                "properties": {"clientId": {"type": "string"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+        "/identity-providers": {
+            "put": {
+                "operationId": "putIdentityProvider",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["clientId"],
+                                "properties": {"clientId": {"type": "string", "minLength": 1}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad request"}},
+            }
+        },
+        "/clients/{clientId}": {
+            "get": {
+                "operationId": "getClient",
+                "parameters": [{"name": "clientId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/clients", methods=["POST"])
+    def create_client():
+        return "", 200
+
+    @app.route("/identity-providers", methods=["PUT"])
+    def put_identity_provider():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get("clientId"), str) or not data["clientId"]:
+            return "", 400
+        return "", 200
+
+    @app.route("/clients/<client_id>", methods=["GET"])
+    def get_client(client_id):
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage",
+            "-c positive_data_acceptance",
+        )
+        == snapshot_cli
+    )
