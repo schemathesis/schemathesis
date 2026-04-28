@@ -121,6 +121,87 @@ _UNICODE_PROPERTY_MAP = (
     (r"\PM", f"[^{_MARK_CLASS}]"),
 )
 
+# Raw class contents (no surrounding brackets) used when `\p{X}` is nested inside a character class.
+_UNICODE_PROPERTY_RAW_MAP: dict[str, str] = {
+    "L": _LETTER_CLASS,
+    "Lu": _LETTER_UPPER_CLASS,
+    "Ll": _LETTER_LOWER_CLASS,
+    "Lo": _OTHER_LETTER_CLASS,
+    "N": _DIGIT_CLASS,
+    "Nd": _DIGIT_CLASS,
+    "Alpha": _LETTER_CLASS,
+    "Digit": _DIGIT_CLASS,
+    "XDigit": _XDIGIT_CLASS,
+    "Alnum": _ALNUM_CLASS,
+    "Space": _SPACE_CLASS,
+    "Z": _SPACE_CLASS,
+    "Zs": _SPACE_CLASS,
+    "P": _PUNCT_CLASS,
+    "Punct": _PUNCT_CLASS,
+    "M": _MARK_CLASS,
+    "S": _SYMBOL_CLASS,
+    "C": _CONTROL_CLASS,
+    "Cntrl": _CONTROL_CLASS,
+    "ASCII": _ASCII_CLASS,
+    "Graph": _GRAPH_CLASS,
+    "Print": _PRINT_CLASS,
+    "Blank": _BLANK_CLASS,
+    "Upper": _LETTER_UPPER_CLASS,
+    "IsLetter": _LETTER_CLASS,
+}
+# Single-letter shorthand (`\pL`, `\pN`, ...) raw equivalents.
+_UNICODE_SHORTHAND_RAW_MAP: dict[str, str] = {
+    "L": _LETTER_CLASS,
+    "N": _DIGIT_CLASS,
+    "P": _PUNCT_CLASS,
+    "M": _MARK_CLASS,
+    "S": _SYMBOL_CLASS,
+    "C": _CONTROL_CLASS,
+    "Z": _SPACE_CLASS,
+}
+
+
+def _inline_unicode_in_classes(pattern: str) -> str | None:
+    r"""Inline `\p{X}` raw class contents inside `[...]`; bail out on `\P{X}` (uncomposable)."""
+    out: list[str] = []
+    i = 0
+    in_class = False
+    n = len(pattern)
+    while i < n:
+        ch = pattern[i]
+        if ch == "\\" and i + 1 < n:
+            next_ch = pattern[i + 1]
+            # `[^contents]` cannot compose with sibling class members in standard regex.
+            if in_class and next_ch == "P":
+                return None
+            if in_class and next_ch == "p" and i + 2 < n:
+                if pattern[i + 2] == "{":
+                    end = pattern.find("}", i + 3)
+                    if end != -1:
+                        name = pattern[i + 3 : end]
+                        raw = _UNICODE_PROPERTY_RAW_MAP.get(name)
+                        if raw is not None:
+                            out.append(raw)
+                            i = end + 1
+                            continue
+                else:
+                    raw = _UNICODE_SHORTHAND_RAW_MAP.get(pattern[i + 2])
+                    if raw is not None:
+                        out.append(raw)
+                        i += 3
+                        continue
+            # Other escapes (`\[`, `\]`, `\\`, unknown `\p{Greek}`) pass through unchanged.
+            out.append(pattern[i : i + 2])
+            i += 2
+            continue
+        if ch == "[" and not in_class:
+            in_class = True
+        elif ch == "]" and in_class:
+            in_class = False
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
 
 @lru_cache(maxsize=256)
 def normalize_regex(pattern: object) -> str | None:
@@ -147,7 +228,9 @@ def normalize_regex(pattern: object) -> str | None:
     if not has_braced and not has_shorthand and not has_python_anchors:
         return None  # No translation needed
 
-    translated = pattern
+    translated = _inline_unicode_in_classes(pattern)
+    if translated is None:
+        return None
     for pcre_escape, python_equiv in _UNICODE_PROPERTY_MAP:
         translated = translated.replace(pcre_escape, python_equiv)
 

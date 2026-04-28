@@ -1,5 +1,8 @@
 [default]
 extend-ignore-re = ["DELET", "RESTFul", "parametrized", "worke", "secon", "\\{Nd\\}"]
 
+[default.extend-words]
+Nd = "Nd"
+
 [files]
 extend-exclude = ["test-corpus/__snapshots__/*/*.json", "test/config/__snapshots__/*/*.raw"]
