@@ -613,8 +613,9 @@ def _body_pool_overlays(
     *,
     correlated: dict[tuple[ParameterLocation, str], Any],
     body_schema: Any,
+    validator_cls: type,
 ) -> dict[str, Any]:
-    """Return pool overlay values for top-level body properties from the correlated map."""
+    """Return pool overlay values for top-level body properties — only those valid against the destination schema."""
     if not isinstance(body_schema, dict):
         return {}
     properties = body_schema.get("properties")
@@ -625,8 +626,14 @@ def _body_pool_overlays(
         if not _is_pool_eligible(prop_schema):
             continue
         value = correlated.get((ParameterLocation.BODY, prop_name))
-        if value is not None:
-            overlays[prop_name] = value
+        if value is None:
+            continue
+        try:
+            if not validator_cls(prop_schema).is_valid(value):
+                continue
+        except Exception:
+            continue
+        overlays[prop_name] = value
     return overlays
 
 
@@ -845,7 +852,7 @@ def _iter_coverage_cases(
                     schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]
                 else:
                     schema["examples"] = examples
-            body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema)
+            body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema, validator_cls=validator_cls)
             if body_overlays:
                 schema = dict(schema)
                 schema_properties = dict(schema.get("properties") or {})
