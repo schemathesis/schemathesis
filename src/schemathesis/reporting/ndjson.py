@@ -10,6 +10,8 @@ from pathlib import Path
 from types import TracebackType
 from typing import IO, TYPE_CHECKING, Any
 
+import requests
+
 from schemathesis.core import NOT_SET
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.result import Err, Ok
@@ -60,8 +62,6 @@ SKIP_RESPONSE_HEADERS: frozenset[str] = frozenset(
 
 def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> Any:
     """Recursively serialize objects to JSON-compatible types."""
-    import requests
-
     if obj is NOT_SET:
         return None
     if isinstance(obj, Unresolvable):
