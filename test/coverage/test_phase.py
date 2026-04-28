@@ -6043,3 +6043,146 @@ def test_coverage_consumes_body_field_keyed_pool(cli, app_runner, snapshot_cli, 
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_correlates_nested_resource_pool_picks(cli, app_runner, snapshot_cli, ctx):
+    # Independent picks return (U2, R1) but R1's parent is U1; only correlation matches the planted pair.
+    paths = {
+        "/products": {
+            "post": {
+                "operationId": "createProduct",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["productId"],
+                                "properties": {
+                                    "productId": {
+                                        "type": "string",
+                                        "examples": [
+                                            "alpha-product-7af3",
+                                            "bravo-product-9c11",
+                                        ],
+                                    }
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+        "/products/{productId}/reviews": {
+            "post": {
+                "operationId": "createReview",
+                "parameters": [
+                    {
+                        "name": "productId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["reviewId"],
+                                "properties": {
+                                    "reviewId": {
+                                        "type": "string",
+                                        "examples": ["alpha-review-1234"],
+                                    }
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+        "/products/{productId}/reviews/{reviewId}": {
+            "get": {
+                "operationId": "getReview",
+                "parameters": [
+                    {
+                        "name": "productId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                    {
+                        "name": "reviewId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    products: set[str] = set()
+    reviews: set[tuple[str, str]] = set()
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        product_id = data.get("productId")
+        if not isinstance(product_id, str):
+            return "", 400
+        products.add(product_id)
+        return "", 201
+
+    @app.route("/products/<product_id>/reviews", methods=["POST"])
+    def create_review(product_id):
+        if product_id not in products:
+            return "", 404
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        review_id = data.get("reviewId")
+        if not isinstance(review_id, str):
+            return "", 400
+        reviews.add((product_id, review_id))
+        return "", 201
+
+    @app.route("/products/<product_id>/reviews/<review_id>", methods=["GET"])
+    def get_review(product_id, review_id):
+        if (product_id, review_id) not in reviews:
+            return "", 404
+        # Planted bug: required `name` is null for matched parent-child pairs.
+        return jsonify({"name": None}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage",
+            "-c response_schema_conformance",
+        )
+        == snapshot_cli
+    )

@@ -11,7 +11,7 @@ from schemathesis.core import NOT_SET, deserialization
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.resources import ExtraDataSource
-from schemathesis.resources.repository import ResourceRepository
+from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
 
 if TYPE_CHECKING:
@@ -317,13 +317,71 @@ class OpenApiExtraDataSource(ExtraDataSource):
         requirement = self.requirements.get((operation.label, location, name))
         if requirement is None:
             return None
-        candidates = self._collect_values(requirement)
+        candidates: list[tuple[ResourceInstance, Any]] = []
+        for instance in self.repository.iter_instances(requirement.resource_name):
+            value = instance.data.get(requirement.resource_field)
+            if value is not None:
+                candidates.append((instance, value))
         if not candidates:
             return None
-        variant_keys = [jsonschema_rs.canonical.json.to_string({name: value}) for value in candidates]
+        variant_keys = [jsonschema_rs.canonical.json.to_string(instance.data) for instance, _ in candidates]
         idx = self.usage_tracker.argmax_by_weight(variant_keys)
         self.usage_tracker.record_draw(variant_keys[idx])
-        return candidates[idx]
+        return candidates[idx][1]
+
+    def pick_correlated_values(
+        self,
+        *,
+        operation: APIOperation,
+    ) -> dict[tuple[ParameterLocation, str], Any]:
+        """Return one (location, name) -> value map keeping all resource-bound slots correlated, or {}."""
+        slots: list[InputSlot] = []
+        for slot in self.inputs_by_label.get(operation.label, ()):
+            if slot.resource_field is None or not isinstance(slot.parameter_name, str):
+                continue
+            slots.append(slot)
+        if not slots:
+            return {}
+
+        resource_names = {slot.resource.name for slot in slots}
+        satisfying: list[tuple[ResourceInstance, dict[tuple[ParameterLocation, str], Any]]] = []
+
+        for resource_name in resource_names:
+            for instance in self.repository.iter_instances(resource_name):
+                filled: dict[tuple[ParameterLocation, str], Any] = {}
+                for slot in slots:
+                    param_name = slot.parameter_name
+                    resource_field = slot.resource_field
+                    assert isinstance(param_name, str)
+                    assert resource_field is not None
+                    if slot.resource.name == resource_name:
+                        value = instance.data.get(resource_field)
+                    else:
+                        value = instance.context.get(param_name)
+                    if value is None:
+                        break
+                    filled[(slot.parameter_location, param_name)] = value
+                else:
+                    satisfying.append((instance, filled))
+
+        if satisfying:
+            variant_keys = [jsonschema_rs.canonical.json.to_string(inst.data) for inst, _ in satisfying]
+            idx = self.usage_tracker.argmax_by_weight(variant_keys)
+            self.usage_tracker.record_draw(variant_keys[idx])
+            return satisfying[idx][1]
+
+        result: dict[tuple[ParameterLocation, str], Any] = {}
+        for slot in slots:
+            param_name = slot.parameter_name
+            assert isinstance(param_name, str)
+            value = self.pick_captured_value(
+                operation=operation,
+                location=slot.parameter_location,
+                name=param_name,
+            )
+            if value is not None:
+                result[(slot.parameter_location, param_name)] = value
+        return result
 
     def should_record(self, *, operation: str) -> bool:
         """Check if responses should be recorded for this operation."""
