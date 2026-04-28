@@ -93,19 +93,20 @@ class OpenAPIAnalysis:
 
     @property
     def extra_data_source(self) -> ExtraDataSource | None:
-        """Extra data source for augmenting test generation with captured API responses.
+        """Extra data source for augmenting test generation with captured API data.
 
-        Returns None if no resource descriptors are available.
+        Returns None when neither response-extractable descriptors nor request-side
+        input slots exist — there is nothing to capture in either case.
         """
         if self._extra_data_source is NOT_SET:
             descriptors = self.resource_descriptors
-            if not descriptors:
+            requirements = build_parameter_requirements(self.dependency_graph)
+            inputs_by_label = build_inputs_by_label(self.dependency_graph)
+            if not descriptors and not inputs_by_label:
                 self._extra_data_source = None
             else:
                 repository = ResourceRepository(descriptors)
                 self._populate_from_response_examples(repository)
-                requirements = build_parameter_requirements(self.dependency_graph)
-                inputs_by_label = build_inputs_by_label(self.dependency_graph)
                 self._extra_data_source = OpenApiExtraDataSource(
                     repository=repository,
                     requirements=requirements,
