@@ -10,6 +10,7 @@ import jsonschema_rs
 from schemathesis.core import NOT_SET, deserialization
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
+from schemathesis.generation import GenerationMode
 from schemathesis.resources import ExtraDataSource
 from schemathesis.resources.repository import ResourceInstance, ResourceRepository
 from schemathesis.specs.openapi.stateful.dependencies.models import DependencyGraph, InputSlot
@@ -402,6 +403,15 @@ class OpenApiExtraDataSource(ExtraDataSource):
         slots = self.inputs_by_label.get(operation.label)
         if not slots:
             return
+        if case.meta is not None:
+            slots = [
+                slot
+                for slot in slots
+                if (component := case.meta.components.get(slot.parameter_location)) is None
+                or component.mode == GenerationMode.POSITIVE
+            ]
+            if not slots:
+                return
         self.repository.record_request(
             operation=operation.label,
             inputs=slots,
