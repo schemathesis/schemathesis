@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import pytest
-from flask import jsonify, request
+from flask import abort, jsonify, request
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -258,6 +258,76 @@ def test_request_pool_captures_body_fields(cli, app_runner, snapshot_cli, ctx):
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--max-examples=10",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_pool_works_when_no_response_descriptors_exist(cli, app_runner, snapshot_cli, ctx):
+    # POST UUIDs and GET's fresh 36-char strings cannot overlap; only pool can bridge them.
+    paths = {
+        "/products": {
+            "post": {
+                "operationId": "createProduct",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["productName"],
+                                "properties": {"productName": {"type": "string", "format": "uuid"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+        "/products/{productName}": {
+            "get": {
+                "operationId": "getProduct",
+                "parameters": [
+                    {
+                        "name": "productName",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "minLength": 36, "maxLength": 36},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    products: set[str] = set()
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        product_name = data.get("productName")
+        if not isinstance(product_name, str):
+            return "", 400
+        products.add(product_name)
+        return "", 201
+
+    @app.route("/products/<product_name>", methods=["GET"])
+    def get_product(product_name):
+        if product_name not in products:
+            return "", 404
+        abort(500)  # reachable only when GET path uses a captured productName
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "-c not_a_server_error",
+            "--max-examples=20",
         )
         == snapshot_cli
     )
