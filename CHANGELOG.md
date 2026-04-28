@@ -15,6 +15,7 @@
 - Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
 - Dependency inference treats `POST /collection {idField: ...}` as a producer when the response has no body.
 - Dependency inference recognizes `GET /collection` returning an array of identifier strings.
+- NDJSON reports include `meta` per case (generation mode, per-location component info, phase).
 
 ### :bug: Fixed
 
