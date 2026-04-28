@@ -6186,3 +6186,79 @@ def test_coverage_correlates_nested_resource_pool_picks(cli, app_runner, snapsho
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_negative_does_not_pollute_pool_with_invalid_values(cli, app_runner, snapshot_cli, ctx):
+    # A permissive endpoint's negative mutations must not seed the pool with values a strict endpoint would later reject.
+    paths = {
+        "/payments": {
+            "post": {
+                "operationId": "createPayment",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["customerId"],
+                                "properties": {"customerId": {"type": "string"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad request"}},
+            }
+        },
+        "/audit": {
+            "post": {
+                "operationId": "createAuditEntry",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["customerId"],
+                                "properties": {"customerId": {"type": "string"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+        "/customers/{customerId}": {
+            "get": {
+                "operationId": "getCustomer",
+                "parameters": [{"name": "customerId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/payments", methods=["POST"])
+    def payments():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get("customerId"), str):
+            return "", 400
+        return "", 200
+
+    @app.route("/audit", methods=["POST"])
+    def audit():
+        return "", 200
+
+    @app.route("/customers/<customer_id>", methods=["GET"])
+    def get_customer(customer_id):
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage",
+            "-c positive_data_acceptance",
+        )
+        == snapshot_cli
+    )
