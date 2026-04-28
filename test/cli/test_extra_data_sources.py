@@ -659,3 +659,84 @@ def test_extra_data_sources_with_examples_and_fuzzing_phases(cli, app_runner, sn
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_examples_phase_uses_pool_for_body_fields(cli, app_runner, snapshot_cli, ctx):
+    # Without body-side pool consumption, fill-missing has nothing to fill the body-only consumer with.
+    session_schema = {
+        "type": "object",
+        "required": ["sessionId"],
+        "properties": {"sessionId": {"type": "string", "format": "uuid"}},
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/sessions": {
+                "post": {
+                    "operationId": "createSession",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": session_schema,
+                                "examples": {"valid": {"value": {"sessionId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"}}},
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {"application/json": {"schema": session_schema}},
+                        }
+                    },
+                }
+            },
+            "/events/log": {
+                "post": {
+                    "operationId": "logEvent",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": session_schema}},
+                    },
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    sessions: set[str] = set()
+
+    @app.route("/sessions", methods=["POST"])
+    def create_session():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        session_id = data.get("sessionId")
+        if not isinstance(session_id, str):
+            return "", 400
+        sessions.add(session_id)
+        return jsonify({"sessionId": session_id}), 201
+
+    @app.route("/events/log", methods=["POST"])
+    def log_event():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        session_id = data.get("sessionId")
+        if session_id not in sessions:
+            return "", 404
+        abort(500)  # reachable only when body sessionId came from the pool
+
+    port = app_runner.run_flask_app(app)
+    config = {"phases": {"examples": {"fill-missing": True}}}
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=examples",
+            "-c not_a_server_error",
+            "--mode=positive",
+            config=config,
+        )
+        == snapshot_cli
+    )
