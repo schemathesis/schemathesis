@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -13,8 +14,10 @@ import schemathesis.auths
 from schemathesis.config import FuzzConfig, OperationConfig, OperationsConfig
 from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.core.result import Ok
+from schemathesis.core.transport import Response
 from schemathesis.engine import Status, StopReason, events, from_schema
 from schemathesis.engine.fuzz._executor import compute_operation_weights
+from schemathesis.engine.fuzz._link_chooser import collect_link_candidates
 from schemathesis.generation import GenerationMode
 
 
@@ -539,3 +542,87 @@ def test_fuzz_interrupted_by_keyboard_interrupt(real_app_schema):
     # Drain to EngineFinished
     for _ in stream:
         pass
+
+
+def _build_schema_with_link():
+    spec = {
+        "openapi": "3.0.2",
+        "info": {"title": "X", "version": "1"},
+        "paths": {
+            "/products": {
+                "post": {
+                    "operationId": "createProduct",
+                    "responses": {
+                        "201": {
+                            "description": "C",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"productId": {"type": "string"}},
+                                    }
+                                }
+                            },
+                            "links": {
+                                "GetProduct": {
+                                    "operationId": "getProduct",
+                                    "parameters": {"productId": "$response.body#/productId"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/products/{productId}": {
+                "get": {
+                    "operationId": "getProduct",
+                    "parameters": [{"name": "productId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        },
+    }
+    return schemathesis.openapi.from_dict(spec)
+
+
+@pytest.mark.parametrize(
+    ("active", "exclude_get", "body", "expected_overrides"),
+    [
+        pytest.param(
+            ("post", "get"),
+            False,
+            {"productId": "abc-123"},
+            {"path_parameters": {"productId": "abc-123"}},
+            id="resolved-target",
+        ),
+        pytest.param(("post", "get"), True, {"productId": "abc-123"}, None, id="target-excluded"),
+        pytest.param(("post",), False, {"productId": "abc-123"}, None, id="target-not-in-active-set"),
+        pytest.param(("post", "get"), False, {"otherField": "x"}, None, id="expression-unresolvable"),
+    ],
+)
+def test_collect_link_candidates(active, exclude_get, body, expected_overrides, case_factory, response_factory):
+    schema = _build_schema_with_link()
+    post_op = schema["/products"]["POST"]
+    get_op = schema["/products/{productId}"]["GET"]
+    by_alias = {"post": post_op, "get": get_op}
+    operations_by_label = {by_alias[a].label: by_alias[a] for a in active}
+    excluded_labels = {get_op.label} if exclude_get else set()
+    case = case_factory(operation=post_op)
+    response = Response.from_requests(
+        response_factory.requests(status_code=201, content=json.dumps(body).encode()),
+        verify=True,
+    )
+    candidates = collect_link_candidates(
+        operation=post_op,
+        case=case,
+        response=response,
+        operations_by_label=operations_by_label,
+        excluded_labels=excluded_labels,
+    )
+    if expected_overrides is None:
+        assert candidates == []
+    else:
+        assert len(candidates) == 1
+        target, overrides = candidates[0]
+        assert target.label == get_op.label
+        assert overrides == expected_overrides

@@ -10,6 +10,7 @@
 - Use identifiers from the runtime resource pool for resource-bound parameters and body fields during the coverage phase.
 - Use captured body-field values to fill resource-bound fields in the examples phase.
 - Enable the runtime resource pool for producers that return empty response bodies.
+- Chain `st fuzz` scenarios via inferred and schema Links, biased 70% toward link-driven steps.
 - Pick correlated identifiers for nested-resource operations during the coverage phase.
 - Dependency inference recognizes `<resource>Name`-style body fields on collection paths (e.g. `POST /products {productName: ...}`).
 - Dependency inference recognizes more identifier-style path parameters (e.g. `username`, `containerGroupName`).
