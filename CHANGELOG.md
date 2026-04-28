@@ -30,6 +30,10 @@
 - False `InfiniteRecursiveReference` on cycles breakable through `patternProperties`.
 - False `InfiniteRecursiveReference` on cycles breakable through `oneOf`/`anyOf`, top-level `allOf`, or unused `definitions`.
 
+### :wrench: Changed
+
+- Include `meta` in NDJSON reports.
+
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 
 ### :bug: Fixed
