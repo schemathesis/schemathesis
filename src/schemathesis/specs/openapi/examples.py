@@ -100,6 +100,18 @@ def _get_pool_combos(
             container = location.container_name
             per_location.append([{container: variant} for variant in variants])
 
+    for body in operation.body:
+        body_schema = body.definition.get("schema")
+        if not isinstance(body_schema, dict):
+            continue
+        variants = extra_data_source.get_captured_variants(
+            operation=operation,
+            location=ParameterLocation.BODY,
+            schema=body_schema,
+        )
+        if variants:
+            per_location.append([{"body": variant} for variant in variants])
+
     if not per_location:
         return []
 
