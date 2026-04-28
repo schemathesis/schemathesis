@@ -33,6 +33,14 @@ class ExtraDataSource(Protocol):
         """Return one weighted-selected pool value for a resource-bound parameter."""
         ...  # pragma: no cover
 
+    def pick_correlated_values(
+        self,
+        *,
+        operation: APIOperation,
+    ) -> dict[tuple[ParameterLocation, str], Any]:
+        """Return correlated pool values for all resource-bound slots in one operation."""
+        ...  # pragma: no cover
+
     def record_response(
         self,
         *,
