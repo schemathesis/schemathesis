@@ -295,7 +295,7 @@ def _run_forever_thread(
 
         for _ in range(MAX_SCENARIO_STEPS):
             if ctx.has_to_stop:
-                # property re-evaluated each iteration; can change via another thread
+                # Outer `except Flaky` swallows any data-tree fallout from this mid-draw break.
                 break  # type: ignore[unreachable]
             link_overrides: dict[str, Any] = {}
             if last_step is not None and is_openapi_schema:
@@ -437,6 +437,9 @@ def _run_forever_thread(
         # Failures are already captured
         pass
     except Flaky as exc:
+        if ctx.has_to_stop:
+            # Deadline-induced data-tree noise; campaign already stopping, suppress.
+            return
         event_queue.put(
             events.NonFatalError(
                 error=exc,
