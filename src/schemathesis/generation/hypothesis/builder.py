@@ -12,6 +12,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from schemathesis.resources import ExtraDataSource
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 
 import hypothesis
@@ -425,6 +426,7 @@ def generate_coverage_cases(
         operation=operation,
         app=operation.app,
     )
+    extra_data_source = as_strategy_kwargs.get("extra_data_source")
     overrides = {
         container: as_strategy_kwargs[container]
         for container in LOCATION_TO_CONTAINER.values()
@@ -444,6 +446,7 @@ def generate_coverage_cases(
             generate_duplicate_query_parameters=generate_duplicate_query_parameters,
             unexpected_methods=unexpected_methods,
             generation_config=generation_config,
+            extra_data_source=extra_data_source,
         ):
             if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
                 continue
@@ -599,6 +602,40 @@ def _stringify_value(val: Any, container_name: str) -> Any:
     return val
 
 
+_GATING_KEYS = frozenset({"example", "examples", "default", "enum", "const"})
+
+
+def _is_pool_eligible(schema: Any) -> bool:
+    return isinstance(schema, dict) and not (_GATING_KEYS & schema.keys())
+
+
+def _body_pool_overlays(
+    *,
+    extra_data_source: ExtraDataSource | None,
+    operation: APIOperation,
+    body_schema: Any,
+) -> dict[str, Any]:
+    """Return pool overlay values for top-level body properties that are eligible."""
+    if extra_data_source is None or not isinstance(body_schema, dict):
+        return {}
+    properties = body_schema.get("properties")
+    if not isinstance(properties, dict):
+        return {}
+    overlays: dict[str, Any] = {}
+    for prop_name, prop_schema in properties.items():
+        if not _is_pool_eligible(prop_schema):
+            continue
+        try:
+            value = extra_data_source.pick_captured_value(
+                operation=operation, location=ParameterLocation.BODY, name=prop_name
+            )
+        except Exception:
+            value = None
+        if value is not None:
+            overlays[prop_name] = value
+    return overlays
+
+
 def _generate_coverage_values_from_custom_strategy(
     media_type: str,
 ) -> Generator[coverage.GeneratedValue, None, None]:
@@ -663,6 +700,7 @@ def _iter_coverage_cases(
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
+    extra_data_source: ExtraDataSource | None = None,
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.examples import find_matching_in_responses
@@ -693,6 +731,14 @@ def _iter_coverage_cases(
             schema["examples"] = examples
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
+        # Pool injection: only when the schema gives no concrete pin.
+        if extra_data_source is not None and _is_pool_eligible(schema):
+            try:
+                pool_value = extra_data_source.pick_captured_value(operation=operation, location=location, name=name)
+            except Exception:
+                pool_value = None
+            if pool_value is not None:
+                schema = {**schema, "examples": [pool_value]}
         gen = coverage.cover_schema_iter(
             coverage.CoverageContext(
                 root_schema=schema,
@@ -800,6 +846,18 @@ def _iter_coverage_cases(
                     schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]
                 else:
                     schema["examples"] = examples
+            # Pool injection for body fields: only top-level eligible properties.
+            body_overlays = _body_pool_overlays(
+                extra_data_source=extra_data_source, operation=operation, body_schema=schema
+            )
+            if body_overlays:
+                schema = dict(schema)
+                schema_properties = dict(schema.get("properties") or {})
+                for prop_name, value in body_overlays.items():
+                    prop_schema = schema_properties.get(prop_name)
+                    if isinstance(prop_schema, dict):
+                        schema_properties[prop_name] = {**prop_schema, "examples": [value]}
+                schema["properties"] = schema_properties
             try:
                 media_type = media_types.parse(body.media_type)
             except MalformedMediaType as exc:
@@ -831,6 +889,8 @@ def _iter_coverage_cases(
                 template_time += elapsed
                 if value.generation_mode == GenerationMode.POSITIVE:
                     template.set_body(value, body.media_type)
+                    if body_overlays and isinstance(template._template.get("body"), dict):
+                        template._template["body"].update(body_overlays)
                 else:
                     # The template must be a valid positive baseline so that
                     # parameter-mutation cases (e.g. missing required header) only
@@ -855,6 +915,8 @@ def _iter_coverage_cases(
                         value if isinstance(first_positive, NotSet) else first_positive,
                         body.media_type,
                     )
+                    if body_overlays and isinstance(template._template.get("body"), dict):
+                        template._template["body"].update(body_overlays)
             data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
                 **data.kwargs,

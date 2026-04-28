@@ -114,6 +114,18 @@ class VariantUsageTracker:
 
         return recency_weight * delete_weight
 
+    def argmax_by_weight(self, variant_keys: list[str]) -> int:
+        """Return the index of the highest-weight variant; ties broken by lowest index."""
+        with self._lock:
+            weights = [self._get_weight_unlocked(k) for k in variant_keys]
+        best_idx = 0
+        best_weight = weights[0]
+        for i in range(1, len(weights)):
+            if weights[i] > best_weight:
+                best_idx = i
+                best_weight = weights[i]
+        return best_idx
+
     def record_draw(self, variant_key: str) -> None:
         """Record that a variant was drawn, advancing the global step."""
         with self._lock:
@@ -293,6 +305,25 @@ class OpenApiExtraDataSource(ExtraDataSource):
             values.append(value)
 
         return values
+
+    def pick_captured_value(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        name: str,
+    ) -> Any | None:
+        """Return one weighted-selected pool value for a resource-bound parameter, or None."""
+        requirement = self.requirements.get((operation.label, location, name))
+        if requirement is None:
+            return None
+        candidates = self._collect_values(requirement)
+        if not candidates:
+            return None
+        variant_keys = [jsonschema_rs.canonical.json.to_string({name: value}) for value in candidates]
+        idx = self.usage_tracker.argmax_by_weight(variant_keys)
+        self.usage_tracker.record_draw(variant_keys[idx])
+        return candidates[idx]
 
     def should_record(self, *, operation: str) -> bool:
         """Check if responses should be recorded for this operation."""

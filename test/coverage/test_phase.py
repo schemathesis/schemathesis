@@ -5874,3 +5874,172 @@ def test_coverage_array_above_max_items_with_complex_items_schema(ctx):
             assert not validator.is_valid(case.body), (
                 f"NEGATIVE body is schema-valid (mutation had no effect): {case.body!r}"
             )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_consumes_path_keyed_pool(cli, app_runner, snapshot_cli, ctx):
+    paths = {
+        "/widgets/{widgetId}": {
+            "post": {
+                "operationId": "createWidget",
+                "parameters": [
+                    {
+                        "name": "widgetId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    }
+                ],
+                "responses": {"201": {"description": "Created"}},
+            },
+            "get": {
+                "operationId": "getWidget",
+                "parameters": [
+                    {
+                        "name": "widgetId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            },
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    widgets: set[str] = set()
+
+    @app.route("/widgets/<widget_id>", methods=["POST"])
+    def create_widget(widget_id):
+        widgets.add(widget_id)
+        return "", 201
+
+    @app.route("/widgets/<widget_id>", methods=["GET"])
+    def get_widget(widget_id):
+        if widget_id not in widgets:
+            return "", 404
+        # Planted bug: required `name` is null for widgets that exist
+        return jsonify({"name": None}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage",
+            "-c response_schema_conformance",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_consumes_body_field_keyed_pool(cli, app_runner, snapshot_cli, ctx):
+    paths = {
+        "/sessions": {
+            "post": {
+                "operationId": "createSession",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["sessionId"],
+                                "properties": {"sessionId": {"type": "string", "format": "uuid"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "Created"}},
+            }
+        },
+        "/sessions/{sessionId}/events": {
+            "post": {
+                "operationId": "createEvent",
+                "parameters": [
+                    {
+                        "name": "sessionId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    }
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["sessionId", "kind"],
+                                "properties": {
+                                    "sessionId": {"type": "string", "format": "uuid"},
+                                    "kind": {"type": "string"},
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    sessions: set[str] = set()
+
+    @app.route("/sessions", methods=["POST"])
+    def create_session():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        session_id = data.get("sessionId")
+        if not isinstance(session_id, str):
+            return "", 400
+        sessions.add(session_id)
+        return "", 201
+
+    @app.route("/sessions/<session_id>/events", methods=["POST"])
+    def create_event(session_id):
+        if session_id not in sessions:
+            return "", 404
+        # Planted bug: required `name` is null when sessionId exists
+        return jsonify({"name": None}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage",
+            "-c response_schema_conformance",
+        )
+        == snapshot_cli
+    )
