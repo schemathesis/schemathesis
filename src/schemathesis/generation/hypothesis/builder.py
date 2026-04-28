@@ -611,12 +611,11 @@ def _is_pool_eligible(schema: Any) -> bool:
 
 def _body_pool_overlays(
     *,
-    extra_data_source: ExtraDataSource | None,
-    operation: APIOperation,
+    correlated: dict[tuple[ParameterLocation, str], Any],
     body_schema: Any,
 ) -> dict[str, Any]:
-    """Return pool overlay values for top-level body properties that are eligible."""
-    if extra_data_source is None or not isinstance(body_schema, dict):
+    """Return pool overlay values for top-level body properties from the correlated map."""
+    if not isinstance(body_schema, dict):
         return {}
     properties = body_schema.get("properties")
     if not isinstance(properties, dict):
@@ -625,12 +624,7 @@ def _body_pool_overlays(
     for prop_name, prop_schema in properties.items():
         if not _is_pool_eligible(prop_schema):
             continue
-        try:
-            value = extra_data_source.pick_captured_value(
-                operation=operation, location=ParameterLocation.BODY, name=prop_name
-            )
-        except Exception:
-            value = None
+        value = correlated.get((ParameterLocation.BODY, prop_name))
         if value is not None:
             overlays[prop_name] = value
     return overlays
@@ -721,6 +715,15 @@ def _iter_coverage_cases(
     assert isinstance(operation.schema, OpenApiSchema)
     validator_cls = operation.schema.adapter.jsonschema_validator_cls
 
+    correlated: dict[tuple[ParameterLocation, str], Any]
+    if extra_data_source is not None:
+        try:
+            correlated = extra_data_source.pick_correlated_values(operation=operation)
+        except Exception:
+            correlated = {}
+    else:
+        correlated = {}
+
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
@@ -731,12 +734,8 @@ def _iter_coverage_cases(
             schema["examples"] = examples
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
-        # Pool injection: only when the schema gives no concrete pin.
-        if extra_data_source is not None and _is_pool_eligible(schema):
-            try:
-                pool_value = extra_data_source.pick_captured_value(operation=operation, location=location, name=name)
-            except Exception:
-                pool_value = None
+        if _is_pool_eligible(schema):
+            pool_value = correlated.get((location, name))
             if pool_value is not None:
                 schema = {**schema, "examples": [pool_value]}
         gen = coverage.cover_schema_iter(
@@ -846,10 +845,7 @@ def _iter_coverage_cases(
                     schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]
                 else:
                     schema["examples"] = examples
-            # Pool injection for body fields: only top-level eligible properties.
-            body_overlays = _body_pool_overlays(
-                extra_data_source=extra_data_source, operation=operation, body_schema=schema
-            )
+            body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema)
             if body_overlays:
                 schema = dict(schema)
                 schema_properties = dict(schema.get("properties") or {})

@@ -936,3 +936,117 @@ def test_pick_captured_value_rotates_across_consecutive_picks(user_schema_builde
     # Deterministic rotation: each draw deprioritizes the chosen variant, so
     # the first four picks cover all four values.
     assert set(picks) == {"a", "b", "c", "d"}
+
+
+def test_pick_correlated_values_empty_for_unbound_operation(user_schema_builder):
+    schema = user_schema_builder()
+    data_source = schema.create_extra_data_source()
+    operation = schema["/users"]["POST"]
+    assert data_source.pick_correlated_values(operation=operation) == {}
+
+
+def test_pick_correlated_values_single_family_correlated_pair(user_schema_builder):
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    nested = {
+        "/users/{user_id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": user_schema}}}},
+            }
+        }
+    }
+    schema = user_schema_builder(response_schema=user_schema, extra_endpoints=nested)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation=POST_USERS, status_code=CREATED, payload={"id": "1", "name": "Alice"}
+    )
+    operation = schema["/users/{user_id}"]["GET"]
+    result = data_source.pick_correlated_values(operation=operation)
+    assert result == {(ParameterLocation.PATH, "user_id"): "1"}
+
+
+def test_pick_correlated_values_falls_back_when_family_lacks_full_match(user_schema_builder):
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    nested = {
+        "/users/{user_id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": user_schema}}}},
+            }
+        }
+    }
+    schema = user_schema_builder(response_schema=user_schema, extra_endpoints=nested)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation=POST_USERS, status_code=CREATED, payload={"id": "1", "name": "Alice"}
+    )
+    operation = schema["/users/{user_id}"]["GET"]
+    result = data_source.pick_correlated_values(operation=operation)
+    assert (ParameterLocation.PATH, "user_id") in result
+
+
+def test_pick_correlated_values_rotates_across_consecutive_calls(user_schema_builder):
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    nested = {
+        "/users/{user_id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": user_schema}}}},
+            }
+        }
+    }
+    schema = user_schema_builder(response_schema=user_schema, extra_endpoints=nested)
+    data_source = schema.create_extra_data_source()
+    for value in ("a", "b", "c", "d"):
+        data_source.repository.record_response(
+            operation=POST_USERS, status_code=CREATED, payload={"id": value, "name": "x"}
+        )
+    operation = schema["/users/{user_id}"]["GET"]
+    picks = [
+        data_source.pick_correlated_values(operation=operation)[(ParameterLocation.PATH, "user_id")] for _ in range(4)
+    ]
+    assert set(picks) == {"a", "b", "c", "d"}
+
+
+def test_correlated_and_per_slot_share_rotation_state(user_schema_builder):
+    # Correlated and per-slot picks must deprioritize the same instance for cross-phase rotation.
+    user_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["id", "name"],
+    }
+    nested = {
+        "/users/{user_id}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [{"name": "user_id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": user_schema}}}},
+            }
+        }
+    }
+    schema = user_schema_builder(response_schema=user_schema, extra_endpoints=nested)
+    data_source = schema.create_extra_data_source()
+    for value in ("a", "b"):
+        data_source.repository.record_response(
+            operation=POST_USERS, status_code=CREATED, payload={"id": value, "name": "x"}
+        )
+    operation = schema["/users/{user_id}"]["GET"]
+    correlated = data_source.pick_correlated_values(operation=operation)
+    drawn_id = correlated[(ParameterLocation.PATH, "user_id")]
+    next_pick = data_source.pick_captured_value(operation=operation, location=ParameterLocation.PATH, name="user_id")
+    assert next_pick != drawn_id
