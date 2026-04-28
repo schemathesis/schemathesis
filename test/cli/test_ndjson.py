@@ -29,6 +29,56 @@ def get_event_data(event):
     return next(iter(event.values()))
 
 
+def test_ndjson_includes_case_meta(cli, ctx, app_runner, ndjson_path):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items/{itemId}": {
+                "get": {
+                    "parameters": [
+                        {"name": "itemId", "in": "path", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    @app.route("/items/<int:item_id>")
+    def get_item(item_id):
+        return jsonify({"id": item_id})
+
+    port = app_runner.run_flask_app(app)
+
+    cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        f"--report-ndjson-path={ndjson_path}",
+        "--max-examples=2",
+        "--seed=1",
+        "--mode=positive",
+    )
+    events = load_ndjson(ndjson_path)
+    scenario_finished = [e for e in events if get_event_type(e) == "ScenarioFinished"]
+
+    meta_dicts = [
+        case_node["value"]["meta"]
+        for event in scenario_finished
+        for case_node in get_event_data(event)["recorder"].get("cases", {}).values()
+        if "meta" in case_node.get("value", {})
+    ]
+    assert meta_dicts, "Expected at least one case to expose `meta`"
+
+    for meta in meta_dicts:
+        assert meta["generation"]["mode"]
+        assert meta["phase"]["name"]
+        assert "_dirty" not in meta
+        assert "_last_validated_hashes" not in meta
+
+    with_components = [m for m in meta_dicts if "components" in m]
+    assert with_components, "Expected at least one case meta to include `components`"
+    for component in with_components[0]["components"].values():
+        assert component["mode"]
+
+
 @pytest.mark.operations("success")
 def test_store_ndjson(cli, schema_url, ndjson_path, hypothesis_max_examples):
     hypothesis_max_examples = hypothesis_max_examples or 2
