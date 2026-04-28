@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 
 import hypothesis
+import jsonschema_rs
 from hypothesis import Phase, Verbosity
 from hypothesis import strategies as st
 from hypothesis._settings import all_settings
@@ -37,13 +38,14 @@ from schemathesis.core.errors import (
     UnresolvableReference,
     is_regex_validation_error,
 )
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
 from schemathesis.core.marks import Mark
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode, coverage
-from schemathesis.generation.case import Case
+from schemathesis.generation.case import _DRAFT4_SUPPLEMENTAL_FORMATS, Case
 from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
@@ -628,8 +630,11 @@ def _body_pool_overlays(
         value = correlated.get((ParameterLocation.BODY, prop_name))
         if value is None:
             continue
+        kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
+        if validator_cls is jsonschema_rs.Draft4Validator:
+            kwargs["formats"] = _DRAFT4_SUPPLEMENTAL_FORMATS
         try:
-            if not validator_cls(prop_schema).is_valid(value):
+            if not validator_cls(prop_schema, **kwargs).is_valid(value):
                 continue
         except Exception:
             continue
