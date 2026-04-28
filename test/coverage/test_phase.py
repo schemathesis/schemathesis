@@ -6338,3 +6338,85 @@ def test_coverage_pool_overlay_respects_stricter_destination_constraints(cli, ap
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_pool_overlay_respects_destination_format(cli, app_runner, snapshot_cli, ctx):
+    # A producer with no `format` constraint must not contribute values that violate a consumer's `format: uuid`.
+    # The producer caps `txnId` length at 5 — no value can satisfy uuid (36 chars), so any pool injection fails.
+    paths = {
+        "/a-create": {
+            "post": {
+                "operationId": "createSession",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["txnId"],
+                                "properties": {"txnId": {"type": "string", "maxLength": 5}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+        "/z-confirm": {
+            "post": {
+                "operationId": "confirmAuth",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["txnId"],
+                                "properties": {"txnId": {"type": "string", "format": "uuid"}},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad request"}},
+            }
+        },
+        "/sessions/{txnId}": {
+            "get": {
+                "operationId": "getSession",
+                "parameters": [{"name": "txnId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/a-create", methods=["POST"])
+    def create_session():
+        return "", 200
+
+    @app.route("/z-confirm", methods=["POST"])
+    def confirm_auth():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return "", 400
+        txn_id = data.get("txnId")
+        if not isinstance(txn_id, str) or not re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", txn_id
+        ):
+            return "", 400
+        return "", 200
+
+    @app.route("/sessions/<txn_id>", methods=["GET"])
+    def get_session(txn_id):
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage",
+            "-c positive_data_acceptance",
+        )
+        == snapshot_cli
+    )
