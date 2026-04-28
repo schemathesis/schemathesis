@@ -1,6 +1,7 @@
 import re
 import string
 import sys
+import warnings
 
 import pytest
 from flask import jsonify
@@ -233,7 +234,27 @@ def test_update_quantifier_invalid_pattern():
         (r"\pN+", r"[0-9]+"),
         (r"\PL", r"[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]"),
         (r"\PN", r"[^0-9]"),
-        (r"^[\w\s\-\/\pL,.#;:()']+$", r"^[\w\s\-\/[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F],.#;:()']+$"),
+        (r"^[\w\s\-\/\pL,.#;:()']+$", r"^[\w\s\-\/a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F,.#;:()']+$"),
+        # `\p{X}` inside a character class with sibling chars: inline raw contents, never nest brackets.
+        (r"[\p{Alnum}_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9_]+"),
+        (r"[\p{Alpha}_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+"),
+        (
+            r"^urn:tdm:[\p{Alnum}_]+:[\p{Alpha}]*:[\p{Alnum}_]+$",
+            r"^urn:tdm:[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9_]+:[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]*:[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9_]+$",
+        ),
+        (r"[\p{Alpha}\p{Digit}_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9_]+"),
+        (r"[\p{Alpha}abc]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024Fabc]+"),
+        (r"[abc\p{Alpha}]+", r"[abca-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+"),
+        (r"[^\p{Alpha}_]+", r"[^a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+"),
+        (r"[\pL_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+"),
+        (r"[\p{Alpha}]+:[\p{Digit}]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+:[0-9]+"),
+        (r"[\p{Alpha}_]+\p{Digit}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+[0-9]+"),
+        (r"\[\p{Alpha}\]", r"\[[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]\]"),
+        # `\P{X}` inside a class has no safe single-class equivalent \u2014 bail out.
+        (r"[\P{Alnum}_]+", None),
+        (r"[\P{L}_]", None),
+        (r"[\PL_]", None),
+        (r"[\p{Greek}_]+", None),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
@@ -245,7 +266,44 @@ def test_update_quantifier_invalid_pattern():
 def test_normalize_regex(pattern, expected):
     assert normalize_regex(pattern) == expected
     if expected:
-        re.compile(expected)
+        # FutureWarning "Possible nested set" means residual bracket nesting — translation didn't fully flatten.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", FutureWarning)
+            re.compile(expected)
+
+
+_PROPERTY_NAMES = ("L", "Lu", "Ll", "N", "Nd", "Alpha", "Digit", "XDigit", "Alnum", "Space", "Punct", "Upper", "ASCII")
+_PROPERTY_FRAGMENTS = st.sampled_from([f"\\p{{{name}}}" for name in _PROPERTY_NAMES] + ["\\pL", "\\pN", "\\pP", "\\pZ"])
+_INSIDE_CLASS_EXTRAS = st.text(alphabet="abcXYZ_-0", max_size=4)
+
+
+@st.composite
+def _patterns_with_properties(draw: st.DrawFn) -> str:
+    parts: list[str] = []
+    for _ in range(draw(st.integers(min_value=1, max_value=4))):
+        choice = draw(st.sampled_from(["literal", "in_class", "out_class"]))
+        if choice == "literal":
+            parts.append(draw(st.text(alphabet=string.ascii_lowercase, min_size=1, max_size=3)))
+        elif choice == "in_class":
+            extras = draw(_INSIDE_CLASS_EXTRAS)
+            prop = draw(_PROPERTY_FRAGMENTS)
+            negate = "^" if draw(st.booleans()) else ""
+            parts.append(f"[{negate}{extras}{prop}]")
+        else:
+            parts.append(draw(_PROPERTY_FRAGMENTS))
+        parts.append(draw(st.sampled_from(["", "+", "*", "?"])))
+    return "".join(parts)
+
+
+@given(_patterns_with_properties())
+@settings(suppress_health_check=list(HealthCheck), max_examples=200)
+def test_normalize_regex_never_produces_nested_classes(pattern: str) -> None:
+    result = normalize_regex(pattern)
+    if result is None:
+        return
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", FutureWarning)
+        re.compile(result)
 
 
 @given(st.data())
