@@ -1,0 +1,55 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ N scenarios  ❌ N unique failures
+
+=================================== FAILURES ===================================
+_________________________________ POST /audit __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    null is not of type "string"
+
+    Schema at /properties/name:
+
+        {
+            "type": "string"
+        }
+
+    Value:
+
+        null
+
+[200] OK:
+
+    `{"name":null}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: N
+
+Stop reason: Completed
+
+Failures:
+  ❌ Response violates schema: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

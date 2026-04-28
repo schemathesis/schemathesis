@@ -423,3 +423,190 @@ def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
 
     assert result.exit_code == 0, result.output
     assert "Counter: 42" in result.output
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_chains_post_with_get_via_link(cli, ctx, app_runner, snapshot_cli):
+    # Server-generated productId means GET path can only match if it comes from POST's response.
+    paths = {
+        "/products": {
+            "post": {
+                "operationId": "createProduct",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["productId"],
+                                    "properties": {"productId": {"type": "string"}},
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "/products/{productId}": {
+            "get": {
+                "operationId": "getProduct",
+                "parameters": [
+                    {
+                        "name": "productId",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    products: set[str] = set()
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        product_id = uuid.uuid4().hex
+        products.add(product_id)
+        return jsonify({"productId": product_id}), 201
+
+    @app.route("/products/<product_id>", methods=["GET"])
+    def get_product(product_id):
+        if product_id not in products:
+            return "", 404
+        # Planted bug: required `name` is null for products that exist.
+        return jsonify({"name": None}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.main(
+            "fuzz",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--max-time=15",
+            "--seed=42",
+            "-c",
+            "response_schema_conformance",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_fuzz_chains_via_request_body_link(cli, ctx, app_runner, snapshot_cli):
+    # POST /products returns a fixed high-entropy (productId, secret) pair; only when /audit
+    # body carries that exact pair does the planted schema violation surface. Random fuzz
+    # has no way to guess the pair, so without body-link forwarding the bug is invisible.
+    valid_product_id = "alpha-product-7af3-bbfd-4b2d-9b5d"
+    valid_secret = "bravo-secret-9c11-c209-1cac-a29f"
+    paths = {
+        "/products": {
+            "post": {
+                "operationId": "createProduct",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["productId", "secret"],
+                                    "properties": {
+                                        "productId": {"type": "string"},
+                                        "secret": {"type": "string"},
+                                    },
+                                }
+                            }
+                        },
+                        "links": {
+                            "AuditProduct": {
+                                "operationId": "auditProduct",
+                                "requestBody": "$response.body",
+                            }
+                        },
+                    }
+                },
+            }
+        },
+        "/audit": {
+            "post": {
+                "operationId": "auditProduct",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["productId", "secret"],
+                                "properties": {
+                                    "productId": {"type": "string"},
+                                    "secret": {"type": "string"},
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name"],
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "400": {"description": "Bad request"},
+                },
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/products", methods=["POST"])
+    def create_product():
+        return jsonify({"productId": valid_product_id, "secret": valid_secret}), 201
+
+    @app.route("/audit", methods=["POST"])
+    def audit_product():
+        from flask import request
+
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        if (data.get("productId"), data.get("secret")) != (valid_product_id, valid_secret):
+            return "", 400
+        # Planted bug: required `name` is null for valid pairs.
+        return jsonify({"name": None}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.main(
+            "fuzz",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--max-time=5",
+            "--seed=42",
+            "-c",
+            "response_schema_conformance",
+        )
+        == snapshot_cli
+    )

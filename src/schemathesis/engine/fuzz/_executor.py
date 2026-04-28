@@ -7,7 +7,7 @@ import time
 import uuid
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from warnings import catch_warnings
 
 import requests
@@ -20,14 +20,17 @@ from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._validate import validate_response
+from schemathesis.engine.fuzz._link_chooser import collect_link_candidates
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
 
 if TYPE_CHECKING:
     from schemathesis.config import FuzzConfig, ProjectConfig
+    from schemathesis.core.transport import Response
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation, BaseSchema
 
 FUZZ_TESTS_LABEL = "Fuzz tests"
@@ -44,6 +47,8 @@ class _StopFuzzing(KeyboardInterrupt):
 
 FUZZ_MAX_EXAMPLES = sys.maxsize
 MAX_SCENARIO_STEPS = 6
+# link-vs-random bias; Hypothesis prefers index 0 on shrinking, so True is the canonical step.
+_LINK_BIAS_CHOICES = [True] * 8 + [False] * 2
 
 
 def compute_operation_weights(schema: BaseSchema, operations: list[APIOperation]) -> dict[str, int]:
@@ -172,6 +177,7 @@ def _run_forever(
     operations: list[APIOperation],
     event_queue: queue.Queue[events.EngineEvent],
 ) -> EventGenerator:
+    ctx.inject_links()
     strategy_kwargs_by_label: dict[str, dict[str, object]] = {
         op.label: _build_strategy_kwargs(ctx.config, operation=op) for op in operations
     }
@@ -241,6 +247,7 @@ def _run_forever_thread(
     from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
 
     from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     if not operations:
         return
@@ -267,18 +274,15 @@ def _run_forever_thread(
     # Layer-0 producers appear more often; consumers and non-OpenAPI ops get weight 1.
     weights_by_label = compute_operation_weights(ctx.schema, operations)
     weighted_operations = [op for op in operations for _ in range(weights_by_label[op.label])]
+    operations_by_label: dict[str, APIOperation] = {operation.label: operation for operation in operations}
+
+    is_openapi_schema = isinstance(ctx.schema, OpenApiSchema)
     # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
     seen_error_labels: set[str] = set()
 
     @st.composite  # type: ignore[untyped-decorator]
     def scheduler(draw: hypothesis.strategies.DrawFn) -> ScenarioRecorder:
-        """API call scheduler.
-
-        Scheduler is deliberately simplistic right now:
-
-         - Prefers producers over consumers
-         - Does not use data from responses
-        """
+        """Compose a scenario: weighted-random producers, then link-biased follow-ups."""
         if ctx.has_to_stop or not weighted_operations:
             raise _StopFuzzing
 
@@ -287,15 +291,33 @@ def _run_forever_thread(
         recorder = ScenarioRecorder(label=FUZZ_TESTS_LABEL)
         excluded_operations: set[str] = set()
 
+        last_step: tuple[APIOperation, Case, Response] | None = None
+
         for _ in range(MAX_SCENARIO_STEPS):
             if ctx.has_to_stop:
                 # property re-evaluated each iteration; can change via another thread
                 break  # type: ignore[unreachable]
-            operation = draw(st.sampled_from(weighted_operations))
+            link_overrides: dict[str, Any] = {}
+            if last_step is not None and is_openapi_schema:
+                previous_operation, previous_case, previous_response = last_step
+                candidates = collect_link_candidates(
+                    operation=previous_operation,
+                    case=previous_case,
+                    response=previous_response,
+                    operations_by_label=operations_by_label,
+                    excluded_labels=excluded_operations,
+                )
+                if candidates and draw(st.sampled_from(_LINK_BIAS_CHOICES)):
+                    operation, link_overrides = draw(st.sampled_from(candidates))
+                else:
+                    operation = draw(st.sampled_from(weighted_operations))
+            else:
+                operation = draw(st.sampled_from(weighted_operations))
+            merged_kwargs = {**strategy_kwargs_by_label[operation.label], **link_overrides}
             try:
                 case = draw(
                     st.one_of(
-                        operation.as_strategy(generation_mode=mode, **strategy_kwargs_by_label[operation.label])
+                        operation.as_strategy(generation_mode=mode, **merged_kwargs)
                         for mode in generation_modes_by_label[operation.label]
                     )
                 )
@@ -335,6 +357,7 @@ def _run_forever_thread(
                     )
                 continue
             recorder.record_response(case_id=case.id, response=response)
+            last_step = (operation, case, response)
 
         started = events.FuzzScenarioStarted(suite_id=suite_id, worker_id=worker_id)
         event_queue.put(started)
