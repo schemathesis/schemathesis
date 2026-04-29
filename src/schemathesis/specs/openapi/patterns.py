@@ -179,6 +179,9 @@ _POSIX_CLASS_RAW_MAP: dict[str, str] = {
 }
 
 
+_PCRE_CLASS_SET_OPERATORS = ("||", "&&", "~~")
+
+
 def _inline_unicode_in_classes(pattern: str) -> str | None:
     r"""Inline `\p{X}` and `[:X:]` raw class contents inside `[...]`; bail out on `\P{X}` / `[:^X:]` (uncomposable)."""
     out: list[str] = []
@@ -212,6 +215,10 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
             out.append(pattern[i : i + 2])
             i += 2
             continue
+        # PCRE/Java class-set operators have no Python `re` equivalent — silent translation
+        # would change semantics (`||` becomes a literal `|`, `&&` a literal `&`, etc.).
+        if in_class and pattern[i : i + 2] in _PCRE_CLASS_SET_OPERATORS:
+            return None
         # POSIX character class `[:name:]` nested inside `[...]`.
         if in_class and ch == "[" and i + 1 < n and pattern[i + 1] == ":":
             end = pattern.find(":]", i + 2)
@@ -227,6 +234,10 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
                 out.append(raw)
                 i = end + 2
                 continue
+        # Nested `[...]` inside an outer class is a PCRE/Java extension; Python `re` has no
+        # equivalent and silently treats `[` as a literal, drifting from the source semantics.
+        if in_class and ch == "[":
+            return None
         if ch == "[" and not in_class:
             in_class = True
         elif ch == "]" and in_class:

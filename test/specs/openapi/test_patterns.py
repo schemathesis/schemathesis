@@ -267,6 +267,15 @@ def test_update_quantifier_invalid_pattern():
         # Negated POSIX class `[:^X:]` and unknown POSIX names \u2014 bail out.
         (r"[[:^alnum:]_]", None),
         (r"[[:greek:]_]", None),
+        # PCRE/Java class-set operators have no Python `re` equivalent; bail out so the
+        # translator doesn't silently change semantics (`||` becomes literal `|`, etc.).
+        (r"[\p{L}||\p{N}]+", None),
+        (r"[\p{N}||\p{P}]+", None),
+        (r"[\p{L}||\p{M}||\p{Z}||\p{S}||\p{N}||\p{P}]+", None),
+        (r"[\p{Print}&&[^|:/]]+", None),
+        (r"[\p{L}~~\p{N}]", None),
+        # Nested class `[[...]]` inside an outer class has no safe Python equivalent.
+        (r"[[\p{L}]\p{N}]", None),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
