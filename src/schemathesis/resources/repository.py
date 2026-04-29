@@ -104,6 +104,22 @@ class ResourceRepository:
                     context=context or {},
                 )
 
+    def seed_input_values(self, by_resource: dict[str, dict[str, Any]], *, source: str) -> None:
+        """Store externally-provided identifier values under specific resource buckets.
+
+        Caller decides which buckets each value belongs to (typically by intersecting claim
+        fields with each resource's queried fields) so unrelated buckets aren't contaminated.
+        """
+        for resource_name, data in by_resource.items():
+            if data:
+                self._store(
+                    resource_name=resource_name,
+                    data=dict(data),
+                    source_operation=source,
+                    status_code=200,
+                    context={},
+                )
+
     def record_request(
         self,
         *,
