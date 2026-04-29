@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from schemathesis.core.parameters import ParameterLocation
 
 
 class Cardinality(str, enum.Enum):
@@ -9,6 +13,29 @@ class Cardinality(str, enum.Enum):
 
     ONE = "ONE"
     MANY = "MANY"
+
+
+class _ResourceRef(Protocol):
+    """Identifies a resource by name."""
+
+    @property
+    def name(self) -> str: ...
+
+
+class ResourceFieldRef(Protocol):
+    """One ``(resource, field)`` reference inside a generated request.
+
+    Implemented structurally by spec-specific types (e.g. OpenAPI's ``InputSlot``).
+    """
+
+    @property
+    def resource(self) -> _ResourceRef: ...
+    @property
+    def resource_field(self) -> str | None: ...
+    @property
+    def parameter_name(self) -> str | int: ...
+    @property
+    def parameter_location(self) -> ParameterLocation: ...
 
 
 @dataclass(slots=True)
