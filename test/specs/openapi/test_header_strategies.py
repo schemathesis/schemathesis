@@ -103,7 +103,9 @@ def test_negative_mode_range_has_three_tiers():
     inner()
 
     assert any(VALID_RANGE_RE.match(v) for v in values), "Expected valid structured Range values"
-    assert "bytes=" in values, "Expected 'bytes=' (empty range) in slightly-invalid tier"
+    assert any(v.startswith("bytes=-1-") or v.startswith("invalid=") for v in values), (
+        "Expected slightly-invalid Range values in negative mode"
+    )
     assert any(not v.startswith("bytes=") and not v.startswith("invalid=") for v in values), (
         "Expected random header values in negative mode"
     )
