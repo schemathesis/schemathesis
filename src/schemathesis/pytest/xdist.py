@@ -200,7 +200,7 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
             response = None
         interaction = Interaction(request=request, response=response)
         interaction.timestamp = interaction_data["timestamp"]
-        recorder.interactions[case_id] = interaction
+        recorder.record_interaction(case_id, interaction)
 
     for case_id, checks in data["checks"].items():
         for check in checks:
@@ -221,18 +221,19 @@ def deserialize_recorder(data: dict) -> tuple[ScenarioRecorder, float]:
                 )
             else:
                 failure_info = None
-            recorder.checks.setdefault(case_id, []).append(
-                CheckNode(name=check["name"], status=status, failure_info=failure_info)
-            )
+            recorder.record_check_node(case_id, CheckNode(name=check["name"], status=status, failure_info=failure_info))
 
     for case_id, meta_data in data["cases"].items():
         meta = CaseMetadata.from_dict(meta_data) if meta_data is not None else None
-        recorder.cases[case_id] = CaseNode(
-            # proxy holds only metadata, not a full Case
-            value=_CaseMetaProxy(meta),  # type: ignore[arg-type]
-            parent_id=None,
-            transition=None,
-            is_transition_applied=False,
+        recorder.record_case_node(
+            case_id,
+            CaseNode(
+                # proxy holds only metadata, not a full Case
+                value=_CaseMetaProxy(meta),  # type: ignore[arg-type]
+                parent_id=None,
+                transition=None,
+                is_transition_applied=False,
+            ),
         )
 
     return recorder, data["elapsed_sec"]
