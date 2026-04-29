@@ -7,6 +7,7 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
     ["parameter", "path", "expected"],
     [
         ("id", "/users/{id}", "User"),
+        ("ids", "/api/persons/{ids}", "Person"),
         ("ID", "/accounts/{ID}", "Account"),
         ("userId", "/users/{userId}", "User"),
         ("accountUuid", "/accounts/{accountUuid}", "Account"),
@@ -274,6 +275,8 @@ def test_strip_affixes(name, prefixes, suffixes, expected):
         # ID synonym matching
         pytest.param("user_id", "User", ["uuid", "name"], "uuid", id="id-synonym-uuid"),
         pytest.param("item_id", "Item", ["guid", "name"], "guid", id="id-synonym-guid"),
+        # Plural ids parameter resolves to the singular id field on the resource
+        pytest.param("ids", "Person", ["id", "name"], "id", id="plural-ids-to-id"),
         # Resource-hint matching (parameter prefix hints at resource, suffix is field)
         pytest.param("file_name", "BackupFile", ["name", "date", "size"], "name", id="resource-hint-file-name"),
         pytest.param("user_email", "User", ["id", "email", "name"], "email", id="resource-hint-user-email"),
