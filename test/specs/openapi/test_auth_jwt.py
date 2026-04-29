@@ -27,7 +27,8 @@ def _new_repository(resource_names: list[str]) -> ResourceRepository:
     return ResourceRepository(descriptors=descriptors)
 
 
-def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, ctx):
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cli, ctx):
     # Without seeding, schemathesis can't generate the bearer's username, so the bug stays hidden.
     user_schema = {
         "type": "object",
@@ -85,17 +86,88 @@ def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, ctx):
     port = app_runner.run_flask_app(app)
     token = _make_jwt({"sub": "alice"})
 
-    result = cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
-        f"--header=Authorization: Bearer {token}",
-        "--phases=fuzzing",
-        "--max-examples=50",
-        "-c response_schema_conformance",
-        "--mode=positive",
-        config={"phases": {"fuzzing": {"extra-data-sources": {"responses": True}}}},
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            f"--header=Authorization: Bearer {token}",
+            "--phases=fuzzing",
+            "--max-examples=50",
+            "-c response_schema_conformance",
+            "--mode=positive",
+        )
+        == snapshot_cli
     )
-    assert result.exit_code == 1, result.stdout
-    assert "Response violates schema" in result.stdout, result.stdout
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_basic_auth_username_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cli, ctx):
+    # Basic-auth username is the same identifier the SUT trusts; without seeding the runner
+    # never generates "alice", so the bug at GET /users/alice stays hidden.
+    user_schema = {
+        "type": "object",
+        "properties": {"username": {"type": "string"}, "name": {"type": "string"}},
+        "required": ["username", "name"],
+    }
+    paths = {
+        "/users": {
+            "post": {
+                "operationId": "createUser",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"username": {"type": "string"}, "name": {"type": "string"}},
+                                "required": ["username", "name"],
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {"description": "Created", "content": {"application/json": {"schema": user_schema}}}
+                },
+            }
+        },
+        "/users/{username}": {
+            "get": {
+                "operationId": "getUser",
+                "parameters": [
+                    {"name": "username", "in": "path", "required": True, "schema": {"type": "string"}},
+                ],
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": user_schema}}},
+                    "404": {"description": "Not found"},
+                },
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json() or {}
+        return jsonify({"username": body.get("username", ""), "name": body.get("name", "")}), 201
+
+    @app.route("/users/<username>", methods=["GET"])
+    def get_user(username):
+        if username != "alice":
+            return "", 404
+        # Bug: required `name` is null for the basic-auth user.
+        return jsonify({"username": "alice", "name": None}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--auth=alice:wonderland",
+            "--phases=fuzzing",
+            "--max-examples=50",
+            "-c response_schema_conformance",
+            "--mode=positive",
+        )
+        == snapshot_cli
+    )
 
 
 def test_seed_only_lands_in_buckets_with_matching_queried_field():

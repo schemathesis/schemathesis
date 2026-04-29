@@ -31,7 +31,9 @@ IDENTIFIER_CLAIMS: dict[str, tuple[str, ...]] = {
     "orgId": ("org_id", "orgId"),
 }
 
-_SEED_SOURCE = "<jwt:auth>"
+_JWT_SEED_SOURCE = "<jwt:auth>"
+_BASIC_SEED_SOURCE = "<basic:auth>"
+_BASIC_AUTH_FIELDS: tuple[str, ...] = ("id", "user_id", "userId", "username")
 
 
 def decode_jwt_payload(token: str) -> dict | None:
@@ -83,4 +85,23 @@ def seed_pool_from_headers(
             by_resource.setdefault(requirement.resource_name, {})[requirement.resource_field] = field_to_value[
                 requirement.resource_field
             ]
-    repository.seed_input_values(by_resource, source=_SEED_SOURCE)
+    repository.seed_input_values(by_resource, source=_JWT_SEED_SOURCE)
+
+
+def seed_pool_from_basic_auth(
+    repository: ResourceRepository,
+    basic_auth: tuple[str, str] | None,
+    requirements: Iterable[ParameterRequirement],
+) -> None:
+    """Seed the configured Basic-auth username into compatible resource buckets.
+
+    Only the username is seeded; the password is never stored in the pool.
+    """
+    if basic_auth is None or not basic_auth[0]:
+        return
+    username = basic_auth[0]
+    by_resource: dict[str, dict[str, str]] = {}
+    for requirement in requirements:
+        if requirement.resource_field in _BASIC_AUTH_FIELDS:
+            by_resource.setdefault(requirement.resource_name, {})[requirement.resource_field] = username
+    repository.seed_input_values(by_resource, source=_BASIC_SEED_SOURCE)

@@ -9,7 +9,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.core.schema_analysis import SchemaWarning
 from schemathesis.resources import ExtraDataSource, ResourceRepository
-from schemathesis.specs.openapi.auth_jwt import seed_pool_from_headers
+from schemathesis.specs.openapi.auth_jwt import seed_pool_from_basic_auth, seed_pool_from_headers
 from schemathesis.specs.openapi.extra_data_source import (
     OpenApiExtraDataSource,
     build_inputs_by_label,
@@ -109,8 +109,11 @@ class OpenAPIAnalysis:
                 repository = ResourceRepository(descriptors)
                 self._populate_from_response_examples(repository)
                 headers = self.schema.config.headers_for()
+                basic_auth = self.schema.config.auth.basic
                 if headers:
                     seed_pool_from_headers(repository, headers, requirements.values())
+                if basic_auth is not None:
+                    seed_pool_from_basic_auth(repository, basic_auth, requirements.values())
                 self._extra_data_source = OpenApiExtraDataSource(
                     repository=repository,
                     requirements=requirements,
