@@ -65,6 +65,9 @@ pytest_plugins = [
 ]
 
 logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
+# The capability probe deliberately sends a NULL byte header; aiohttp logs the parser rejection
+# at ERROR level once per test, polluting captured-log output for unrelated failures.
+logging.getLogger("aiohttp.server").setLevel(logging.CRITICAL)
 
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`

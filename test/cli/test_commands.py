@@ -304,10 +304,11 @@ def test_connection_timeout(ctx, cli, schema_url, workers, snapshot_cli):
         def noop(ctx, response, case):
             pass
 
+        # Timeout is well under /slow's 500ms sleep but high enough to absorb CI jitter on /success.
         assert (
             cli.run(
                 schema_url,
-                "--request-timeout=0.08",
+                "--request-timeout=0.25",
                 f"--workers={workers}",
                 "--phases=fuzzing",
                 "--checks=noop",
