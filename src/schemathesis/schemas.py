@@ -112,6 +112,8 @@ class BaseSchema(Mapping):
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
+        # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase.
+        self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
 
     @property
     def specification(self) -> Specification:

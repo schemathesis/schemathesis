@@ -6420,3 +6420,32 @@ def test_coverage_pool_overlay_respects_destination_format(cli, app_runner, snap
         )
         == snapshot_cli
     )
+
+
+def test_undeclared_method_probes_dedup_across_operations(ctx):
+    # Each (path, unexpected_method) pair is emitted once across all declared operations on the path.
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/items": {
+                method: {"responses": {"200": {"description": "OK"}}} for method in ("get", "post", "put", "delete")
+            },
+        },
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    unexpected_methods = {"options", "patch", "trace", "query"}
+
+    seen: list[tuple[str, str]] = []
+    seen_dedup: set[tuple[str, str]] = set()
+    for declared in ("GET", "POST", "PUT", "DELETE"):
+        for case in _iter_coverage_cases(
+            operation=schema["/items"][declared],
+            generation_modes=[GenerationMode.NEGATIVE],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=unexpected_methods,
+            generation_config=schema.config.generation,
+            unexpected_methods_seen=seen_dedup,
+        ):
+            if case.meta.phase.data.scenario == CoverageScenario.UNSPECIFIED_HTTP_METHOD:
+                seen.append((case.operation.path, case.method))
+
+    assert sorted(seen) == sorted([("/items", method.upper()) for method in unexpected_methods])

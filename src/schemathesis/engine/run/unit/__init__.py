@@ -112,6 +112,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         mode = HypothesisTestMode.EXAMPLES
     elif phase.name == PhaseName.COVERAGE:
         mode = HypothesisTestMode.COVERAGE
+        engine.schema.coverage_unexpected_methods_seen.clear()
     else:
         mode = HypothesisTestMode.FUZZING
 
@@ -263,6 +264,9 @@ def worker_task(
                                 seed=ctx.config.seed,
                                 project=ctx.config,
                                 as_strategy_kwargs=as_strategy_kwargs,
+                                unexpected_methods_seen=(
+                                    ctx.schema.coverage_unexpected_methods_seen if phase == PhaseName.COVERAGE else None
+                                ),
                             ),
                         )
                     except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:
