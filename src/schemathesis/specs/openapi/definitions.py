@@ -5,6 +5,7 @@ from typing import Any
 
 import jsonschema_rs
 
+from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.lazy_import import lazy_import
 
 SWAGGER_20 = {
@@ -2563,13 +2564,18 @@ _VALIDATORS = [
     "OPENAPI_32_VALIDATOR",
 ]
 
+SWAGGER_20_VALIDATOR: jsonschema_rs.Validator
+OPENAPI_30_VALIDATOR: jsonschema_rs.Validator
+OPENAPI_31_VALIDATOR: jsonschema_rs.Validator
+OPENAPI_32_VALIDATOR: jsonschema_rs.Validator
+
 __all__ = ["SWAGGER_20", "OPENAPI_30", "OPENAPI_31", "OPENAPI_32", *_VALIDATORS]
 
 _imports = {
-    "SWAGGER_20_VALIDATOR": lambda: jsonschema_rs.Draft4Validator(SWAGGER_20),
-    "OPENAPI_30_VALIDATOR": lambda: jsonschema_rs.Draft4Validator(OPENAPI_30),
-    "OPENAPI_31_VALIDATOR": lambda: jsonschema_rs.Draft202012Validator(OPENAPI_31),
-    "OPENAPI_32_VALIDATOR": lambda: jsonschema_rs.Draft202012Validator(OPENAPI_32),
+    "SWAGGER_20_VALIDATOR": lambda: make_validator(SWAGGER_20, jsonschema_rs.Draft4Validator),
+    "OPENAPI_30_VALIDATOR": lambda: make_validator(OPENAPI_30, jsonschema_rs.Draft4Validator),
+    "OPENAPI_31_VALIDATOR": lambda: make_validator(OPENAPI_31, jsonschema_rs.Draft202012Validator),
+    "OPENAPI_32_VALIDATOR": lambda: make_validator(OPENAPI_32, jsonschema_rs.Draft202012Validator),
 }
 
 

@@ -14,7 +14,7 @@ from hypothesis_jsonschema import from_schema
 from schemathesis.config import GenerationConfig
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
-from schemathesis.core.jsonschema import is_valid
+from schemathesis.core.jsonschema import is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
@@ -238,9 +238,7 @@ def extract_top_level(
         try:
             param_schema = parameter.validation_schema
             param_validator: jsonschema_rs.Validator | None = (
-                None
-                if isinstance(param_schema, bool)
-                else jsonschema_rs.validator_for(param_schema, validate_formats=True)
+                None if isinstance(param_schema, bool) else make_validator_for(param_schema)
             )
         except Exception:
             param_validator = None
@@ -254,11 +252,7 @@ def extract_top_level(
                 # - A oneOf/anyOf branch example is validated against the branch (not the full
                 #   combined schema, which would reject strings valid for multiple branches).
                 try:
-                    validator = (
-                        None
-                        if isinstance(definition, bool)
-                        else jsonschema_rs.validator_for(definition, validate_formats=True)
-                    )
+                    validator = None if isinstance(definition, bool) else make_validator_for(definition)
                 except Exception:
                     validator = None
             # Open API 2 also supports `example`
@@ -305,7 +299,7 @@ def extract_top_level(
         try:
             body_schema = body.validation_schema
             body_validator: jsonschema_rs.Validator | None = (
-                None if isinstance(body_schema, bool) else jsonschema_rs.validator_for(body_schema)
+                None if isinstance(body_schema, bool) else make_validator_for(body_schema)
             )
         except Exception:
             body_validator = None
@@ -567,7 +561,7 @@ def extract_from_schemas(
         if isinstance(schema, bool):
             continue
         try:
-            body_validator: jsonschema_rs.Validator | None = jsonschema_rs.validator_for(schema)
+            body_validator: jsonschema_rs.Validator | None = make_validator_for(schema)
         except Exception:
             body_validator = None
         resolver = RefResolver.from_schema(schema)
