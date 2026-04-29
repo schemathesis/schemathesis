@@ -11,11 +11,10 @@ import jsonschema_rs
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import status_code_matches
-from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
+from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor, ResourceFieldRef
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-    from schemathesis.specs.openapi.stateful.dependencies.models import InputSlot
 
 # Maximum number of resource instances cached per unique context within a resource type.
 # This ensures diversity across parent resources (e.g., pets from different owners).
@@ -124,7 +123,7 @@ class ResourceRepository:
         self,
         *,
         operation: str,
-        inputs: Sequence[InputSlot],
+        inputs: Sequence[ResourceFieldRef],
         case: Case,
         status_code: int,
         context: dict[str, Any] | None = None,
@@ -219,8 +218,8 @@ class ResourceRepository:
             context_buckets[context_key].append(instance)
 
 
-def _extract_request_value(slot: InputSlot, case: Case) -> Any:
-    """Pull the value for an InputSlot out of a generated Case.
+def _extract_request_value(slot: ResourceFieldRef, case: Case) -> Any:
+    """Pull the value for a resource-field reference out of a generated Case.
 
     Returns None when the slot's location isn't supported (query, header,
     body-array-index) or when the named field is absent from the case.
