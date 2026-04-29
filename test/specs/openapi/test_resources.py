@@ -652,6 +652,81 @@ def test_negative_aware_strategy_with_captured_values(ctx):
     assert all(isinstance(r, GeneratedValue) for r in results)
 
 
+def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
+    # Body schema declares `properties` and `required` but omits `type: object`. The generator
+    # may then draw non-dict values (None, scalars) and the captured-variant overlay must not
+    # silently coerce those to `{}` and produce a body missing required fields.
+    spec = ctx.openapi.build_schema(
+        {
+            "/clients": {
+                "post": {
+                    "operationId": "createClient",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"clientId": {"type": "string"}},
+                                    }
+                                }
+                            },
+                            "links": {
+                                "CreateTask": {
+                                    "operationId": "createTask",
+                                    "parameters": {"clientId": "$response.body#/clientId"},
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/tasks": {
+                "post": {
+                    "operationId": "createTask",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "clientId": {"type": "string"},
+                                        "clientSecret": {"type": "string"},
+                                    },
+                                    "required": ["clientId", "clientSecret"],
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"201": {"description": "Created"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    for i in range(5):
+        data_source.repository.record_response(
+            operation="POST /clients", status_code=201, payload={"clientId": f"client-{i}"}
+        )
+
+    operation = schema["/tasks"]["POST"]
+    body = operation.body[0]
+    config = GenerationConfig()
+
+    strategy = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
+
+    @given(strategy)
+    @settings(max_examples=200, database=None, deadline=None)
+    def t(value):
+        if isinstance(value, dict):
+            for required in ("clientId", "clientSecret"):
+                assert required in value, f"required field {required!r} missing from POSITIVE body: {value!r}"
+
+    t()
+
+
 def test_negative_aware_strategy_with_captured_values_body(ctx):
     spec = ctx.openapi.build_schema(
         {

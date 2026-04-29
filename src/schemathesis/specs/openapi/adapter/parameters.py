@@ -101,7 +101,12 @@ def build_hybrid_strategy(
         # Always generate base values first, then overlay captured values.
         # This ensures parameters without resource requirements (like `file_name`)
         # still get generated values while resource-linked params use captured data.
-        base = draw(original_strategy) or {}
+        base = draw(original_strategy)
+
+        # Captured variants are partial dict overrides; meaningful only when the base is a dict.
+        # Schemas without `type: object` can produce scalars/lists — leave those untouched.
+        if not isinstance(base, dict):
+            return base
 
         # Single variant: no selection needed
         if n_variants == 1:
