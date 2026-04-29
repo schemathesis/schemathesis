@@ -1,5 +1,6 @@
-import json
 from pathlib import Path
+
+from test.utils import load_json_or_fail
 
 
 def test_allure_xdist_stable_path_without_explicit_path(testdir, openapi3_base_url, tmp_path, ctx):
@@ -51,7 +52,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     feature_labels = [lbl["value"] for lbl in data["labels"] if lbl["name"] == "feature"]
     assert set(feature_labels) == {"users", "readonly"}
 
@@ -83,7 +84,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert data["name"] == "xdist title"
     assert data["description"] == "xdist description"
     assert any(lnk["name"] == "xdist link" for lnk in data.get("links", []))
@@ -119,7 +120,7 @@ def test_api(case):
 
     result_files = list(Path(allure_dir).glob("*-result.json"))
     assert len(result_files) >= 1
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert "name" in data
     assert data["status"] in ("passed", "failed", "broken")
 
@@ -141,7 +142,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert len(result_files) >= 1
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert "name" in data
     assert data["status"] in ("passed", "failed", "broken")
     assert data["testCaseId"] == data["historyId"]
@@ -164,7 +165,7 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=2)
     result_files = list(allure_dir.glob("*-result.json"))
-    failed_results = [json.loads(f.read_text()) for f in result_files]
+    failed_results = [load_json_or_fail(f) for f in result_files]
     assert any(r["status"] == "failed" for r in failed_results)
     failed = next(r for r in failed_results if r["status"] == "failed")
     step_messages = [s["statusDetails"]["message"] for s in failed.get("steps", [])]
@@ -191,7 +192,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert any(a["name"] == "my-note" for a in data.get("attachments", []))
 
 
@@ -214,7 +215,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert any(lnk["name"] == "API Docs" for lnk in data.get("links", []))
 
 
@@ -237,7 +238,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert data.get("description") == "Custom description"
 
 
@@ -260,5 +261,5 @@ def test_api(case):
     result.assert_outcomes(passed=1)
     result_files = list(allure_dir.glob("*-result.json"))
     assert len(result_files) >= 1
-    data = json.loads(result_files[0].read_text())
+    data = load_json_or_fail(result_files[0])
     assert data["name"] == "My Custom Title"

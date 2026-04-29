@@ -14,6 +14,7 @@ from hypothesis import strategies as st
 from schemathesis.generation import GenerationMode
 from schemathesis.reporting.har import _cookie_to_har
 from schemathesis.reporting.vcr import write_double_quoted
+from test.utils import load_json_or_fail, load_yaml_or_fail
 
 
 @pytest.fixture
@@ -22,8 +23,7 @@ def cassette_path(tmp_path):
 
 
 def load_cassette(path):
-    with path.open(encoding="utf-8") as fd:
-        return yaml.safe_load(fd)
+    return load_yaml_or_fail(path)
 
 
 def load_response_body(cassette, idx):
@@ -116,10 +116,9 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
         assert cassette["seed"] == 1
         assert cassette["http_interactions"][0]["response"] is None
     elif format == "har":
-        with cassette_path.open(encoding="utf-8") as fd:
-            data = json.load(fd)
-            assert len(data["log"]["entries"]) == 3
-            assert data["log"]["entries"][1]["response"]["bodySize"] == -1
+        data = load_json_or_fail(cassette_path)
+        assert len(data["log"]["entries"]) == 3
+        assert data["log"]["entries"][1]["response"]["bodySize"] == -1
     else:
         # ndjson format (externally tagged)
         events = []
@@ -228,8 +227,7 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
     )
     assert str(cassette_path) in result.stdout
     assert cassette_path.exists()
-    with cassette_path.open(encoding="utf-8") as fd:
-        data = json.load(fd)
+    data = load_json_or_fail(cassette_path)
     assert "log" in data
     assert "entries" in data["log"]
     assert len(data["log"]["entries"]) > 1

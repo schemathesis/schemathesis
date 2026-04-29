@@ -3,11 +3,10 @@ import uuid
 from xml.etree import ElementTree
 
 import pytest
-import yaml
 from _pytest.main import ExitCode
 from flask import jsonify, request
 
-from test.utils import flaky
+from test.utils import flaky, load_yaml_or_fail
 
 
 @pytest.mark.openapi_version("3.0")
@@ -78,8 +77,7 @@ def test_with_cassette(tmp_path, cli, schema_url):
         f"--report-vcr-path={cassette_path}",
     )
     assert cassette_path.exists()
-    with cassette_path.open(encoding="utf-8") as fd:
-        cassette = yaml.safe_load(fd)
+    cassette = load_yaml_or_fail(cassette_path)
     assert len(cassette["http_interactions"]) >= 20
     assert cassette["seed"] not in (None, "None")
 
@@ -97,8 +95,7 @@ def test_with_cassette_stateful_only(tmp_path, cli, schema_url):
         f"--report-vcr-path={cassette_path}",
     )
     assert cassette_path.exists()
-    with cassette_path.open(encoding="utf-8") as fd:
-        cassette = yaml.safe_load(fd)
+    cassette = load_yaml_or_fail(cassette_path)
     for interaction in cassette["http_interactions"]:
         assert interaction["phase"]["name"] == "stateful"
 
