@@ -160,9 +160,27 @@ _UNICODE_SHORTHAND_RAW_MAP: dict[str, str] = {
     "Z": _SPACE_CLASS,
 }
 
+# POSIX character classes (only valid inside `[...]` in PCRE; Python's `re` misparses them
+# and emits FutureWarning about possible nested sets).
+_POSIX_CLASS_RAW_MAP: dict[str, str] = {
+    "alpha": _LETTER_CLASS,
+    "alnum": _ALNUM_CLASS,
+    "digit": _DIGIT_CLASS,
+    "upper": _LETTER_UPPER_CLASS,
+    "lower": _LETTER_LOWER_CLASS,
+    "space": _SPACE_CLASS,
+    "xdigit": _XDIGIT_CLASS,
+    "print": _PRINT_CLASS,
+    "graph": _GRAPH_CLASS,
+    "punct": _PUNCT_CLASS,
+    "cntrl": _CONTROL_CLASS,
+    "blank": _BLANK_CLASS,
+    "ascii": _ASCII_CLASS,
+}
+
 
 def _inline_unicode_in_classes(pattern: str) -> str | None:
-    r"""Inline `\p{X}` raw class contents inside `[...]`; bail out on `\P{X}` (uncomposable)."""
+    r"""Inline `\p{X}` and `[:X:]` raw class contents inside `[...]`; bail out on `\P{X}` / `[:^X:]` (uncomposable)."""
     out: list[str] = []
     i = 0
     in_class = False
@@ -194,6 +212,21 @@ def _inline_unicode_in_classes(pattern: str) -> str | None:
             out.append(pattern[i : i + 2])
             i += 2
             continue
+        # POSIX character class `[:name:]` nested inside `[...]`.
+        if in_class and ch == "[" and i + 1 < n and pattern[i + 1] == ":":
+            end = pattern.find(":]", i + 2)
+            if end != -1:
+                inner = pattern[i + 2 : end]
+                # Negated POSIX class `[:^X:]` cannot compose with sibling class members.
+                if inner.startswith("^"):
+                    return None
+                raw = _POSIX_CLASS_RAW_MAP.get(inner)
+                if raw is None:
+                    # Unknown POSIX name (or not a POSIX class at all) - bail out.
+                    return None
+                out.append(raw)
+                i = end + 2
+                continue
         if ch == "[" and not in_class:
             in_class = True
         elif ch == "]" and in_class:
@@ -209,6 +242,7 @@ def normalize_regex(pattern: object) -> str | None:
 
     Handles:
     - PCRE Unicode property escapes (\p{L}, \pL, etc.) -> Python equivalents
+    - POSIX character classes ([:alnum:], [:digit:], etc.) -> Python equivalents
     - Python anchors (\A, \Z) -> Rust-compatible equivalents (^, $)
 
     Returns the translated pattern if successful, None if translation failed
@@ -222,10 +256,12 @@ def normalize_regex(pattern: object) -> str | None:
         esc in pattern
         for esc in (r"\pL", r"\pN", r"\pP", r"\pM", r"\pS", r"\pC", r"\pZ", r"\PL", r"\PN", r"\PC", r"\PM")
     )
+    # Check for POSIX character classes like `[:alnum:]` (only valid inside `[...]`)
+    has_posix = "[:" in pattern and ":]" in pattern
     # Check for Python-specific anchors that need Rust translation
     has_python_anchors = pattern.startswith(r"\A") or pattern.endswith(r"\Z")
 
-    if not has_braced and not has_shorthand and not has_python_anchors:
+    if not has_braced and not has_shorthand and not has_posix and not has_python_anchors:
         return None  # No translation needed
 
     translated = _inline_unicode_in_classes(pattern)
@@ -250,9 +286,17 @@ def normalize_regex(pattern: object) -> str | None:
     return None
 
 
+_POSIX_CLASS_RE = re.compile(r"\[\[:\^?[a-zA-Z]+:\]")
+
+
 def is_valid_python_regex(pattern: object) -> bool:
     """Check if a pattern is valid Python regex."""
     if not isinstance(pattern, str):
+        return False
+    # POSIX character classes nested inside `[...]` are misparsed by Python's `re` (it treats
+    # `[:alnum:]` as the literal characters `:`, `a`, `l`, `n`, `u`, `m` and emits a FutureWarning).
+    # Treat such patterns as invalid so callers route them through `normalize_regex`.
+    if _POSIX_CLASS_RE.search(pattern):
         return False
     try:
         re.compile(pattern)
