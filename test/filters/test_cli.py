@@ -163,7 +163,7 @@ def test_cli_and_config_intersection(ctx, cli, cli_args, config, expected, casse
 
 
 def assert_filtered(cli, schema_path, cassette_path, openapi3_base_url, expected, *, args, kwargs):
-    cli.run(
+    result = cli.run(
         str(schema_path),
         "--checks=not_a_server_error",
         "--max-examples=1",
@@ -173,8 +173,8 @@ def assert_filtered(cli, schema_path, cassette_path, openapi3_base_url, expected
         *args,
         **kwargs,
     )
+    assert result.exit_code == 0, result.stdout
     cassette = load_cassette(cassette_path)
-    assert [
-        f"{entry['request']['method']} /{entry['request']['uri'].split('/')[-1]}"
-        for entry in cassette["http_interactions"]
-    ] == expected
+    interactions = cassette["http_interactions"] or []
+    actual = [f"{entry['request']['method']} /{entry['request']['uri'].split('/')[-1]}" for entry in interactions]
+    assert actual == expected, f"stdout:\n{result.stdout}\ncassette:\n{cassette}"
