@@ -41,6 +41,7 @@
 - Resource-pool variants for path/query/header parameters skip values that violate the destination schema.
 - Bodies missing required fields when a captured value is overlaid on a schema without `type: object`.
 - Boolean path parameters rewritten to integer `1` when the path also contains an integer parameter.
+- Examples violating their own schema surfacing as POSITIVE generation cases.
 - NDJSON reports truncated after the first event from a threaded `requests` import race in the writer.
 
 ### :wrench: Changed
