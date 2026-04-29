@@ -22,6 +22,7 @@ from schemathesis.specs.openapi.examples import (
     extract_inner_examples,
     extract_top_level,
     find_matching_in_responses,
+    get_strategies_from_examples,
     produce_combinations,
 )
 from schemathesis.specs.openapi.extra_data_source import OpenApiExtraDataSource, ParameterRequirement
@@ -3464,3 +3465,70 @@ def test_content_encoded_header_parameter_example_is_valid(ctx):
     for example in extract_from_schemas(operation):
         assert isinstance(example, ParameterExample)
         assert validator.is_valid(example.value), f"Invalid parameter example yielded: {example.value!r}"
+
+
+def test_get_strategies_with_binary_body_and_pool_does_not_crash(ctx):
+    # Generated `Binary` values aren't JSON-serializable; dedup must not crash via canonical-JSON keys.
+    raw = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["itemId"],
+                                    "properties": {"itemId": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"itemId": {"type": "string"}},
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}/upload": {
+                "post": {
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["name", "file"],
+                                    "properties": {
+                                        "name": {"type": "string", "example": "doc.pdf"},
+                                        "file": {"type": "string", "format": "binary"},
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    upload = schema["/items/{itemId}/upload"]["POST"]
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"itemId": "abc"})
+
+    strategies = get_strategies_from_examples(upload, extra_data_source=data_source)
+
+    assert strategies

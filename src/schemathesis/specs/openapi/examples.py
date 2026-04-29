@@ -76,6 +76,14 @@ def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     return left
 
 
+def _combo_dedup_key(combo: Any) -> str:
+    """Build a stable dedup key for a combo, falling back to repr when values aren't JSON-serializable."""
+    try:
+        return jsonschema_rs.canonical.json.to_string(combo)
+    except (TypeError, ValueError):
+        return repr(combo)
+
+
 def _get_pool_combos(
     operation: APIOperation,
     extra_data_source: OpenApiExtraDataSource,
@@ -175,10 +183,10 @@ def get_strategies_from_examples(
             for i in range(n)
         ]
         # Keep original schema combos; append pool-augmented ones that differ.
-        schema_combo_keys = {jsonschema_rs.canonical.json.to_string(c) for c in schema_combos}
+        schema_combo_keys = {_combo_dedup_key(c) for c in schema_combos}
         all_combos = [
             *schema_combos,
-            *(c for c in pool_augmented if jsonschema_rs.canonical.json.to_string(c) not in schema_combo_keys),
+            *(c for c in pool_augmented if _combo_dedup_key(c) not in schema_combo_keys),
         ]
     elif schema_combos:
         all_combos = schema_combos
