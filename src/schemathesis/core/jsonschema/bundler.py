@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.references import sanitize
 from schemathesis.core.jsonschema.types import JsonSchema, to_json_type_name
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import decode_pointer, deepclone
 
 if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver
@@ -220,21 +220,22 @@ def bundle(schema: JsonSchema, resolver: RefResolver, *, inline_recursive: bool)
     return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
 
 
-def unbundle_path(path: list, name_to_uri: dict[str, str]) -> list:
+def unbundle_path(path: list[str | int], name_to_uri: dict[str, str]) -> list[str | int]:
     """Translate bundled path segments back to original reference path segments.
 
     E.g. ['x-bundled', 'schema1', 'properties', 'host'] with name_to_uri={'schema1': '#/components/schemas/Host'}
     becomes ['components', 'schemas', 'Host', 'properties', 'host'].
     """
-    result = []
+    result: list[str | int] = []
     i = 0
     while i < len(path):
-        if path[i] == BUNDLE_STORAGE_KEY and i + 1 < len(path) and path[i + 1] in name_to_uri:
-            uri = name_to_uri[path[i + 1]]
+        next_key = path[i + 1] if i + 1 < len(path) else None
+        if path[i] == BUNDLE_STORAGE_KEY and isinstance(next_key, str) and next_key in name_to_uri:
+            uri = name_to_uri[next_key]
             if "#" in uri:
                 fragment = uri.split("#", 1)[1]
                 if fragment.startswith("/"):
-                    result.extend(fragment[1:].split("/"))
+                    result.extend(decode_pointer(segment) for segment in fragment[1:].split("/"))
             i += 2
         else:
             result.append(path[i])
@@ -263,10 +264,10 @@ def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str])
                     if bundled_name in name_to_uri:
                         original_uri = name_to_uri[bundled_name]
                         if "#/components/schemas/" in original_uri:
-                            schema_name = original_uri.split("#/components/schemas/")[1]
+                            schema_name = decode_pointer(original_uri.split("#/components/schemas/")[1])
                             components["schemas"][schema_name] = unbundle(bundled_schema, name_to_uri)
                         elif "#/definitions/" in original_uri:
-                            schema_name = original_uri.split("#/definitions/")[1]
+                            schema_name = decode_pointer(original_uri.split("#/definitions/")[1])
                             components["schemas"][schema_name] = unbundle(bundled_schema, name_to_uri)
                         else:
                             components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)

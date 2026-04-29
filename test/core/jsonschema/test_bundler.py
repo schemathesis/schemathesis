@@ -3,7 +3,7 @@ import pytest
 from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle
-from schemathesis.core.jsonschema.bundler import BundleError
+from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 
@@ -653,3 +653,26 @@ def test_bundle_mutual_cycle_through_pattern_properties_is_breakable():
     resolver = RefResolver.from_schema(store)
 
     bundle(schema, resolver, inline_recursive=True)
+
+
+def test_unbundle_decodes_pointer_escaping_in_definition_names():
+    # Definition name with a literal `/` is encoded as `~1` in the URI fragment.
+    # Unbundling should recover the original key, not the encoded form.
+    name_to_uri = {"schema1": "#/definitions/User~1Profile"}
+    bundled = {
+        "$ref": "#/x-bundled/schema1",
+        BUNDLE_STORAGE_KEY: {"schema1": {"type": "object"}},
+    }
+    result = unbundle(bundled, name_to_uri)
+    assert result["components"]["schemas"] == {"User/Profile": {"type": "object"}}
+
+
+def test_unbundle_path_decodes_pointer_escaping():
+    # Path segments reconstructed from a URI fragment must be JSON-Pointer-decoded.
+    name_to_uri = {"schema1": "#/definitions/User~1Profile"}
+    assert unbundle_path([BUNDLE_STORAGE_KEY, "schema1", "properties", "id"], name_to_uri) == [
+        "definitions",
+        "User/Profile",
+        "properties",
+        "id",
+    ]
