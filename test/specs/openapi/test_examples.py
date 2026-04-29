@@ -2649,6 +2649,52 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
     ]
 
 
+def test_get_pool_combos_filters_swagger_2_path_value_violating_schemathesis_min_length(ctx):
+    # Empty path values would corrupt the URL template; the pool must respect `minLength: 1`.
+    resource = "Item"
+    producer_label = "POST /items"
+    consumer_label = "GET /items/{name}"
+
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name=resource,
+                operation=producer_label,
+                status_code="201",
+                pointer="",
+                cardinality=Cardinality.ONE,
+            ),
+        ]
+    )
+    repository.record_response(operation=producer_label, status_code=201, payload={"name": ""})
+
+    requirements = {
+        (consumer_label, ParameterLocation.PATH, "name"): ParameterRequirement(
+            resource_name=resource, resource_field="name"
+        ),
+    }
+    extra_data_source = OpenApiExtraDataSource(repository=repository, requirements=requirements)
+
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items/{name}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {"name": "name", "in": "path", "required": True, "type": "string"},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items/{name}"]["GET"]
+
+    assert _get_pool_combos(operation, extra_data_source) == []
+
+
 def _extract_json_body_examples(ctx, body_schema):
     raw = ctx.openapi.build_schema(
         {

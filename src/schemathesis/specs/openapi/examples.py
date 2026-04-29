@@ -24,7 +24,7 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.adapter import OpenApiResponses
-from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameter, OpenApiParameterSet
 from schemathesis.specs.openapi.adapter.security import OpenApiSecurityParameters
 from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
@@ -138,11 +138,14 @@ def _build_location_schema(
     operation: APIOperation,
     location: ParameterLocation,
 ) -> dict[str, Any] | None:
-    """Build a minimal JSON schema covering all parameters at a given location."""
-    properties = {
-        p.name: (p.definition.get("schema") or {}) for p in operation.iter_parameters() if p.location == location
-    }
-    return {"type": "object", "properties": properties} if properties else None
+    """Return the merged parameter-set schema for the given location, or None when empty."""
+    container = getattr(operation, location.container_name)
+    if not isinstance(container, OpenApiParameterSet):
+        return None
+    schema = container.schema
+    if not schema.get("properties"):
+        return None
+    return schema
 
 
 def get_strategies_from_examples(
