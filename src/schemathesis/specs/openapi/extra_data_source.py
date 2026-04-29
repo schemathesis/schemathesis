@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 import jsonschema_rs
 
 from schemathesis.core import NOT_SET, deserialization
+from schemathesis.core.jsonschema import make_validator, schema_with_bundle
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
@@ -183,6 +184,31 @@ def build_inputs_by_label(graph: DependencyGraph) -> dict[str, list[InputSlot]]:
     return inputs_by_label
 
 
+def _variant_satisfies(variant: dict[str, Any], validators: dict[str, jsonschema_rs.Validator | None]) -> bool:
+    for name, value in variant.items():
+        validator = validators.get(name)
+        if validator is None:
+            continue
+        try:
+            if not validator.is_valid(value):
+                return False
+        except Exception:
+            continue
+    return True
+
+
+def _build_property_validator(
+    prop_schema: Any, container_schema: Any, validator_cls: type
+) -> jsonschema_rs.Validator | None:
+    """Validator for a single property, splicing the container's `x-bundled` for `$ref` resolution."""
+    if not isinstance(prop_schema, dict):
+        return None
+    try:
+        return make_validator(schema_with_bundle(prop_schema, container_schema), validator_cls)
+    except Exception:
+        return None
+
+
 @dataclass(slots=True)
 class OpenApiExtraDataSource(ExtraDataSource):
     """Provides extra data from captured API responses to augment parameter schemas."""
@@ -237,13 +263,23 @@ class OpenApiExtraDataSource(ExtraDataSource):
         # Single requirement: return simple single-property variants
         if len(property_requirements) == 1:
             name, requirement = next(iter(property_requirements.items()))
-            values = self._collect_values(requirement)
-            if not values:
-                return None
-            return [{name: value} for value in values]
+            variants = [{name: value} for value in self._collect_values(requirement)]
+        else:
+            # Multiple requirements: return complete object variants preserving relationships
+            variants = self._collect_object_variants(property_requirements)
 
-        # Multiple requirements: return complete object variants preserving relationships
-        return self._collect_object_variants(property_requirements) or None
+        # Drop variants whose values violate the destination schema (e.g. producer's `id: 0`
+        # leaking into a consumer with `minimum: 1`).
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+        assert isinstance(operation.schema, OpenApiSchema)
+        validator_cls = operation.schema.adapter.jsonschema_validator_cls
+        validators = {
+            name: _build_property_validator(properties.get(name), schema, validator_cls)
+            for name in property_requirements
+        }
+        variants = [v for v in variants if _variant_satisfies(v, validators)]
+        return variants or None
 
     def _collect_object_variants(self, requirements: dict[str, ParameterRequirement]) -> list[dict[str, Any]]:
         """Collect complete value sets that preserve relationships between properties."""

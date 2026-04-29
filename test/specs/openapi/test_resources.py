@@ -92,6 +92,57 @@ def test_many_cardinality_extracts_each_item(user_schema_builder):
     assert {instance.data["id"] for instance in resources} == {"a", "b"}
 
 
+def test_captured_variants_filter_values_invalid_for_destination(ctx):
+    # Producer accepts `id: 0` but consumer's path requires `minimum: 1`; pool injection must filter.
+    spec = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}/sync": {
+                "post": {
+                    "operationId": "syncItem",
+                    "parameters": [
+                        {
+                            "name": "itemId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 1},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 0})
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 5})
+
+    sync_op = schema["/items/{itemId}/sync"]["POST"]
+    variants = data_source.get_captured_variants(
+        operation=sync_op, location=ParameterLocation.PATH, schema=sync_op.path_parameters.schema
+    )
+
+    assert variants == [{"itemId": 5}]
+
+
 def test_data_source_provides_captured_variants(user_schema_builder):
     user_schema = {
         "type": "object",

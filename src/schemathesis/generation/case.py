@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-import jsonschema_rs
 from jsonschema_rs import Validator
 
 from schemathesis import hooks, transport
@@ -13,7 +11,7 @@ from schemathesis.checks import CHECKS, CheckContext, CheckFunction, CheckResult
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
@@ -53,22 +51,6 @@ def _contains_bytes(value: Any) -> bool:
     if isinstance(value, list):
         return any(_contains_bytes(item) for item in value)
     return False
-
-
-def _is_valid_uuid(value: Any) -> bool:
-    if not isinstance(value, str):
-        return True
-    try:
-        uuid.UUID(value)
-        return True
-    except ValueError:
-        return False
-
-
-# Formats that newer JSON Schema drafts validate natively but Draft 4 (used by
-# OpenAPI 2.0 / 3.0) does not. Registered only for Draft4Validator so built-in
-# implementations in newer drafts are not overridden.
-_DRAFT4_SUPPLEMENTAL_FORMATS: dict[str, Callable[[Any], bool]] = {"uuid": _is_valid_uuid}
 
 
 @dataclass
@@ -288,10 +270,6 @@ class Case:
         """Validate a component value against its schema."""
         from requests.structures import CaseInsensitiveDict
 
-        kwargs: dict[str, Any] = {"validate_formats": True, "pattern_options": FANCY_REGEX_OPTIONS}
-        if validator_cls is jsonschema_rs.Draft4Validator:
-            kwargs["formats"] = _DRAFT4_SUPPLEMENTAL_FORMATS
-
         if location == ParameterLocation.BODY:
             # Validate body against media type schema
             if isinstance(value, NotSet) or value is None:
@@ -300,12 +278,12 @@ class Case:
                 if _contains_bytes(value):
                     return False
                 if alternative.media_type == self.media_type:
-                    return validator_cls(alternative.optimized_schema, **kwargs).is_valid(value)
+                    return make_validator(alternative.optimized_schema, validator_cls).is_valid(value)
         # Validate other locations against container schema
         container = getattr(self.operation, location.container_name)
         if isinstance(value, CaseInsensitiveDict):
             value = dict(value)
-        return validator_cls(container.schema, **kwargs).is_valid(value)
+        return make_validator(container.schema, validator_cls).is_valid(value)
 
     def _hash_container(self, value: Any) -> int:
         """Create a hash representing the current state of a container.

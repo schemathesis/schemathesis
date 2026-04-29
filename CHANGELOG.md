@@ -34,6 +34,7 @@
 - False positives from `\p{X}` Unicode property escapes inside character classes (e.g. `[\p{Alnum}_]+`).
 - Spurious `FlakyStrategyDefinition` from `st fuzz` when the time limit trips mid-scenario.
 - Crash in the examples phase when a body example contained `format: binary` data alongside captured pool values.
+- Resource-pool variants for path/query/header parameters skip values that violate the destination schema.
 - NDJSON reports truncated after the first event from a threaded `requests` import race in the writer.
 
 ### :wrench: Changed
