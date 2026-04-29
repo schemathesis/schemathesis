@@ -17,7 +17,7 @@
 - Dependency inference treats `POST /resource/{name}` as a producer when the response has no body.
 - Dependency inference treats `POST /collection {idField: ...}` as a producer when the response has no body.
 - Dependency inference recognizes `GET /collection` returning an array of identifier strings.
-- Seed the runtime resource pool with identifier claims (`sub`, `username`, `tenant_id`, ...) from a Bearer JWT.
+- Seed the runtime resource pool with identifier values from a Bearer JWT or HTTP Basic username.
 
 ### :bug: Fixed
 
