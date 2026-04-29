@@ -1045,7 +1045,7 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3
     ],
     ids=["implicit", "explicit"],
 )
-def test_discriminator_const_injection_in_generation(ctx, discriminator, valid_values):
+def test_discriminator_property_pinned_in_generation(ctx, discriminator, valid_values):
     raw_schema = ctx.openapi.build_schema(
         {
             "/pets": {

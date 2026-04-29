@@ -36,6 +36,7 @@
 - Translate POSIX character classes (e.g. `[[:alnum:]_]`) to Python equivalents instead of misparsing them.
 - Silent character-set widening when `\p{X}` patterns combine with PCRE class-set operators (`||`, `&&`) or nested classes.
 - Runtime Error in negative generation for OpenAPI 3.1 schemas with `prefixItems`. [#3842](https://github.com/schemathesis/schemathesis/issues/3842)
+- Honor `discriminator` pin in `oneOf`/`anyOf` validation under Draft 4 (OpenAPI 2.0/3.0).
 - Spurious `FlakyStrategyDefinition` from `st fuzz` when the time limit trips mid-scenario.
 - Crash in the examples phase when a body example contained `format: binary` data alongside captured pool values.
 - Resource-pool variants for path/query/header parameters skip values that violate the destination schema.
