@@ -17,6 +17,7 @@ def to_json_schema(
     update_quantifiers: bool = True,
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
 ) -> dict[str, Any]: ...  # pragma: no cover
 
@@ -29,6 +30,7 @@ def to_json_schema(
     update_quantifiers: bool = True,
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
 ) -> bool: ...  # pragma: no cover
 
@@ -40,6 +42,7 @@ def to_json_schema(
     update_quantifiers: bool = True,
     clone: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
 ) -> dict[str, Any] | bool:
     if isinstance(schema, bool):
@@ -52,6 +55,7 @@ def to_json_schema(
         is_response_schema=is_response_schema,
         update_quantifiers=update_quantifiers,
         upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+        convert_prefix_items=convert_prefix_items,
         name_to_uri=name_to_uri,
     )
 
@@ -63,6 +67,7 @@ def _to_json_schema(
     is_response_schema: bool = False,
     update_quantifiers: bool = True,
     upgrade_legacy_exclusive_bounds: bool = False,
+    convert_prefix_items: bool = True,
     name_to_uri: dict[str, str] | None = None,
 ) -> JsonSchema:
     if not isinstance(schema, dict):
@@ -126,9 +131,9 @@ def _to_json_schema(
 
     ensure_required_properties(schema)
 
-    # Convert JSON Schema Draft 2020-12 prefixItems to Draft 4/7 items array form
-    # hypothesis-jsonschema only supports Draft 4/6/7
-    if "prefixItems" in schema:
+    # Convert prefixItems -> items[array] for hypothesis-jsonschema (Draft 4/7-only).
+    # Skipped when the consumer needs `prefixItems` to stay intact (e.g. for Draft 2020-12 validators).
+    if convert_prefix_items and "prefixItems" in schema:
         prefix_items = schema.pop("prefixItems")
         if "items" in schema:
             # When both prefixItems and items exist, items becomes additionalItems
@@ -149,6 +154,7 @@ def _to_json_schema(
                 is_response_schema=is_response_schema,
                 update_quantifiers=update_quantifiers,
                 upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+                convert_prefix_items=convert_prefix_items,
                 name_to_uri=name_to_uri,
             )
         elif keyword in IN_ITEM and isinstance(value, list):
@@ -159,6 +165,7 @@ def _to_json_schema(
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+                    convert_prefix_items=convert_prefix_items,
                     name_to_uri=name_to_uri,
                 )
         elif keyword in IN_CHILD and isinstance(value, dict):
@@ -169,6 +176,7 @@ def _to_json_schema(
                     is_response_schema=is_response_schema,
                     update_quantifiers=update_quantifiers,
                     upgrade_legacy_exclusive_bounds=upgrade_legacy_exclusive_bounds,
+                    convert_prefix_items=convert_prefix_items,
                     name_to_uri=name_to_uri,
                 )
 
@@ -305,6 +313,7 @@ IN_ITEM = frozenset(
         "allOf",
         "anyOf",
         "oneOf",
+        "prefixItems",
     )
 )
 IN_CHILD = frozenset(

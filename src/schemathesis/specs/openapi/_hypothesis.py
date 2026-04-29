@@ -838,6 +838,7 @@ def make_positive_strategy(
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
+    validation_schema: JsonSchema | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
@@ -864,6 +865,7 @@ def make_negative_strategy(
     generation_config: GenerationConfig,
     validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
+    validation_schema: JsonSchema | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(generation_config, GenerationMode.NEGATIVE)
     return negative_schema(
@@ -874,6 +876,7 @@ def make_negative_strategy(
         custom_formats=custom_formats,
         generation_config=generation_config,
         validator_cls=validator_cls,
+        validation_schema=validation_schema,
         name_to_uri=name_to_uri,
     )
 

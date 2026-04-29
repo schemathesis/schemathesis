@@ -135,6 +135,7 @@ def negative_schema(
     *,
     custom_formats: dict[str, st.SearchStrategy[str]],
     validator_cls: type[jsonschema_rs.Validator],
+    validation_schema: JsonSchema | None = None,
     name_to_uri: dict[str, str] | None = None,
 ) -> st.SearchStrategy:
     """A strategy for instances that DO NOT match the input schema.
@@ -142,11 +143,20 @@ def negative_schema(
     It is used to cover the input space that is not possible to cover with the "positive" strategy.
 
     Returns a strategy that produces GeneratedValue instances with mutation metadata.
+
+    `validation_schema`, when provided, keeps `prefixItems` intact and is used only to build the
+    runtime validator; falls back to `schema`.
     """
     # The mutated schema is passed to `from_schema` and guarded against producing instances valid against
     # the original schema.
     cache_key = CacheKey(operation_name, location, schema, validator_cls, frozenset(custom_formats))
-    validator = get_validator(cache_key)
+    # Build the validator from the form with `prefixItems` intact so meta-validation accepts it.
+    validator_cache_key = (
+        cache_key
+        if validation_schema is None or validation_schema is schema
+        else CacheKey(operation_name, location, validation_schema, validator_cls, frozenset(custom_formats))
+    )
+    validator = get_validator(validator_cache_key)
     keywords, non_keywords = split_schema(cache_key)
 
     # For unconstrained binary/byte schemas, skip the validation filter entirely.
