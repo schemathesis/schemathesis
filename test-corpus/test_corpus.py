@@ -93,6 +93,7 @@ SLOW_DEFAULT = {
     "azure.com/network-applicationGateway/2019-07-01.json",
     "azure.com/network-applicationGateway/2019-08-01.json",
     "bungie.net/2.18.0.json",
+    "influxdata.com/2.0.0.json",
     "kubernetes.io/unversioned.json",
     "kubernetes.io/v1.10.0.json",
     "microsoft.com/graph-beta/1.0.1.json",
