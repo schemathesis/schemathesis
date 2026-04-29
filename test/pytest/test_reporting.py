@@ -1,9 +1,9 @@
-import json
 import pathlib
 from xml.etree import ElementTree
 
 import pytest
-import yaml
+
+from test.utils import load_json_or_fail, load_yaml_or_fail
 
 
 def _make_xdist_test(testdir, content, base_url, paths=None):
@@ -43,8 +43,7 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     assert "http_interactions" in cassette
     assert len(cassette["http_interactions"]) >= 1
 
@@ -67,8 +66,7 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=2)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     all_checks = [c for i in cassette["http_interactions"] for c in i["checks"]]
     assert any(c["status"] == "FAILURE" for c in all_checks)
 
@@ -92,8 +90,7 @@ def test_api(case, monkeypatch):
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     assert cassette["http_interactions"] is None
 
 
@@ -113,8 +110,7 @@ def test_api(case):
     result = testdir.runpytest("-s")
     result.assert_outcomes(passed=1)
 
-    with open(cassette_path) as f:
-        har = json.load(f)
+    har = load_json_or_fail(cassette_path)
     assert "log" in har
     assert len(har["log"]["entries"]) >= 1
 
@@ -181,8 +177,7 @@ def test_api(case):
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(passed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     assert "http_interactions" in cassette
     interactions = cassette["http_interactions"]
     assert len(interactions) >= 1
@@ -208,8 +203,7 @@ def test_api(case):
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(passed=1)
 
-    with open(cassette_path) as f:
-        har = json.load(f)
+    har = load_json_or_fail(cassette_path)
     assert "log" in har
     assert len(har["log"]["entries"]) >= 1
 
@@ -278,8 +272,7 @@ def test_api(case):
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(failed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     all_checks = [c for i in cassette["http_interactions"] for c in i["checks"]]
     assert any(c["status"] == "FAILURE" for c in all_checks)
 
@@ -325,8 +318,7 @@ def test_api(case):
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(passed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     interactions = cassette["http_interactions"]
     assert len(interactions) >= 1
     # ExamplesPhaseData round-trip via worker→controller boundary
@@ -358,8 +350,7 @@ def test_api(case):
     result.assert_outcomes(passed=1)
 
     cassette_path = testdir.tmpdir.join("reports", "vcr.yaml")
-    with open(str(cassette_path)) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(str(cassette_path))
     assert "http_interactions" in cassette
     assert len(cassette["http_interactions"]) >= 1
 
@@ -404,8 +395,7 @@ def test_api(case):
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(passed=2)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     assert len(cassette["http_interactions"]) >= 2
 
 
@@ -431,8 +421,7 @@ def test_api(case):
     result = testdir.runpytest("-n", "2")
     result.assert_outcomes(passed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     interactions = cassette["http_interactions"]
     assert len(interactions) >= 1
     assert all(i["response"] is None for i in interactions)
@@ -486,7 +475,7 @@ def test_schema_b(case):
     suffixed = sorted(pathlib.Path(report_dir).glob("vcr-*.yaml"))
     assert len(suffixed) == 2
     for f in suffixed:
-        cassette = yaml.safe_load(f.read_text())
+        cassette = load_yaml_or_fail(f)
         assert "http_interactions" in cassette
         assert len(cassette["http_interactions"]) >= 1
 
@@ -532,8 +521,7 @@ TestCase = schema.as_state_machine().TestCase
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=1)
 
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     interactions = cassette["http_interactions"]
     assert len(interactions) >= 1
     assert "request" in interactions[0]
@@ -554,8 +542,7 @@ TestCase = schema.as_state_machine().TestCase
     result = testdir.runpytest("-s")
     result.assert_outcomes(failed=1)
 
-    with open(har_path) as f:
-        har = json.load(f)
+    har = load_json_or_fail(har_path)
     entries = har["log"]["entries"]
     assert len(entries) >= 1
     assert "request" in entries[0]
@@ -602,8 +589,7 @@ TestCase = schema.as_state_machine().TestCase
     result.assert_outcomes(failed=1)
 
     assert pathlib.Path(cassette_path).exists()
-    with open(cassette_path) as f:
-        cassette = yaml.safe_load(f)
+    cassette = load_yaml_or_fail(cassette_path)
     interactions = cassette["http_interactions"]
     assert len(interactions) >= 1
     assert "request" in interactions[0]

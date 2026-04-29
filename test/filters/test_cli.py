@@ -1,5 +1,6 @@
 import pytest
-import yaml
+
+from test.utils import load_yaml_or_fail
 
 RESPONSES = {"responses": {"default": {"description": "OK"}}}
 SCHEMA = {
@@ -30,11 +31,6 @@ SCHEMA = {
 @pytest.fixture
 def cassette_path(tmp_path):
     return tmp_path / "output.yaml"
-
-
-def load_cassette(path):
-    with path.open(encoding="utf-8") as fd:
-        return yaml.safe_load(fd)
 
 
 @pytest.mark.parametrize(
@@ -174,7 +170,7 @@ def assert_filtered(cli, schema_path, cassette_path, openapi3_base_url, expected
         **kwargs,
     )
     assert result.exit_code == 0, result.stdout
-    cassette = load_cassette(cassette_path)
-    interactions = cassette["http_interactions"] or []
+    cassette = load_yaml_or_fail(cassette_path, context=f"stdout:\n{result.stdout}")
+    interactions = cassette.get("http_interactions") or []
     actual = [f"{entry['request']['method']} /{entry['request']['uri'].split('/')[-1]}" for entry in interactions]
     assert actual == expected, f"stdout:\n{result.stdout}\ncassette:\n{cassette}"

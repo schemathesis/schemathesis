@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Callable
 from functools import lru_cache, wraps
+from pathlib import Path
 from typing import Any, TypeVar
 
 import pytest
 import requests
 import urllib3
+import yaml
 from syrupy import SnapshotAssertion
 
 import schemathesis
@@ -94,6 +97,38 @@ def assert_requests_call(case: Case):
     with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
         # On Windows it may take time to get the connection error, hence we set a timeout
         case.call(base_url="http://127.0.0.1:1", timeout=0.001)
+
+
+def load_yaml_or_fail(path: str | os.PathLike, *, context: str = "") -> dict:
+    """Load YAML; surface raw file + caller context if it doesn't parse to a dict."""
+    raw = Path(path).read_text(encoding="utf-8")
+    parsed = yaml.safe_load(raw)
+    assert isinstance(parsed, dict), (
+        f"YAML at {path} parsed to {type(parsed).__name__} (expected dict). "
+        f"File size: {len(raw)} bytes.{_format_context(context)}\n--- raw ---\n{raw}\n--- end raw ---"
+    )
+    return parsed
+
+
+def load_json_or_fail(path: str | os.PathLike, *, context: str = "") -> Any:
+    """Load JSON; surface raw file + caller context on parse failure or None result."""
+    raw = Path(path).read_text(encoding="utf-8")
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise AssertionError(
+            f"JSON at {path} failed to parse: {exc}. File size: {len(raw)} bytes."
+            f"{_format_context(context)}\n--- raw ---\n{raw}\n--- end raw ---"
+        ) from exc
+    assert parsed is not None, (
+        f"JSON at {path} parsed to None. File size: {len(raw)} bytes."
+        f"{_format_context(context)}\n--- raw ---\n{raw}\n--- end raw ---"
+    )
+    return parsed
+
+
+def _format_context(context: str) -> str:
+    return f"\n--- context ---\n{context}\n--- end context ---" if context else ""
 
 
 def flaky(*, max_runs: int, min_passes: int):
