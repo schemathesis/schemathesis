@@ -42,6 +42,7 @@
 - Bodies missing required fields when a captured value is overlaid on a schema without `type: object`.
 - Boolean path parameters rewritten to integer `1` when the path also contains an integer parameter.
 - Examples violating their own schema surfacing as POSITIVE generation cases.
+- Duplicate required header entries when a spec parameter and a security scheme share a header name.
 - NDJSON reports truncated after the first event from a threaded `requests` import race in the writer.
 
 ### :wrench: Changed

@@ -167,6 +167,44 @@ def test_valid_headers():
     test()
 
 
+@pytest.mark.parametrize("spec_required", [True, False], ids=["spec-required", "spec-optional"])
+def test_header_schema_dedupes_case_insensitive_duplicates(ctx, spec_required):
+    # HTTP header names are case-insensitive; the merged headers schema must collapse
+    # spec parameter and security-scheme entries that differ only by case, and the
+    # canonical first-seen casing must end up `required` whenever any duplicate is required.
+    raw = ctx.openapi.build_schema(
+        {
+            "/v2/": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "authorization",
+                            "in": "header",
+                            "required": spec_required,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "security": [{"Bearer": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "securitySchemes": {"Bearer": {"type": "http", "scheme": "bearer"}},
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    operation = schema["/v2/"]["POST"]
+    properties = operation.headers.schema["properties"]
+    required = operation.headers.schema.get("required", [])
+    seen = {name.lower() for name in properties}
+    assert len(seen) == len(properties), f"case-insensitive duplicates in headers schema: {sorted(properties)}"
+    seen_required = {name.lower() for name in required}
+    assert len(seen_required) == len(required), f"case-insensitive duplicates in required: {sorted(required)}"
+    # Security scheme always demands the header — the canonical casing must be required either way.
+    assert "authorization" in seen_required
+
+
 def test_configure_headers():
     strategy = make_positive_strategy(
         {
