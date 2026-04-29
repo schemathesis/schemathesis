@@ -1328,9 +1328,11 @@ def _merge_parameters_to_object_schema(
     parameters: Iterable[tuple[str, Any, bool]], location: ParameterLocation
 ) -> dict[str, Any]:
     """Merge parameter data into a JSON Schema object."""
-    properties = {}
-    required = []
-    bundled = {}
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    bundled: dict[str, Any] = {}
+    # HTTP header names are case-insensitive — collapse duplicates onto the first-seen casing.
+    canonical_by_lower: dict[str, str] = {}
 
     for name, subschema, is_required in parameters:
         # Extract bundled data if present
@@ -1352,6 +1354,15 @@ def _merge_parameters_to_object_schema(
             elif location == ParameterLocation.PATH and subschema.get("type") == "string":
                 if "minLength" not in subschema:
                     subschema = {**subschema, "minLength": 1}
+
+        if location.is_in_header:
+            canonical = canonical_by_lower.setdefault(name.lower(), name)
+            if canonical != name:
+                # Same header under different case — first definition wins.
+                if (location == ParameterLocation.PATH or is_required) and canonical not in required:
+                    required.append(canonical)
+                continue
+            name = canonical
 
         properties[name] = subschema
 
