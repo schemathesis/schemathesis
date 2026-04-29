@@ -107,6 +107,47 @@ def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optiona
     check()
 
 
+def test_negative_form_body_with_optional_binary_does_not_emit_empty_dict(ctx):
+    # The form-builder path (triggered by `encoding.contentType`) assembles bodies field-by-field
+    # and bypasses the negation filter. With an optional binary field and no required fields the
+    # builder can drop the field entirely and emit `{}`, which the schema accepts.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"captionfile": {"type": "string", "format": "binary"}},
+                                },
+                                "encoding": {
+                                    "captionfile": {"contentType": "text/vtt, application/x-subrip, text/plain"}
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/upload"]["PUT"]
+    real_validator = make_validator(operation.body[0].optimized_schema, jsonschema_rs.Draft4Validator)
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=20, suppress_health_check=list(HealthCheck))
+    def check(case):
+        if not isinstance(case.body, dict):
+            return
+        assert not real_validator.is_valid(case.body), f"NEGATIVE body still valid against real schema: {case.body!r}"
+
+    check()
+
+
 def test_custom_media_type_raw_binary_body_in_negative_mode():
     schemathesis.openapi.media_type("application/x-tar", st.just(b""))
 

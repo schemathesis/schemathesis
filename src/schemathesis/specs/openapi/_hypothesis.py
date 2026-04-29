@@ -54,7 +54,7 @@ from .formats import (
 )
 from .headers import KNOWN_HEADER_FORMATS, get_header_format_strategies
 from .media_types import MEDIA_TYPES
-from .negative import GeneratedValue, negative_schema
+from .negative import CacheKey, GeneratedValue, get_validator, negative_schema
 from .negative.utils import can_negate
 
 SLASH = "/"
@@ -447,6 +447,18 @@ def _find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | N
     return None
 
 
+def _form_body_has_negation_candidates(schema: dict[str, Any]) -> bool:
+    """Whether the schema has any constraint per-property mutation can violate."""
+    if schema.get("required"):
+        return True
+    if schema.get("additionalProperties") is False:
+        return True
+    return any(
+        isinstance(p, dict) and any(k in p for k in ("type", "enum", "const", "$ref", "allOf", "oneOf", "anyOf"))
+        for p in (schema.get("properties") or {}).values()
+    )
+
+
 def _build_form_strategy_with_encoding(
     parameter: OpenApiBody,
     operation: APIOperation,
@@ -459,6 +471,8 @@ def _build_form_strategy_with_encoding(
 
     Returns `None` if no custom encoding with registered strategies or comma-separated content types is found.
     """
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
+
     schema = parameter.optimized_schema
     if not isinstance(schema, dict) or schema.get("type") != "object":
         return None
@@ -574,7 +588,21 @@ def _build_form_strategy_with_encoding(
 
         return FormBodyWithContentTypes(body=body, content_types=selected_content_types)
 
-    return build_body()
+    strategy = build_body()
+    if generation_mode.is_negative and _form_body_has_negation_candidates(schema):
+        # Reject assembled bodies that are still schema-valid (e.g. `{}` when all fields are optional).
+        assert isinstance(operation.schema, OpenApiSchema)
+        custom_formats = _build_custom_formats(generation_config, generation_mode)
+        cache_key = CacheKey(
+            operation.label,
+            ParameterLocation.BODY,
+            schema,
+            operation.schema.adapter.jsonschema_validator_cls,
+            frozenset(custom_formats),
+        )
+        validator = get_validator(cache_key)
+        strategy = strategy.filter(lambda x: not validator.is_valid(x.body))
+    return strategy
 
 
 def _get_body_strategy(
