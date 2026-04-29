@@ -48,6 +48,7 @@
 ### :wrench: Changed
 
 - Include `meta` in NDJSON reports.
+- Probe each path with undeclared HTTP methods once per path instead of once per declared operation.
 
 ## [4.16.1](https://github.com/schemathesis/schemathesis/compare/v4.16.0...v4.16.1) - 2026-04-26
 

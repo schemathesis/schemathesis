@@ -84,6 +84,7 @@ class HypothesisTestConfig:
     as_strategy_kwargs: dict[str, Any]
     given_args: tuple[GivenInput, ...]
     given_kwargs: dict[str, GivenInput]
+    unexpected_methods_seen: set[tuple[str, str]] | None
 
     __slots__ = (
         "project",
@@ -94,6 +95,7 @@ class HypothesisTestConfig:
         "as_strategy_kwargs",
         "given_args",
         "given_kwargs",
+        "unexpected_methods_seen",
     )
 
     def __init__(
@@ -106,6 +108,7 @@ class HypothesisTestConfig:
         as_strategy_kwargs: dict[str, Any] | None = None,
         given_args: tuple[GivenInput, ...] = (),
         given_kwargs: dict[str, GivenInput] | None = None,
+        unexpected_methods_seen: set[tuple[str, str]] | None = None,
     ) -> None:
         self.project = project
         self.modes = modes
@@ -115,6 +118,7 @@ class HypothesisTestConfig:
         self.as_strategy_kwargs = as_strategy_kwargs or {}
         self.given_args = given_args
         self.given_kwargs = given_kwargs or {}
+        self.unexpected_methods_seen = unexpected_methods_seen
 
 
 def create_test(
@@ -247,6 +251,7 @@ def create_test(
             generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
             unexpected_methods=phases_config.coverage.unexpected_methods,
             generation_config=generation,
+            unexpected_methods_seen=config.unexpected_methods_seen,
         )
 
     injected_path_parameter_names = [
@@ -392,6 +397,7 @@ def add_coverage(
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
+    unexpected_methods_seen: set[tuple[str, str]] | None = None,
 ) -> Callable:
     for case in generate_coverage_cases(
         operation=operation,
@@ -401,6 +407,7 @@ def add_coverage(
         generate_duplicate_query_parameters=generate_duplicate_query_parameters,
         unexpected_methods=unexpected_methods,
         generation_config=generation_config,
+        unexpected_methods_seen=unexpected_methods_seen,
     ):
         test = hypothesis.example(case=case)(test)
     return test
@@ -415,6 +422,7 @@ def generate_coverage_cases(
     generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
+    unexpected_methods_seen: set[tuple[str, str]] | None = None,
 ) -> Generator[Case]:
     from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 
@@ -443,6 +451,7 @@ def generate_coverage_cases(
             unexpected_methods=unexpected_methods,
             generation_config=generation_config,
             extra_data_source=extra_data_source,
+            unexpected_methods_seen=unexpected_methods_seen,
         ):
             if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
                 continue
@@ -698,6 +707,7 @@ def _iter_coverage_cases(
     unexpected_methods: set[str],
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None = None,
+    unexpected_methods_seen: set[tuple[str, str]] | None = None,
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi._hypothesis import _build_custom_formats
     from schemathesis.specs.openapi.examples import find_matching_in_responses
@@ -1012,9 +1022,14 @@ def _iter_coverage_cases(
                 ),
             )
     if GenerationMode.NEGATIVE in generation_modes:
-        # Generate HTTP methods that are not specified in the spec
-        methods = unexpected_methods - set(operation.schema[operation.path])
-        for method in sorted(methods):
+        # Path-level: each `(path, method)` pair runs once across declared operations.
+        methods = sorted(unexpected_methods - set(operation.schema[operation.path]))
+        for method in methods:
+            if unexpected_methods_seen is not None:
+                key = (operation.path, method)
+                if key in unexpected_methods_seen:
+                    continue
+                unexpected_methods_seen.add(key)
             instant = Instant()
             data = template.unmodified()
             yield operation.Case(
