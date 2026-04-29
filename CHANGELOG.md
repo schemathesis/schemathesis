@@ -39,6 +39,7 @@
 - Spurious `FlakyStrategyDefinition` from `st fuzz` when the time limit trips mid-scenario.
 - Crash in the examples phase when a body example contained `format: binary` data alongside captured pool values.
 - Resource-pool variants for path/query/header parameters skip values that violate the destination schema.
+- Bodies missing required fields when a captured value is overlaid on a schema without `type: object`.
 - NDJSON reports truncated after the first event from a threaded `requests` import race in the writer.
 
 ### :wrench: Changed
