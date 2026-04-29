@@ -2649,6 +2649,49 @@ def test_get_pool_combos_merges_multiple_locations(ctx):
     ]
 
 
+def test_body_example_violating_schema_is_not_used_in_positive_generation(ctx):
+    # A schema's own `example` may not match its `schema`; positive generation must filter it out.
+    from schemathesis.generation.modes import GenerationMode
+
+    raw = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "example": {"name": "demo", "timestamp": "not-an-int"},
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "timestamp": {"type": "integer"},
+                                    },
+                                    "required": ["name", "timestamp"],
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    operation = schema["/items"]["POST"]
+    body = operation.body[0]
+    validator = jsonschema_rs.validator_for(body.optimized_schema)
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(deadline=None, max_examples=200, suppress_health_check=list(HealthCheck))
+    def t(case):
+        if isinstance(case.body, dict):
+            assert validator.is_valid(case.body), f"strategy yielded body invalid against its schema: {case.body!r}"
+
+    t()
+
+
 def test_get_pool_combos_filters_swagger_2_path_value_violating_schemathesis_min_length(ctx):
     # Empty path values would corrupt the URL template; the pool must respect `minLength: 1`.
     resource = "Item"

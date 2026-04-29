@@ -14,7 +14,7 @@ from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, BundleError, Bundler
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, BundleError, Bundler, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
@@ -193,6 +193,19 @@ def build_positive_biased_path_strategy(strategy: st.SearchStrategy) -> st.Searc
         return _bias_path_integers_to_positive(params, random)
 
     return biased()
+
+
+def filter_schema_valid_examples(examples: list[Any], schema: Any, validator_cls: type) -> list[Any]:
+    """Drop examples that don't conform to the given schema; real-world specs often disagree."""
+    if not examples:
+        return examples
+    from schemathesis.specs.openapi.examples import _example_is_valid
+
+    try:
+        validator = make_validator(schema, validator_cls)
+    except Exception:
+        return examples
+    return [ex for ex in examples if _example_is_valid(ex, validator)]
 
 
 def build_example_aware_strategy(
@@ -642,7 +655,11 @@ class OpenApiBody(OpenApiComponent):
         # Mix in schema examples for positive mode (20% example, 80% generated)
         # Skip during EXAMPLES phase since examples are handled separately there
         if mix_examples and generation_mode == GenerationMode.POSITIVE:
-            strategy_examples = self._get_strategy_examples(operation)
+            strategy_examples = filter_schema_valid_examples(
+                self._get_strategy_examples(operation),
+                self.validation_schema,
+                self.adapter.jsonschema_validator_cls,
+            )
             if strategy_examples:
                 strategy = build_example_aware_strategy(strategy, strategy_examples)
 
@@ -1155,10 +1172,14 @@ class OpenApiParameterSet(ParameterSet):
             # Must be applied BEFORE serialization so examples go through the same transformations
             # Skip during EXAMPLES phase since examples are handled separately there
             if mix_examples and not is_negative:
+                validator_cls = operation.schema.adapter.jsonschema_validator_cls
                 parameter_examples: dict[str, list[Any]] = {}
                 for param in self.items:
-                    if param.name not in exclude_key and param.examples:
-                        parameter_examples[param.name] = param.examples
+                    if param.name in exclude_key or not param.examples:
+                        continue
+                    valid = filter_schema_valid_examples(param.examples, param.validation_schema, validator_cls)
+                    if valid:
+                        parameter_examples[param.name] = valid
                 if parameter_examples:
                     strategy = build_parameter_example_aware_strategy(strategy, parameter_examples)
 

@@ -657,7 +657,7 @@ def test_path_example_with_slash_allows_encoded_slash(ctx):
                             "name": "block",
                             "in": "path",
                             "required": True,
-                            "schema": {"type": "string", "pattern": "^[0-9]+/[0-9]+$"},
+                            "schema": {"type": "string", "pattern": r"^[0-9.]+/[0-9]+$"},
                             "example": "192.168.1.0/24",
                         }
                     ],
