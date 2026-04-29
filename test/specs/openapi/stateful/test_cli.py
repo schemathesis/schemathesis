@@ -117,14 +117,17 @@ def test_junit(tmp_path, cli, schema_url):
         exit_code=ExitCode.TESTS_FAILED,
     )
     assert junit_path.exists()
-    tree = ElementTree.parse(junit_path)
-    root = tree.getroot()
-    assert root.tag == "testsuites"
-    assert len(root) == 1
-    assert len(root[0]) == 1
-    assert root[0][0].attrib["name"] == "Stateful tests"
-    assert len(root[0][0]) == 1
-    assert root[0][0][0].tag == "failure"
+    xml_content = junit_path.read_text()
+    root = ElementTree.fromstring(xml_content)
+    structure = (
+        root.tag,
+        [
+            (suite.attrib.get("name"), [(case.attrib.get("name"), [child.tag for child in case]) for case in suite])
+            for suite in root
+        ],
+    )
+    expected = ("testsuites", [("schemathesis", [("Stateful tests", ["failure"])])])
+    assert structure == expected, xml_content
 
 
 @pytest.mark.openapi_version("3.0")
