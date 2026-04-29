@@ -38,7 +38,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
     parameter = parameter.strip()
     lower = parameter.lower()
 
-    if lower == "id":
+    if lower in ("id", "ids"):
         return from_path(path, parameter_name=parameter)
 
     # Capital-sensitive
@@ -514,7 +514,7 @@ def find_matching_field(*, parameter: str, resource: str, fields: list[str]) -> 
             for field in fields:
                 if _normalize_for_matching(field) == id_name:
                     return field
-    elif suffix_normalized in ID_FIELD_NAMES:
+    elif suffix_normalized in ID_FIELD_NAMES or suffix_normalized == "ids":
         # Try to match with any identifier field, preferring exact match first
         for id_name in ID_FIELD_NAMES:
             for field in fields:
