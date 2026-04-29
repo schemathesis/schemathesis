@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema_rs
 
 from schemathesis.core import media_types
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema import schema_with_bundle
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -71,7 +71,7 @@ def _make_keywords(
             content_schema = parent_schema.get("contentSchema")
             if content_schema is None:
                 return
-            resolved = _schema_with_bundle(content_schema, root_schema)
+            resolved = schema_with_bundle(content_schema, root_schema)
             self._content = (
                 validator_cls(resolved, validate_formats=True, keywords={"contentMediaType": ContentMediaTypeKeyword}),
                 resolved,
@@ -101,14 +101,3 @@ def _make_keywords(
             self._validate_parsed(parsed, content_schema, validator)
 
     return {"contentMediaType": ContentMediaTypeKeyword}
-
-
-def _schema_with_bundle(schema: dict[str, Any] | bool, root_schema: dict[str, Any] | bool) -> dict[str, Any] | bool:
-    if not isinstance(schema, dict) or not isinstance(root_schema, dict):
-        return schema
-    bundled = root_schema.get(BUNDLE_STORAGE_KEY)
-    if bundled is None or BUNDLE_STORAGE_KEY in schema:
-        return schema
-    result = dict(schema)
-    result[BUNDLE_STORAGE_KEY] = bundled
-    return result
