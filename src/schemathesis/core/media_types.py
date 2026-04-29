@@ -78,6 +78,16 @@ def is_sse(value: str) -> bool:
     return parse(value) == ("text", "event-stream")
 
 
+def is_form_urlencoded(value: str | None) -> bool:
+    """Detect the application/x-www-form-urlencoded media type."""
+    if value is None:
+        return False
+    try:
+        return parse(value) == ("application", "x-www-form-urlencoded")
+    except MalformedMediaType:
+        return False
+
+
 def is_xml(value: str) -> bool:
     """Detect variations of the ``application/xml`` media type."""
     _, sub = parse(value)

@@ -379,13 +379,8 @@ def generate_example_cases(
 
 
 def adjust_urlencoded_payload(case: Case) -> None:
-    if case.media_type is not None:
-        try:
-            media_type = media_types.parse(case.media_type)
-            if media_type == ("application", "x-www-form-urlencoded"):
-                case.body = prepare_urlencoded(case.body)
-        except ValueError:
-            pass
+    if media_types.is_form_urlencoded(case.media_type):
+        case.body = prepare_urlencoded(case.body)
 
 
 def add_coverage(

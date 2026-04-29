@@ -212,10 +212,7 @@ def openapi_cases(
                 event(event_text)
                 reject()
             media_type, _ = draw(st.sampled_from(possible_media_types))
-            if media_type is not None and media_types.parse(media_type) == (
-                "application",
-                "x-www-form-urlencoded",
-            ):
+            if media_types.is_form_urlencoded(media_type):
                 # Helper to transform FormBodyWithContentTypes while preserving it
                 def prepare_urlencoded_form(x: Any) -> Any:
                     if isinstance(x, FormBodyWithContentTypes):
