@@ -1,5 +1,7 @@
 import pytest
 
+import schemathesis
+from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.transforms import transform
 from schemathesis.specs.openapi import converter
 from schemathesis.specs.openapi.converter import is_read_only, is_write_only, rewrite_properties, to_json_schema
@@ -277,8 +279,8 @@ def test_nested_object_required_array_not_duplicated():
             },
             {
                 "oneOf": [
-                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"const": "Cat"}}}]},
-                    {"allOf": [{"$ref": "#/components/schemas/Dog"}, {"properties": {"petType": {"const": "Dog"}}}]},
+                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"enum": ["Cat"]}}}]},
+                    {"allOf": [{"$ref": "#/components/schemas/Dog"}, {"properties": {"petType": {"enum": ["Dog"]}}}]},
                 ],
                 "discriminator": {"propertyName": "petType"},
             },
@@ -297,8 +299,18 @@ def test_nested_object_required_array_not_duplicated():
             },
             {
                 "anyOf": [
-                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"const": "feline"}}}]},
-                    {"allOf": [{"$ref": "#/components/schemas/Dog"}, {"properties": {"petType": {"const": "canine"}}}]},
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Cat"},
+                            {"properties": {"petType": {"enum": ["feline"]}}},
+                        ]
+                    },
+                    {
+                        "allOf": [
+                            {"$ref": "#/components/schemas/Dog"},
+                            {"properties": {"petType": {"enum": ["canine"]}}},
+                        ]
+                    },
                 ],
                 "discriminator": {
                     "propertyName": "petType",
@@ -328,7 +340,7 @@ def test_nested_object_required_array_not_duplicated():
             },
             {
                 "anyOf": [
-                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"const": "Cat"}}}]},
+                    {"allOf": [{"$ref": "#/components/schemas/Cat"}, {"properties": {"petType": {"enum": ["Cat"]}}}]},
                     True,
                 ],
                 "discriminator": {"propertyName": "petType"},
@@ -337,5 +349,57 @@ def test_nested_object_required_array_not_duplicated():
         ),
     ],
 )
-def test_discriminator_const_injection(schema, expected):
+def test_discriminator_property_pinned(schema, expected):
     assert to_json_schema(schema, nullable_keyword="nullable") == expected
+
+
+def test_discriminator_pin_validates_with_openapi_3_0_draft4(ctx):
+    # OpenAPI 3.0 uses Draft 4, which silently ignores `const`. Pin keyword must use `enum` so the
+    # discriminator branches are actually disambiguated at validation time.
+    raw = ctx.openapi.build_schema(
+        {
+            "/rules": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {"$ref": "#/components/schemas/Allow"},
+                                        {"$ref": "#/components/schemas/Deny"},
+                                    ],
+                                    "discriminator": {
+                                        "propertyName": "type",
+                                        "mapping": {
+                                            "allow": "#/components/schemas/Allow",
+                                            "deny": "#/components/schemas/Deny",
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Allow": {
+                    "type": "object",
+                    "properties": {"type": {"type": "string"}},
+                    "required": ["type"],
+                },
+                "Deny": {
+                    "type": "object",
+                    "properties": {"type": {"type": "string"}},
+                    "required": ["type"],
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    body = schema["/rules"]["POST"].body[0]
+    validator = make_validator(body.optimized_schema, schema.adapter.jsonschema_validator_cls)
+    assert validator.is_valid({"type": "allow"}) is True, "branch-disambiguating pin must work under Draft 4"

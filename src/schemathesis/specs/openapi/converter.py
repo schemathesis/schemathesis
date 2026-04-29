@@ -144,7 +144,7 @@ def _to_json_schema(
         _rewrite_allof_of_contains_consts(schema)
 
     if not is_response_schema:
-        _inject_discriminator_consts(schema, name_to_uri)
+        _pin_discriminator_property(schema, name_to_uri)
 
     for keyword, value in schema.items():
         if keyword in IN_VALUE and isinstance(value, dict):
@@ -183,11 +183,11 @@ def _to_json_schema(
     return schema
 
 
-def _inject_discriminator_consts(schema: dict[str, Any], name_to_uri: dict[str, str] | None) -> None:
+def _pin_discriminator_property(schema: dict[str, Any], name_to_uri: dict[str, str] | None) -> None:
     """Pin the discriminator property to its expected value in each oneOf/anyOf branch.
 
     When a schema has a `discriminator`, each branch in oneOf/anyOf is wrapped in
-    `allOf` with a `const` constraint on the discriminator property. This ensures
+    `allOf` with an `enum` constraint on the discriminator property. This ensures
     hypothesis-jsonschema generates the correct discriminator value for each branch.
     """
     discriminator = schema.get("discriminator")
@@ -220,7 +220,9 @@ def _inject_discriminator_consts(schema: dict[str, Any], name_to_uri: dict[str, 
             disc_value = ref_to_value.get(resolved_ref) or resolved_ref.rstrip("/").rsplit("/", 1)[-1]
             if not disc_value:
                 continue
-            items[idx] = {"allOf": [item, {"properties": {property_name: {"const": disc_value}}}]}
+            # `enum` is used instead of `const` so the pin is recognized under Draft 4
+            # (used by OpenAPI 2.0 / 3.0); Draft 4 silently ignores `const`.
+            items[idx] = {"allOf": [item, {"properties": {property_name: {"enum": [disc_value]}}}]}
 
 
 def _rewrite_allof_of_contains_consts(schema: dict[str, Any]) -> None:
