@@ -129,25 +129,7 @@ class EngineContext:
         session = getattr(self._thread_local, "session", None)
         if session is not None:
             return session
-        import requests
-
-        session = requests.Session()
-        session.headers = {}
-        config = self.config
-
-        session.verify = config.tls_verify_for(operation=operation)
-        auth = config.auth_for(operation=operation)
-        if auth is not None:
-            session.auth = auth
-        headers = config.headers_for(operation=operation)
-        if headers:
-            session.headers.update(headers)
-        request_cert = config.request_cert_for(operation=operation)
-        if request_cert is not None:
-            session.cert = request_cert
-        proxy = config.proxy_for(operation=operation)
-        if proxy is not None:
-            session.proxies["all"] = proxy
+        session = make_session(self.config, operation=operation)
         self._thread_local.session = session
         return session
 
@@ -184,3 +166,25 @@ class EngineContext:
                 if self._extra_data_source is None:
                     self._extra_data_source = self.schema.create_extra_data_source()
         return self._extra_data_source
+
+
+def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:
+    """Build a `requests.Session` configured from project config."""
+    import requests
+
+    session = requests.Session()
+    session.headers = {}
+    session.verify = config.tls_verify_for(operation=operation)
+    auth = config.auth_for(operation=operation)
+    if auth is not None:
+        session.auth = auth
+    headers = config.headers_for(operation=operation)
+    if headers:
+        session.headers.update(headers)
+    request_cert = config.request_cert_for(operation=operation)
+    if request_cert is not None:
+        session.cert = request_cert
+    proxy = config.proxy_for(operation=operation)
+    if proxy is not None:
+        session.proxies["all"] = proxy
+    return session

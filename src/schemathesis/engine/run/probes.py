@@ -146,18 +146,13 @@ PROBES = (NullByteInHeader,)
 
 def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     """Send the probe to the application."""
-    from requests import PreparedRequest, Request, RequestException, Session
+    from requests import PreparedRequest, Request, RequestException
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
-    session = Session()
-    session.headers = {}
-    tls_verify = ctx.config.tls_verify_for(operation=None)
-    if tls_verify is not None:
-        session.verify = tls_verify
-    proxy = ctx.config.proxy_for(operation=None)
-    if proxy is not None:
-        session.proxies["all"] = proxy
+    from schemathesis.engine.context import make_session
+
+    session = make_session(ctx.config)
     try:
         request = probe.prepare_request(session, Request(), ctx.schema)
         request.headers[HEADER_NAME] = probe.name
