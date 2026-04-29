@@ -933,6 +933,34 @@ def test_path_parameters_never_contain_slash():
 
 
 @pytest.mark.hypothesis_nested
+def test_path_boolean_param_is_not_coerced_to_int_alongside_integer_param(ctx):
+    # The integer positive-bias must not rewrite `False` into `1` for a sibling boolean param.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/items/{id}/{flag}": {
+                "get": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "flag", "in": "path", "required": True, "schema": {"type": "boolean"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/items/{id}/{flag}"]["GET"]
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE))
+    @settings(deadline=None, max_examples=100, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
+    def test(case):
+        flag = case.path_parameters["flag"]
+        assert flag in {"true", "false"}, f"boolean path param became {flag!r}"
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
 def test_negative_path_parameters_reject_encoded_slash_for_explicit_slash_examples():
     schema = schemathesis.openapi.from_dict(
         {

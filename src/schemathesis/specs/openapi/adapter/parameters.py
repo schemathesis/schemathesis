@@ -166,7 +166,13 @@ def _bias_path_integers_to_positive(params: dict[str, Any], random: Random) -> d
     """
     result = {}
     for key, value in params.items():
-        if isinstance(value, int) and value <= 0 and random.random() < PATH_INTEGER_POSITIVE_BIAS:
+        # `bool` is a subclass of `int`; without excluding it `False` would be rewritten to `1`.
+        if (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and value <= 0
+            and random.random() < PATH_INTEGER_POSITIVE_BIAS
+        ):
             # Convert to positive: 0 -> 1, negative -> abs(value) or 1
             result[key] = max(1, abs(value))
         else:
