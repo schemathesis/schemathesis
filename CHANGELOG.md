@@ -22,6 +22,7 @@
 ### :bug: Fixed
 
 - False positive `negative_data_rejection` for body-level type mutations on `multipart/form-data` endpoints. [#3801](https://github.com/schemathesis/schemathesis/issues/3801)
+- False positive `negative_data_rejection` for body fields with `format: binary` or `format: byte`.
 - Crash on schemas with non-schema values inside `properties` (e.g. an integer where a sub-schema is expected).
 - Cascading generation failures after one schema corrupted shared `hypothesis-jsonschema` constants in the same process.
 - Crash on `$ref` with sibling keywords when exploring the Python API outside the pytest runner.
