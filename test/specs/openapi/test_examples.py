@@ -3532,3 +3532,71 @@ def test_get_strategies_with_binary_body_and_pool_does_not_crash(ctx):
     strategies = get_strategies_from_examples(upload, extra_data_source=data_source)
 
     assert strategies
+
+
+def test_pool_injected_body_with_multiple_media_types_does_not_crash(ctx):
+    # Captured body variants must carry a media type so make_case can pick one.
+    raw = ctx.openapi.build_schema(
+        {
+            "/projects/{projectId}/tags/{tagId}": {
+                "patch": {
+                    "operationId": "UpdateTag",
+                    "parameters": [
+                        {
+                            "name": "projectId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                            "examples": {"ex": {"value": "bc3f7dad-5544-468c-8573-3ef04d55463e"}},
+                        },
+                        {
+                            "name": "tagId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                            "examples": {"ex": {"value": "9e27bc1b-7ae7-4e3b-a4e5-36153479dc01"}},
+                        },
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"$ref": "#/components/schemas/Tag"}},
+                            "application/xml": {"schema": {"$ref": "#/components/schemas/Tag"}},
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {"schema": {"$ref": "#/components/schemas/Tag"}},
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "Tag": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string", "format": "uuid"},
+                        "name": {"type": "string"},
+                    },
+                }
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw)
+    operation = schema["/projects/{projectId}/tags/{tagId}"]["PATCH"]
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation=operation.label,
+        status_code=200,
+        payload={"id": "9e27bc1b-7ae7-4e3b-a4e5-36153479dc01", "name": "foo"},
+    )
+
+    strategies = get_strategies_from_examples(operation, extra_data_source=data_source)
+    assert strategies
+    for strategy in strategies:
+        examples.generate_one(strategy)
