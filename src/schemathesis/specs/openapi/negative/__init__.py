@@ -11,7 +11,7 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
-from schemathesis.core.jsonschema import ALL_KEYWORDS, FANCY_REGEX_OPTIONS
+from schemathesis.core.jsonschema import ALL_KEYWORDS, DRAFT4_SUPPLEMENTAL_FORMATS, FANCY_REGEX_OPTIONS
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.core.media_types import is_json
 from schemathesis.core.parameters import ParameterLocation
@@ -101,10 +101,14 @@ def _is_unconstrained_binary_schema(schema: JsonSchema) -> bool:
 
 @lru_cache
 def get_validator(cache_key: CacheKey) -> jsonschema_rs.Validator:
-    """Get JSON Schema validator for the given schema."""
+    """Hook custom formats to always-fail (enables format-violating fuzzing); skip `binary`/`byte` (runtime is permissive)."""
+    formats: dict[str, Any] = {}
+    if cache_key.validator_cls is jsonschema_rs.Draft4Validator:
+        formats.update(DRAFT4_SUPPLEMENTAL_FORMATS)
+    formats.update(dict.fromkeys(cache_key.custom_format_names - _ALWAYS_INVALID_FORMATS, _always_invalid))
     return cache_key.validator_cls(
         cache_key.schema,
-        formats=dict.fromkeys(cache_key.custom_format_names | _ALWAYS_INVALID_FORMATS, _always_invalid),
+        formats=formats,
         validate_formats=True,
         pattern_options=FANCY_REGEX_OPTIONS,
     )

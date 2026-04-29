@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+import jsonschema_rs
 import pytest
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core.jsonschema import make_validator
 from schemathesis.generation import GenerationMode
 
 
@@ -65,6 +67,42 @@ def test_binary_format_negative_mutations(encoding):
     @settings(max_examples=10)
     def check(case):
         assert is_structural_mutation(case.body, "file") or is_type_mutation(case.body, "file", bytes)
+
+    check()
+
+
+def test_negative_body_is_invalid_against_real_schema_when_only_field_is_optional_binary(ctx):
+    # `format: binary` is permissive at runtime; mutations producing valid strings aren't actually negative.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/upload": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"captionfile": {"type": "string", "format": "binary"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/upload"]["PUT"]
+    real_validator = make_validator(operation.body[0].optimized_schema, jsonschema_rs.Draft4Validator)
+
+    @given(case=operation.as_strategy(generation_mode=GenerationMode.NEGATIVE))
+    @settings(max_examples=20, suppress_health_check=list(HealthCheck))
+    def check(case):
+        if not isinstance(case.body, dict):
+            return
+        assert not real_validator.is_valid(case.body), f"NEGATIVE body still valid against real schema: {case.body!r}"
 
     check()
 
