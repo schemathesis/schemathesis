@@ -300,7 +300,10 @@ class OpenApiComponent(ABC):
 
     @property
     def validation_schema(self) -> JsonSchema:
-        """JSON schema for conformance validation — resolved but without generation-specific type injection."""
+        """JSON schema for conformance validation — resolved but without generation-specific type injection.
+
+        Keeps `prefixItems` intact so `Draft202012Validator` accepts the schema during construction.
+        """
         if self._validation_schema is NOT_SET:
             self._validation_schema = to_json_schema(
                 self.raw_schema,
@@ -309,6 +312,7 @@ class OpenApiComponent(ABC):
                 upgrade_legacy_exclusive_bounds=(
                     self.adapter.jsonschema_validator_cls is jsonschema_rs.Draft202012Validator
                 ),
+                convert_prefix_items=False,
                 name_to_uri=self.name_to_uri,
             )
         assert not isinstance(self._validation_schema, NotSet)
@@ -1024,27 +1028,28 @@ class OpenApiParameterSet(ParameterSet):
         if exclude_key in self._schema_cache:
             return self._schema_cache[exclude_key]
 
-        schema = self.schema
-        if exclude_key:
-            # Need to exclude some parameters - create a shallow copy to avoid mutating cached schema
-            schema = dict(schema)
-            if self.location == ParameterLocation.HEADER:
-                # Remove excluded headers case-insensitively
-                exclude_lower = {name.lower() for name in exclude_key}
-                schema["properties"] = {
-                    key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
-                }
-                if "required" in schema:
-                    schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
-            else:
-                # Non-header locations: remove by exact name
-                schema["properties"] = {
-                    key: value for key, value in schema["properties"].items() if key not in exclude_key
-                }
-                if "required" in schema:
-                    schema["required"] = [key for key in schema["required"] if key not in exclude_key]
-
+        schema = self._apply_exclusions(self.schema, exclude_key)
         self._schema_cache[exclude_key] = schema
+        return schema
+
+    def _apply_exclusions(self, base: dict[str, Any], exclude_key: frozenset[str]) -> dict[str, Any]:
+        if not exclude_key:
+            return base
+        # Need to exclude some parameters - create a shallow copy to avoid mutating cached schema
+        schema = dict(base)
+        if self.location == ParameterLocation.HEADER:
+            # Remove excluded headers case-insensitively
+            exclude_lower = {name.lower() for name in exclude_key}
+            schema["properties"] = {
+                key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
+            }
+            if "required" in schema:
+                schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
+        else:
+            # Non-header locations: remove by exact name
+            schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude_key}
+            if "required" in schema:
+                schema["required"] = [key for key in schema["required"] if key not in exclude_key]
         return schema
 
     def get_strategy(
@@ -1115,6 +1120,12 @@ class OpenApiParameterSet(ParameterSet):
             strategy = st.none()
         else:
             assert isinstance(operation.schema, OpenApiSchema)
+            # Negative filter needs `prefixItems` intact so `Draft202012Validator` can be constructed.
+            validation_schema_obj: JsonSchema | None = None
+            if strategy_factory is make_negative_strategy:
+                validation_schema_obj = self._apply_exclusions(
+                    parameters_to_validation_schema(self.items, self.location), exclude_key
+                )
             strategy = strategy_factory(
                 schema_obj,
                 operation.label,
@@ -1123,6 +1134,7 @@ class OpenApiParameterSet(ParameterSet):
                 generation_config,
                 operation.schema.adapter.jsonschema_validator_cls,
                 self.name_to_uri,
+                validation_schema=validation_schema_obj,
             )
 
             # For negative strategies, we need to handle GeneratedValue wrappers
@@ -1267,6 +1279,15 @@ def form_data_to_json_schema(parameters: Sequence[Mapping[str, Any]]) -> dict[st
 def parameters_to_json_schema(parameters: Iterable[OpenApiParameter], location: ParameterLocation) -> dict[str, Any]:
     """Convert multiple Open API parameters to a JSON Schema."""
     parameter_data = ((param.name, param.optimized_schema, param.is_required) for param in parameters)
+
+    return _merge_parameters_to_object_schema(parameter_data, location)
+
+
+def parameters_to_validation_schema(
+    parameters: Iterable[OpenApiParameter], location: ParameterLocation
+) -> dict[str, Any]:
+    """Merge parameters' validation schemas — `prefixItems` intact, suitable for Draft 2020-12 validators."""
+    parameter_data = ((param.name, param.validation_schema, param.is_required) for param in parameters)
 
     return _merge_parameters_to_object_schema(parameter_data, location)
 
