@@ -99,6 +99,12 @@ def assert_requests_call(case: Case):
         case.call(base_url="http://127.0.0.1:1", timeout=0.001)
 
 
+def assert_cli_snapshot(result: Any, snapshot: Any) -> None:
+    """Match a CLI Result against ``snapshot_cli``; show un-normalised stdout on failure."""
+    raw_stdout = getattr(result, "stdout", "") or ""
+    assert result == snapshot, f"\n--- raw stdout ---\n{raw_stdout}\n--- end ---"
+
+
 def load_yaml_or_fail(path: str | os.PathLike, *, context: str = "") -> dict:
     """Load YAML; surface raw file + caller context if it doesn't parse to a dict."""
     raw = Path(path).read_text(encoding="utf-8")

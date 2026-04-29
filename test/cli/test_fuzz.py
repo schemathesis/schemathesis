@@ -25,6 +25,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.events import EngineFinished
 from schemathesis.engine.fuzz._executor import FUZZ_TESTS_LABEL
 from schemathesis.engine.recorder import ScenarioRecorder
+from test.utils import assert_cli_snapshot
 
 
 class _RaisingEngine:
@@ -41,7 +42,7 @@ def test_fuzz_basic(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2") == snapshot_cli
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -53,7 +54,9 @@ def test_fuzz_final_line_with_failure(cli, ctx, app_runner, snapshot_cli):
         return jsonify({}), 500
 
     port = app_runner.run_flask_app(app)
-    assert cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2", "--seed=42") == snapshot_cli
+    assert_cli_snapshot(
+        cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2", "--seed=42"), snapshot_cli
+    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -66,11 +69,11 @@ def test_fuzz_final_line_with_error(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert (
+    assert_cli_snapshot(
         cli.main(
             "fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2", "--request-timeout=0.001", "--seed=42"
-        )
-        == snapshot_cli
+        ),
+        snapshot_cli,
     )
 
 
@@ -83,12 +86,14 @@ def test_fuzz_final_line_empty_test_suite(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--include-path=/nonexistent") == snapshot_cli
+    assert_cli_snapshot(
+        cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--include-path=/nonexistent"), snapshot_cli
+    )
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_fuzz_fatal_error_loader(cli, snapshot_cli):
-    assert cli.main("fuzz", "http://127.0.0.1:1/openapi.json") == snapshot_cli
+    assert_cli_snapshot(cli.main("fuzz", "http://127.0.0.1:1/openapi.json"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -102,7 +107,7 @@ def test_fuzz_fatal_error_internal(cli, ctx, app_runner, snapshot_cli, monkeypat
     monkeypatch.setattr(fuzz_executor, "from_schema", lambda schema: _RaisingEngine())
 
     port = app_runner.run_flask_app(app)
-    assert cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json") == snapshot_cli
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json"), snapshot_cli)
 
 
 def _make_fuzz_app(ctx, app_runner):
@@ -373,7 +378,7 @@ def test_fuzz_custom_handler_error(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2") == snapshot_cli
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -391,7 +396,7 @@ def test_fuzz_custom_handler(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2") == snapshot_cli
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2"), snapshot_cli)
 
 
 def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
@@ -495,7 +500,7 @@ def test_fuzz_chains_post_with_get_via_link(cli, ctx, app_runner, snapshot_cli):
         return jsonify({"name": None}), 200
 
     port = app_runner.run_flask_app(app)
-    assert (
+    assert_cli_snapshot(
         cli.main(
             "fuzz",
             f"http://127.0.0.1:{port}/openapi.json",
@@ -503,8 +508,8 @@ def test_fuzz_chains_post_with_get_via_link(cli, ctx, app_runner, snapshot_cli):
             "--seed=42",
             "-c",
             "response_schema_conformance",
-        )
-        == snapshot_cli
+        ),
+        snapshot_cli,
     )
 
 
@@ -599,7 +604,7 @@ def test_fuzz_chains_via_request_body_link(cli, ctx, app_runner, snapshot_cli):
         return jsonify({"name": None}), 200
 
     port = app_runner.run_flask_app(app)
-    assert (
+    assert_cli_snapshot(
         cli.main(
             "fuzz",
             f"http://127.0.0.1:{port}/openapi.json",
@@ -607,8 +612,8 @@ def test_fuzz_chains_via_request_body_link(cli, ctx, app_runner, snapshot_cli):
             "--seed=42",
             "-c",
             "response_schema_conformance",
-        )
-        == snapshot_cli
+        ),
+        snapshot_cli,
     )
 
 
