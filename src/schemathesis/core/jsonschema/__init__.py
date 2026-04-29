@@ -46,6 +46,11 @@ def make_validator(schema: Any, validator_cls: type) -> jsonschema_rs.Validator:
     return validator_cls(schema, **kwargs)
 
 
+def make_validator_for(schema: Any) -> jsonschema_rs.Validator:
+    """Like `make_validator`, but auto-detects the draft from `$schema` (defaults to Draft 2020-12)."""
+    return make_validator(schema, jsonschema_rs.validator_cls_for(schema))
+
+
 def schema_with_bundle(schema: Any, root_schema: Any) -> Any:
     """Splice `x-bundled` from `root_schema` into `schema` so nested `$ref`s resolve at the per-schema root."""
     if not isinstance(schema, dict) or not isinstance(root_schema, dict):
@@ -63,7 +68,7 @@ def is_valid(value: Any, schema: dict[str, Any]) -> bool:
     are passed through rather than silently dropped.
     """
     try:
-        return jsonschema_rs.validator_for(schema).is_valid(value)
+        return make_validator_for(schema).is_valid(value)
     except Exception:
         return True
 
@@ -78,6 +83,7 @@ __all__ = [
     "FANCY_REGEX_OPTIONS",
     "is_valid",
     "make_validator",
+    "make_validator_for",
     "schema_with_bundle",
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",

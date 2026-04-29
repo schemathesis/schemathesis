@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
 
-from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid
+from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
 from schemathesis.core.jsonschema.keywords import ALL_KEYWORDS
 
@@ -433,7 +433,7 @@ class CoverageContext:
             elif max_length is not None:
                 strategy = strategy.filter(lambda s: len(s) <= max_length)
             if (fmt := schema.get("format")) in VALIDATED_FORMATS:
-                validator = jsonschema_rs.validator_for({"type": "string", "format": fmt}, validate_formats=True)
+                validator = make_validator_for({"type": "string", "format": fmt})
                 strategy = strategy.filter(validator.is_valid)
             return cached_draw(strategy)
         if (
@@ -1277,7 +1277,7 @@ def _is_valid_with_formats(value: Any, schema: JsonSchema, ctx: CoverageContext)
         full_schema: JsonSchema = schema
         if BUNDLE_STORAGE_KEY in ctx.root_schema:
             full_schema = {**schema, BUNDLE_STORAGE_KEY: ctx.root_schema[BUNDLE_STORAGE_KEY]}
-        return jsonschema_rs.validator_for(full_schema, validate_formats=True).is_valid(value)
+        return make_validator_for(full_schema).is_valid(value)
     except Exception:
         return True
 
@@ -1288,7 +1288,7 @@ def _make_branch_validators(schemas: list[JsonSchema], ctx: CoverageContext) -> 
     for schema in schemas:
         if bundle is not None and isinstance(schema, dict):
             schema = {**schema, BUNDLE_STORAGE_KEY: bundle}
-        result.append(jsonschema_rs.validator_for(schema, validate_formats=True))
+        result.append(make_validator_for(schema))
     return result
 
 

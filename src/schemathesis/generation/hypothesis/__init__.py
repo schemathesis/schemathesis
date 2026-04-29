@@ -22,7 +22,12 @@ def setup() -> None:
 
     from schemathesis.core import INTERNAL_BUFFER_SIZE
     from schemathesis.core.errors import InvalidSchema
-    from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, FANCY_REGEX_OPTIONS, REFERENCE_TO_BUNDLE_PREFIX
+    from schemathesis.core.jsonschema import (
+        BUNDLE_STORAGE_KEY,
+        REFERENCE_TO_BUNDLE_PREFIX,
+        make_validator,
+        make_validator_for,
+    )
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import deepclone
 
@@ -427,7 +432,7 @@ def setup() -> None:
     def _make_rust_validator(schema: dict[str, Any]) -> Any:
         last_error: jsonschema_rs.ValidationError | None = None
         try:
-            return jsonschema_rs.validator_for(schema, pattern_options=FANCY_REGEX_OPTIONS)
+            return make_validator_for(schema)
         except jsonschema_rs.ValidationError as exc:
             last_error = exc
             if is_regex_validation_error(exc):
@@ -435,7 +440,7 @@ def setup() -> None:
 
         for cls in (jsonschema_rs.Draft7Validator, jsonschema_rs.Draft4Validator):
             try:
-                return cls(schema, pattern_options=FANCY_REGEX_OPTIONS)
+                return make_validator(schema, cls)
             except jsonschema_rs.ValidationError as exc:
                 last_error = exc
                 if is_regex_validation_error(exc):
@@ -444,7 +449,7 @@ def setup() -> None:
         assert last_error is not None
         raise last_error
 
-    def make_validator(schema: dict[str, Any]) -> _ValidatorWrapper:
+    def _make_wrapped_validator(schema: dict[str, Any]) -> _ValidatorWrapper:
         try:
             validator = _make_rust_validator(schema)
             return _ValidatorWrapper(validator)
@@ -468,7 +473,7 @@ def setup() -> None:
                 continue
             seen.add(cls)
             try:
-                cls(schema, pattern_options=FANCY_REGEX_OPTIONS)
+                make_validator(schema, cls)
                 return cls
             except jsonschema_rs.ValidationError as exc:
                 last_error = exc
@@ -485,7 +490,7 @@ def setup() -> None:
             return _original_get_validator_class(schema)
         raise last_error
 
-    _canonicalise.make_validator = make_validator
-    _from_schema.make_validator = make_validator
+    _canonicalise.make_validator = _make_wrapped_validator
+    _from_schema.make_validator = _make_wrapped_validator
     _canonicalise._get_validator_class = _get_validator_class
     setup._is_patched = True  # type: ignore[attr-defined]
