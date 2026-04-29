@@ -118,7 +118,7 @@ def _get_pool_combos(
             schema=body_schema,
         )
         if variants:
-            per_location.append([{"body": variant} for variant in variants])
+            per_location.append([{"body": variant, "media_type": body.media_type} for variant in variants])
 
     if not per_location:
         return []
