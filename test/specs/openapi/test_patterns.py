@@ -250,11 +250,23 @@ def test_update_quantifier_invalid_pattern():
         (r"[\p{Alpha}]+:[\p{Digit}]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]+:[0-9]+"),
         (r"[\p{Alpha}_]+\p{Digit}+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+[0-9]+"),
         (r"\[\p{Alpha}\]", r"\[[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F]\]"),
+        # POSIX character classes nested inside `[...]` inline as raw class contents.
+        (r"[[:alnum:]]", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9]"),
+        (r"[[:alnum:]\/\_]", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9\/\_]"),
+        (r"[[:digit:]]+", r"[0-9]+"),
+        (r"[[:alpha:]_]+", r"[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F_]+"),
+        (
+            r"^([01]\d|2[0-3])(\[[[:alnum:]\/\_]+\])?$",
+            r"^([01]\d|2[0-3])(\[[a-zA-Z\u00C0-\u00D6\u00D8-\u00F6\u00F8-\u024F0-9\/\_]+\])?$",
+        ),
         # `\P{X}` inside a class has no safe single-class equivalent \u2014 bail out.
         (r"[\P{Alnum}_]+", None),
         (r"[\P{L}_]", None),
         (r"[\PL_]", None),
         (r"[\p{Greek}_]+", None),
+        # Negated POSIX class `[:^X:]` and unknown POSIX names \u2014 bail out.
+        (r"[[:^alnum:]_]", None),
+        (r"[[:greek:]_]", None),
         # No translation needed (already valid Python regex)
         (r"[a-z]+", None),
         (r"^\d+$", None),
