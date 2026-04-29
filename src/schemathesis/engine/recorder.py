@@ -75,6 +75,18 @@ class ScenarioRecorder:
         """Record a successful pass of a check for a given test case."""
         self.checks.setdefault(case_id, []).append(CheckNode(name=name, status=Status.SUCCESS, failure_info=None))
 
+    def record_interaction(self, case_id: str, interaction: Interaction) -> None:
+        """Record a pre-built `Interaction` (used for serialization round-trips, e.g. xdist worker IPC)."""
+        self.interactions[case_id] = interaction
+
+    def record_check_node(self, case_id: str, node: CheckNode) -> None:
+        """Record a pre-built `CheckNode` (used for serialization round-trips)."""
+        self.checks.setdefault(case_id, []).append(node)
+
+    def record_case_node(self, case_id: str, node: CaseNode) -> None:
+        """Record a pre-built `CaseNode` (used for serialization round-trips)."""
+        self.cases[case_id] = node
+
     def find_failure_data(self, *, parent_id: str, failure: Failure) -> FailureData:
         """Retrieve the relevant test case & interaction data for a failure.
 
