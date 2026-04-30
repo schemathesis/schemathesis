@@ -35,7 +35,15 @@
       ]
     },
     "DELETE /tags/{resourceArn}#tagKeys": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceArn",
+          "resource": "Tag",
+          "resource_field": "resourceArn"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -142,7 +150,15 @@
       ]
     },
     "GET /tags/{resourceArn}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceArn",
+          "resource": "Tag",
+          "resource_field": "resourceArn"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -155,7 +171,15 @@
       ]
     },
     "POST /matchingworkflows": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "roleArn",
+          "resource": "Role",
+          "resource_field": "roleArn"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -224,7 +248,15 @@
       ]
     },
     "POST /tags/{resourceArn}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceArn",
+          "resource": "Tag",
+          "resource_field": "resourceArn"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -233,11 +265,28 @@
           "pointer": "/",
           "resource": "TagResource",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "path_parameter": "resourceArn",
+          "pointer": "",
+          "resource": "Tag",
+          "status_code": "200"
         }
       ]
     },
     "PUT /matchingworkflows/{workflowName}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "roleArn",
+          "resource": "CreateMatchingWorkflow",
+          "resource_field": "roleArn"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -740,6 +789,12 @@
         ]
       }
     },
+    "Role": {
+      "fields": [
+        "roleArn"
+      ],
+      "types": {}
+    },
     "Schema": {
       "fields": [
         "schemaName"
@@ -760,6 +815,12 @@
           "string"
         ]
       }
+    },
+    "Tag": {
+      "fields": [
+        "resourceArn"
+      ],
+      "types": {}
     },
     "TagMap": {
       "fields": [],

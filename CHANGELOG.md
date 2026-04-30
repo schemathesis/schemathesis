@@ -11,6 +11,10 @@
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
 - Capture pool entries from more GET-list response shapes: custom wrappers, nested envelopes, multi-array roots.
 
+### :wrench: Changed
+
+- Recognize more path parameters as resource identifiers.
+
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 
 ### :rocket: Added
