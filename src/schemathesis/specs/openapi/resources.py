@@ -47,8 +47,9 @@ def build_descriptors(schema: OpenApiSchema) -> Sequence[ResourceDescriptor]:
             cardinality=output.cardinality,
             is_primitive_identifier=output.is_primitive_identifier,
             identifier_field=get_identifier_field(label, output.resource.name)
-            if output.is_primitive_identifier
+            if output.is_primitive_identifier or output.extract_object_keys
             else None,
+            extract_object_keys=output.extract_object_keys,
         )
         for label, operation in graph.operations.items()
         for output in operation.outputs

@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "NonDeletionIncident",
@@ -17,6 +18,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Incident",
@@ -29,6 +31,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeletionIncident",
@@ -41,6 +44,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Incident",
@@ -53,6 +57,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
@@ -73,6 +78,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
@@ -80,6 +86,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "LeagueVideogame",
@@ -100,6 +107,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -120,6 +128,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -140,6 +149,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -160,6 +170,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -180,6 +191,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -200,6 +212,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -212,6 +225,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Live",
@@ -224,6 +238,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -236,6 +251,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -248,6 +264,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -260,6 +277,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -280,6 +298,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -287,6 +306,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/league",
           "resource": "BaseLeague",
@@ -294,6 +314,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/live",
           "resource": "MatchLive",
@@ -301,6 +322,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/serie",
           "resource": "BaseSerie",
@@ -308,6 +330,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/streams",
           "resource": "MatchLocalizedStreams",
@@ -315,6 +338,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/tournament",
           "resource": "BaseTournament",
@@ -322,6 +346,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "CurrentVideogame",
@@ -342,6 +367,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "MatchTeamOpponentsObject",
@@ -354,6 +380,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
@@ -374,6 +401,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
@@ -394,6 +422,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -406,6 +435,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -418,6 +448,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -430,6 +461,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -442,6 +474,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -462,6 +495,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -469,6 +503,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/league",
           "resource": "BaseLeague",
@@ -476,6 +511,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "CurrentVideogame",
@@ -496,6 +532,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -516,6 +553,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -536,6 +574,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -556,6 +595,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -576,6 +616,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
@@ -596,6 +637,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -608,6 +650,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
@@ -628,6 +671,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
@@ -648,6 +692,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
@@ -668,6 +713,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -688,6 +734,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -708,6 +755,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -720,6 +768,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -732,6 +781,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -744,6 +794,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -756,6 +807,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -776,6 +828,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Tournament",
@@ -783,6 +836,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/league",
           "resource": "BaseLeague",
@@ -790,6 +844,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/serie",
           "resource": "BaseSerie",
@@ -797,6 +852,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/videogame",
           "resource": "CurrentVideogame",
@@ -817,6 +873,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Bracket",
@@ -837,6 +894,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
@@ -857,6 +915,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Player",
@@ -877,6 +936,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TournamentTeamRosters",
@@ -897,6 +957,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Standing",
@@ -917,6 +978,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Team",
@@ -929,6 +991,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Videogame",
@@ -949,6 +1012,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Videogame_LoL",
@@ -969,6 +1033,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
@@ -989,6 +1054,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
@@ -1009,6 +1075,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
@@ -1029,6 +1096,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortVideogameVersion",

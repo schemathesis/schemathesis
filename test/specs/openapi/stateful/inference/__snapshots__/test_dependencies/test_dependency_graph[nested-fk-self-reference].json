@@ -20,6 +20,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Post",
@@ -32,6 +33,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "User",

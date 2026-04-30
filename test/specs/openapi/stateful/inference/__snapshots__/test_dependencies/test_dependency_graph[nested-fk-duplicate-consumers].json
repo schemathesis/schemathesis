@@ -13,6 +13,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Order",
@@ -33,6 +34,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Warehouse",
@@ -53,6 +55,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Warehouse",

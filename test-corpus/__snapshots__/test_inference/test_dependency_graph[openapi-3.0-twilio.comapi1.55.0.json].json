@@ -515,6 +515,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Accounts.json",
@@ -522,8 +523,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/accounts",
+          "pointer": "/accounts",
           "resource": "api.v2010.account",
           "status_code": "200"
         }
@@ -542,6 +544,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Addresses.json",
@@ -549,8 +552,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/addresses",
+          "pointer": "/addresses",
           "resource": "api.v2010.account.address",
           "status_code": "200"
         }
@@ -576,6 +580,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DependentPhoneNumbers.json",
@@ -583,8 +588,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/dependent_phone_numbers",
+          "pointer": "/dependent_phone_numbers",
           "resource": "api.v2010.account.address.dependent_phone_number",
           "status_code": "200"
         }
@@ -603,6 +609,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.address",
@@ -623,6 +630,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Applications.json",
@@ -630,8 +638,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/applications",
+          "pointer": "/applications",
           "resource": "api.v2010.account.application",
           "status_code": "200"
         }
@@ -650,6 +659,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.application",
@@ -670,6 +680,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AuthorizedConnectApps.json",
@@ -677,8 +688,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/authorized_connect_apps",
+          "pointer": "/authorized_connect_apps",
           "resource": "api.v2010.account.authorized_connect_app",
           "status_code": "200"
         }
@@ -704,6 +716,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.authorized_connect_app",
@@ -724,6 +737,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AvailablePhoneNumbers.json",
@@ -731,8 +745,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/countries",
+          "pointer": "/countries",
           "resource": "api.v2010.account.available_phone_number_country",
           "status_code": "200"
         }
@@ -751,6 +766,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.available_phone_number_country",
@@ -771,6 +787,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Local.json",
@@ -778,8 +795,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_local",
           "status_code": "200"
         }
@@ -798,6 +816,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "MachineToMachine.json",
@@ -805,8 +824,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_machine_to_machine",
           "status_code": "200"
         }
@@ -825,6 +845,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Mobile.json",
@@ -832,8 +853,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_mobile",
           "status_code": "200"
         }
@@ -852,6 +874,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "National.json",
@@ -859,8 +882,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_national",
           "status_code": "200"
         }
@@ -879,6 +903,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "SharedCost.json",
@@ -886,8 +911,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_shared_cost",
           "status_code": "200"
         }
@@ -906,6 +932,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TollFree.json",
@@ -913,8 +940,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_toll_free",
           "status_code": "200"
         }
@@ -933,6 +961,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Voip.json",
@@ -940,8 +969,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/available_phone_numbers",
+          "pointer": "/available_phone_numbers",
           "resource": "api.v2010.account.available_phone_number_country.available_phone_number_voip",
           "status_code": "200"
         }
@@ -960,6 +990,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.balance",
@@ -987,6 +1018,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Calls.json",
@@ -994,8 +1026,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/calls",
+          "pointer": "/calls",
           "resource": "api.v2010.account.call",
           "status_code": "200"
         }
@@ -1021,6 +1054,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Events.json",
@@ -1028,8 +1062,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/events",
+          "pointer": "/events",
           "resource": "api.v2010.account.call.call_event",
           "status_code": "200"
         }
@@ -1055,6 +1090,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Notifications.json",
@@ -1062,8 +1098,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/notifications",
+          "pointer": "/notifications",
           "resource": "api.v2010.account.call.call_notification",
           "status_code": "200"
         }
@@ -1089,6 +1126,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_notification-instance",
@@ -1116,6 +1154,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
@@ -1123,8 +1162,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/recordings",
+          "pointer": "/recordings",
           "resource": "api.v2010.account.call.call_recording",
           "status_code": "200"
         }
@@ -1150,6 +1190,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_recording",
@@ -1170,6 +1211,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call",
@@ -1190,6 +1232,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Conferences.json",
@@ -1197,8 +1240,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/conferences",
+          "pointer": "/conferences",
           "resource": "api.v2010.account.conference",
           "status_code": "200"
         }
@@ -1224,6 +1268,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Participants.json",
@@ -1231,8 +1276,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/participants",
+          "pointer": "/participants",
           "resource": "api.v2010.account.conference.participant",
           "status_code": "200"
         }
@@ -1265,6 +1311,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.participant",
@@ -1292,6 +1339,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
@@ -1299,8 +1347,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/recordings",
+          "pointer": "/recordings",
           "resource": "api.v2010.account.conference.conference_recording",
           "status_code": "200"
         }
@@ -1326,6 +1375,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.conference_recording",
@@ -1346,6 +1396,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference",
@@ -1366,6 +1417,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ConnectApps.json",
@@ -1373,8 +1425,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/connect_apps",
+          "pointer": "/connect_apps",
           "resource": "api.v2010.account.connect_app",
           "status_code": "200"
         }
@@ -1393,6 +1446,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.connect_app",
@@ -1413,6 +1467,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IncomingPhoneNumbers.json",
@@ -1420,8 +1475,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/incoming_phone_numbers",
+          "pointer": "/incoming_phone_numbers",
           "resource": "api.v2010.account.incoming_phone_number",
           "status_code": "200"
         }
@@ -1440,6 +1496,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Local.json",
@@ -1447,8 +1504,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/incoming_phone_numbers",
+          "pointer": "/incoming_phone_numbers",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_local",
           "status_code": "200"
         }
@@ -1467,6 +1525,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Mobile.json",
@@ -1474,8 +1533,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/incoming_phone_numbers",
+          "pointer": "/incoming_phone_numbers",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile",
           "status_code": "200"
         }
@@ -1494,6 +1554,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TollFree.json",
@@ -1501,8 +1562,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/incoming_phone_numbers",
+          "pointer": "/incoming_phone_numbers",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free",
           "status_code": "200"
         }
@@ -1528,6 +1590,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AssignedAddOns.json",
@@ -1535,8 +1598,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/assigned_add_ons",
+          "pointer": "/assigned_add_ons",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
           "status_code": "200"
         }
@@ -1569,6 +1633,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Extensions.json",
@@ -1576,8 +1641,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/extensions",
+          "pointer": "/extensions",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension",
           "status_code": "200"
         }
@@ -1610,6 +1676,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on.incoming_phone_number_assigned_add_on_extension",
@@ -1637,6 +1704,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
@@ -1657,6 +1725,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number",
@@ -1677,6 +1746,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Keys.json",
@@ -1684,8 +1754,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/keys",
+          "pointer": "/keys",
           "resource": "api.v2010.account.key",
           "status_code": "200"
         }
@@ -1704,6 +1775,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.key",
@@ -1724,6 +1796,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Messages.json",
@@ -1731,8 +1804,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/messages",
+          "pointer": "/messages",
           "resource": "api.v2010.account.message",
           "status_code": "200"
         }
@@ -1758,6 +1832,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Media.json",
@@ -1765,8 +1840,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/media_list",
+          "pointer": "/media_list",
           "resource": "api.v2010.account.message.media",
           "status_code": "200"
         }
@@ -1792,6 +1868,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message.media",
@@ -1812,6 +1889,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message",
@@ -1832,6 +1910,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Notifications.json",
@@ -1839,8 +1918,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/notifications",
+          "pointer": "/notifications",
           "resource": "api.v2010.account.notification",
           "status_code": "200"
         }
@@ -1859,6 +1939,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.notification-instance",
@@ -1879,6 +1960,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "OutgoingCallerIds.json",
@@ -1886,8 +1968,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/outgoing_caller_ids",
+          "pointer": "/outgoing_caller_ids",
           "resource": "api.v2010.account.outgoing_caller_id",
           "status_code": "200"
         }
@@ -1906,6 +1989,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.outgoing_caller_id",
@@ -1926,6 +2010,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Queues.json",
@@ -1933,8 +2018,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/queues",
+          "pointer": "/queues",
           "resource": "api.v2010.account.queue",
           "status_code": "200"
         }
@@ -1960,6 +2046,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Members.json",
@@ -1967,8 +2054,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/queue_members",
+          "pointer": "/queue_members",
           "resource": "api.v2010.account.queue.member",
           "status_code": "200"
         }
@@ -2001,6 +2089,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue.member",
@@ -2021,6 +2110,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue",
@@ -2055,6 +2145,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Recordings.json",
@@ -2062,8 +2153,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/recordings",
+          "pointer": "/recordings",
           "resource": "api.v2010.account.recording",
           "status_code": "200"
         }
@@ -2089,6 +2181,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Transcriptions.json",
@@ -2096,8 +2189,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/transcriptions",
+          "pointer": "/transcriptions",
           "resource": "api.v2010.account.recording.recording_transcription",
           "status_code": "200"
         }
@@ -2123,6 +2217,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording.recording_transcription",
@@ -2150,6 +2245,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AddOnResults.json",
@@ -2157,8 +2253,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/add_on_results",
+          "pointer": "/add_on_results",
           "resource": "api.v2010.account.recording.recording_add_on_result",
           "status_code": "200"
         }
@@ -2191,6 +2288,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Payloads.json",
@@ -2198,8 +2296,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/payloads",
+          "pointer": "/payloads",
           "resource": "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload",
           "status_code": "200"
         }
@@ -2232,6 +2331,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording.recording_add_on_result.recording_add_on_result_payload",
@@ -2259,6 +2359,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording.recording_add_on_result",
@@ -2279,6 +2380,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.recording",
@@ -2299,6 +2401,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialLists.json",
@@ -2306,8 +2409,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/credential_lists",
+          "pointer": "/credential_lists",
           "resource": "api.v2010.account.sip.sip_credential_list",
           "status_code": "200"
         }
@@ -2333,6 +2437,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Credentials.json",
@@ -2340,8 +2445,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/credentials",
+          "pointer": "/credentials",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
           "status_code": "200"
         }
@@ -2367,6 +2473,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
@@ -2387,6 +2494,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list",
@@ -2407,6 +2515,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Domains.json",
@@ -2414,8 +2523,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/domains",
+          "pointer": "/domains",
           "resource": "api.v2010.account.sip.sip_domain",
           "status_code": "200"
         }
@@ -2441,6 +2551,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
@@ -2448,8 +2559,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/contents",
+          "pointer": "/contents",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
           "status_code": "200"
         }
@@ -2475,6 +2587,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
@@ -2502,6 +2615,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlListMappings.json",
@@ -2509,8 +2623,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/contents",
+          "pointer": "/contents",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
           "status_code": "200"
         }
@@ -2536,6 +2651,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
@@ -2563,6 +2679,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
@@ -2570,8 +2687,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/contents",
+          "pointer": "/contents",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
           "status_code": "200"
         }
@@ -2597,6 +2715,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
@@ -2624,6 +2743,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CredentialListMappings.json",
@@ -2631,8 +2751,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/credential_list_mappings",
+          "pointer": "/credential_list_mappings",
           "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
           "status_code": "200"
         }
@@ -2658,6 +2779,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
@@ -2685,6 +2807,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlListMappings.json",
@@ -2692,8 +2815,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/ip_access_control_list_mappings",
+          "pointer": "/ip_access_control_list_mappings",
           "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
           "status_code": "200"
         }
@@ -2719,6 +2843,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
@@ -2739,6 +2864,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
@@ -2759,6 +2885,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAccessControlLists.json",
@@ -2766,8 +2893,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/ip_access_control_lists",
+          "pointer": "/ip_access_control_lists",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
           "status_code": "200"
         }
@@ -2793,6 +2921,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "IpAddresses.json",
@@ -2800,8 +2929,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/ip_addresses",
+          "pointer": "/ip_addresses",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
           "status_code": "200"
         }
@@ -2827,6 +2957,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
@@ -2847,6 +2978,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
@@ -2867,6 +2999,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortCodes.json",
@@ -2874,8 +3007,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/short_codes",
+          "pointer": "/short_codes",
           "resource": "api.v2010.account.short_code",
           "status_code": "200"
         }
@@ -2894,6 +3028,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.short_code",
@@ -2914,6 +3049,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "SigningKeys.json",
@@ -2921,8 +3057,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/signing_keys",
+          "pointer": "/signing_keys",
           "resource": "api.v2010.account.signing_key",
           "status_code": "200"
         }
@@ -2941,6 +3078,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.signing_key",
@@ -2961,6 +3099,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Transcriptions.json",
@@ -2968,8 +3107,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/transcriptions",
+          "pointer": "/transcriptions",
           "resource": "api.v2010.account.transcription",
           "status_code": "200"
         }
@@ -2988,6 +3128,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.transcription",
@@ -3008,6 +3149,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Records.json",
@@ -3015,8 +3157,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record",
           "status_code": "200"
         }
@@ -3035,6 +3178,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AllTime.json",
@@ -3042,8 +3186,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_all_time",
           "status_code": "200"
         }
@@ -3062,6 +3207,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Daily.json",
@@ -3069,8 +3215,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_daily",
           "status_code": "200"
         }
@@ -3089,6 +3236,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "LastMonth.json",
@@ -3096,8 +3244,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_last_month",
           "status_code": "200"
         }
@@ -3116,6 +3265,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Monthly.json",
@@ -3123,8 +3273,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_monthly",
           "status_code": "200"
         }
@@ -3143,6 +3294,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ThisMonth.json",
@@ -3150,8 +3302,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_this_month",
           "status_code": "200"
         }
@@ -3170,6 +3323,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Today.json",
@@ -3177,8 +3331,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_today",
           "status_code": "200"
         }
@@ -3197,6 +3352,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Yearly.json",
@@ -3204,8 +3360,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_yearly",
           "status_code": "200"
         }
@@ -3224,6 +3381,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Yesterday.json",
@@ -3231,8 +3389,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_records",
+          "pointer": "/usage_records",
           "resource": "api.v2010.account.usage.usage_record.usage_record_yesterday",
           "status_code": "200"
         }
@@ -3251,6 +3410,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Triggers.json",
@@ -3258,8 +3418,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/usage_triggers",
+          "pointer": "/usage_triggers",
           "resource": "api.v2010.account.usage.usage_trigger",
           "status_code": "200"
         }
@@ -3278,6 +3439,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.usage.usage_trigger",
@@ -3290,6 +3452,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account",
@@ -3302,6 +3465,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Healthcheck",
@@ -3314,6 +3478,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account",
@@ -3334,6 +3499,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.address",
@@ -3354,6 +3520,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.address",
@@ -3374,6 +3541,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.application",
@@ -3394,6 +3562,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.application",
@@ -3414,6 +3583,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call",
@@ -3441,6 +3611,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.payments",
@@ -3468,6 +3639,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.payments",
@@ -3495,6 +3667,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_recording",
@@ -3522,6 +3695,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.call_recording",
@@ -3549,6 +3723,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.siprec",
@@ -3576,6 +3751,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.siprec",
@@ -3603,6 +3779,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.stream",
@@ -3630,6 +3807,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.stream",
@@ -3657,6 +3835,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.user_defined_message_subscription",
@@ -3684,6 +3863,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call.user_defined_message",
@@ -3704,6 +3884,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.call",
@@ -3731,6 +3912,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.participant",
@@ -3765,6 +3947,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.participant",
@@ -3792,6 +3975,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference.conference_recording",
@@ -3812,6 +3996,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.conference",
@@ -3832,6 +4017,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.connect_app",
@@ -3852,6 +4038,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number",
@@ -3872,6 +4059,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_local",
@@ -3892,6 +4080,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_mobile",
@@ -3912,6 +4101,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_toll_free",
@@ -3939,6 +4129,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number.incoming_phone_number_assigned_add_on",
@@ -3959,6 +4150,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.incoming_phone_number",
@@ -3979,6 +4171,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.new_key",
@@ -3999,6 +4192,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.key",
@@ -4019,6 +4213,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message",
@@ -4046,6 +4241,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message.message_feedback",
@@ -4066,6 +4262,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.message",
@@ -4086,6 +4283,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.validation_request",
@@ -4106,6 +4304,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.outgoing_caller_id",
@@ -4126,6 +4325,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue",
@@ -4160,6 +4360,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue.member",
@@ -4180,6 +4381,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.queue",
@@ -4200,6 +4402,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list",
@@ -4227,6 +4430,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
@@ -4254,6 +4458,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list.sip_credential",
@@ -4274,6 +4479,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_credential_list",
@@ -4294,6 +4500,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
@@ -4321,6 +4528,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_credential_list_mapping",
@@ -4348,6 +4556,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_calls.sip_auth_calls_ip_access_control_list_mapping",
@@ -4375,6 +4584,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_auth.sip_auth_registrations.sip_auth_registrations_credential_list_mapping",
@@ -4402,6 +4612,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_credential_list_mapping",
@@ -4429,6 +4640,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain.sip_ip_access_control_list_mapping",
@@ -4449,6 +4661,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_domain",
@@ -4469,6 +4682,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
@@ -4496,6 +4710,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
@@ -4523,6 +4738,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list.sip_ip_address",
@@ -4543,6 +4759,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.sip.sip_ip_access_control_list",
@@ -4563,6 +4780,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.short_code",
@@ -4583,6 +4801,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.new_signing_key",
@@ -4603,6 +4822,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.signing_key",
@@ -4623,6 +4843,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.token",
@@ -4643,6 +4864,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.usage.usage_trigger",
@@ -4663,6 +4885,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account.usage.usage_trigger",
@@ -4675,6 +4898,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "api.v2010.account",

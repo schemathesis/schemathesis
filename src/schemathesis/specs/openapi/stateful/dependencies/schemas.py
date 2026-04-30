@@ -324,7 +324,8 @@ def _is_pagination_wrapper(
 
     metadata_fields = frozenset(["links", "errors"])
 
-    # Find array properties
+    # Find array-of-objects properties; arrays of primitive items act as metadata
+    # (e.g. Docker `/volumes` returns `{Volumes: [Volume], Warnings: [string]}`).
     arrays = []
     for name, subschema in properties.items():
         if name in metadata_fields:
@@ -332,6 +333,9 @@ def _is_pagination_wrapper(
         if isinstance(subschema, dict):
             _, subschema = maybe_resolve(subschema, resolver, "")
             if subschema.get("type") == "array":
+                items = subschema.get("items")
+                if isinstance(items, dict) and items.get("type") in ("string", "integer", "number", "boolean"):
+                    continue
                 arrays.append(name)
 
     # Must have exactly one array property
@@ -341,23 +345,41 @@ def _is_pagination_wrapper(
     array_field = arrays[0]
 
     # Check if array field name matches common patterns
-    common_data_fields = {"data", "items", "results", "value", "content", "elements", "records", "list"}
+    common_data_fields = {
+        "data",
+        "items",
+        "results",
+        "value",
+        "content",
+        "elements",
+        "records",
+        "list",
+        "rows",
+        "entries",
+    }
 
     if parent_ref:
         resource_name = resource_name_from_ref(parent_ref)
         resource_name = naming.strip_affixes(resource_name, ["get", "create", "list", "delete"], ["response"])
         common_data_fields.add(resource_name.lower())
 
-    if array_field.lower() not in common_data_fields:
+    matched_via_known_wrapper = array_field.lower() in common_data_fields
+
+    if not matched_via_known_wrapper:
         # Check if field name matches resource-specific pattern
         # Example: path="/items/runner-groups" -> resource="RunnerGroup" -> "runner_groups"
         resource_name_from_path = naming.from_path(path)
         if resource_name_from_path is None:
             return None
 
-        candidate = naming.to_plural(naming.to_snake_case(resource_name_from_path))
-        if array_field.lower() != candidate:
-            # Field name doesn't match resource pattern
+        plural = naming.to_plural(naming.to_snake_case(resource_name_from_path))
+        singular = naming.to_snake_case(resource_name_from_path).lower()
+        af = array_field.lower()
+        # Exact match (plural or singular) handles `compliance` for Compliance (uncountable / domain noun);
+        # suffix match handles compound keys like `source_fields` for the `Field` resource on `/.../fields`.
+        if af not in {plural, singular} and not any(
+            af.endswith(f"_{candidate}") or af.endswith(f"-{candidate}") for candidate in (plural, singular)
+        ):
             return None
 
     # Check for pagination metadata indicators
@@ -370,6 +392,11 @@ def _is_pagination_wrapper(
         "total_count",
         "totalelements",
         "total_elements",
+        "totalsize",
+        "total_size",
+        "done",
+        "kind",
+        "metadata",
         "page",
         "pagenumber",
         "page_number",
@@ -414,8 +441,10 @@ def _is_pagination_wrapper(
         prop.lower().replace("_", "").replace("-", "") in pagination_indicators for prop in others
     )
 
-    # Either there is pagination metadata or the wrapper has just items + some other field which is likely an unrecognized metadata
-    if has_pagination_metadata or len(properties) <= 2:
+    # Accept directly when the array field is an unambiguous wrapper word (`data`, `records`, `items`, ...).
+    # Otherwise require pagination metadata signal or a near-trivial shape, to avoid treating a
+    # single-resource response as a wrapper just because one of its fields happens to be an array.
+    if matched_via_known_wrapper or has_pagination_metadata or len(properties) <= 2:
         return array_field
 
     return None

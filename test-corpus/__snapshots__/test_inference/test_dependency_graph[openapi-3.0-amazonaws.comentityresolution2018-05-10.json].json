@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeleteMatchingWorkflow",
@@ -25,6 +26,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeleteSchemaMapping",
@@ -37,6 +39,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "UntagResource",
@@ -49,6 +52,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ListMatchingWorkflows",
@@ -61,6 +65,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GetMatchingWorkflow",
@@ -73,6 +78,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/jobs",
           "resource": "JobSummary",
@@ -93,6 +99,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GetMatchingJob",
@@ -105,6 +112,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ListSchemaMappings",
@@ -125,6 +133,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GetSchemaMapping",
@@ -137,6 +146,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/tags",
           "resource": "TagMap",
@@ -149,6 +159,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CreateMatchingWorkflow",
@@ -161,6 +172,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "StartMatchingJob",
@@ -173,6 +185,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "GetMatchId",
@@ -193,6 +206,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "CreateSchemaMapping",
@@ -201,6 +215,7 @@
         {
           "body_field": "schemaName",
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "",
           "resource": "Schema",
@@ -213,6 +228,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TagResource",
@@ -225,6 +241,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "UpdateMatchingWorkflow",

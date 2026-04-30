@@ -48,6 +48,8 @@ class ExtractedResource:
     cardinality: Cardinality
     # True when response is a primitive value (string/number) that IS the identifier
     is_primitive_identifier: bool = False
+    # True when the response is a map keyed by identifier (`{<id>: <object>, ...}`)
+    extract_object_keys: bool = False
 
 
 def extract_resources_from_responses(
@@ -116,6 +118,16 @@ def iter_resources_from_response(
             primitive_array = _resource_from_primitive_array(path=path, resources=resources)
             if primitive_array is not None:
                 yield primitive_array
+                return None
+
+    # Handle map-by-id GET responses: `{type: object, additionalProperties: <object>}` with no
+    # explicit properties. Keys are the identifiers (Kubernetes pod-statuses, TBA team-statuses).
+    if method == "get" and schema_type == "object" and not schema.get("properties"):
+        additional = schema.get("additionalProperties")
+        if isinstance(additional, dict) and (additional.get("type") == "object" or "$ref" in additional):
+            map_resource = _resource_from_map_by_id(path=path, resources=resources)
+            if map_resource is not None:
+                yield map_resource
                 return None
 
     # Push the response's scope so all nested $refs are resolved relative to the response's location
@@ -188,6 +200,7 @@ def iter_resources_from_response(
             else:
                 pointer = unwrapped.pointer
             yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
+            parent_cardinality = cardinality
             # Look for sub-resources
             properties = unwrapped.schema.get("properties")
             if isinstance(properties, dict):
@@ -200,7 +213,7 @@ def iter_resources_from_response(
                             if isinstance(items, dict):
                                 reference = items.get("$ref")
                         if isinstance(reference, str):
-                            result = _extract_resource_and_cardinality(
+                            sub_result = _extract_resource_and_cardinality(
                                 schema=subschema,
                                 path=path,
                                 resources=resources,
@@ -208,12 +221,38 @@ def iter_resources_from_response(
                                 resolver=resolver,
                                 parent_ref=reference,
                             )
-                            if result is not None:
-                                subresource, cardinality = result
-                                subresource_pointer = extend_pointer(pointer, field, cardinality=cardinality)
-                                yield ExtractedResource(
-                                    resource=subresource, cardinality=cardinality, pointer=subresource_pointer
+                            if sub_result is not None:
+                                subresource, sub_cardinality = sub_result
+                                subresource_pointer = extend_pointer(
+                                    pointer, field, parent_cardinality=parent_cardinality
                                 )
+                                yield ExtractedResource(
+                                    resource=subresource, cardinality=sub_cardinality, pointer=subresource_pointer
+                                )
+                                # When the sub-schema is itself a pagination/list wrapper (e.g. Spring
+                                # `CustomResponse{response: {content: [...]}}`), descend one more level
+                                # so the leaf array of resource items enters the pool, not the envelope.
+                                if sub_cardinality == Cardinality.ONE:
+                                    _, resolved_sub = maybe_resolve(subschema, resolver, "")
+                                    sub_unwrapped = unwrap_schema(
+                                        schema=resolved_sub, path=path, parent_ref=reference, resolver=resolver
+                                    )
+                                    if sub_unwrapped.pointer != ROOT_POINTER:
+                                        inner_result = _extract_resource_and_cardinality(
+                                            schema=sub_unwrapped.schema,
+                                            path=path,
+                                            resources=resources,
+                                            updated_resources=updated_resources,
+                                            resolver=resolver,
+                                            parent_ref=sub_unwrapped.ref or reference,
+                                        )
+                                        if inner_result is not None:
+                                            inner_resource, inner_cardinality = inner_result
+                                            yield ExtractedResource(
+                                                resource=inner_resource,
+                                                cardinality=inner_cardinality,
+                                                pointer=subresource_pointer + sub_unwrapped.pointer,
+                                            )
     finally:
         resolver.pop_scope()
 
@@ -275,6 +314,35 @@ def _resource_from_primitive_response(*, path: str, resources: ResourceMap) -> E
         cardinality=Cardinality.ONE,
         pointer=ROOT_POINTER,
         is_primitive_identifier=True,
+    )
+
+
+def _resource_from_map_by_id(*, path: str, resources: ResourceMap) -> ExtractedResource | None:
+    """Handle a `{<id>: <object>}` map response by capturing each key as a resource id.
+
+    The resource is derived from the parent path segment, since the last segment names the
+    sub-collection (`statuses`, `metrics`, ...) rather than the resource type. For example,
+    `GET /teams/statuses` -> `/teams` -> `Team`.
+    """
+    segments = [s for s in path.split("/") if s]
+    if len(segments) < 2:
+        name = from_path(path)
+    else:
+        parent_path = "/" + "/".join(segments[:-1])
+        name = from_path(parent_path) or from_path(path)
+    if name is None:
+        return None
+
+    resource = resources.get(name)
+    if resource is None:
+        resource = ResourceDefinition.inferred_from_parameter(name=name, parameter_name="id")
+        resources[name] = resource
+
+    return ExtractedResource(
+        resource=resource,
+        cardinality=Cardinality.MANY,
+        pointer=ROOT_POINTER,
+        extract_object_keys=True,
     )
 
 

@@ -92,6 +92,414 @@ def test_many_cardinality_extracts_each_item(user_schema_builder):
     assert {instance.data["id"] for instance in resources} == {"a", "b"}
 
 
+@pytest.mark.parametrize(
+    ("paths", "payload", "operation_label", "resource_name", "id_field", "expected_ids"),
+    [
+        pytest.param(
+            {
+                "/volumes": {
+                    "get": {
+                        "operationId": "listVolumes",
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "Volumes": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "Name": {"type": "string"},
+                                                            "Driver": {"type": "string"},
+                                                        },
+                                                        "required": ["Name", "Driver"],
+                                                    },
+                                                },
+                                                "Warnings": {"type": "array", "items": {"type": "string"}},
+                                            },
+                                            "required": ["Volumes"],
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/volumes/{Name}": {
+                    "get": {
+                        "operationId": "getVolume",
+                        "parameters": [{"name": "Name", "in": "path", "required": True, "schema": {"type": "string"}}],
+                        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                    }
+                },
+            },
+            {"Volumes": [{"Name": "v1", "Driver": "local"}, {"Name": "v2", "Driver": "local"}], "Warnings": []},
+            "GET /volumes",
+            "Volume",
+            "Name",
+            {"v1", "v2"},
+            id="multi-array-root-docker-volumes",
+        ),
+        pytest.param(
+            {
+                "/sources/{sourceId}/fields": {
+                    "get": {
+                        "operationId": "listFields",
+                        "parameters": [
+                            {"name": "sourceId", "in": "path", "required": True, "schema": {"type": "string"}}
+                        ],
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "source_fields": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {"type": "string"},
+                                                            "label": {"type": "string"},
+                                                        },
+                                                        "required": ["id"],
+                                                    },
+                                                },
+                                                "total": {"type": "integer"},
+                                            },
+                                            "required": ["source_fields"],
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/sources/{sourceId}/fields/{id}": {
+                    "get": {
+                        "operationId": "getField",
+                        "parameters": [
+                            {"name": "sourceId", "in": "path", "required": True, "schema": {"type": "string"}},
+                            {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                        ],
+                        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                    }
+                },
+            },
+            {"source_fields": [{"id": "f1", "label": "L1"}, {"id": "f2", "label": "L2"}], "total": 2},
+            "GET /sources/{sourceId}/fields",
+            "Field",
+            "id",
+            {"f1", "f2"},
+            id="snake-case-wrapper-with-total-sibling",
+        ),
+        pytest.param(
+            {
+                "/services/{serviceSid}/compliance": {
+                    "get": {
+                        "operationId": "listCompliance",
+                        "parameters": [
+                            {"name": "serviceSid", "in": "path", "required": True, "schema": {"type": "string"}}
+                        ],
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "compliance": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "sid": {"type": "string"},
+                                                            "status": {"type": "string"},
+                                                        },
+                                                        "required": ["sid"],
+                                                    },
+                                                },
+                                                "count": {"type": "integer"},
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/services/{serviceSid}/compliance/{sid}": {
+                    "get": {
+                        "operationId": "getCompliance",
+                        "parameters": [
+                            {"name": "serviceSid", "in": "path", "required": True, "schema": {"type": "string"}},
+                            {"name": "sid", "in": "path", "required": True, "schema": {"type": "string"}},
+                        ],
+                        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                    }
+                },
+            },
+            {"compliance": [{"sid": "C1", "status": "ok"}, {"sid": "C2", "status": "ok"}], "count": 2},
+            "GET /services/{serviceSid}/compliance",
+            "Compliance",
+            "sid",
+            {"C1", "C2"},
+            id="singular-wrapper-noun-array",
+        ),
+        pytest.param(
+            {
+                "/products": {
+                    "get": {
+                        "operationId": "listProducts",
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "records": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {"type": "string"},
+                                                            "name": {"type": "string"},
+                                                        },
+                                                        "required": ["id"],
+                                                    },
+                                                },
+                                                "totalSize": {"type": "integer"},
+                                                "done": {"type": "boolean"},
+                                            },
+                                            "required": ["records", "totalSize", "done"],
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                    }
+                },
+                "/products/{id}": {
+                    "get": {
+                        "operationId": "getProduct",
+                        "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                        "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                    }
+                },
+            },
+            {"records": [{"id": "p1", "name": "n1"}, {"id": "p2", "name": "n2"}], "totalSize": 2, "done": True},
+            "GET /products",
+            "Product",
+            "id",
+            {"p1", "p2"},
+            id="generic-wrapper-word-salesforce",
+        ),
+    ],
+)
+def test_pool_captures_individuals_from_get_list_envelope(
+    ctx, paths, payload, operation_label, resource_name, id_field, expected_ids
+):
+    spec = ctx.openapi.build_schema(paths)
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(operation=operation_label, status_code=200, payload=payload)
+    resources = list(data_source.repository.iter_instances(resource_name))
+    assert {instance.data.get(id_field) for instance in resources} == expected_ids
+
+
+def test_pool_captures_individuals_from_map_by_id_response(ctx):
+    # Map-by-id payload: keys ARE the identifiers, values are the resources.
+    spec = ctx.openapi.build_schema(
+        {
+            "/teams/statuses": {
+                "get": {
+                    "operationId": "listTeamStatuses",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "object",
+                                            "properties": {"qual_average": {"type": "number"}},
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/teams/{teamId}": {
+                "get": {
+                    "operationId": "getTeam",
+                    "parameters": [{"name": "teamId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation="GET /teams/statuses",
+        status_code=200,
+        payload={"frc1": {"qual_average": 95.0}, "frc2": {"qual_average": 87.0}},
+    )
+    resources = list(data_source.repository.iter_instances("Team"))
+    assert {instance.data.get("teamId") for instance in resources} == {"frc1", "frc2"}
+
+
+def test_pool_captures_individuals_from_nested_envelope_response(ctx):
+    # Spring-style `{response: {content: [...], pageNumber, pageSize}, status, time}` envelope.
+    spec = ctx.openapi.build_schema(
+        {
+            "/flights": {
+                "get": {
+                    "operationId": "listFlights",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/CustomResponseFlightPage"}
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/flights/{id}": {
+                "get": {
+                    "operationId": "getFlight",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        },
+        components={
+            "schemas": {
+                "Flight": {
+                    "type": "object",
+                    "properties": {"id": {"type": "string"}, "name": {"type": "string"}},
+                    "required": ["id"],
+                },
+                "FlightPage": {
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "array", "items": {"$ref": "#/components/schemas/Flight"}},
+                        "pageNumber": {"type": "integer"},
+                        "pageSize": {"type": "integer"},
+                    },
+                },
+                "CustomResponseFlightPage": {
+                    "type": "object",
+                    "properties": {
+                        "response": {"$ref": "#/components/schemas/FlightPage"},
+                        "status": {"type": "string"},
+                        "time": {"type": "string"},
+                    },
+                },
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+    payload = {
+        "response": {
+            "content": [{"id": "f1", "name": "n1"}, {"id": "f2", "name": "n2"}],
+            "pageNumber": 0,
+            "pageSize": 20,
+        },
+        "status": "200 OK",
+        "time": "2026-04-30T00:00:00Z",
+    }
+    data_source.repository.record_response(operation="GET /flights", status_code=200, payload=payload)
+    resources = list(data_source.repository.iter_instances("Flight"))
+    assert {instance.data.get("id") for instance in resources} == {"f1", "f2"}
+
+
+def test_pool_map_by_id_with_single_segment_path(ctx):
+    # Path has one segment; the helper falls back to `from_path(path)` directly.
+    spec = ctx.openapi.build_schema(
+        {
+            "/widgets": {
+                "get": {
+                    "operationId": "listWidgetMap",
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "object",
+                                            "properties": {"label": {"type": "string"}},
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/widgets/{widgetId}": {
+                "get": {
+                    "operationId": "getWidget",
+                    "parameters": [{"name": "widgetId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+    data_source.repository.record_response(
+        operation="GET /widgets",
+        status_code=200,
+        payload={"w1": {"label": "L1"}, "w2": {"label": "L2"}},
+    )
+    resources = list(data_source.repository.iter_instances("Widget"))
+    assert {instance.data.get("widgetId") for instance in resources} == {"w1", "w2"}
+
+
+def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
+    # Path resolves to no resource name (only path-param segments); helper returns None.
+    spec = ctx.openapi.build_schema(
+        {
+            "/{slug}": {
+                "get": {
+                    "operationId": "rootMap",
+                    "parameters": [{"name": "slug", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "additionalProperties": {
+                                            "type": "object",
+                                            "properties": {"value": {"type": "string"}},
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    descriptors = [d for d in schema.analysis.resource_descriptors if d.operation == "GET /{slug}"]
+    assert descriptors == []
+
+
 def test_captured_variants_filter_values_invalid_for_destination(ctx):
     # Producer accepts `id: 0` but consumer's path requires `minimum: 1`; pool injection must filter.
     spec = ctx.openapi.build_schema(

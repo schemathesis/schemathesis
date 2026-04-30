@@ -55,6 +55,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ChannelDetails",
@@ -75,6 +76,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ChannelDetails",
@@ -82,6 +84,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/status",
           "resource": "ChannelStatus",
@@ -102,6 +105,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Message",
@@ -136,6 +140,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PresenceMessage",
@@ -156,6 +161,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PresenceMessage",
@@ -183,6 +189,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -190,6 +197,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
@@ -202,6 +210,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": true,
           "pointer": "/",
           "resource": "Channel",
@@ -229,6 +238,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -236,6 +246,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
@@ -256,6 +267,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -263,6 +275,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
@@ -283,6 +296,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -290,6 +304,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
@@ -302,6 +317,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Stat",
@@ -314,6 +330,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": true,
           "pointer": "/",
           "resource": "Time",
@@ -348,6 +365,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -355,6 +373,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
@@ -396,6 +415,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Message",
@@ -416,6 +436,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "TokenDetails",
@@ -447,6 +468,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -454,6 +476,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",
@@ -462,6 +485,7 @@
         {
           "body_field": "id",
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "",
           "resource": "DeviceRegistration",
@@ -500,6 +524,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "DeviceDetails",
@@ -507,6 +532,7 @@
         },
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/push.recipient",
           "resource": "Recipient",

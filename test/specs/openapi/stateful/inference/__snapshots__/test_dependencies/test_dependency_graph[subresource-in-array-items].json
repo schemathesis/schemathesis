@@ -17,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "AllBackups",
@@ -24,8 +25,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/0/imports",
+          "pointer": "/imports",
           "resource": "BackupFile",
           "status_code": "200"
         }

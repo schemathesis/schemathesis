@@ -26,6 +26,7 @@
         {
           "body_field": "productName",
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "",
           "resource": "Product",

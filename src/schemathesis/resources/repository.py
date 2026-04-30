@@ -158,6 +158,11 @@ class ResourceRepository:
             if target is UNRESOLVABLE:
                 return ()
 
+        if descriptor.extract_object_keys and descriptor.identifier_field is not None and isinstance(target, dict):
+            # Map-by-id payload: keys ARE the identifier values.
+            # Example: GET /teams/statuses -> {"frc1": {...}, "frc2": {...}}
+            return [{descriptor.identifier_field: key} for key in target]
+
         if descriptor.cardinality == Cardinality.MANY and isinstance(target, list):
             values = target
         else:
