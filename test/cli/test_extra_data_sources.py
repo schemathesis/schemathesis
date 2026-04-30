@@ -936,3 +936,98 @@ def test_parent_aware_pool_correlates_path_params(cli, app_runner, snapshot_cli,
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, app_runner, ctx):
+    # After a successful DELETE, the pool no longer feeds the deleted id to GET/PUT/PATCH
+    # consumers. Verified by counting per-id calls server-side, not by snapshotting CLI output.
+    items: dict[str, dict] = {}
+    deleted_ids: set[str] = set()
+    stale_get_calls = 0
+
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string", "format": "uuid"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [
+                        {
+                            "name": "itemId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                },
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [
+                        {
+                            "name": "itemId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                        }
+                    ],
+                    "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
+                },
+            },
+        }
+    )
+
+    @app.route("/items", methods=["POST"])
+    def create_item():
+        item_id = uuid.uuid4().hex
+        items[item_id] = {"id": item_id}
+        return jsonify({"id": item_id}), 201
+
+    @app.route("/items/<item_id>", methods=["GET"])
+    def get_item(item_id):
+        nonlocal stale_get_calls
+        if item_id in deleted_ids:
+            stale_get_calls += 1
+            return "", 404
+        if item_id not in items:
+            return "", 404
+        return jsonify(items[item_id]), 200
+
+    @app.route("/items/<item_id>", methods=["DELETE"])
+    def delete_item(item_id):
+        if item_id not in items:
+            return "", 404
+        deleted_ids.add(item_id)
+        del items[item_id]
+        return "", 204
+
+    port = app_runner.run_flask_app(app)
+    cli.run(
+        f"http://127.0.0.1:{port}/openapi.json",
+        "--phases=fuzzing",
+        "--max-examples=100",
+        "--mode=positive",
+        "--seed=42",
+    )
+
+    # Tombstone+eviction must keep stale-id GETs near zero
+    assert stale_get_calls <= 5, f"pool kept feeding deleted ids: {stale_get_calls} stale GETs"
