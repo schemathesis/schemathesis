@@ -139,7 +139,7 @@ class DependencyGraph:
                             # or an array of identifier strings from GET /collection).
                             pointer = output_slot.pointer
                             if output_slot.cardinality == Cardinality.MANY:
-                                pointer = pointer.rstrip("/") + "/0"
+                                pointer = pointer.rstrip("/") + "/*"
                             value_expr = f"$response.body#{pointer}"
                         elif input_slot.resource_field is not None:
                             body_pointer = extend_pointer(
@@ -255,11 +255,11 @@ class DependencyGraph:
 
                             # Build the body pointer to the FK field
                             if fk_field.is_array:
-                                # For array FK, reference first element: /data/0/site_ids/0
+                                # For array FK, fan out across every element: /data/*/site_ids/*
                                 body_pointer = extend_pointer(
                                     output_slot.pointer, fk_field.field_name, output_slot.cardinality
                                 )
-                                body_pointer += "/0"  # Access first element of the FK array
+                                body_pointer += "/*"  # Fan out across every element of the FK array
                             else:
                                 body_pointer = extend_pointer(
                                     output_slot.pointer, fk_field.field_name, output_slot.cardinality
@@ -302,12 +302,12 @@ class DependencyGraph:
 
                             # Build pointer: output_slot.pointer + nested_fk.pointer
                             if output_slot.cardinality == Cardinality.MANY:
-                                base = output_slot.pointer.rstrip("/") + "/0"
+                                base = output_slot.pointer.rstrip("/") + "/*"
                             else:
                                 base = output_slot.pointer.rstrip("/")
                             body_pointer = base + nested_fk.pointer
                             if nested_fk.is_array:
-                                body_pointer += "/0"
+                                body_pointer += "/*"
 
                             link_name = f"{consumer.method.capitalize()}{nested_fk.target_resource}"
                             if link_name in fk_links:
@@ -495,8 +495,8 @@ def extract_nested_fk_fields(
             if isinstance(items, dict):
                 _, resolved_items = maybe_resolve(items, resolver, "")
                 if isinstance(resolved_items, dict):
-                    # Use /0 to indicate first array element
-                    items_pointer = f"{field_pointer}/0"
+                    # Use /* to fan out across every array element
+                    items_pointer = f"{field_pointer}/*"
                     result.extend(extract_nested_fk_fields(resolved_items, resolver, items_pointer, max_depth - 1))
 
     return result
@@ -555,8 +555,8 @@ def extend_pointer(base: str, field: str, parent_cardinality: Cardinality) -> st
     if not base.endswith("/"):
         base += "/"
     if parent_cardinality == Cardinality.MANY:
-        # Parent is an array; descend into its first element: /data -> /data/0/<field>
-        base += "0/"
+        # Wildcard sentinel: pool extraction and link substitution fan out across every element.
+        base += "*/"
     base += encode_pointer(field)
     return base
 

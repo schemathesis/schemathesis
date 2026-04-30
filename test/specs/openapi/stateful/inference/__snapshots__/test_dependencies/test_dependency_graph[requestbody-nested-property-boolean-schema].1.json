@@ -7,7 +7,7 @@
         "operationRef": "#/paths/~1orders/post",
         "requestBody": {
           "shipping": {
-            "warehouse_id": "$response.body#/0/id"
+            "warehouse_id": "$response.body#/*/id"
           }
         },
         "x-schemathesis": {

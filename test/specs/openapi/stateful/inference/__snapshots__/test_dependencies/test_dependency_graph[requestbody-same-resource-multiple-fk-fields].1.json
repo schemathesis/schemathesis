@@ -6,8 +6,8 @@
       "PostAccount": {
         "operationRef": "#/paths/~1transfers/post",
         "requestBody": {
-          "account_id": "$response.body#/0/id",
-          "account_uuid": "$response.body#/0/uuid"
+          "account_id": "$response.body#/*/id",
+          "account_uuid": "$response.body#/*/uuid"
         },
         "x-schemathesis": {
           "is_inferred": true,

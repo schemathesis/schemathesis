@@ -8,8 +8,8 @@
         "requestBody": {
           "items": [
             {
-              "product_id": "$response.body#/0/id",
-              "product_uuid": "$response.body#/0/uuid"
+              "product_id": "$response.body#/*/id",
+              "product_uuid": "$response.body#/*/uuid"
             }
           ]
         },

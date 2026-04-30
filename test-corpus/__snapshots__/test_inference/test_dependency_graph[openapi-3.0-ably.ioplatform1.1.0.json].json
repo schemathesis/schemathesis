@@ -60,6 +60,14 @@
           "pointer": "/",
           "resource": "ChannelDetails",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/status",
+          "resource": "ChannelStatus",
+          "status_code": "2XX"
         }
       ]
     },
@@ -110,6 +118,14 @@
           "pointer": "/",
           "resource": "Message",
           "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/extras",
+          "resource": "Extras",
+          "status_code": "2XX"
         }
       ]
     },
@@ -145,6 +161,14 @@
           "pointer": "/",
           "resource": "PresenceMessage",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/extras",
+          "resource": "Extras",
+          "status_code": "200"
         }
       ]
     },
@@ -165,6 +189,14 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "PresenceMessage",
+          "status_code": "2XX"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/extras",
+          "resource": "Extras",
           "status_code": "2XX"
         }
       ]
@@ -645,6 +677,16 @@
         "id"
       ],
       "types": {}
+    },
+    "Extras": {
+      "fields": [
+        "push"
+      ],
+      "types": {
+        "push": [
+          "object"
+        ]
+      }
     },
     "Key": {
       "fields": [

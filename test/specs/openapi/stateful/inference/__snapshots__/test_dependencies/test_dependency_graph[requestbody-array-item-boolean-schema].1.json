@@ -8,7 +8,7 @@
         "requestBody": {
           "items": [
             {
-              "product_id": "$response.body#/0/id"
+              "product_id": "$response.body#/*/id"
             }
           ]
         },

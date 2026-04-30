@@ -72,6 +72,8 @@ KNOWN_FIELDLESS_RESOURCES = {
             "Videogame",
             "LeagueVideogame",
             "CurrentVideogame",
+            # `anyOf` union over primitive ID type aliases (LeagueID/MatchID/...).
+            "IncidentID",
         ]
     ),
     "ably.io/platform/1.1.0.json": frozenset(

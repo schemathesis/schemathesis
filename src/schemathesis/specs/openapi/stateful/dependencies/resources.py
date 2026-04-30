@@ -201,8 +201,14 @@ def iter_resources_from_response(
                 pointer = unwrapped.pointer
             yield ExtractedResource(resource=resource, cardinality=cardinality, pointer=pointer)
             parent_cardinality = cardinality
-            # Look for sub-resources
-            properties = unwrapped.schema.get("properties")
+            # Look for sub-resources. When the unwrapped schema is an array (MANY producer),
+            # descend into `items` so we examine the per-element object's properties.
+            sub_search_schema: Mapping[str, Any] = unwrapped.schema
+            if cardinality == Cardinality.MANY:
+                items = sub_search_schema.get("items")
+                if isinstance(items, dict):
+                    _, sub_search_schema = maybe_resolve(items, resolver, "")
+            properties = sub_search_schema.get("properties")
             if isinstance(properties, dict):
                 for field, subschema in properties.items():
                     if isinstance(subschema, dict):

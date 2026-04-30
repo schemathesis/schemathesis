@@ -6,7 +6,7 @@
       "GetCategory": {
         "operationRef": "#/paths/~1categories~1{category_id_or_slug}/get",
         "parameters": {
-          "path.category_id_or_slug": "$response.body#/0/slug"
+          "path.category_id_or_slug": "$response.body#/*/slug"
         },
         "x-schemathesis": {
           "is_inferred": true

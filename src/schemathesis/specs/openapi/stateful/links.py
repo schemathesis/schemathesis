@@ -182,12 +182,13 @@ class OpenApiLink:
 
         Returns a two-level dictionary: container -> parameter name -> extracted value
         """
+        eval_fn = expressions.evaluate_wildcard if self.is_inferred else expressions.evaluate
         extracted: dict[str, dict[str, ExtractedParam]] = {}
         for parameter in self.parameters:
             container = extracted.setdefault(parameter.container_name, {})
             value: Result[Any, Exception]
             try:
-                value = Ok(expressions.evaluate(parameter.expression, output))
+                value = Ok(eval_fn(parameter.expression, output))
             except Exception as exc:
                 value = Err(exc)
             container[parameter.name] = ExtractedParam(
@@ -199,6 +200,7 @@ class OpenApiLink:
         if not isinstance(self.body, NotSet):
             value: Result[Any, Exception]
             try:
+                # `body` is `dict | NotSet`, never `str` — no wildcard expression to route.
                 value = Ok(expressions.evaluate(self.body, output, evaluate_nested=True))
             except Exception as exc:
                 value = Err(exc)

@@ -1031,3 +1031,237 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, app_runner, ctx):
 
     # Tombstone+eviction must keep stale-id GETs near zero
     assert stale_get_calls <= 5, f"pool kept feeding deleted ids: {stale_get_calls} stale GETs"
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    ("producer_shape", "wrap_response"),
+    [
+        ("top-level-array", lambda items: items),
+        ("wrapped-array", lambda items: {"data": items}),
+    ],
+    ids=["top-level-array", "wrapped-array"],
+)
+def test_stateful_reaches_every_list_producer_element(
+    cli, app_runner, snapshot_cli, ctx, producer_shape, wrap_response
+):
+    # The planted bug at the last seeded id is only reachable if the inferred link
+    # samples across every element of the producer's list, not just the first one.
+    seeded = [
+        {"id": "w-1", "label": "alpha"},
+        {"id": "w-2", "label": "beta"},
+        {"id": "w-3", "label": "gamma"},
+    ]
+    bug_id = seeded[-1]["id"]
+    widget_ref = "#/components/schemas/Widget"
+    components = {
+        "schemas": {
+            "Widget": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "label": {"type": "string"}},
+                "required": ["id", "label"],
+            }
+        }
+    }
+    if producer_shape == "top-level-array":
+        list_schema = {"type": "array", "items": {"$ref": widget_ref}}
+    else:
+        list_schema = {
+            "type": "object",
+            "properties": {"data": {"type": "array", "items": {"$ref": widget_ref}}},
+            "required": ["data"],
+        }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/widgets": {
+                "get": {
+                    "operationId": "listWidgets",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": list_schema}},
+                        }
+                    },
+                }
+            },
+            "/widgets/{widgetId}": {
+                "get": {
+                    "operationId": "getWidget",
+                    "parameters": [{"name": "widgetId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": widget_ref}}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        },
+        components=components,
+    )
+
+    @app.route("/widgets", methods=["GET"])
+    def list_widgets():
+        return jsonify(wrap_response(seeded))
+
+    @app.route("/widgets/<widget_id>", methods=["GET"])
+    def get_widget(widget_id):
+        if widget_id == bug_id:
+            raise RuntimeError("planted bug")
+        for w in seeded:
+            if w["id"] == widget_id:
+                return jsonify(w)
+        return "", 404
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "--max-examples=30",
+            "--mode=positive",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.parametrize(
+    ("sub_cardinality", "sub_resource", "consumer_path", "consumer_op", "ids", "make_post"),
+    [
+        (
+            "many",
+            "Comment",
+            "/comments/{commentId}",
+            "getComment",
+            ["c-1", "c-2", "c-3", "c-4"],
+            lambda ids: [
+                {"id": "p-1", "comments": [{"id": ids[0], "text": "x"}, {"id": ids[1], "text": "y"}]},
+                {"id": "p-2", "comments": [{"id": ids[2], "text": "z"}, {"id": ids[3], "text": "w"}]},
+            ],
+        ),
+        (
+            "one",
+            "Author",
+            "/authors/{authorId}",
+            "getAuthor",
+            ["a-1", "a-2"],
+            lambda ids: [
+                {"id": "p-1", "author": {"id": ids[0], "name": "Alice"}},
+                {"id": "p-2", "author": {"id": ids[1], "name": "Bob"}},
+            ],
+        ),
+    ],
+    ids=["many-children-per-parent", "one-child-per-parent"],
+)
+def test_pool_captures_subresources_from_every_parent(
+    cli,
+    app_runner,
+    snapshot_cli,
+    ctx,
+    sub_cardinality,
+    sub_resource,
+    consumer_path,
+    consumer_op,
+    ids,
+    make_post,
+):
+    # Last child of the last parent is only reachable if every parent's sub-resources enter the pool.
+    bug_id = ids[-1]
+    sub_schema_ref = f"#/components/schemas/{sub_resource}"
+    if sub_cardinality == "many":
+        sub_property = {"type": "array", "items": {"$ref": sub_schema_ref}}
+        sub_props = {"id": {"type": "string"}, "text": {"type": "string"}}
+    else:
+        sub_property = {"$ref": sub_schema_ref}
+        sub_props = {"id": {"type": "string"}, "name": {"type": "string"}}
+    sub_field = "comments" if sub_cardinality == "many" else "author"
+    sub_param = "commentId" if sub_cardinality == "many" else "authorId"
+    components = {
+        "schemas": {
+            sub_resource: {
+                "type": "object",
+                "properties": sub_props,
+                "required": list(sub_props),
+            },
+            "Post": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, sub_field: sub_property},
+                "required": ["id", sub_field],
+            },
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/posts": {
+                "get": {
+                    "operationId": "listPosts",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "data": {
+                                                "type": "array",
+                                                "items": {"$ref": "#/components/schemas/Post"},
+                                            }
+                                        },
+                                        "required": ["data"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            consumer_path: {
+                "get": {
+                    "operationId": consumer_op,
+                    "parameters": [{"name": sub_param, "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": {"$ref": sub_schema_ref}}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        },
+        components=components,
+    )
+
+    @app.route("/posts", methods=["GET"])
+    def list_posts():
+        return jsonify({"data": make_post(ids)})
+
+    @app.route(
+        consumer_path.replace("{commentId}", "<comment_id>").replace("{authorId}", "<author_id>"),
+        methods=["GET"],
+    )
+    def get_sub(**kwargs):
+        target = next(iter(kwargs.values()))
+        if target == bug_id:
+            raise RuntimeError("planted bug")
+        if target not in ids:
+            return "", 404
+        return jsonify({"id": target, "text": "ok"} if sub_cardinality == "many" else {"id": target, "name": "ok"})
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--max-examples=30",
+            "--mode=positive",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )

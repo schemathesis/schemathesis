@@ -10,6 +10,14 @@
           "pointer": "/",
           "resource": "entities",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/statistics",
+          "resource": "statistics",
+          "status_code": "200"
         }
       ]
     },
@@ -35,6 +43,14 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "entity-data",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/statistics",
+          "resource": "statistics",
           "status_code": "200"
         }
       ]
@@ -125,6 +141,36 @@
           "string"
         ],
         "possible_reasons": [
+          "string"
+        ]
+      }
+    },
+    "statistics": {
+      "fields": [
+        "SESSION",
+        "execution_time",
+        "operation_id",
+        "token"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "operation_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Operation"
+        }
+      ],
+      "types": {
+        "SESSION": [
+          "string"
+        ],
+        "execution_time": [
+          "number"
+        ],
+        "operation_id": [
+          "string"
+        ],
+        "token": [
           "string"
         ]
       }

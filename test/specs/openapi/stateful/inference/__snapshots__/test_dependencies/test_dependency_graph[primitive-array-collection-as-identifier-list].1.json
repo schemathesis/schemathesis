@@ -6,7 +6,7 @@
       "DeleteProduct": {
         "operationRef": "#/paths/~1products~1{productName}~1features~1{featureName}/delete",
         "parameters": {
-          "path.productName": "$response.body#/0"
+          "path.productName": "$response.body#/*"
         },
         "x-schemathesis": {
           "is_inferred": true

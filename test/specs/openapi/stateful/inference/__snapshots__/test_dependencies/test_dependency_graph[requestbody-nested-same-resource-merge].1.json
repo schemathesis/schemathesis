@@ -7,8 +7,8 @@
         "operationRef": "#/paths/~1payments/post",
         "requestBody": {
           "transfer": {
-            "account_id": "$response.body#/0/id",
-            "account_uuid": "$response.body#/0/uuid"
+            "account_id": "$response.body#/*/id",
+            "account_uuid": "$response.body#/*/uuid"
           }
         },
         "x-schemathesis": {

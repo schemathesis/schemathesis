@@ -36,6 +36,22 @@
           "pointer": "/",
           "resource": "DeletionIncident",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/id",
+          "resource": "IncidentID",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/object",
+          "resource": "DeletionObject",
+          "status_code": "200"
         }
       ]
     },
@@ -61,6 +77,14 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "League",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "LeagueVideogame",
           "status_code": "200"
         }
       ]
@@ -112,6 +136,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -132,6 +204,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -154,6 +274,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -174,6 +342,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -196,6 +412,22 @@
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -217,6 +449,30 @@
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -229,6 +485,14 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Live",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/match",
+          "resource": "Match",
           "status_code": "200"
         }
       ]
@@ -243,6 +507,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -255,6 +567,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -269,6 +629,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -281,6 +689,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -427,6 +883,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -439,6 +943,22 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -453,6 +973,22 @@
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -466,6 +1002,22 @@
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -478,6 +1030,22 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Serie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -537,6 +1105,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -557,6 +1173,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -579,6 +1243,54 @@
           "pointer": "/",
           "resource": "Match",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -599,6 +1311,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -641,6 +1401,30 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -697,6 +1481,14 @@
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "LeagueVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -717,6 +1509,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -739,6 +1579,22 @@
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -760,6 +1616,30 @@
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -772,6 +1652,30 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -786,6 +1690,30 @@
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -799,6 +1727,30 @@
           "pointer": "/",
           "resource": "ShortTournament",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -811,6 +1763,30 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -878,6 +1854,22 @@
           "pointer": "/",
           "resource": "Bracket",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
         }
       ]
     },
@@ -898,6 +1890,54 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "Match",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/live",
+          "resource": "MatchLive",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/streams",
+          "resource": "MatchLocalizedStreams",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/tournament",
+          "resource": "BaseTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -1038,6 +2078,14 @@
           "pointer": "/",
           "resource": "League",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "LeagueVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -1059,6 +2107,22 @@
           "pointer": "/",
           "resource": "Serie",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
+          "status_code": "200"
         }
       ]
     },
@@ -1079,6 +2143,30 @@
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "ShortTournament",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/league",
+          "resource": "BaseLeague",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/serie",
+          "resource": "BaseSerie",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/*/videogame",
+          "resource": "CurrentVideogame",
           "status_code": "200"
         }
       ]
@@ -1407,14 +2495,14 @@
         {
           "field_name": "match_id",
           "is_array": false,
-          "pointer": "/games/0/match_id",
+          "pointer": "/games/*/match_id",
           "target_field": "id",
           "target_resource": "Match"
         },
         {
           "field_name": "match_id",
           "is_array": false,
-          "pointer": "/previous_matches/0/match_id",
+          "pointer": "/previous_matches/*/match_id",
           "target_field": "id",
           "target_resource": "Match"
         }
@@ -1586,7 +2674,42 @@
         ]
       }
     },
+    "DeletionObject": {
+      "fields": [
+        "deleted_at",
+        "reason",
+        "videogame_id"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "videogame_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Videogame"
+        }
+      ],
+      "types": {
+        "deleted_at": [
+          "string"
+        ],
+        "reason": [
+          "array",
+          "boolean",
+          "null",
+          "number",
+          "object",
+          "string"
+        ],
+        "videogame_id": [
+          "integer"
+        ]
+      }
+    },
     "Incident": {
+      "fields": [],
+      "types": {}
+    },
+    "IncidentID": {
       "fields": [],
       "types": {}
     },
@@ -1605,14 +2728,14 @@
         {
           "field_name": "league_id",
           "is_array": false,
-          "pointer": "/series/0/league_id",
+          "pointer": "/series/*/league_id",
           "target_field": "id",
           "target_resource": "League"
         },
         {
           "field_name": "winner_id",
           "is_array": false,
-          "pointer": "/series/0/winner_id",
+          "pointer": "/series/*/winner_id",
           "target_field": "id",
           "target_resource": "Winner"
         }
@@ -1673,14 +2796,14 @@
         {
           "field_name": "match_id",
           "is_array": false,
-          "pointer": "/endpoints/0/match_id",
+          "pointer": "/endpoints/*/match_id",
           "target_field": "id",
           "target_resource": "Match"
         },
         {
           "field_name": "match_id",
           "is_array": false,
-          "pointer": "/match/games/0/match_id",
+          "pointer": "/match/games/*/match_id",
           "target_field": "id",
           "target_resource": "Match"
         },
@@ -1832,7 +2955,7 @@
         {
           "field_name": "match_id",
           "is_array": false,
-          "pointer": "/games/0/match_id",
+          "pointer": "/games/*/match_id",
           "target_field": "id",
           "target_resource": "Match"
         },
@@ -2253,21 +3376,21 @@
         {
           "field_name": "league_id",
           "is_array": false,
-          "pointer": "/tournaments/0/league_id",
+          "pointer": "/tournaments/*/league_id",
           "target_field": "id",
           "target_resource": "League"
         },
         {
           "field_name": "serie_id",
           "is_array": false,
-          "pointer": "/tournaments/0/serie_id",
+          "pointer": "/tournaments/*/serie_id",
           "target_field": "id",
           "target_resource": "Serie"
         },
         {
           "field_name": "winner_id",
           "is_array": false,
-          "pointer": "/tournaments/0/winner_id",
+          "pointer": "/tournaments/*/winner_id",
           "target_field": "id",
           "target_resource": "Winner"
         }
@@ -2418,14 +3541,14 @@
         {
           "field_name": "tournament_id",
           "is_array": false,
-          "pointer": "/matches/0/tournament_id",
+          "pointer": "/matches/*/tournament_id",
           "target_field": "id",
           "target_resource": "Tournament"
         },
         {
           "field_name": "winner_id",
           "is_array": false,
-          "pointer": "/matches/0/winner_id",
+          "pointer": "/matches/*/winner_id",
           "target_field": "id",
           "target_resource": "Winner"
         },
@@ -2653,14 +3776,14 @@
         {
           "field_name": "tournament_id",
           "is_array": false,
-          "pointer": "/matches/0/tournament_id",
+          "pointer": "/matches/*/tournament_id",
           "target_field": "id",
           "target_resource": "Tournament"
         },
         {
           "field_name": "winner_id",
           "is_array": false,
-          "pointer": "/matches/0/winner_id",
+          "pointer": "/matches/*/winner_id",
           "target_field": "id",
           "target_resource": "Winner"
         },
@@ -2791,14 +3914,14 @@
         {
           "field_name": "league_id",
           "is_array": false,
-          "pointer": "/leagues/0/series/0/league_id",
+          "pointer": "/leagues/*/series/*/league_id",
           "target_field": "id",
           "target_resource": "League"
         },
         {
           "field_name": "winner_id",
           "is_array": false,
-          "pointer": "/leagues/0/series/0/winner_id",
+          "pointer": "/leagues/*/series/*/winner_id",
           "target_field": "id",
           "target_resource": "Winner"
         }

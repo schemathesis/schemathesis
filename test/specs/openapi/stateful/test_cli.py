@@ -422,6 +422,7 @@ def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
             "--generation-database=none",
             "-c not_a_server_error",
             "--mode=positive",
+            "--seed=1",
             config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
         )
         == snapshot_cli
