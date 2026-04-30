@@ -591,6 +591,117 @@ def test_data_source_provides_captured_variants(user_schema_builder):
     assert {"user_id": "2"} in variants
 
 
+def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws(ctx):
+    spec = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
+                },
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "alive"})
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "doomed"})
+
+    delete_operation = schema["/items/{itemId}"]["DELETE"]
+    case = delete_operation.Case(path_parameters={"itemId": "doomed"})
+    data_source.record_successful_delete(operation=delete_operation, case=case)
+
+    remaining = {inst.data.get("id") for inst in data_source.repository.iter_instances("Item")}
+    assert remaining == {"alive"}, "deleted id should be evicted from the pool"
+
+    get_operation = schema["/items/{itemId}"]["GET"]
+    drawn = {
+        data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="itemId")
+        for _ in range(10)
+    }
+    assert drawn == {"alive"}, "tombstoned id must not be drawn even when it is the highest-weighted candidate"
+
+
+def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):
+    spec = ctx.openapi.build_schema(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "createItem",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/items/{itemId}": {
+                "delete": {
+                    "operationId": "deleteItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"204": {"description": "Deleted"}},
+                },
+                "get": {
+                    "operationId": "getItem",
+                    "parameters": [{"name": "itemId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "doomed"})
+    assert [inst.data for inst in data_source.repository.iter_instances("Item")] == [{"id": "doomed"}]
+
+    delete_operation = schema["/items/{itemId}"]["DELETE"]
+    case = delete_operation.Case(path_parameters={"itemId": "doomed"})
+    data_source.record_successful_delete(operation=delete_operation, case=case)
+
+    # Eviction: the deleted entry is gone from the repository, not just deprioritized.
+    assert list(data_source.repository.iter_instances("Item")) == []
+
+    # Tombstone: even if the entry were to slip back in, the value is filtered at draw time.
+    get_operation = schema["/items/{itemId}"]["GET"]
+    assert (
+        data_source.pick_captured_value(operation=get_operation, location=ParameterLocation.PATH, name="itemId") is None
+    )
+
+
 def test_record_successful_delete_uses_only_resource_linked_params(ctx):
     spec = ctx.openapi.build_schema(
         {

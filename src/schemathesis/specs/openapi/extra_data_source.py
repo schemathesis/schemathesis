@@ -229,6 +229,14 @@ class OpenApiExtraDataSource(ExtraDataSource):
         self.requirements = requirements
         self.inputs_by_label = inputs_by_label if inputs_by_label is not None else {}
         self.usage_tracker = usage_tracker if usage_tracker is not None else VariantUsageTracker()
+        # Values that have been successfully DELETEd; pool draws skip them.
+        self._tombstoned: set[tuple[str, Any]] = set()
+
+    def _is_tombstoned(self, resource_name: str, value: Any) -> bool:
+        try:
+            return (resource_name, value) in self._tombstoned
+        except TypeError:  # unhashable value
+            return False
 
     def get_captured_variants(
         self,
@@ -302,7 +310,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
                         # Value from context (e.g., ownerId from request path)
                         value = instance.context.get(param_name)
 
-                    if value is not None:
+                    if value is not None and not self._is_tombstoned(req.resource_name, value):
                         variant[param_name] = value
 
                 # Only include if we filled ALL requirements
@@ -326,6 +334,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 value = instance.data.get(req.resource_field) if req.resource_name else None
                 if value is None:
                     continue
+                if self._is_tombstoned(req.resource_name, value):
+                    continue
                 if any(instance.context.get(k) not in (None, v) for k, v in chosen.items()):
                     continue
                 best = value
@@ -339,7 +349,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         return variants
 
     def _collect_values(self, requirement: ParameterRequirement) -> list[Any]:
-        """Collect unique values from captured resource instances."""
+        """Collect unique non-tombstoned values from captured resource instances."""
         instances = self.repository.iter_instances(requirement.resource_name)
         values: list[Any] = []
         seen: set[DedupKey] = set()
@@ -347,6 +357,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
         for instance in instances:
             value = instance.data.get(requirement.resource_field, NOT_SET)
             if value is NOT_SET:
+                continue
+            if self._is_tombstoned(requirement.resource_name, value):
                 continue
 
             dedup_key: DedupKey
@@ -387,6 +399,8 @@ class OpenApiExtraDataSource(ExtraDataSource):
         for instance in self.repository.iter_instances(requirement.resource_name):
             value = instance.data.get(requirement.resource_field)
             if value is None:
+                continue
+            if self._is_tombstoned(requirement.resource_name, value):
                 continue
             all_candidates.append((instance, value))
             if context_constraints and any(
@@ -556,3 +570,15 @@ class OpenApiExtraDataSource(ExtraDataSource):
 
         variant_key = jsonschema_rs.canonical.json.to_string(resource_params)
         self.usage_tracker.record_successful_delete(variant_key)
+
+        # Tombstone + evict the deleted resource: subsequent pool draws skip it, and the
+        # underlying entries no longer linger in the repository.
+        for param_name, param_value in case.path_parameters.items():
+            requirement = self.requirements.get((operation.label, ParameterLocation.PATH, param_name))
+            if requirement is None:
+                continue
+            try:
+                self._tombstoned.add((requirement.resource_name, param_value))
+            except TypeError:  # unhashable value (e.g. list); fall through, eviction still runs
+                pass
+            self.repository.remove_by_value(requirement.resource_name, param_value)

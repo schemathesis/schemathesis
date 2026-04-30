@@ -81,6 +81,26 @@ class ResourceRepository:
             instances.extend(bucket)
         return tuple(instances)
 
+    def remove_by_value(self, resource_name: str, value: Any) -> int:
+        """Drop instances whose data carries the given value; returns the number removed.
+
+        Called after a successful DELETE so subsequent draws don't re-feed a server-side gone id.
+        """
+        context_buckets = self._resource_buckets.get(resource_name)
+        if not context_buckets:
+            return 0
+        removed = 0
+        with self._lock:
+            for bucket in context_buckets.values():
+                kept = deque(
+                    (instance for instance in bucket if value not in instance.data.values()),
+                    maxlen=bucket.maxlen,
+                )
+                removed += len(bucket) - len(kept)
+                bucket.clear()
+                bucket.extend(kept)
+        return removed
+
     def record_response(
         self, *, operation: str, status_code: int, payload: Any, context: dict[str, Any] | None = None
     ) -> None:

@@ -11,6 +11,7 @@
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
 - Capture pool entries from more GET-list response shapes: custom wrappers, nested envelopes, multi-array roots.
 - Mismatched parent/child path parameters in pool draws for hierarchical operations.
+- Pool keeps re-feeding successfully-deleted resource identifiers to subsequent operations.
 
 ### :wrench: Changed
 
