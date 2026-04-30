@@ -313,6 +313,29 @@ class OpenApiExtraDataSource(ExtraDataSource):
                         seen.add(key)
                         variants.append(variant)
 
+        if variants:
+            return variants
+
+        # No single instance covered every slot; build a partial variant by chaining picks,
+        # each constrained by the context of slots already chosen.
+        chosen: dict[str, Any] = {}
+        for param_name in requirements:
+            req = requirements[param_name]
+            best: Any = None
+            for instance in self.repository.iter_instances(req.resource_name):
+                value = instance.data.get(req.resource_field) if req.resource_name else None
+                if value is None:
+                    continue
+                if any(instance.context.get(k) not in (None, v) for k, v in chosen.items()):
+                    continue
+                best = value
+                break
+            if best is not None:
+                chosen[param_name] = best
+        if chosen:
+            key = jsonschema_rs.canonical.json.to_string(chosen)
+            if key not in seen:
+                variants.append(chosen)
         return variants
 
     def _collect_values(self, requirement: ParameterRequirement) -> list[Any]:
@@ -349,16 +372,29 @@ class OpenApiExtraDataSource(ExtraDataSource):
         operation: APIOperation,
         location: ParameterLocation,
         name: str,
+        context_constraints: dict[str, Any] | None = None,
     ) -> Any | None:
-        """Return one weighted-selected pool value for a resource-bound parameter, or None."""
+        """Return one weighted-selected pool value for a resource-bound parameter, or None.
+
+        `context_constraints` keeps draws on the same parent chain; missing context keys
+        match anything, and the filter falls through when no constrained instance exists.
+        """
         requirement = self.requirements.get((operation.label, location, name))
         if requirement is None:
             return None
-        candidates: list[tuple[ResourceInstance, Any]] = []
+        all_candidates: list[tuple[ResourceInstance, Any]] = []
+        constrained: list[tuple[ResourceInstance, Any]] = []
         for instance in self.repository.iter_instances(requirement.resource_name):
             value = instance.data.get(requirement.resource_field)
-            if value is not None:
-                candidates.append((instance, value))
+            if value is None:
+                continue
+            all_candidates.append((instance, value))
+            if context_constraints and any(
+                instance.context.get(k) not in (None, v) for k, v in context_constraints.items()
+            ):
+                continue
+            constrained.append((instance, value))
+        candidates = constrained or all_candidates
         if not candidates:
             return None
         variant_keys = [jsonschema_rs.canonical.json.to_string(instance.data) for instance, _ in candidates]
@@ -407,7 +443,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
             self.usage_tracker.record_draw(variant_keys[idx])
             return satisfying[idx][1]
 
+        # Independent picks with chained context constraints so child resources track parent.
         result: dict[tuple[ParameterLocation, str], Any] = {}
+        context_constraints: dict[str, Any] = {}
         for slot in slots:
             param_name = slot.parameter_name
             assert isinstance(param_name, str)
@@ -415,9 +453,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 operation=operation,
                 location=slot.parameter_location,
                 name=param_name,
+                context_constraints=context_constraints,
             )
             if value is not None:
                 result[(slot.parameter_location, param_name)] = value
+                context_constraints[param_name] = value
         return result
 
     def should_record(self, *, operation: str) -> bool:
