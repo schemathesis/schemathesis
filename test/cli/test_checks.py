@@ -1507,3 +1507,56 @@ def test_negative_data_rejection_nested_body_description(ctx, app_runner, cli, s
         "--phases=coverage",
     )
     assert result == snapshot_cli
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_readonly_in_allof_branch_does_not_collapse_positive_generation(ctx, app_runner, cli, snapshot_cli):
+    # Server bug behind valid POST body; reachable only when positive-mode generates valid data.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/widgets": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Widget"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        components={
+            "schemas": {
+                "WidgetFields": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string", "minLength": 1, "maxLength": 30}},
+                    "required": ["name"],
+                },
+                "Widget": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/WidgetFields"},
+                        {"type": "object", "properties": {"id": {"type": "integer", "readOnly": True}}},
+                    ],
+                    "required": ["id", "name"],
+                },
+            }
+        },
+    )
+
+    @app.route("/widgets", methods=["POST"])
+    def create_widget():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict) or not isinstance(data.get("name"), str) or not data["name"]:
+            return "", 400
+        raise RuntimeError("planted bug")
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--mode=positive",
+            "--phases=fuzzing",
+            "--max-examples=10",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )

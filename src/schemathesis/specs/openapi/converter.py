@@ -180,7 +180,31 @@ def _to_json_schema(
                     name_to_uri=name_to_uri,
                 )
 
+    # A property forbidden inside an `allOf` branch (read/write-only rewrite produces `{"not": {}}`)
+    # must also be removed from the parent's `required`, otherwise the schema is unsatisfiable.
+    required = schema.get("required")
+    if isinstance(required, list) and required:
+        forbidden = _forbidden_in_allof_branches(schema)
+        if forbidden:
+            new_required = [name for name in required if name not in forbidden]
+            if new_required:
+                schema["required"] = new_required
+            else:
+                schema.pop("required", None)
+
     return schema
+
+
+def _forbidden_in_allof_branches(schema: dict[str, Any]) -> set[str]:
+    forbidden: set[str] = set()
+    for branch in schema.get("allOf") or []:
+        if not isinstance(branch, dict):
+            continue
+        for name, subschema in (branch.get("properties") or {}).items():
+            if subschema == {"not": {}}:
+                forbidden.add(name)
+        forbidden.update(_forbidden_in_allof_branches(branch))
+    return forbidden
 
 
 def _pin_discriminator_property(schema: dict[str, Any], name_to_uri: dict[str, str] | None) -> None:
