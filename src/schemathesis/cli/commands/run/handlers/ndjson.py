@@ -57,16 +57,15 @@ def _run(
     queue: Queue[_Initialize | _Process | _Finalize],
     sanitization: SanitizationConfig | None,
 ) -> None:
-    writer = NdjsonWriter(output=output, sanitization=sanitization)
-    while True:
-        item = queue.get()
-        if isinstance(item, _Initialize):
-            writer.open(seed=item.seed, command=item.command)
-        elif isinstance(item, _Process):
-            writer.write_event(item.payload)
-        else:  # _Finalize
-            writer.close()
-            break
+    with NdjsonWriter(output=output, sanitization=sanitization) as writer:
+        while True:
+            item = queue.get()
+            if isinstance(item, _Initialize):
+                writer.open(seed=item.seed, command=item.command)
+            elif isinstance(item, _Process):
+                writer.write_event(item.payload)
+            else:  # _Finalize
+                break
 
 
 @dataclass(slots=True)

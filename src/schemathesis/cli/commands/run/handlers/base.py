@@ -54,7 +54,7 @@ class WritableText(Protocol):
 
 TextOutput = IO[str] | StringIO | Path
 
-WRITER_WORKER_JOIN_TIMEOUT = 1
+WRITER_WORKER_JOIN_TIMEOUT = 10
 
 
 @contextmanager

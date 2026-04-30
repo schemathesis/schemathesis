@@ -68,16 +68,15 @@ def _run(
     preserve_bytes: bool,
     queue: Queue[_Initialize | _Process | _Finalize],
 ) -> None:
-    writer = HarWriter(output=output, config=config, preserve_bytes=preserve_bytes)
-    while True:
-        item = queue.get()
-        if isinstance(item, _Initialize):
-            writer.open(seed=item.seed)
-        elif isinstance(item, _Process):
-            writer.write(item.recorder)
-        else:  # _Finalize
-            writer.close()
-            break
+    with HarWriter(output=output, config=config, preserve_bytes=preserve_bytes) as writer:
+        while True:
+            item = queue.get()
+            if isinstance(item, _Initialize):
+                writer.open(seed=item.seed)
+            elif isinstance(item, _Process):
+                writer.write(item.recorder)
+            else:  # _Finalize
+                break
 
 
 @dataclass
