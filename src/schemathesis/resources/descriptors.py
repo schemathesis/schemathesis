@@ -60,3 +60,6 @@ class ResourceDescriptor:
     cardinality: Cardinality
     is_primitive_identifier: bool = False
     identifier_field: str | None = None
+    # When True, the response payload is a `{<id>: <object>, ...}` map and the keys are the
+    # identifier values (e.g. Kubernetes pod-statuses, TBA team-statuses, slack auth.test).
+    extract_object_keys: bool = False

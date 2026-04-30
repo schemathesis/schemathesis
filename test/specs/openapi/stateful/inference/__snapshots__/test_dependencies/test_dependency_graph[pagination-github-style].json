@@ -17,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/runner_groups",
           "resource": "RunnerGroup",

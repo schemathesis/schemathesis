@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "entities",
@@ -17,6 +18,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "error-codes",
@@ -29,6 +31,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "entity-data",

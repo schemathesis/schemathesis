@@ -551,11 +551,11 @@ def _merge_nested_body(target: dict[str, Any], source: dict[str, Any]) -> None:
             target[key] = value
 
 
-def extend_pointer(base: str, field: str, cardinality: Cardinality) -> str:
+def extend_pointer(base: str, field: str, parent_cardinality: Cardinality) -> str:
     if not base.endswith("/"):
         base += "/"
-    if cardinality == Cardinality.MANY:
-        # For arrays, reference first element: /data -> /data/0
+    if parent_cardinality == Cardinality.MANY:
+        # Parent is an array; descend into its first element: /data -> /data/0/<field>
         base += "0/"
     base += encode_pointer(field)
     return base
@@ -691,6 +691,9 @@ class OutputSlot:
     # the response body (POST `/sessions {sessionId: ...}` confirms the session
     # exists once the response is 2xx).
     body_field: str | None = None
+    # True when the response body is a map keyed by identifier; capture every map key
+    # as a resource instance (e.g. `{<teamKey>: {...}, ...}` from `GET /teams/statuses`).
+    extract_object_keys: bool = False
 
 
 @dataclass(slots=True)

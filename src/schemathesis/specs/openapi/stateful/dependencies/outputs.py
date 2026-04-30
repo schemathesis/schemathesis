@@ -51,6 +51,7 @@ def extract_outputs(
             cardinality=extracted.cardinality,
             status_code=response.status_code,
             is_primitive_identifier=extracted.is_primitive_identifier,
+            extract_object_keys=extracted.extract_object_keys,
         )
 
     yield from _path_keyed_outputs(

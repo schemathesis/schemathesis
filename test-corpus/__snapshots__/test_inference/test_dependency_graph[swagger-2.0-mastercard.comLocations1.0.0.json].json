@@ -5,6 +5,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/Atms",
           "resource": "Atms",
@@ -12,8 +13,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/Atms/0/Atm",
+          "pointer": "/Atms/Atm",
           "resource": "Atm",
           "status_code": "200"
         }
@@ -24,6 +26,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/Countries",
           "resource": "Countries",
@@ -31,8 +34,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/Countries/0/Country",
+          "pointer": "/Countries/Country",
           "resource": "Country",
           "status_code": "200"
         }
@@ -43,6 +47,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/CountrySubdivisions",
           "resource": "CountrySubdivisions",
@@ -50,8 +55,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/CountrySubdivisions/0/CountrySubdivision",
+          "pointer": "/CountrySubdivisions/CountrySubdivision",
           "resource": "CountrySubdivision",
           "status_code": "200"
         }
@@ -62,6 +68,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/Categories",
           "resource": "Categories",
@@ -74,6 +81,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/Countries",
           "resource": "Countries",
@@ -81,8 +89,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/Countries/0/Country",
+          "pointer": "/Countries/Country",
           "resource": "Country",
           "status_code": "200"
         }
@@ -93,6 +102,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/CountrySubdivisions",
           "resource": "CountrySubdivisions",
@@ -100,8 +110,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/CountrySubdivisions/0/CountrySubdivision",
+          "pointer": "/CountrySubdivisions/CountrySubdivision",
           "resource": "CountrySubdivision",
           "status_code": "200"
         }
@@ -112,6 +123,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/Merchants",
           "resource": "Merchants",
@@ -119,8 +131,9 @@
         },
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
-          "pointer": "/Merchants/0/Merchant",
+          "pointer": "/Merchants/Merchant",
           "resource": "Merchant",
           "status_code": "200"
         }

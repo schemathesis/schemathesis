@@ -740,3 +740,91 @@ def test_examples_phase_uses_pool_for_body_fields(cli, app_runner, snapshot_cli,
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runner, snapshot_cli, ctx):
+    # Docker Engine /volumes shape: `{Volumes: [...], Warnings: [...]}`. Server-seeded names;
+    # no POST creator. UUIDs make blind generation practically incapable of guessing.
+    seeded_names = [
+        "550e8400-e29b-41d4-a716-446655440000",
+        "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+        "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    ]
+    bug_name = seeded_names[2]
+    volume_schema = {
+        "type": "object",
+        "properties": {"Name": {"type": "string", "format": "uuid"}, "Driver": {"type": "string"}},
+        "required": ["Name", "Driver"],
+    }
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/volumes": {
+                "get": {
+                    "operationId": "listVolumes",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "Volumes": {"type": "array", "items": volume_schema},
+                                            "Warnings": {"type": "array", "items": {"type": "string"}},
+                                        },
+                                        "required": ["Volumes"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/volumes/{Name}": {
+                "get": {
+                    "operationId": "getVolume",
+                    "parameters": [
+                        {
+                            "name": "Name",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": volume_schema}},
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                }
+            },
+        }
+    )
+
+    @app.route("/volumes", methods=["GET"])
+    def list_volumes():
+        return jsonify({"Volumes": [{"Name": name, "Driver": "local"} for name in seeded_names], "Warnings": []})
+
+    @app.route("/volumes/<name>", methods=["GET"])
+    def get_volume(name):
+        if name == bug_name:
+            raise RuntimeError("planted bug")
+        if name not in seeded_names:
+            return "", 404
+        return jsonify({"Name": name, "Driver": "local"})
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--max-examples=30",
+            "--mode=positive",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )

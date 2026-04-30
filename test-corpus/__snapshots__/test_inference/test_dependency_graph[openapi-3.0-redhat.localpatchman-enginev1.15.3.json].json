@@ -17,6 +17,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.AdvisoryItem",
@@ -37,6 +38,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.AdvisoryDetailItem",
@@ -57,6 +59,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
@@ -69,6 +72,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.AdvisoryInlineItem",
@@ -89,6 +93,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemInlineItem",
@@ -101,6 +106,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.PackageItem",
@@ -121,6 +127,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.PackageSystemItem",
@@ -133,6 +140,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemInlineItem",
@@ -153,6 +161,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemAdvisoriesDBLookup",
@@ -173,6 +182,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/",
           "resource": "controllers.SystemPackageInline",
@@ -185,6 +195,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageItem",
@@ -205,6 +216,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageDetailItem",
@@ -225,6 +237,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageSystemItem",
@@ -245,6 +258,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.PackageVersionItem",
@@ -257,6 +271,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
@@ -277,6 +292,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
@@ -297,6 +313,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemAdvisoryItem",
@@ -317,6 +334,7 @@
       "outputs": [
         {
           "cardinality": "MANY",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemPackageData",
@@ -329,6 +347,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.AdvisoriesSystemsResponse",
@@ -341,6 +360,7 @@
       "outputs": [
         {
           "cardinality": "ONE",
+          "extract_object_keys": false,
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemsAdvisoriesResponse",
