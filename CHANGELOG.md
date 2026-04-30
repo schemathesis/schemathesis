@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.17.0...HEAD) - TBD
 
+### :bug: Fixed
+
+- Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
+
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 
 ### :rocket: Added

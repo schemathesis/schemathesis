@@ -231,6 +231,104 @@ def test_rewrite_write_only(schema, expected):
     assert schema == expected
 
 
+@pytest.mark.parametrize(
+    ("schema", "is_response_schema", "expected"),
+    [
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                    {"type": "object", "properties": {"id": {"type": "integer", "readOnly": True}}},
+                ],
+                "required": ["id", "name"],
+            },
+            False,
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                    {"type": "object", "properties": {"id": {"not": {}}}},
+                ],
+                "required": ["name"],
+            },
+            id="readOnly_request",
+        ),
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                    {"type": "object", "properties": {"secret": {"type": "string", "writeOnly": True}}},
+                ],
+                "required": ["secret", "name"],
+            },
+            True,
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                    {"type": "object", "properties": {"secret": {"not": {}}}},
+                ],
+                "required": ["name"],
+            },
+            id="writeOnly_response",
+        ),
+        pytest.param(
+            {
+                "allOf": [
+                    {"allOf": [{"type": "object", "properties": {"id": {"type": "integer", "readOnly": True}}}]},
+                    {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                ],
+                "required": ["id", "name"],
+            },
+            False,
+            {
+                "allOf": [
+                    {"allOf": [{"type": "object", "properties": {"id": {"not": {}}}}]},
+                    {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]},
+                ],
+                "required": ["name"],
+            },
+            id="readOnly_nested_allOf",
+        ),
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"id": {"type": "integer", "readOnly": True}}},
+                ],
+                "required": ["id"],
+            },
+            False,
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"id": {"not": {}}}},
+                ],
+            },
+            id="required_emptied_is_dropped",
+        ),
+        pytest.param(
+            {
+                "allOf": [
+                    True,
+                    {"type": "object", "properties": {"id": {"type": "integer", "readOnly": True}}},
+                ],
+                "required": ["id"],
+            },
+            False,
+            {
+                "allOf": [
+                    True,
+                    {"type": "object", "properties": {"id": {"not": {}}}},
+                ],
+            },
+            id="non_dict_allOf_branch_is_skipped",
+        ),
+    ],
+)
+def test_forbidden_in_allof_branch_strips_outer_required(schema, is_response_schema, expected):
+    result = transform(
+        schema, converter.to_json_schema, nullable_keyword="x-nullable", is_response_schema=is_response_schema
+    )
+    assert result == expected
+
+
 def test_pattern_translation_success():
     # When a schema contains a PCRE pattern that can be translated to Python regex
     schema = {"type": "string", "pattern": r"\p{L}+"}
