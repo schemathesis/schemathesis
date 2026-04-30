@@ -73,16 +73,15 @@ def _run(
     queue: Queue[_Initialize | _Process | _Finalize],
     command: str,
 ) -> None:
-    writer = VcrWriter(output=output, config=config, preserve_bytes=preserve_bytes)
-    while True:
-        item = queue.get()
-        if isinstance(item, _Initialize):
-            writer.open(seed=item.seed, command=command)
-        elif isinstance(item, _Process):
-            writer.write(item.recorder)
-        else:  # _Finalize
-            writer.close()
-            break
+    with VcrWriter(output=output, config=config, preserve_bytes=preserve_bytes) as writer:
+        while True:
+            item = queue.get()
+            if isinstance(item, _Initialize):
+                writer.open(seed=item.seed, command=command)
+            elif isinstance(item, _Process):
+                writer.write(item.recorder)
+            else:  # _Finalize
+                break
 
 
 @dataclass
