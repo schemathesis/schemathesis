@@ -22,7 +22,15 @@
       ]
     },
     "GET /oauth2/1/file/{uri}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "uri",
+          "resource": "File",
+          "resource_field": "uri"
+        }
+      ],
       "outputs": []
     },
     "GET /oauth2/1/files/": {
@@ -86,7 +94,15 @@
       ]
     },
     "GET /oauth2/1/xml/{uri}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "uri",
+          "resource": "Xml",
+          "resource_field": "uri"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -634,6 +650,12 @@
           "object"
         ]
       }
+    },
+    "Xml": {
+      "fields": [
+        "uri"
+      ],
+      "types": {}
     }
   }
 }

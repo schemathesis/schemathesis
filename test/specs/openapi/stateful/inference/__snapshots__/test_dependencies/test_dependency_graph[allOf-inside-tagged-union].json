@@ -1,7 +1,15 @@
 {
   "operations": {
     "GET /tags/{resourceArn}": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "path",
+          "parameter_name": "resourceArn",
+          "resource": "Tag",
+          "resource_field": "resourceArn"
+        }
+      ],
       "outputs": [
         {
           "cardinality": "ONE",
@@ -15,6 +23,12 @@
     }
   },
   "resources": {
+    "Tag": {
+      "fields": [
+        "resourceArn"
+      ],
+      "types": {}
+    },
     "TagMap": {
       "fields": [
         "id"

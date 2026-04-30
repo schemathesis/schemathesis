@@ -42,7 +42,7 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
         return from_path(path, parameter_name=parameter)
 
     # Capital-sensitive
-    capital_suffixes = ("Id", "Uuid", "Guid")
+    capital_suffixes = ("Id", "Uuid", "Guid", "Arn", "Address")
     for suffix in capital_suffixes:
         if parameter.endswith(suffix):
             prefix = parameter[: -len(suffix)]
@@ -63,11 +63,15 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
         "_id",
         "_slug",
         "_name",
+        "_arn",
+        "_address",
         "-guid",
         "-uuid",
         "-id",
         "-slug",
         "-name",
+        "-arn",
+        "-address",
     )
     for suffix in snake_suffixes:
         if lower.endswith(suffix):
@@ -86,9 +90,10 @@ def from_parameter(parameter: str, path: str, *, body_field: bool = False) -> st
         if len(prefix) >= 2:
             return to_pascal_case(prefix)
 
-    # Bare "slug" / "name" parameter - use path context if it's a path parameter.
+    # Bare identifier-shaped parameter - use path context if it's a path parameter.
     # Strip API version prefixes first so `/v1/{name}` doesn't infer a fictitious `V1`.
-    if lower in ("slug", "name") and f"{{{parameter}}}" in path:
+    BARE_IDENTIFIER_NAMES = ("slug", "name", "username", "namespace", "token", "tag", "uri", "address", "arn")
+    if lower in BARE_IDENTIFIER_NAMES and f"{{{parameter}}}" in path:
         return from_path(strip_version_prefix(path), parameter_name=parameter)
 
     # Concatenated identifier suffix without separator (e.g., `username`, `userid`).
