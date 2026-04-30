@@ -828,3 +828,111 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runn
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_parent_aware_pool_correlates_path_params(cli, app_runner, snapshot_cli, ctx):
+    # Deep path planted bug fires only when (productName, itemName) co-refer.
+    # Without parent-aware draws, pool feeds independent values and the bug stays unreached.
+    products: set[str] = set()
+    items: set[tuple[str, str]] = set()
+    spec = {
+        "/products/{productName}": {
+            "post": {
+                "operationId": "createProduct",
+                "parameters": [
+                    {
+                        "name": "productName",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    }
+                ],
+                "responses": {"201": {"description": "Created"}, "409": {"description": "Already exists"}},
+            }
+        },
+        "/products/{productName}/items/{itemName}": {
+            "post": {
+                "operationId": "createItem",
+                "parameters": [
+                    {
+                        "name": "productName",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    },
+                    {
+                        "name": "itemName",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    },
+                ],
+                "responses": {
+                    "201": {"description": "Created"},
+                    "404": {"description": "Product not found"},
+                    "409": {"description": "Already exists"},
+                },
+            }
+        },
+        "/products/{productName}/items/{itemName}/sync": {
+            "post": {
+                "operationId": "syncItem",
+                "parameters": [
+                    {
+                        "name": "productName",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    },
+                    {
+                        "name": "itemName",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string", "format": "uuid"},
+                    },
+                ],
+                "responses": {
+                    "200": {"description": "Synced"},
+                    "404": {"description": "Item not found in this product"},
+                },
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(spec)
+
+    @app.route("/products/<product_name>", methods=["POST"])
+    def create_product(product_name):
+        if product_name in products:
+            return "", 409
+        products.add(product_name)
+        return "", 201
+
+    @app.route("/products/<product_name>/items/<item_name>", methods=["POST"])
+    def create_item(product_name, item_name):
+        if product_name not in products:
+            return "", 404
+        if (product_name, item_name) in items:
+            return "", 409
+        items.add((product_name, item_name))
+        return "", 201
+
+    @app.route("/products/<product_name>/items/<item_name>/sync", methods=["POST"])
+    def sync_item(product_name, item_name):
+        if (product_name, item_name) not in items:
+            return "", 404
+        # Planted bug fires only when (productName, itemName) form a real parent-child pair.
+        raise RuntimeError("planted bug")
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=fuzzing",
+            "--max-examples=100",
+            "--mode=positive",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )
