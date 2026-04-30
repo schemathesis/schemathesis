@@ -23,6 +23,14 @@
           "pointer": "/operations",
           "resource": "Operation",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/operations/*/error",
+          "resource": "Status",
+          "status_code": "200"
         }
       ]
     },
@@ -68,6 +76,24 @@
         ],
         "response": [
           "object"
+        ]
+      }
+    },
+    "Status": {
+      "fields": [
+        "code",
+        "details",
+        "message"
+      ],
+      "types": {
+        "code": [
+          "integer"
+        ],
+        "details": [
+          "array"
+        ],
+        "message": [
+          "string"
         ]
       }
     }

@@ -53,7 +53,7 @@
         {
           "field_name": "product_id",
           "is_array": false,
-          "pointer": "/line_items/0/product_id",
+          "pointer": "/line_items/*/product_id",
           "target_field": "id",
           "target_resource": "Product"
         }

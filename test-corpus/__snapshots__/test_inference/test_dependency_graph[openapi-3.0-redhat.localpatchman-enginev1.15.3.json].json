@@ -22,6 +22,14 @@
           "pointer": "/data",
           "resource": "controllers.AdvisoryItem",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/data/*/attributes",
+          "resource": "controllers.AdvisoryItemAttributes",
+          "status_code": "200"
         }
       ]
     },
@@ -63,6 +71,14 @@
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemItem",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/data/*/attributes",
+          "resource": "controllers.SystemItemAttributes",
           "status_code": "200"
         }
       ]
@@ -276,6 +292,14 @@
           "pointer": "/data",
           "resource": "controllers.SystemItem",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/data/*/attributes",
+          "resource": "controllers.SystemItemAttributes",
+          "status_code": "200"
         }
       ]
     },
@@ -318,6 +342,14 @@
           "pointer": "/data",
           "resource": "controllers.SystemAdvisoryItem",
           "status_code": "200"
+        },
+        {
+          "cardinality": "ONE",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/data/*/attributes",
+          "resource": "controllers.SystemAdvisoryItemAttributes",
+          "status_code": "200"
         }
       ]
     },
@@ -338,6 +370,14 @@
           "is_primitive_identifier": false,
           "pointer": "/data",
           "resource": "controllers.SystemPackageData",
+          "status_code": "200"
+        },
+        {
+          "cardinality": "MANY",
+          "extract_object_keys": false,
+          "is_primitive_identifier": false,
+          "pointer": "/data/*/updates",
+          "resource": "models.PackageUpdate",
           "status_code": "200"
         }
       ]
@@ -462,6 +502,40 @@
           "string"
         ],
         "type": [
+          "string"
+        ]
+      }
+    },
+    "controllers.AdvisoryItemAttributes": {
+      "fields": [
+        "advisory_type",
+        "applicable_systems",
+        "cve_count",
+        "description",
+        "public_date",
+        "severity",
+        "synopsis"
+      ],
+      "types": {
+        "advisory_type": [
+          "integer"
+        ],
+        "applicable_systems": [
+          "integer"
+        ],
+        "cve_count": [
+          "integer"
+        ],
+        "description": [
+          "string"
+        ],
+        "public_date": [
+          "string"
+        ],
+        "severity": [
+          "integer"
+        ],
+        "synopsis": [
           "string"
         ]
       }
@@ -603,6 +677,36 @@
         ]
       }
     },
+    "controllers.SystemAdvisoryItemAttributes": {
+      "fields": [
+        "advisory_type",
+        "cve_count",
+        "description",
+        "public_date",
+        "severity",
+        "synopsis"
+      ],
+      "types": {
+        "advisory_type": [
+          "integer"
+        ],
+        "cve_count": [
+          "integer"
+        ],
+        "description": [
+          "string"
+        ],
+        "public_date": [
+          "string"
+        ],
+        "severity": [
+          "integer"
+        ],
+        "synopsis": [
+          "string"
+        ]
+      }
+    },
     "controllers.SystemInlineItem": {
       "fields": [
         "created",
@@ -728,6 +832,100 @@
         ]
       }
     },
+    "controllers.SystemItemAttributes": {
+      "fields": [
+        "created",
+        "culled_timestamp",
+        "display_name",
+        "insights_id",
+        "last_evaluation",
+        "last_upload",
+        "os_major",
+        "os_minor",
+        "os_name",
+        "other_count",
+        "packages_installed",
+        "packages_updatable",
+        "rhba_count",
+        "rhea_count",
+        "rhsa_count",
+        "rhsm",
+        "stale",
+        "stale_timestamp",
+        "stale_warning_timestamp",
+        "third_party"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "insights_id",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Insights"
+        }
+      ],
+      "types": {
+        "created": [
+          "string"
+        ],
+        "culled_timestamp": [
+          "string"
+        ],
+        "display_name": [
+          "string"
+        ],
+        "insights_id": [
+          "string"
+        ],
+        "last_evaluation": [
+          "string"
+        ],
+        "last_upload": [
+          "string"
+        ],
+        "os_major": [
+          "string"
+        ],
+        "os_minor": [
+          "string"
+        ],
+        "os_name": [
+          "string"
+        ],
+        "other_count": [
+          "integer"
+        ],
+        "packages_installed": [
+          "integer"
+        ],
+        "packages_updatable": [
+          "integer"
+        ],
+        "rhba_count": [
+          "integer"
+        ],
+        "rhea_count": [
+          "integer"
+        ],
+        "rhsa_count": [
+          "integer"
+        ],
+        "rhsm": [
+          "string"
+        ],
+        "stale": [
+          "boolean"
+        ],
+        "stale_timestamp": [
+          "string"
+        ],
+        "stale_warning_timestamp": [
+          "string"
+        ],
+        "third_party": [
+          "boolean"
+        ]
+      }
+    },
     "controllers.SystemPackageData": {
       "fields": [
         "description",
@@ -791,6 +989,20 @@
     "controllers.SystemsAdvisoriesResponse": {
       "fields": [],
       "types": {}
+    },
+    "models.PackageUpdate": {
+      "fields": [
+        "advisory",
+        "evra"
+      ],
+      "types": {
+        "advisory": [
+          "string"
+        ],
+        "evra": [
+          "string"
+        ]
+      }
     }
   }
 }

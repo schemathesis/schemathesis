@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import jsonschema_rs
 
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
+from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer, resolve_pointer_all
 from schemathesis.core.transport import status_code_matches
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor, ResourceFieldRef
 
@@ -173,6 +173,22 @@ class ResourceRepository:
         pointer = descriptor.pointer
         if pointer in ("", None, "/"):
             target = payload
+        elif "/*" in pointer:
+            result = resolve_pointer_all(payload, pointer)
+            if isinstance(result, Unresolvable):
+                return ()
+            # MANY descriptors yield one list per wildcard branch; flatten so each
+            # resource instance becomes a single pool entry.
+            if descriptor.cardinality == Cardinality.MANY:
+                values: list[Any] = []
+                for item in result:
+                    if isinstance(item, list):
+                        values.extend(item)
+                    else:
+                        values.append(item)
+            else:
+                values = result
+            return _wrap_extracted_values(values, descriptor)
         else:
             target = resolve_pointer(payload, pointer)
             if target is UNRESOLVABLE:
@@ -188,15 +204,7 @@ class ResourceRepository:
         else:
             values = [target]
 
-        results: list[dict[str, Any]] = []
-        for value in values:
-            if isinstance(value, dict):
-                results.append(value)
-            elif descriptor.is_primitive_identifier and descriptor.identifier_field is not None:
-                # Wrap primitive identifier (string, int, etc.) in a dict
-                # Example: POST /recipes returns "my-slug" -> {"slug": "my-slug"}
-                results.append({descriptor.identifier_field: value})
-        return results
+        return _wrap_extracted_values(values, descriptor)
 
     def _store(
         self,
@@ -241,6 +249,17 @@ class ResourceRepository:
                 context_order.append(context_key)
 
             context_buckets[context_key].append(instance)
+
+
+def _wrap_extracted_values(values: Iterable[Any], descriptor: ResourceDescriptor) -> list[dict[str, Any]]:
+    """Wrap raw values as resource-instance dicts, lifting primitives onto `identifier_field`."""
+    results: list[dict[str, Any]] = []
+    for value in values:
+        if isinstance(value, dict):
+            results.append(value)
+        elif descriptor.is_primitive_identifier and descriptor.identifier_field is not None:
+            results.append({descriptor.identifier_field: value})
+    return results
 
 
 def _extract_request_value(slot: ResourceFieldRef, case: Case) -> Any:

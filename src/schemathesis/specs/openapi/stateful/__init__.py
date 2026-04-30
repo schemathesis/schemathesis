@@ -21,6 +21,7 @@ from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.expressions import MultiMatch
 from schemathesis.specs.openapi.stateful.control import TransitionController
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 from schemathesis.specs.openapi.utils import expand_status_code
@@ -295,6 +296,14 @@ def into_step_input(
                         continue
 
                     param_key = f"{container}.{name}"
+                    value = extracted.value.ok()
+                    # Wildcard expressions yield multiple candidates. Pick via the
+                    # `use_true_random` instance so the per-step pick stays out of
+                    # Hypothesis's data tree — the producer's response shape can vary
+                    # across runs of the same byte stream when the SUT has mutable
+                    # state, and a tracked draw would be flagged as inconsistent.
+                    if isinstance(value, MultiMatch):
+                        value = random.choice(value.values)
 
                     # Calculate exploration rate based on parameter characteristics
                     exploration_rate = BASE_EXPLORATION_RATE
@@ -312,7 +321,7 @@ def into_step_input(
                         exploration_rate *= 3.0
 
                     if biased_coin(1 - exploration_rate):
-                        overrides[container][name] = extracted.value.ok()
+                        overrides[container][name] = value
                         applied_parameters.append(param_key)
 
             # Get the extracted body value

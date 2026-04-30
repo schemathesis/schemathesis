@@ -117,3 +117,42 @@ def resolve_path(document: Any, path: Iterable[str | int]) -> dict | list | str 
         else:
             return UNRESOLVABLE
     return target
+
+
+def resolve_pointer_all(document: Any, pointer: str) -> list[Any] | Unresolvable:
+    """Resolve a JSON Pointer that may contain `*` wildcard segments, fanning out at each `*`.
+
+    Returns a flat list of every match. Returns UNRESOLVABLE only if the
+    pointer is malformed or fails before any `*`; failures past a `*` drop
+    silently so partial coverage is preserved.
+    """
+    if not pointer:
+        return [document]
+    if not pointer.startswith("/"):
+        return UNRESOLVABLE
+    return _resolve_all(document, list(iter_decoded_pointer_segments(pointer)))
+
+
+def _resolve_all(target: Any, segments: list[str]) -> list[Any] | Unresolvable:
+    if not segments:
+        return [target]
+    head, *rest = segments
+    if head == "*":
+        if not isinstance(target, list):
+            return []
+        results: list[Any] = []
+        for item in target:
+            sub = _resolve_all(item, rest)
+            if isinstance(sub, list):
+                results.extend(sub)
+        return results
+    if isinstance(target, dict):
+        if head not in target:
+            return UNRESOLVABLE
+        return _resolve_all(target[head], rest)
+    if isinstance(target, list):
+        try:
+            return _resolve_all(target[int(head)], rest)
+        except (IndexError, ValueError):
+            return UNRESOLVABLE
+    return UNRESOLVABLE

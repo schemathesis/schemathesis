@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
+- Capture every element of list-shaped responses into the pool, not just the first.
 
 ### :bug: Fixed
 

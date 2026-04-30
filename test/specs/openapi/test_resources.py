@@ -10,7 +10,12 @@ from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.resources.repository import MAX_CONTEXTS_PER_TYPE, PER_CONTEXT_CAPACITY
+from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
+from schemathesis.resources.repository import (
+    MAX_CONTEXTS_PER_TYPE,
+    PER_CONTEXT_CAPACITY,
+    ResourceRepository,
+)
 from schemathesis.specs.openapi.extra_data_source import ParameterRequirement
 from schemathesis.specs.openapi.negative import GeneratedValue
 
@@ -90,6 +95,24 @@ def test_many_cardinality_extracts_each_item(user_schema_builder):
 
     resources = list(data_source.repository.iter_instances(USER_RESOURCE))
     assert {instance.data["id"] for instance in resources} == {"a", "b"}
+
+
+def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
+    # Wildcard descriptor pointer where the literal prefix is missing in the payload.
+    # `_extract_payload` short-circuits to an empty result without reaching fan-out.
+    repository = ResourceRepository(
+        [
+            ResourceDescriptor(
+                resource_name="Item",
+                operation="GET /items",
+                status_code="200",
+                pointer="/missing/*/id",
+                cardinality=Cardinality.MANY,
+            )
+        ]
+    )
+    repository.record_response(operation="GET /items", status_code=200, payload={"data": [{"id": "a"}]})
+    assert repository.iter_instances("Item") == ()
 
 
 @pytest.mark.parametrize(

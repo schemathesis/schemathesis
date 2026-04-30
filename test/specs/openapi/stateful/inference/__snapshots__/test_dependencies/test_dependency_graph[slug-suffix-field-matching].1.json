@@ -6,7 +6,7 @@
       "GetTag": {
         "operationRef": "#/paths/~1tags~1{tag_slug}/get",
         "parameters": {
-          "path.tag_slug": "$response.body#/0/slug"
+          "path.tag_slug": "$response.body#/*/slug"
         },
         "x-schemathesis": {
           "is_inferred": true

@@ -251,3 +251,49 @@ def test_lexer(expr, expected):
 )
 def test_pointer(pointer, expected):
     assert resolve_pointer(DOCUMENT, pointer) == expected
+
+
+WILDCARD_DOC = {
+    "data": [
+        {"id": "a", "tags": [1, 2]},
+        {"id": "b", "tags": [3]},
+        {"id": "c", "tags": []},
+    ],
+    "single": {"id": "lone"},
+    "empty": [],
+    "one": [{"id": "solo"}],
+}
+
+
+@pytest.fixture
+def wildcard_output(case, response_factory):
+    response = response_factory.requests(content=json.dumps(WILDCARD_DOC).encode())
+    wrapped = Response.from_requests(response, True)
+    return StepOutput(response=wrapped, case=case)
+
+
+@pytest.mark.parametrize(
+    ("expr", "expected"),
+    [
+        ("$response.body#/single/id", "lone"),
+        ("$response.body#/data/1/id", "b"),
+        ("$response.body#/one/*/id", "solo"),
+        ("$response.body#/data/*/id", expressions.MultiMatch(["a", "b", "c"])),
+        ("$response.body#/data/*/tags/*", expressions.MultiMatch([1, 2, 3])),
+        ("$response.body#/empty/*", UNRESOLVABLE),
+        ("$response.body#/missing", UNRESOLVABLE),
+        ("$method", "PUT"),
+    ],
+    ids=[
+        "literal-key-passthrough",
+        "list-index-passthrough",
+        "wildcard-single-match",
+        "multi-set-multimatch",
+        "nested-wildcard-multimatch",
+        "empty-fan-out-unresolvable",
+        "structural-failure",
+        "literal-expression-passthrough",
+    ],
+)
+def test_evaluate_wildcard(wildcard_output, expr, expected):
+    assert expressions.evaluate_wildcard(expr, wildcard_output) == expected
