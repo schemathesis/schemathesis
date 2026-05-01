@@ -8,15 +8,17 @@ import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from time import sleep, time
+from time import monotonic, sleep, time
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
 import pytest
 import requests
+import uvicorn
 from aiohttp import web
 
 if TYPE_CHECKING:
+    from fastapi import FastAPI
     from flask import Flask
 
 
@@ -143,6 +145,28 @@ def run_flask_app(app: Flask, port: int | None = None, timeout: float = 0.05) ->
     return run(app.run, port=port, timeout=timeout)
 
 
+def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 0.05) -> int:
+    """Start a daemon thread running uvicorn against the given ASGI application."""
+    if port is None:
+        port = unused_port()
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error", lifespan="off")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = monotonic() + 5.0
+    while monotonic() < deadline:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+                return port
+        except OSError:
+            sleep(timeout)
+    raise RuntimeError(f"uvicorn did not bind to 127.0.0.1:{port}")
+
+
 @pytest.fixture(scope="session")
 def app_runner():
-    return SimpleNamespace(run_flask_app=run_flask_app, run_aiohttp_app=run_aiohttp_app)
+    return SimpleNamespace(
+        run_flask_app=run_flask_app,
+        run_aiohttp_app=run_aiohttp_app,
+        run_asgi_app=run_asgi_app,
+    )

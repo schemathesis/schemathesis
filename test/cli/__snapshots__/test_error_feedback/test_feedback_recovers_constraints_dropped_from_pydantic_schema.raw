@@ -1,0 +1,83 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.1.0
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+_________________________________ POST /users __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- API rejected schema-compliant request
+
+    Valid data should have been accepted
+    Expected: 2xx, 401, 403, 404, 409, 5xx
+
+[422] Unprocessable Content:
+
+    `{"detail":[{"type":"string_too_short","loc":["body","name"],"msg":"String should have at least 3 characters","input":"","ctx":{"min_length":3}},{"type":"string_too_short","loc":["body","code"],"msg":"String should have at least 5 characters","input":"","ctx":{"min_length":5}},{"type":"string_too_short","loc":["body","nickname"],"msg":"String should have at least 10 characters","input":"","ctx":{"min_length":10}}]}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+- Undocumented HTTP status code
+
+    Received: 500
+    Documented: 200, 422
+
+[500] Internal Server Error:
+
+    `{"detail":"Internal Server Error"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ❌ Coverage
+  ❌ Fuzzing
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Server error: 1
+  ❌ API rejected schema-compliant request: 1
+  ❌ Undocumented HTTP status code: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 3 failures in 1.00s ==============================

@@ -168,12 +168,14 @@ def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayloa
         # Tighter wins: server's bound only overrides if it's stricter than what
         # the schema already declares. This keeps user-supplied constraints intact
         # while still narrowing under-specified ones.
-        existing_min = prop.get(min_keyword)
-        if not isinstance(existing_min, int) or payload.min > existing_min:
-            prop[min_keyword] = payload.min
-        existing_max = prop.get(max_keyword)
-        if not isinstance(existing_max, int) or payload.max < existing_max:
-            prop[max_keyword] = payload.max
+        if payload.min is not None:
+            existing_min = prop.get(min_keyword)
+            if not isinstance(existing_min, int) or payload.min > existing_min:
+                prop[min_keyword] = payload.min
+        if payload.max is not None:
+            existing_max = prop.get(max_keyword)
+            if not isinstance(existing_max, int) or payload.max < existing_max:
+                prop[max_keyword] = payload.max
 
 
 def _walk_to_property(schema: dict[str, Any], path: tuple[str | int, ...]) -> dict[str, Any] | None:
