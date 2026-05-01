@@ -1560,3 +1560,42 @@ def test_readonly_in_allof_branch_does_not_collapse_positive_generation(ctx, app
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_response_schema_conformance_large_pattern(ctx, app_runner, cli, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "string",
+                                        "pattern": r"^.{0,404600}$",
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @app.route("/data")
+    def data():
+        return jsonify("")
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=response_schema_conformance",
+            "--max-examples=1",
+        )
+        == snapshot_cli
+    )
