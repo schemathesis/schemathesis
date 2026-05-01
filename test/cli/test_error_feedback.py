@@ -538,3 +538,53 @@ def test_feedback_unmasks_planted_bug_via_enum(cli, jackson_enum_planted_bug_app
         )
         == snapshot_cli
     )
+
+
+# Required query parameters not declared as such in the spec — Spring rejects
+# their absence with `MissingServletRequestParameterException`. Multiple params
+# so observations cross the calibration threshold during coverage.
+MISSING_QUERY_PARAMS: tuple[str, ...] = ("lat", "lon", "raioMaximo")
+
+
+@pytest.fixture
+def missing_query_param_app(ctx, app_runner):
+    schema_body = {
+        "parameters": [{"name": name, "in": "query", "schema": {"type": "number"}} for name in MISSING_QUERY_PARAMS],
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/v1/hospitais/maisProximo": {"get": dict(schema_body)}})
+
+    @app.route("/v1/hospitais/maisProximo", methods=["GET"])
+    def find_nearest():
+        absent = [name for name in MISSING_QUERY_PARAMS if name not in request.args]
+        if absent:
+            return jsonify(
+                {
+                    "timestamp": "2026-05-01T01:00:40.560+0000",
+                    "status": 400,
+                    "error": "Bad Request",
+                    "message": "; ".join(f"Required Double parameter '{name}' is not present" for name in absent),
+                    "path": "/v1/hospitais/maisProximo",
+                }
+            ), 400
+        return "", 500  # planted bug — surfaces once all three params are required.
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_missing_query_parameter(cli, missing_query_param_app, snapshot_cli):
+    assert (
+        cli.run(
+            missing_query_param_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
