@@ -4,6 +4,8 @@ from schemathesis.core.error_feedback.store import (
     ErrorFeedbackStore,
     Observation,
     ObservationKind,
+    ObservationPayload,
+    SizeBoundPayload,
 )
 
 __all__ = [
@@ -12,4 +14,6 @@ __all__ = [
     "MIN_OBSERVATIONS",
     "Observation",
     "ObservationKind",
+    "ObservationPayload",
+    "SizeBoundPayload",
 ]

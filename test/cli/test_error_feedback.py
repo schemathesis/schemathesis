@@ -135,3 +135,72 @@ def test_feedback_unmasks_planted_bug_via_dotted_path(cli, nested_planted_bug_ap
         )
         == snapshot_cli
     )
+
+
+SIZE_BOUNDED_FIELDS = (
+    ("username", 3, 8),
+    ("title", 5, 20),
+    ("description", 10, 50),
+)
+
+
+@pytest.fixture
+def size_bound_planted_bug_app(ctx, app_runner):
+    # Server enforces length bounds the schema doesn't declare. Multiple bounded
+    # fields so each rejected case emits one message per field — enough observations
+    # cross the calibration threshold by the time fuzzing builds its strategy.
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "username": {"type": "string"},
+                            "title": {"type": "string"},
+                            "description": {"type": "string"},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": [field for field, _, _ in SIZE_BOUNDED_FIELDS],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        issues = [
+            f"{field} - size must be between {lo} and {hi}"
+            for field, lo, hi in SIZE_BOUNDED_FIELDS
+            if not isinstance(body.get(field), str) or not lo <= len(body[field]) <= hi
+        ]
+        if issues:
+            return jsonify({"messages": issues}), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_size_bound(cli, size_bound_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            size_bound_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )

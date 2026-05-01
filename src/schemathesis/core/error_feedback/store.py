@@ -16,6 +16,23 @@ class ObservationKind(str, Enum):
     """Kinds of signal a parser can extract from a 4xx body."""
 
     MUST_NOT_BE_BLANK = "must_not_be_blank"
+    SIZE_BOUND = "size_bound"
+
+
+@dataclass(frozen=True, slots=True)
+class SizeBoundPayload:
+    """Numeric size bounds extracted from a Bean-validation `@Size`/`@Length` message.
+
+    Applies to whatever JSON-Schema container the field resolves to: strings
+    (`minLength`/`maxLength`), arrays (`minItems`/`maxItems`), or objects
+    (`minProperties`/`maxProperties`).
+    """
+
+    min: int
+    max: int
+
+
+ObservationPayload = SizeBoundPayload | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +44,7 @@ class Observation:
     parameter_path: tuple[str | int, ...]
     kind: ObservationKind
     raw_message: str
+    payload: ObservationPayload = None
 
 
 _EntryKey = tuple[tuple[str | int, ...], ObservationKind]

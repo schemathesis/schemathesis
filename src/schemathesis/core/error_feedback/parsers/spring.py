@@ -4,13 +4,27 @@ import re
 from collections.abc import Iterable
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.store import Observation, ObservationKind
+from schemathesis.core.error_feedback.store import (
+    Observation,
+    ObservationKind,
+    ObservationPayload,
+    SizeBoundPayload,
+)
 from schemathesis.core.parameters import ParameterLocation
 
 # Bean Validation messages we recognize as "this field is required and non-blank":
 # Spring's stdlib `must not be blank/null/empty`, plus common custom variants.
 _NON_BLANK = re.compile(
     r"\b(?:must not be (?:blank|null|empty)|cannot be empty|is required)\b",
+    re.IGNORECASE,
+)
+
+# Bean Validation `@Size`/`@Length` messages — apply to String, Collection, Map,
+# and array; the message text doesn't reveal which, so the consumer branches on
+# schema type. Spring stdlib emits "size must be between X and Y"; Hibernate
+# Validator's `@Length` emits "length must be between X and Y".
+_SIZE_BOUND = re.compile(
+    r"\b(?:size|length) must be between (\d+) and (\d+)\b",
     re.IGNORECASE,
 )
 
@@ -31,22 +45,30 @@ def _split_path(field: str) -> tuple[str | int, ...]:
     return tuple(field.split(".")) if field else ()
 
 
-def _classify(message: str) -> ObservationKind | None:
+def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None:
     if _NON_BLANK.search(message):
-        return ObservationKind.MUST_NOT_BE_BLANK
+        return ObservationKind.MUST_NOT_BE_BLANK, None
+    size_match = _SIZE_BOUND.search(message)
+    if size_match:
+        return ObservationKind.SIZE_BOUND, SizeBoundPayload(
+            min=int(size_match.group(1)),
+            max=int(size_match.group(2)),
+        )
     return None
 
 
 def _emit(operation_label: str, field: str, message: str) -> Observation | None:
-    kind = _classify(message)
-    if kind is None or not field:
+    classification = _classify(message)
+    if classification is None or not field:
         return None
+    kind, payload = classification
     return Observation(
         operation_label=operation_label,
         location=ParameterLocation.BODY,
         parameter_path=_split_path(field),
         kind=kind,
         raw_message=message,
+        payload=payload,
     )
 
 
