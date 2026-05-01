@@ -1,0 +1,8 @@
+[
+  [
+    "Blog post public",
+    "POST /blog/posts",
+    "201",
+    "/"
+  ]
+]

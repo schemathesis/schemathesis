@@ -1,0 +1,14 @@
+[
+  [
+    "Recipe",
+    "GET /recipes/{slug}",
+    "200",
+    "/"
+  ],
+  [
+    "Recipe",
+    "POST /recipes",
+    "201",
+    "/"
+  ]
+]

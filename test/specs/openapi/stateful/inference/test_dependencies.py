@@ -3176,6 +3176,11 @@ def test_dependency_graph(request, ctx, paths, components, snapshot_json):
 
     assert [[entry.status_code, entry.producer_operation_ref, entry.to_openapi()] for entry in data] == snapshot_json
 
+    assert (
+        sorted((d.resource_name, d.operation, d.status_code, d.pointer) for d in schema.analysis.resource_descriptors)
+        == snapshot_json
+    )
+
 
 @pytest.mark.parametrize(
     ["paths", "kwargs", "version"],

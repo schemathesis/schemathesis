@@ -1,0 +1,8 @@
+[
+  [
+    "Category",
+    "POST /something",
+    "200",
+    "/category"
+  ]
+]

@@ -1,0 +1,14 @@
+[
+  [
+    "User",
+    "GET /users/{userId}",
+    "200",
+    "/"
+  ],
+  [
+    "User",
+    "POST /orders",
+    "201",
+    "/user"
+  ]
+]

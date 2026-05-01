@@ -1,0 +1,8 @@
+[
+  [
+    "Channel",
+    "POST /channels",
+    "201",
+    "/"
+  ]
+]

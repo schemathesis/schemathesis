@@ -1,0 +1,8 @@
+[
+  [
+    "Warehouse",
+    "GET /warehouses",
+    "200",
+    "/"
+  ]
+]

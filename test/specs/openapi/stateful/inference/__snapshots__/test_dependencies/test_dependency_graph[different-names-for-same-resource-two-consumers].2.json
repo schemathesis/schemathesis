@@ -1,0 +1,14 @@
+[
+  [
+    "User",
+    "GET /users/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "User",
+    "GET /users/{userId}/messages",
+    "200",
+    "/"
+  ]
+]

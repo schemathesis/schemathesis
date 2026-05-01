@@ -1,0 +1,8 @@
+[
+  [
+    "RunnerGroup",
+    "GET /items/runner-groups",
+    "200",
+    "/runner_groups"
+  ]
+]

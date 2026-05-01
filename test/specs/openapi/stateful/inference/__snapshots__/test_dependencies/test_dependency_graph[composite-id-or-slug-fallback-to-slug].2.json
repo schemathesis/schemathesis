@@ -1,0 +1,14 @@
+[
+  [
+    "Category",
+    "GET /categories",
+    "200",
+    "/"
+  ],
+  [
+    "Category",
+    "GET /categories/{category_id_or_slug}",
+    "200",
+    "/"
+  ]
+]

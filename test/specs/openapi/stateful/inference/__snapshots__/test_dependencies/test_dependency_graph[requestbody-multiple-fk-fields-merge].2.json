@@ -1,0 +1,14 @@
+[
+  [
+    "Carrier",
+    "GET /carriers",
+    "200",
+    "/"
+  ],
+  [
+    "Warehouse",
+    "GET /warehouses",
+    "200",
+    "/"
+  ]
+]

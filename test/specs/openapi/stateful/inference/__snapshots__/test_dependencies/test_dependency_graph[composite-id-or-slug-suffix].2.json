@@ -1,0 +1,14 @@
+[
+  [
+    "League",
+    "GET /leagues",
+    "200",
+    "/"
+  ],
+  [
+    "League",
+    "GET /leagues/{league_id_or_slug}",
+    "200",
+    "/"
+  ]
+]
