@@ -19,6 +19,7 @@ class ObservationKind(str, Enum):
     SIZE_BOUND = "size_bound"
     FORMAT = "format"
     NUMERIC_BOUND = "numeric_bound"
+    PATTERN = "pattern"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +63,18 @@ class NumericBoundPayload:
     exclusive: bool
 
 
-ObservationPayload = SizeBoundPayload | FormatPayload | NumericBoundPayload | None
+@dataclass(frozen=True, slots=True)
+class PatternPayload:
+    """Regex captured verbatim from a Bean-validation `@Pattern` message.
+
+    The consumer normalizes Java-only constructs (PCRE escapes, POSIX classes,
+    Python anchors) before writing it as `pattern: <regex>` onto the property.
+    """
+
+    regex: str
+
+
+ObservationPayload = SizeBoundPayload | FormatPayload | NumericBoundPayload | PatternPayload | None
 
 
 @dataclass(frozen=True, slots=True)

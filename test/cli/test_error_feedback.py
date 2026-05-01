@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 from flask import jsonify, request
 
@@ -329,6 +331,69 @@ def test_feedback_unmasks_planted_bug_via_numeric_bound(cli, numeric_bound_plant
     assert (
         cli.run(
             numeric_bound_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
+PATTERN_FIELDS: tuple[tuple[str, str], ...] = (
+    ("code", "[A-Z]{2,5}"),
+    ("ticker", "[A-Z]{3,4}"),
+    ("zip_code", "[0-9]{5}"),
+)
+
+
+@pytest.fixture
+def pattern_planted_bug_app(ctx, app_runner):
+    # Multiple `@Pattern`-bounded fields so observations cross the threshold during coverage.
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {field: {"type": "string"} for field, _ in PATTERN_FIELDS}
+                        | {"tags": {"type": "array", "items": {"type": "string"}}},
+                        "required": [field for field, _ in PATTERN_FIELDS],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        issues = [
+            f'{field} - must match "{regex}"'
+            for field, regex in PATTERN_FIELDS
+            if not isinstance(body.get(field), str) or not re.fullmatch(regex, body[field])
+        ]
+        if issues:
+            return jsonify({"messages": issues}), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_pattern(cli, pattern_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            pattern_planted_bug_app,
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
