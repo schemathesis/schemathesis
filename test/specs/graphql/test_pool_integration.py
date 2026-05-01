@@ -113,3 +113,25 @@ def test_list_argument_planted_bug_findability(cli, buggy_list_graphql_url, snap
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    "config",
+    [_DEFAULT_CONFIG, _POOL_DISABLED_CONFIG],
+    ids=["pool-enabled", "pool-disabled-via-config"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_tombstone_planted_bug_findability(cli, buggy_tombstone_graphql_url, snapshot_cli, config):
+    # Tombstones evict deleted ids so updateBook draws from still-existing books and finds the planted bug.
+    assert (
+        cli.run(
+            buggy_tombstone_graphql_url,
+            "--max-examples=10",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+            config=config,
+        )
+        == snapshot_cli
+    )

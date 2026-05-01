@@ -5,9 +5,13 @@ from __future__ import annotations
 import json
 import threading
 from collections import deque
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, cast
 
 import graphql
+
+from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
+from schemathesis.specs.graphql.inference import OperationRole, classify_operation
+from schemathesis.specs.graphql.substitution import iter_operation_pool_values
 
 if TYPE_CHECKING:
     from random import Random
@@ -16,29 +20,33 @@ if TYPE_CHECKING:
     from schemathesis.core.transport import Response
     from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
+    from schemathesis.specs.graphql.schemas import GraphQLOperationDefinition
 
 # Per-parent cap on captured values; older entries are evicted FIFO.
 DEFAULT_MAX_PER_KEY: Final = 32
 
 
-def _unwrap(t: graphql.GraphQLType) -> graphql.GraphQLType:
-    while isinstance(t, (graphql.GraphQLNonNull, graphql.GraphQLList)):
-        t = t.of_type
-    return t
+def _parse_response_data(body: bytes) -> dict[str, Any] | None:
+    """Return `data` from a successful GraphQL response, or None if missing/errored."""
+    try:
+        payload = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("errors"):
+        return None
+    data = payload.get("data")
+    return data if isinstance(data, dict) else None
 
 
-def _root_type_for(schema: graphql.GraphQLSchema, operation: graphql.OperationType) -> graphql.GraphQLObjectType | None:
-    if operation == graphql.OperationType.QUERY:
-        return schema.query_type
-    if operation == graphql.OperationType.MUTATION:
-        return schema.mutation_type
-    return None
+def _is_cleanup(operation: APIOperation) -> bool:
+    definition = cast("GraphQLOperationDefinition", operation.definition)
+    return classify_operation(field_name=definition.field_name, root_type=definition.root_type) == OperationRole.CLEANUP
 
 
 class GraphQLResourcePool:
     """Cross-test-case pool of GraphQL identifier values."""
 
-    __slots__ = ("_data", "_lock", "_max_per_key", "_schema")
+    __slots__ = ("_data", "_lock", "_max_per_key", "_schema", "_tombstoned")
 
     def __init__(
         self,
@@ -49,6 +57,7 @@ class GraphQLResourcePool:
         self._schema = client_schema
         self._max_per_key = max_per_key
         self._data: dict[str, deque[str]] = {}
+        self._tombstoned: set[tuple[str, str]] = set()
         self._lock = threading.RLock()
 
     def should_record(self, *, operation: str) -> bool:
@@ -75,14 +84,21 @@ class GraphQLResourcePool:
             (d for d in document.definitions if isinstance(d, graphql.OperationDefinitionNode)),
             None,
         )
-        if operation_node is not None:
-            self.capture_response(response_body=body, operation_node=operation_node)
+        if operation_node is None:
+            return
+        data = _parse_response_data(body)
+        if data is None:
+            return
+        self.capture(operation_node=operation_node, response_data=data)
+        if _is_cleanup(operation):
+            for parent_type_name, value in iter_operation_pool_values(operation_node, self._schema):
+                self.tombstone(parent_type_name=parent_type_name, value=value)
 
     def record_request(self, *, operation: APIOperation, case: Case, status_code: int) -> None:
         return None  # pragma: no cover
 
     def record_successful_delete(self, *, operation: APIOperation, case: Case) -> None:
-        # Eviction of deleted ids is deferred; the per-key cap bounds re-feeding.
+        # Tombstoning runs from `record_response`; this engine hook has no extra work for GraphQL.
         return None  # pragma: no cover
 
     def pick_captured_value(
@@ -120,14 +136,8 @@ class GraphQLResourcePool:
         response_body: bytes,
         operation_node: graphql.OperationDefinitionNode,
     ) -> None:
-        try:
-            payload = json.loads(response_body)
-        except (ValueError, UnicodeDecodeError):
-            return
-        if not isinstance(payload, dict) or payload.get("errors"):
-            return
-        data = payload.get("data")
-        if isinstance(data, dict):
+        data = _parse_response_data(response_body)
+        if data is not None:
             self.capture(operation_node=operation_node, response_data=data)
 
     def draw(self, *, parent_type_name: str, random: Random) -> str | None:
@@ -136,6 +146,14 @@ class GraphQLResourcePool:
             if not entries:
                 return None
             return random.choice(list(entries))
+
+    def tombstone(self, *, parent_type_name: str, value: str) -> None:
+        """Mark a value as deleted: evict it from the pool and prevent re-capture."""
+        with self._lock:
+            self._tombstoned.add((parent_type_name, value))
+            entries = self._data.get(parent_type_name)
+            if entries is not None and value in entries:
+                self._data[parent_type_name] = deque((v for v in entries if v != value), maxlen=self._max_per_key)
 
     def _walk_selection(
         self,
@@ -179,6 +197,8 @@ class GraphQLResourcePool:
 
     def _store(self, parent_type_name: str, value: str) -> None:
         with self._lock:
+            if (parent_type_name, value) in self._tombstoned:
+                return
             entries = self._data.get(parent_type_name)
             if entries is None:
                 entries = deque(maxlen=self._max_per_key)

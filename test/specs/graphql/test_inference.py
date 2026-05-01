@@ -4,8 +4,7 @@ import enum
 
 import pytest
 
-from schemathesis.specs.graphql.inference import OperationRole, classify_operation
-from schemathesis.specs.graphql.schemas import RootType
+from schemathesis.specs.graphql.inference import OperationRole, RootType, classify_operation
 
 
 @pytest.mark.parametrize(
