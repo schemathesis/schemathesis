@@ -11,6 +11,7 @@
 
 ### :bug: Fixed
 
+- Panic during response validation for schemas with very large `{0,N}` regex quantifiers (e.g. `{0,404600}`).
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
 - Capture pool entries from more GET-list response shapes: custom wrappers, nested envelopes, multi-array roots.
 - Mismatched parent/child path parameters in pool draws for hierarchical operations.
