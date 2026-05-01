@@ -620,7 +620,7 @@ def _body_pool_overlays(
     body_schema: Any,
     validator_cls: type,
 ) -> dict[str, Any]:
-    """Return pool overlay values for top-level body properties — only those valid against the destination schema."""
+    """Return pool overlay values for body properties valid against the destination schema."""
     if not isinstance(body_schema, dict):
         return {}
     properties = body_schema.get("properties")
@@ -628,18 +628,49 @@ def _body_pool_overlays(
         return {}
     overlays: dict[str, Any] = {}
     for prop_name, prop_schema in properties.items():
-        if not _is_pool_eligible(prop_schema):
+        if _is_pool_eligible(prop_schema):
+            value = correlated.get((ParameterLocation.BODY, prop_name))
+            if value is not None:
+                try:
+                    if make_validator(prop_schema, validator_cls).is_valid(value):
+                        overlays[prop_name] = value
+                        continue
+                except Exception:
+                    pass
+        # Fall through to the nested branch even when the top-level lookup misses:
+        # an object-typed property is pool-eligible but its overlay key lives one level deeper.
+        if isinstance(prop_schema, dict) and isinstance(prop_schema.get("properties"), dict):
+            nested = _nested_body_pool_overlay(
+                correlated=correlated, outer_name=prop_name, inner_schema=prop_schema, validator_cls=validator_cls
+            )
+            if nested:
+                overlays[prop_name] = nested
+    return overlays
+
+
+def _nested_body_pool_overlay(
+    *,
+    correlated: dict[tuple[ParameterLocation, str], Any],
+    outer_name: str,
+    inner_schema: dict[str, Any],
+    validator_cls: type,
+) -> dict[str, Any]:
+    inner_props = inner_schema.get("properties")
+    assert isinstance(inner_props, dict), "caller must validate inner_schema['properties'] is a dict"
+    inner: dict[str, Any] = {}
+    for sub_name, sub_schema in inner_props.items():
+        if not _is_pool_eligible(sub_schema):
             continue
-        value = correlated.get((ParameterLocation.BODY, prop_name))
+        value = correlated.get((ParameterLocation.BODY, f"{outer_name}/{sub_name}"))
         if value is None:
             continue
         try:
-            if not make_validator(prop_schema, validator_cls).is_valid(value):
+            if not make_validator(sub_schema, validator_cls).is_valid(value):
                 continue
         except Exception:
             continue
-        overlays[prop_name] = value
-    return overlays
+        inner[sub_name] = value
+    return inner
 
 
 def _generate_coverage_values_from_custom_strategy(
@@ -861,10 +892,19 @@ def _iter_coverage_cases(
             body_overlays = _body_pool_overlays(correlated=correlated, body_schema=schema, validator_cls=validator_cls)
             if body_overlays:
                 schema = dict(schema)
-                schema_properties = dict(schema.get("properties") or {})
+                schema_properties = dict(schema["properties"])
                 for prop_name, value in body_overlays.items():
-                    prop_schema = schema_properties.get(prop_name)
-                    if isinstance(prop_schema, dict):
+                    prop_schema = schema_properties[prop_name]
+                    assert isinstance(prop_schema, dict), "_body_pool_overlays only emits dict-schema keys"
+                    if isinstance(value, dict):
+                        # Splice per leaf so the coverage generator still fills sibling fields.
+                        sub_props = dict(prop_schema.get("properties") or {})
+                        for sub_name, sub_value in value.items():
+                            sub_schema = sub_props.get(sub_name)
+                            if isinstance(sub_schema, dict):
+                                sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}
+                        schema_properties[prop_name] = {**prop_schema, "properties": sub_props}
+                    else:
                         schema_properties[prop_name] = {**prop_schema, "examples": [value]}
                 schema["properties"] = schema_properties
             try:

@@ -1265,3 +1265,167 @@ def test_pool_captures_subresources_from_every_parent(
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_extra_data_sources_overlays_nested_body_foreign_key(cli, app_runner, snapshot_cli, ctx):
+    # Server returns 500 only when shipping.location_id matches a real Location id;
+    # without the nested overlay random ints never hit a real id and the bug stays hidden.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/a/locations": {
+                "post": {
+                    "operationId": "createLocation",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                        "example": {"id": 11},
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/b/departments": {
+                "post": {
+                    "operationId": "createDepartment",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "shipping": {
+                                            "type": "object",
+                                            "properties": {
+                                                "location_id": {"type": "integer"},
+                                                "note": {"type": "string"},
+                                            },
+                                        },
+                                    },
+                                    "required": ["shipping"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {"description": "OK"},
+                        "500": {"description": "Server error"},
+                    },
+                }
+            },
+        }
+    )
+    locations = [11, 22, 33]
+    location_index = [0]
+
+    @app.route("/a/locations", methods=["POST"])
+    def create_location():
+        loc_id = locations[location_index[0] % len(locations)]
+        location_index[0] += 1
+        return jsonify({"id": loc_id}), 201
+
+    @app.route("/b/departments", methods=["POST"])
+    def create_department():
+        body = request.get_json(silent=True) or {}
+        shipping = body.get("shipping") or {}
+        if shipping.get("location_id") in locations:
+            abort(500)
+        return jsonify({"id": 1}), 201
+
+    port = app_runner.run_flask_app(app)
+    config = {
+        "phases": {
+            "fuzzing": {"extra-data-sources": {"responses": True}},
+        },
+    }
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=coverage,fuzzing",
+            "--max-examples=30",
+            "--mode=positive",
+            "--seed=42",
+            "-c not_a_server_error",
+            config=config,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.1")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_extra_data_sources_handles_boolean_body_schema(cli, app_runner, snapshot_cli, ctx):
+    # A `schema: true` body alongside pool-using operations must not derail generation.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/widgets": {
+                "post": {
+                    "operationId": "createWidget",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/widgets/{id}": {
+                "get": {
+                    "operationId": "getWidget",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/anything": {
+                "post": {
+                    "operationId": "postAnything",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": True}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+        version="3.1.0",
+    )
+
+    @app.route("/widgets", methods=["POST"])
+    def create_widget():
+        return jsonify({"id": "w-1"}), 201
+
+    @app.route("/widgets/<widget_id>", methods=["GET"])
+    def get_widget(widget_id):
+        return jsonify({}), 200
+
+    @app.route("/anything", methods=["POST"])
+    def post_anything():
+        return jsonify({"ok": True}), 200
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--max-examples=5",
+            "--mode=positive",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )

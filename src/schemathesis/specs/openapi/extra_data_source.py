@@ -209,6 +209,67 @@ def _build_property_validator(
         return None
 
 
+@dataclass(slots=True, frozen=True)
+class _VariantSlot:
+    # `path` is where the value lands in the variant; `lookup_key` is the slash-joined
+    # form used as the requirements-dict key and `instance.context` lookup.
+    path: tuple[str, ...]
+    leaf_schema: JsonSchema
+    requirement: ParameterRequirement
+
+    @property
+    def lookup_key(self) -> str:
+        return "/".join(self.path)
+
+
+def _assemble_path(path: tuple[str, ...], value: Any) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    cursor = result
+    for key in path[:-1]:
+        nxt: dict[str, Any] = {}
+        cursor[key] = nxt
+        cursor = nxt
+    cursor[path[-1]] = value
+    return result
+
+
+def _assemble_variant(slots: list[_VariantSlot], values_by_lookup_key: dict[str, Any]) -> dict[str, Any]:
+    variant: dict[str, Any] = {}
+    for slot in slots:
+        if slot.lookup_key not in values_by_lookup_key:
+            continue
+        cursor = variant
+        for key in slot.path[:-1]:
+            cursor = cursor.setdefault(key, {})
+        cursor[slot.path[-1]] = values_by_lookup_key[slot.lookup_key]
+    return variant
+
+
+def _variant_satisfies_paths(
+    variant: dict[str, Any],
+    slots: list[_VariantSlot],
+    validators: dict[str, jsonschema_rs.Validator | None],
+) -> bool:
+    for slot in slots:
+        validator = validators.get(slot.lookup_key)
+        if validator is None:
+            continue
+        cursor: Any = variant
+        for key in slot.path:
+            if not isinstance(cursor, dict) or key not in cursor:
+                cursor = None
+                break
+            cursor = cursor[key]
+        if cursor is None:
+            continue
+        try:
+            if not validator.is_valid(cursor):
+                return False
+        except Exception:
+            continue
+    return True
+
+
 @dataclass(slots=True)
 class OpenApiExtraDataSource(ExtraDataSource):
     """Provides extra data from captured API responses to augment parameter schemas."""
@@ -250,6 +311,7 @@ class OpenApiExtraDataSource(ExtraDataSource):
         Returns list of parameter value sets from captured responses.
         For single requirements, returns single-property dicts.
         For multiple requirements, returns complete value sets preserving relationships.
+        For BODY location, walks one level into nested objects so nested foreign-key fields get overlays.
         """
         if not isinstance(schema, dict):
             return None
@@ -258,64 +320,61 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if not isinstance(properties, dict):
             return None
 
-        # Collect requirements for this schema
-        property_requirements: dict[str, ParameterRequirement] = {}
-        for name in properties:
+        slots: list[_VariantSlot] = []
+        for name, prop_schema in properties.items():
             requirement = self.requirements.get((operation.label, location, name))
             if requirement is not None:
-                property_requirements[name] = requirement
+                slots.append(_VariantSlot((name,), prop_schema, requirement))
+                continue
+            if location != ParameterLocation.BODY or not isinstance(prop_schema, dict):
+                continue
+            sub_props = prop_schema.get("properties")
+            if not isinstance(sub_props, dict):
+                continue
+            for sub_name, sub_schema in sub_props.items():
+                req = self.requirements.get((operation.label, location, f"{name}/{sub_name}"))
+                if req is not None:
+                    slots.append(_VariantSlot((name, sub_name), sub_schema, req))
 
-        if not property_requirements:
+        if not slots:
             return None
 
-        # Single requirement: return simple single-property variants
-        if len(property_requirements) == 1:
-            name, requirement = next(iter(property_requirements.items()))
-            variants = [{name: value} for value in self._collect_values(requirement)]
+        if len(slots) == 1:
+            slot = slots[0]
+            variants = [_assemble_path(slot.path, value) for value in self._collect_values(slot.requirement)]
         else:
-            # Multiple requirements: return complete object variants preserving relationships
-            variants = self._collect_object_variants(property_requirements)
+            variants = self._collect_object_variants(slots)
 
-        # Drop variants whose values violate the destination schema (e.g. producer's `id: 0`
-        # leaking into a consumer with `minimum: 1`).
         from schemathesis.specs.openapi.schemas import OpenApiSchema
 
         assert isinstance(operation.schema, OpenApiSchema)
         validator_cls = operation.schema.adapter.jsonschema_validator_cls
         validators = {
-            name: _build_property_validator(properties.get(name), schema, validator_cls)
-            for name in property_requirements
+            slot.lookup_key: _build_property_validator(slot.leaf_schema, schema, validator_cls) for slot in slots
         }
-        variants = [v for v in variants if _variant_satisfies(v, validators)]
+        variants = [v for v in variants if _variant_satisfies_paths(v, slots, validators)]
         return variants or None
 
-    def _collect_object_variants(self, requirements: dict[str, ParameterRequirement]) -> list[dict[str, Any]]:
+    def _collect_object_variants(self, slots: list[_VariantSlot]) -> list[dict[str, Any]]:
         """Collect complete value sets that preserve relationships between properties."""
-        # Get all resource types involved
-        resource_names = {req.resource_name for req in requirements.values()}
+        resource_names = {slot.requirement.resource_name for slot in slots}
 
         variants: list[dict[str, Any]] = []
         seen: set[str] = set()
 
-        # For each resource instance, try to build a complete variant
         for resource_name in resource_names:
             for instance in self.repository.iter_instances(resource_name):
-                variant: dict[str, Any] = {}
-
-                for param_name, req in requirements.items():
+                filled: dict[str, Any] = {}
+                for slot in slots:
+                    req = slot.requirement
                     if req.resource_name == resource_name:
-                        # Value from the resource data (e.g., Pet.id from response)
                         value = instance.data.get(req.resource_field)
                     else:
-                        # Value from context (e.g., ownerId from request path)
-                        value = instance.context.get(param_name)
-
+                        value = instance.context.get(slot.lookup_key)
                     if value is not None and not self._is_tombstoned(req.resource_name, value):
-                        variant[param_name] = value
-
-                # Only include if we filled ALL requirements
-                if len(variant) == len(requirements):
-                    # Deduplicate by serializing the variant
+                        filled[slot.lookup_key] = value
+                if len(filled) == len(slots):
+                    variant = _assemble_variant(slots, filled)
                     key = jsonschema_rs.canonical.json.to_string(variant)
                     if key not in seen:
                         seen.add(key)
@@ -324,11 +383,11 @@ class OpenApiExtraDataSource(ExtraDataSource):
         if variants:
             return variants
 
-        # No single instance covered every slot; build a partial variant by chaining picks,
-        # each constrained by the context of slots already chosen.
+        # No instance covered every slot; chain picks across resources, each constrained
+        # by the context of slots already chosen.
         chosen: dict[str, Any] = {}
-        for param_name in requirements:
-            req = requirements[param_name]
+        for slot in slots:
+            req = slot.requirement
             best: Any = None
             for instance in self.repository.iter_instances(req.resource_name):
                 value = instance.data.get(req.resource_field) if req.resource_name else None
@@ -341,11 +400,9 @@ class OpenApiExtraDataSource(ExtraDataSource):
                 best = value
                 break
             if best is not None:
-                chosen[param_name] = best
+                chosen[slot.lookup_key] = best
         if chosen:
-            key = jsonschema_rs.canonical.json.to_string(chosen)
-            if key not in seen:
-                variants.append(chosen)
+            variants.append(_assemble_variant(slots, chosen))
         return variants
 
     def _collect_values(self, requirement: ParameterRequirement) -> list[Any]:
