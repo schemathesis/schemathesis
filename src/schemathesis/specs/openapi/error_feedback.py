@@ -11,6 +11,7 @@ from schemathesis.core.error_feedback.store import (
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
+    TypeMismatchPayload,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
@@ -124,16 +125,19 @@ def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
 
 
 def _walk_and_apply(schema: dict[str, Any], path: tuple[str | int, ...]) -> None:
-    """Descend into `schema.properties[...]` along `path` and mark the leaf as required."""
-    # Bail before any mutation when the path can't be followed: empty paths or
-    # array indices (Spring parser only emits non-empty string-only paths today).
+    """Descend along `path` and mark the leaf as required.
+
+    String-only paths only — synthesizing intermediate objects under `properties`
+    is safe but synthesizing array `items` requires knowing the element shape,
+    which we don't have. Jackson never drives required-field adjustments anyway.
+    """
     if not path or not all(isinstance(step, str) for step in path):
         return
     *prefix, leaf = path
-    assert isinstance(leaf, str)  # narrowed by the all-strings precondition above
+    assert isinstance(leaf, str)
     current = schema
     for step in prefix:
-        assert isinstance(step, str)  # same precondition
+        assert isinstance(step, str)
         properties = current.setdefault("properties", {})
         nested = properties.get(step)
         if not isinstance(nested, dict):
@@ -172,15 +176,23 @@ def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayloa
 
 
 def _walk_to_property(schema: dict[str, Any], path: tuple[str | int, ...]) -> dict[str, Any] | None:
-    """Descend `schema.properties[...]` along `path`; return the leaf prop dict or None."""
-    if not path or not all(isinstance(step, str) for step in path):
+    """Descend `schema` along `path`; return the leaf prop dict or None.
+
+    String steps navigate `properties[<name>]` (object properties); int steps
+    navigate `items` (array elements). The index value itself is irrelevant for
+    JSON Schema's uniform-items model — every element shares the `items` schema.
+    """
+    if not path:
         return None
     current = schema
     for step in path:
-        properties = current.get("properties")
-        if not isinstance(properties, dict):
-            return None
-        nested = properties.get(step)
+        if isinstance(step, str):
+            properties = current.get("properties")
+            if not isinstance(properties, dict):
+                return None
+            nested = properties.get(step)
+        else:
+            nested = current.get("items")
         if not isinstance(nested, dict):
             return None
         current = nested
@@ -385,6 +397,54 @@ class PatternAdjustment:
                 prop = _walk_to_property(target, observation.parameter_path)
                 if prop is not None:
                     _apply_pattern_to_property(prop, observation.payload.regex)
+
+        return schema
+
+
+# Java-type-to-JSON-Schema-format map. Covers the standard `java.time` and
+# `java.net`/`java.util` types; unknown types are skipped at the consumer level.
+_JAVA_TYPE_TO_FORMAT: dict[str, str] = {
+    "java.time.LocalDate": "date",
+    "java.time.LocalDateTime": "date-time",
+    "java.time.Instant": "date-time",
+    "java.time.OffsetDateTime": "date-time",
+    "java.time.ZonedDateTime": "date-time",
+    "java.util.UUID": "uuid",
+    "java.net.URI": "uri",
+    "java.net.URL": "uri",
+}
+
+
+@ADJUSTMENTS.register
+class TypeMismatchAdjustment:
+    """Inject `format` from a Jackson type-error message via the Java-type-to-format map."""
+
+    handles = frozenset({ObservationKind.TYPE_MISMATCH})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        for observation in observations:
+            assert isinstance(observation.payload, TypeMismatchPayload)
+            format_name = _JAVA_TYPE_TO_FORMAT.get(observation.payload.java_type)
+            if format_name is None:
+                continue
+            for target in targets:
+                prop = _walk_to_property(target, observation.parameter_path)
+                if prop is not None:
+                    _apply_format_to_property(prop, format_name)
 
         return schema
 

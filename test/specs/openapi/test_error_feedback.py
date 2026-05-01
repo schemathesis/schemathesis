@@ -15,9 +15,11 @@ from schemathesis.core.error_feedback import (
     ObservationKind,
     PatternPayload,
     SizeBoundPayload,
+    TypeMismatchPayload,
 )
 from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.error_feedback.parsers import PARSERS
+from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
 from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.error_feedback.pipeline import FeedbackPipeline, _reset_pipeline_for_tests
 from schemathesis.core.parameters import ParameterLocation
@@ -36,6 +38,7 @@ from schemathesis.specs.openapi.error_feedback import (
     PatternAdjustment,
     RequiredFieldAdjustment,
     SizeBoundAdjustment,
+    TypeMismatchAdjustment,
     apply_adjustments,
 )
 from schemathesis.specs.openapi.patterns import normalize_regex
@@ -414,6 +417,170 @@ def test_spring_parser_recognizes_pattern_message_variants(message, expected_reg
     obs = SpringParser().parse(operation_label="POST /api/users", body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("code",), ObservationKind.PATTERN, PatternPayload(regex=expected_regex)),
+    ]
+
+
+def test_parsers_registry_contains_jackson_parser():
+    assert JacksonParser in PARSERS.get_all()
+
+
+_JACKSON_LOCAL_DATE = (
+    'JSON parse error: Cannot deserialize value of type `java.time.LocalDate` from String "dd-MM-yyyy" '
+    'through reference chain: User["hire_date"]'
+)
+_JACKSON_LOCAL_DATETIME = (
+    'Cannot deserialize value of type `java.time.LocalDateTime` from String "now" '
+    'through reference chain: Event["startedAt"]'
+)
+_JACKSON_UUID = (
+    'Cannot deserialize value of type `java.util.UUID` from String "abc" through reference chain: Token["id"]'
+)
+_JACKSON_NESTED_CHAIN = (
+    'Cannot deserialize value of type `java.time.LocalDate` from String "x" '
+    'through reference chain: Owner["address"]->Address["created_on"]'
+)
+_JACKSON_INNER_CLASS = (
+    'Cannot deserialize value of type `java.util.Map$Entry` from String "x" through reference chain: User["meta"]'
+)
+_JACKSON_GENERIC_TYPE = (
+    'Cannot deserialize value of type `java.util.List<java.lang.Integer>` from String "x" '
+    'through reference chain: User["scores"]'
+)
+# Pre-2.10 wording: bare type, no backticks, "Can not" verb form.
+_JACKSON_LEGACY_LOCAL_DATE = (
+    "Can not deserialize instance of java.time.LocalDate out of VALUE_STRING token "
+    'through reference chain: User["hire_date"]'
+)
+_JACKSON_LEGACY_UUID = (
+    'Can not deserialize instance of java.util.UUID out of VALUE_STRING token through reference chain: Token["id"]'
+)
+# Collection-element failure: chain has a bare `[N]` between the field and the
+# leaf. Jackson uses this when deserialization fails inside a list/array element.
+# The index value is irrelevant for JSON Schema (every element shares `items`),
+# but it must appear in the path so the walker takes the `items` branch.
+_JACKSON_ARRAY_ELEMENT = (
+    'Cannot deserialize value of type `java.time.LocalDate` from String "x" '
+    'through reference chain: User["addresses"]->java.util.ArrayList[0]->Address["created_on"]'
+)
+
+
+@pytest.mark.parametrize(
+    "carrier_key, message, expected_path, expected_type",
+    [
+        ("msg", _JACKSON_LOCAL_DATE, ("hire_date",), "java.time.LocalDate"),
+        ("message", _JACKSON_LOCAL_DATETIME, ("startedAt",), "java.time.LocalDateTime"),
+        ("error", _JACKSON_UUID, ("id",), "java.util.UUID"),
+        ("detail", _JACKSON_NESTED_CHAIN, ("address", "created_on"), "java.time.LocalDate"),
+        ("msg", _JACKSON_INNER_CLASS, ("meta",), "java.util.Map$Entry"),
+        ("msg", _JACKSON_GENERIC_TYPE, ("scores",), "java.util.List<java.lang.Integer>"),
+        ("msg", _JACKSON_LEGACY_LOCAL_DATE, ("hire_date",), "java.time.LocalDate"),
+        ("detail", _JACKSON_LEGACY_UUID, ("id",), "java.util.UUID"),
+        ("msg", _JACKSON_ARRAY_ELEMENT, ("addresses", 0, "created_on"), "java.time.LocalDate"),
+    ],
+    ids=[
+        "msg-localdate",
+        "message-localdatetime",
+        "error-uuid",
+        "detail-nested-chain",
+        "inner-class-name",
+        "generic-type-name",
+        "legacy-pre-2.10-localdate",
+        "legacy-pre-2.10-uuid",
+        "array-element-failure",
+    ],
+)
+def test_jackson_parser_extracts_observations(carrier_key, message, expected_path, expected_type):
+    body = {carrier_key: message}
+    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (expected_path, ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(java_type=expected_type)),
+    ]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        None,
+        "",
+        [],
+        {"detail": "validation failed"},
+        {"msg": 123},
+    ],
+    ids=[
+        "empty-dict",
+        "none",
+        "empty-string",
+        "empty-list",
+        "wrong-text-in-detail",
+        "non-string-msg",
+    ],
+)
+def test_jackson_parser_can_parse_rejects_non_jackson_bodies(body):
+    assert JacksonParser().can_parse(body=body) is False
+
+
+def test_jackson_parser_skips_message_without_reference_chain():
+    # Field attribution requires the chain — a bare type message can't be routed.
+    body = {"msg": 'Cannot deserialize value of type `java.time.LocalDate` from String "x"'}
+    assert JacksonParser().can_parse(body=body) is True
+    assert JacksonParser().parse(operation_label="POST /api/users", body=body) == ()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        None,
+        "not a dict",
+        [1, 2, 3],
+        {"msg": "no Jackson text here"},
+    ],
+    ids=["none", "string", "list", "no-jackson-text"],
+)
+def test_jackson_parser_parse_returns_empty_for_unparsable_bodies(body):
+    assert JacksonParser().parse(operation_label="POST /api/users", body=body) == ()
+
+
+@pytest.mark.parametrize(
+    "array_key, item_key",
+    [
+        ("errors", "message"),
+        ("errors", "defaultMessage"),
+        ("subErrors", "message"),
+        ("fieldErrors", "message"),
+    ],
+    ids=[
+        "errors-message",
+        "errors-defaultMessage",
+        "subErrors-message",
+        "fieldErrors-message",
+    ],
+)
+def test_jackson_parser_walks_into_array_shape_envelopes(array_key, item_key):
+    # Custom `@ControllerAdvice` handlers sometimes funnel Jackson parse errors
+    # alongside Bean-validation results into a single `errors[]` array.
+    body = {array_key: [{item_key: _JACKSON_LOCAL_DATE}]}
+    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    assert [o.payload for o in obs] == [TypeMismatchPayload(java_type="java.time.LocalDate")]
+
+
+def test_jackson_parser_skips_non_dict_array_items():
+    body = {"errors": ["string-item", 123, None, {"message": _JACKSON_LOCAL_DATE}]}
+    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    assert [o.payload for o in obs] == [TypeMismatchPayload(java_type="java.time.LocalDate")]
+
+
+def test_jackson_parser_extracts_one_observation_per_carrier_key():
+    # Different carrier keys can each carry a Jackson error — `_carrier_strings`
+    # walks them in order and emits one observation per match.
+    body = {
+        "msg": _JACKSON_LOCAL_DATE,
+        "detail": _JACKSON_UUID,
+    }
+    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.payload) for o in obs] == [
+        (("hire_date",), TypeMismatchPayload(java_type="java.time.LocalDate")),
+        (("id",), TypeMismatchPayload(java_type="java.util.UUID")),
     ]
 
 
@@ -1709,6 +1876,203 @@ def test_pattern_adjustment_applies_correctly(input_schema, items, expected, cas
         location=ParameterLocation.BODY,
         schema=input_schema,
         observations=_build_pattern_observations(*items),
+    )
+    assert out == expected
+
+
+def _build_type_mismatch_observations(
+    *items: tuple[tuple[str | int, ...], str],
+) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.TYPE_MISMATCH,
+            raw_message=f'Cannot deserialize value of type `{java_type}` from String "..."',
+            payload=TypeMismatchPayload(java_type=java_type),
+        )
+        for path, java_type in items
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"hire_date": {"type": "string"}}, "required": []},
+            [(("hire_date",), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {"hire_date": {"type": "string", "format": "date"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"started_at": {"type": "string"}}, "required": []},
+            [(("started_at",), "java.time.LocalDateTime")],
+            {
+                "type": "object",
+                "properties": {"started_at": {"type": "string", "format": "date-time"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"created_at": {"type": "string"}}, "required": []},
+            [(("created_at",), "java.time.Instant")],
+            {
+                "type": "object",
+                "properties": {"created_at": {"type": "string", "format": "date-time"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"token": {"type": "string"}}, "required": []},
+            [(("token",), "java.util.UUID")],
+            {
+                "type": "object",
+                "properties": {"token": {"type": "string", "format": "uuid"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"website": {"type": "string"}}, "required": []},
+            [(("website",), "java.net.URL")],
+            {
+                "type": "object",
+                "properties": {"website": {"type": "string", "format": "uri"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"hire_date": {"type": "string", "format": "date"}}, "required": []},
+            [(("hire_date",), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {"hire_date": {"type": "string", "format": "date"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            [(("x",), "com.example.Custom")],
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+            [(("x",), "java.time.LocalDate")],
+            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"hire_date": {"type": ["string", "null"]}}, "required": []},
+            [(("hire_date",), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {"hire_date": {"type": ["string", "null"], "format": "date"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [(("hire_date",), "java.time.LocalDate")],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (True, [(("hire_date",), "java.time.LocalDate")], True),
+        ({"type": "string"}, [(("hire_date",), "java.time.LocalDate")], {"type": "string"}),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "owner": {
+                        "type": "object",
+                        "properties": {"hire_date": {"type": "string"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+            [(("owner", "hire_date"), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {
+                    "owner": {
+                        "type": "object",
+                        "properties": {"hire_date": {"type": "string", "format": "date"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "addresses": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"created_on": {"type": "string"}},
+                            "required": [],
+                        },
+                    }
+                },
+                "required": [],
+            },
+            [(("addresses", 0, "created_on"), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {
+                    "addresses": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {"created_on": {"type": "string", "format": "date"}},
+                            "required": [],
+                        },
+                    }
+                },
+                "required": [],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"addresses": {"type": "array"}},
+                "required": [],
+            },
+            [(("addresses", 0, "created_on"), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {"addresses": {"type": "array"}},
+                "required": [],
+            },
+        ),
+    ],
+    ids=[
+        "localdate-to-date",
+        "localdatetime-to-date-time",
+        "instant-to-date-time",
+        "uuid-to-uuid",
+        "url-to-uri",
+        "existing-format-preserved",
+        "unmapped-type-passthrough",
+        "non-string-property-skipped",
+        "type-union-with-null-applies",
+        "absent-property-not-synthesised",
+        "bool-schema-passthrough",
+        "non-object-root-passthrough",
+        "nested-path-applies-format",
+        "array-element-applies-format-via-items",
+        "array-without-items-passes-through",
+    ],
+)
+def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expected, case_factory):
+    out = TypeMismatchAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_type_mismatch_observations(*items),
     )
     assert out == expected
 
