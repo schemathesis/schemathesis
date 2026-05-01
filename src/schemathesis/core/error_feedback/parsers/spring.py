@@ -17,9 +17,13 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.parameters import ParameterLocation
 
 # Bean Validation messages we recognize as "this field is required and non-blank":
-# Spring's stdlib `must not be blank/null/empty`, plus common custom variants.
+# Spring's stdlib `must not be blank/null/empty`, plus common custom variants
+# (apostrophe-contracted "can't be blank", "must be filled", etc.).
 _NON_BLANK = re.compile(
-    r"\b(?:must not be (?:blank|null|empty)|cannot be empty|is required)\b",
+    r"\b(?:must not be (?:blank|null|empty)"
+    r"|can(?:not|'?t) be (?:blank|empty|null)"
+    r"|must be filled"
+    r"|is required)\b",
     re.IGNORECASE,
 )
 
@@ -32,19 +36,17 @@ _SIZE_BOUND = re.compile(
     re.IGNORECASE,
 )
 
-# Bean-validation format constraints. Hibernate's `@Email` emits
-# "must be a well-formed email address"; the `@URL`/`@UUID` extensions emit
-# "must be a valid URL"/"must be a valid UUID". The phrasing varies between
-# stdlib and custom annotations, hence the optional `well-formed`/`valid`.
+# Bean-validation format constraints. Hibernate's `@Email` emits "must be a
+# well-formed email address"; `@URL`/`@UUID` extensions emit "must be a valid
+# URL"/"must be a valid UUID". Custom @ControllerAdvice handlers also use
+# softer phrasings like "Please enter a valid e-mail address" — we don't
+# require a leading verb, only the `(well-formed|valid) <token>` core.
 # Order matters: UUID before URI so the more specific phrase wins on edge
 # strings, and email last because its token is short and easiest to misclassify.
 _FORMAT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\bmust be (?:a |an )?(?:well-formed |valid )?UUID\b", re.IGNORECASE), "uuid"),
-    (re.compile(r"\bmust be (?:a |an )?(?:well-formed |valid )?(?:URL|URI)\b", re.IGNORECASE), "uri"),
-    (
-        re.compile(r"\bmust be (?:a |an )?(?:well-formed |valid )?email(?:\s+address)?\b", re.IGNORECASE),
-        "email",
-    ),
+    (re.compile(r"\b(?:well-formed|valid)\s+UUID\b", re.IGNORECASE), "uuid"),
+    (re.compile(r"\b(?:well-formed|valid)\s+(?:URL|URI)\b", re.IGNORECASE), "uri"),
+    (re.compile(r"\b(?:well-formed|valid)\s+e-?mail(?:\s+address)?\b", re.IGNORECASE), "email"),
 )
 
 # Bean-validation numeric bounds. Hibernate's stdlib emits this single shape
