@@ -40,6 +40,14 @@
       "fields": [
         "brandId"
       ],
+      "fk_fields": [
+        {
+          "field_name": "brandId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Brand"
+        }
+      ],
       "types": {
         "brandId": [
           "string"

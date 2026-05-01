@@ -785,6 +785,14 @@
         "team",
         "week"
       ],
+      "fk_fields": [
+        {
+          "field_name": "gameId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Game"
+        }
+      ],
       "types": {
         "defense": [
           "object"
@@ -967,6 +975,26 @@
         "round",
         "weight",
         "year"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "collegeAthleteId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "CollegeAthlete"
+        },
+        {
+          "field_name": "collegeId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "College"
+        },
+        {
+          "field_name": "nflAthleteId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "NflAthlete"
+        }
       ],
       "types": {
         "collegeAthleteId": [
@@ -1448,6 +1476,14 @@
         "team",
         "week"
       ],
+      "fk_fields": [
+        {
+          "field_name": "gameId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Game"
+        }
+      ],
       "types": {
         "conference": [
           "string"
@@ -1499,6 +1535,14 @@
         "week",
         "windDirection",
         "windSpeed"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "venueId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Venue"
+        }
       ],
       "types": {
         "awayConference": [
@@ -1581,6 +1625,43 @@
         "status",
         "teams",
         "yardsToGoal"
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "defenseId",
+          "is_array": false,
+          "pointer": "/drives/*/defenseId",
+          "target_field": "id",
+          "target_resource": "Defense"
+        },
+        {
+          "field_name": "offenseId",
+          "is_array": false,
+          "pointer": "/drives/*/offenseId",
+          "target_field": "id",
+          "target_resource": "Offense"
+        },
+        {
+          "field_name": "playTypeId",
+          "is_array": false,
+          "pointer": "/drives/*/plays/*/playTypeId",
+          "target_field": "id",
+          "target_resource": "PlayType"
+        },
+        {
+          "field_name": "teamId",
+          "is_array": false,
+          "pointer": "/drives/*/plays/*/teamId",
+          "target_field": "id",
+          "target_resource": "Team"
+        },
+        {
+          "field_name": "teamId",
+          "is_array": false,
+          "pointer": "/teams/*/teamId",
+          "target_field": "id",
+          "target_resource": "Team"
+        }
       ],
       "types": {
         "clock": [
@@ -1765,6 +1846,32 @@
         "week",
         "yardsToGoal"
       ],
+      "fk_fields": [
+        {
+          "field_name": "athleteId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Athlete"
+        },
+        {
+          "field_name": "driveId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Drive"
+        },
+        {
+          "field_name": "gameId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Game"
+        },
+        {
+          "field_name": "playId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Play"
+        }
+      ],
       "types": {
         "athleteId": [
           "integer"
@@ -1876,6 +1983,32 @@
         "spread",
         "timeRemaining",
         "yardLine"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "awayId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Away"
+        },
+        {
+          "field_name": "gamesId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Games"
+        },
+        {
+          "field_name": "homeId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Home"
+        },
+        {
+          "field_name": "playId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Play"
+        }
       ],
       "types": {
         "away": [
@@ -2160,6 +2293,14 @@
         "statType",
         "team"
       ],
+      "fk_fields": [
+        {
+          "field_name": "playerId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Player"
+        }
+      ],
       "types": {
         "category": [
           "string"
@@ -2326,6 +2467,14 @@
         "spread",
         "week"
       ],
+      "fk_fields": [
+        {
+          "field_name": "gameId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Game"
+        }
+      ],
       "types": {
         "awayTeam": [
           "string"
@@ -2394,6 +2543,14 @@
         "stateProvince",
         "weight",
         "year"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "athleteId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Athlete"
+        }
       ],
       "types": {
         "athleteId": [

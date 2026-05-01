@@ -524,6 +524,15 @@
         "data",
         "errors"
       ],
+      "nested_fk_fields": [
+        {
+          "field_name": "wikiDataId",
+          "is_array": false,
+          "pointer": "/data/wikiDataId",
+          "target_field": "id",
+          "target_resource": "WikiData"
+        }
+      ],
       "types": {
         "data": [
           "object"
@@ -539,6 +548,14 @@
         "currencyCodes",
         "name",
         "wikiDataId"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "wikiDataId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "WikiData"
+        }
       ],
       "types": {
         "code": [
@@ -647,6 +664,15 @@
         "data",
         "errors"
       ],
+      "nested_fk_fields": [
+        {
+          "field_name": "wikiDataId",
+          "is_array": false,
+          "pointer": "/data/wikiDataId",
+          "target_field": "id",
+          "target_resource": "WikiData"
+        }
+      ],
       "types": {
         "data": [
           "object"
@@ -670,6 +696,14 @@
         "regionCode",
         "type",
         "wikiDataId"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "wikiDataId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "WikiData"
+        }
       ],
       "types": {
         "country": [
@@ -720,6 +754,15 @@
         "data",
         "errors"
       ],
+      "nested_fk_fields": [
+        {
+          "field_name": "wikiDataId",
+          "is_array": false,
+          "pointer": "/data/wikiDataId",
+          "target_field": "id",
+          "target_resource": "WikiData"
+        }
+      ],
       "types": {
         "data": [
           "object"
@@ -736,6 +779,14 @@
         "isoCode",
         "name",
         "wikiDataId"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "wikiDataId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "WikiData"
+        }
       ],
       "types": {
         "countryCode": [

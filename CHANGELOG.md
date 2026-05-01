@@ -22,6 +22,7 @@
 ### :wrench: Changed
 
 - Recognize more path parameters as resource identifiers.
+- Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 
