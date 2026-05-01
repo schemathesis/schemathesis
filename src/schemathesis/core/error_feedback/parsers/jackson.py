@@ -17,8 +17,12 @@ from schemathesis.core.parameters import ParameterLocation
 # character on the modern path so generic types like `java.util.List<E>` come
 # through verbatim — the consumer's type-to-format map ignores unknown shapes.
 _JACKSON_TYPE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # 2.10+ — wraps the type in backticks and uses "Cannot ... value of type".
+    # 2.10+ — String source: `Cannot deserialize value of type \`X\` from String "Y"`.
     re.compile(r'Cannot deserialize value of type `(?P<type>[^`]+)` from String "(?P<value>[^"]*)"'),
+    # 2.10+ — non-String source (object / array / boolean): `Cannot deserialize
+    # instance of \`X\` out of <token>`. Different verb form ("instance of" vs
+    # "value of type") because Jackson distinguishes the input shape internally.
+    re.compile(r"Cannot deserialize instance of `(?P<type>[^`]+)` out of \w+\s+token"),
     # pre-2.10 (Spring Boot 2.1 and older Jakarta EE deployments) — bare type,
     # different word order. No String value in this form.
     re.compile(r"Can not deserialize instance of (?P<type>[\w.$<>]+)"),
@@ -100,7 +104,10 @@ class JacksonParser:
         if not isinstance(body, dict):
             return False
         return any(
-            "Cannot deserialize value of type" in s or "Can not deserialize instance of" in s or "Enum class:" in s
+            "Cannot deserialize value of type" in s
+            or "Cannot deserialize instance of" in s
+            or "Can not deserialize instance of" in s
+            or "Enum class:" in s
             for s in _carrier_strings(body)
         )
 

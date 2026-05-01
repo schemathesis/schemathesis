@@ -410,6 +410,7 @@ _JAVA_TYPE_TO_FORMAT: dict[str, str] = {
     "java.time.Instant": "date-time",
     "java.time.OffsetDateTime": "date-time",
     "java.time.ZonedDateTime": "date-time",
+    "java.util.Date": "date-time",
     "java.util.UUID": "uuid",
     "java.net.URI": "uri",
     "java.net.URL": "uri",

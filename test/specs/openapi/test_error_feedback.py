@@ -438,6 +438,78 @@ def test_spring_parser_recognizes_pattern_message_variants(message, expected_reg
     ]
 
 
+# Verbatim from gestao-hospital 4.18-rc.1 traffic.
+_SPRING_MISSING_PARAMETER_BODY = {
+    "timestamp": "2026-05-01T01:00:40.560+0000",
+    "status": 400,
+    "error": "Bad Request",
+    "message": "Required Double parameter 'lat' is not present",
+    "path": "/v1/hospitais/maisProximo",
+}
+# Verbatim from pet-clinic 4.18-rc.1 traffic — Spring 6 / RFC 7807 Problem Detail.
+_SPRING_TYPE_COERCION_PETCLINIC = {
+    "type": "http://localhost:8080/petclinic/api/owners/null%2Cnull/pets",
+    "title": "MethodArgumentTypeMismatchException",
+    "status": 500,
+    "detail": (
+        "Method parameter 'ownerId': Failed to convert value of type "
+        "'java.lang.String' to required type 'java.lang.Integer'; "
+        'For input string: "null"'
+    ),
+}
+
+
+def test_spring_parser_recognizes_missing_request_parameter():
+    obs = SpringParser().parse(operation_label="GET /v1/hospitais/maisProximo", body=_SPRING_MISSING_PARAMETER_BODY)
+    assert [(o.parameter_path, o.kind, o.location) for o in obs] == [
+        (("lat",), ObservationKind.MUST_NOT_BE_BLANK, ParameterLocation.QUERY),
+    ]
+
+
+def test_spring_parser_can_parse_recognizes_missing_parameter_envelope():
+    assert SpringParser().can_parse(body=_SPRING_MISSING_PARAMETER_BODY) is True
+
+
+def test_spring_parser_recognizes_method_argument_type_mismatch():
+    # Field captured from `Method parameter 'ownerId':` prefix; emitted on both
+    # PATH and QUERY because the message doesn't pin the binding.
+    obs = SpringParser().parse(operation_label="GET /api/owners/{ownerId}/pets", body=_SPRING_TYPE_COERCION_PETCLINIC)
+    assert [(o.parameter_path, o.kind, o.location, o.payload) for o in obs] == [
+        (
+            ("ownerId",),
+            ObservationKind.TYPE_MISMATCH,
+            ParameterLocation.PATH,
+            TypeMismatchPayload(java_type="java.lang.Integer"),
+        ),
+        (
+            ("ownerId",),
+            ObservationKind.TYPE_MISMATCH,
+            ParameterLocation.QUERY,
+            TypeMismatchPayload(java_type="java.lang.Integer"),
+        ),
+    ]
+
+
+def test_spring_parser_can_parse_recognizes_type_coercion_envelope():
+    assert SpringParser().can_parse(body=_SPRING_TYPE_COERCION_PETCLINIC) is True
+
+
+def test_spring_parser_skips_type_coercion_without_method_parameter_prefix():
+    # Older Spring stdlib envelope omits the `Method parameter 'X':` prefix —
+    # without a field name we can't attribute, so we don't emit.
+    body = {
+        "timestamp": "2026-05-01T01:54:33.490+0000",
+        "status": 400,
+        "error": "Bad Request",
+        "message": (
+            "Failed to convert value of type 'java.lang.String' to required type 'java.lang.Double'; "
+            'nested exception is java.lang.NumberFormatException: For input string: "x"'
+        ),
+        "path": "/v1/hospitais/maisProximo",
+    }
+    assert SpringParser().parse(operation_label="GET /v1/hospitais/maisProximo", body=body) == ()
+
+
 def test_parsers_registry_contains_jackson_parser():
     assert JacksonParser in PARSERS.get_all()
 
@@ -480,6 +552,19 @@ _JACKSON_ARRAY_ELEMENT = (
     'Cannot deserialize value of type `java.time.LocalDate` from String "x" '
     'through reference chain: User["addresses"]->java.util.ArrayList[0]->Address["created_on"]'
 )
+# Modern Jackson with non-String source (object / array / boolean) — different
+# verb form ("instance of" rather than "value of type") and the source token
+# replaces the String quoting. Verbatim from gestao-hospital 4.18-rc.1 traffic.
+_JACKSON_NON_STRING_SOURCE = (
+    "JSON parse error: Cannot deserialize instance of `java.util.Date` out of START_OBJECT token; "
+    "nested exception is com.fasterxml.jackson.databind.exc.MismatchedInputException: "
+    "Cannot deserialize instance of `java.util.Date` out of START_OBJECT token "
+    'through reference chain: Patient["checkin"]'
+)
+_JACKSON_NON_STRING_ARRAY_SOURCE = (
+    "Cannot deserialize instance of `java.lang.Integer` out of START_ARRAY token "
+    'through reference chain: Order["quantity"]'
+)
 # Jackson enum-deserialization: the `not one of the values accepted` clause
 # names the valid literals inline. A single message carries both the offending
 # Java type and the accepted value list — parser emits both kinds of observation.
@@ -507,6 +592,8 @@ _JACKSON_ENUM_BARE = (
         ("msg", _JACKSON_LEGACY_LOCAL_DATE, ("hire_date",), "java.time.LocalDate"),
         ("detail", _JACKSON_LEGACY_UUID, ("id",), "java.util.UUID"),
         ("msg", _JACKSON_ARRAY_ELEMENT, ("addresses", 0, "created_on"), "java.time.LocalDate"),
+        ("message", _JACKSON_NON_STRING_SOURCE, ("checkin",), "java.util.Date"),
+        ("message", _JACKSON_NON_STRING_ARRAY_SOURCE, ("quantity",), "java.lang.Integer"),
     ],
     ids=[
         "msg-localdate",
@@ -518,6 +605,8 @@ _JACKSON_ENUM_BARE = (
         "legacy-pre-2.10-localdate",
         "legacy-pre-2.10-uuid",
         "array-element-failure",
+        "non-string-object-source",
+        "non-string-array-source",
     ],
 )
 def test_jackson_parser_extracts_observations(carrier_key, message, expected_path, expected_type):
