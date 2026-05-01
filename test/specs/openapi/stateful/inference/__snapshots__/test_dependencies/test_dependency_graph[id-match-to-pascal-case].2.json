@@ -1,0 +1,14 @@
+[
+  [
+    "Brand",
+    "GET /brands/{brandId}",
+    "200",
+    "/"
+  ],
+  [
+    "Brand",
+    "POST /brands",
+    "201",
+    "/"
+  ]
+]

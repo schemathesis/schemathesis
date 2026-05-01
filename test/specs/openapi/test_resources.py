@@ -33,7 +33,15 @@ def user_schema_builder(ctx):
         paths = {
             "/users": {
                 "post": {"responses": {status_code: {"content": {"application/json": {"schema": response_schema}}}}}
-            }
+            },
+            # GET /users/{id} consumes User.id so the descriptor stays reachable under
+            # the orphan-resource filter; record_response can populate the User pool.
+            "/users/{id}": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
         }
         if extra_endpoints:
             paths.update(extra_endpoints)
@@ -222,11 +230,11 @@ def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
         ),
         pytest.param(
             {
-                "/services/{serviceSid}/compliance": {
+                "/services/{serviceId}/compliance": {
                     "get": {
                         "operationId": "listCompliance",
                         "parameters": [
-                            {"name": "serviceSid", "in": "path", "required": True, "schema": {"type": "string"}}
+                            {"name": "serviceId", "in": "path", "required": True, "schema": {"type": "string"}}
                         ],
                         "responses": {
                             "200": {
@@ -240,10 +248,10 @@ def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
                                                     "items": {
                                                         "type": "object",
                                                         "properties": {
-                                                            "sid": {"type": "string"},
+                                                            "id": {"type": "string"},
                                                             "status": {"type": "string"},
                                                         },
-                                                        "required": ["sid"],
+                                                        "required": ["id"],
                                                     },
                                                 },
                                                 "count": {"type": "integer"},
@@ -255,21 +263,21 @@ def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
                         },
                     }
                 },
-                "/services/{serviceSid}/compliance/{sid}": {
+                "/services/{serviceId}/compliance/{id}": {
                     "get": {
                         "operationId": "getCompliance",
                         "parameters": [
-                            {"name": "serviceSid", "in": "path", "required": True, "schema": {"type": "string"}},
-                            {"name": "sid", "in": "path", "required": True, "schema": {"type": "string"}},
+                            {"name": "serviceId", "in": "path", "required": True, "schema": {"type": "string"}},
+                            {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
                         ],
                         "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
                     }
                 },
             },
-            {"compliance": [{"sid": "C1", "status": "ok"}, {"sid": "C2", "status": "ok"}], "count": 2},
-            "GET /services/{serviceSid}/compliance",
+            {"compliance": [{"id": "C1", "status": "ok"}, {"id": "C2", "status": "ok"}], "count": 2},
+            "GET /services/{serviceId}/compliance",
             "Compliance",
-            "sid",
+            "id",
             {"C1", "C2"},
             id="singular-wrapper-noun-array",
         ),
@@ -521,6 +529,70 @@ def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
     schema = schemathesis.openapi.from_dict(spec)
     descriptors = [d for d in schema.analysis.resource_descriptors if d.operation == "GET /{slug}"]
     assert descriptors == []
+
+
+def test_orphan_resource_descriptors_are_filtered(ctx):
+    # Producer creates a Widget; no operation consumes Widget. The descriptor would only ever
+    # write into a bucket nothing reads, so it must not be built.
+    spec = ctx.openapi.build_schema(
+        {
+            "/widgets": {
+                "post": {
+                    "operationId": "createWidget",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    assert [d.resource_name for d in schema.analysis.resource_descriptors] == []
+
+
+def test_descriptor_kept_when_consumer_exists(ctx):
+    # Sibling regression guard: with a consumer present, the descriptor must still be built.
+    spec = ctx.openapi.build_schema(
+        {
+            "/widgets": {
+                "post": {
+                    "operationId": "createWidget",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/widgets/{id}": {
+                "get": {
+                    "operationId": "getWidget",
+                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    assert [d.resource_name for d in schema.analysis.resource_descriptors] == ["Widget"]
 
 
 def test_captured_variants_filter_values_invalid_for_destination(ctx):
@@ -1110,6 +1182,16 @@ def test_context_aware_eviction_maintains_diversity(ctx):
                     "responses": {"201": {"content": {"application/json": {"schema": pet_schema}}}},
                 }
             },
+            "/owners/{ownerId}/pets/{id}": {
+                "get": {
+                    "operationId": "getPet",
+                    "parameters": [
+                        {"name": "ownerId", "in": "path", "required": True, "schema": {"type": "integer"}},
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
         }
     )
     schema = schemathesis.openapi.from_dict(spec)
@@ -1454,25 +1536,6 @@ def test_identifier_field_fallback_when_paths_differ(ctx):
     resources = list(data_source.repository.iter_instances("Recipe"))
     assert len(resources) == 1
     assert resources[0].data == {"slug": "my-recipe"}
-
-
-def test_identifier_field_defaults_to_id_when_no_consumer(ctx):
-    # POST /recipes with no consumer - falls back to "id"
-    spec = ctx.openapi.build_schema(
-        {
-            "/recipes": {
-                "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}
-            }
-        }
-    )
-    schema = schemathesis.openapi.from_dict(spec)
-    data_source = schema.create_extra_data_source()
-
-    data_source.repository.record_response(operation="POST /recipes", status_code=201, payload="my-recipe")
-
-    resources = list(data_source.repository.iter_instances("Recipe"))
-    assert len(resources) == 1
-    assert resources[0].data == {"id": "my-recipe"}
 
 
 def test_primitive_integer_identifier(ctx):

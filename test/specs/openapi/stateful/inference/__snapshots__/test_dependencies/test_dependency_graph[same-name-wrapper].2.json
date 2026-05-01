@@ -1,0 +1,8 @@
+[
+  [
+    "DataRequest",
+    "PUT /data_requests/{data_request_id}",
+    "200",
+    "/data_request"
+  ]
+]

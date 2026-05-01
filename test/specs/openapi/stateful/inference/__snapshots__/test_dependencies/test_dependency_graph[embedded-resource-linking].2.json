@@ -1,0 +1,20 @@
+[
+  [
+    "Customer",
+    "GET /customers/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "Customer",
+    "GET /orders/{id}",
+    "200",
+    "/customer"
+  ],
+  [
+    "Order",
+    "GET /orders/{id}",
+    "200",
+    "/"
+  ]
+]

@@ -1,0 +1,14 @@
+[
+  [
+    "Product",
+    "GET /products",
+    "200",
+    "/"
+  ],
+  [
+    "Supplier",
+    "GET /suppliers",
+    "200",
+    "/"
+  ]
+]

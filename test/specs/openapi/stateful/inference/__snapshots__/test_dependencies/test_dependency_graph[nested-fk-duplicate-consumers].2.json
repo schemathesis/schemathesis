@@ -1,0 +1,20 @@
+[
+  [
+    "Order",
+    "GET /orders/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "Warehouse",
+    "GET /warehouses/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "Warehouse",
+    "GET /warehouses/{warehouseId}",
+    "200",
+    "/"
+  ]
+]

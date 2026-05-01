@@ -1,0 +1,14 @@
+[
+  [
+    "Session",
+    "GET /sessions/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "User",
+    "GET /users/{id}",
+    "200",
+    "/"
+  ]
+]

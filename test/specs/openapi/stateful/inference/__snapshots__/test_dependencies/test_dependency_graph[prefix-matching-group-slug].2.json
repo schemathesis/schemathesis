@@ -1,0 +1,8 @@
+[
+  [
+    "GroupSummary",
+    "GET /groups/self",
+    "200",
+    "/"
+  ]
+]

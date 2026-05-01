@@ -1,0 +1,8 @@
+[
+  [
+    "Product",
+    "GET /products",
+    "200",
+    "/"
+  ]
+]

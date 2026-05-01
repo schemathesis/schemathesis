@@ -1,0 +1,14 @@
+[
+  [
+    "Group",
+    "GET /children/groups",
+    "200",
+    "/"
+  ],
+  [
+    "Group",
+    "GET /smallgroups/groups",
+    "200",
+    "/"
+  ]
+]

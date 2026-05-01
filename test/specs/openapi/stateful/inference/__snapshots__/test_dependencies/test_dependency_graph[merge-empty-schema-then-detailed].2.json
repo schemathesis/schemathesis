@@ -1,0 +1,20 @@
+[
+  [
+    "Directory",
+    "GET /directories/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "File",
+    "GET /files/{id}",
+    "200",
+    "/"
+  ],
+  [
+    "File",
+    "GET /oauth2/1/files/{id}",
+    "200",
+    "/"
+  ]
+]

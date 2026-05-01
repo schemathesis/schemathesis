@@ -1,0 +1,14 @@
+[
+  [
+    "BalanceResponse",
+    "GET /balances/{id}",
+    "200",
+    "/result"
+  ],
+  [
+    "BalanceResponse",
+    "POST /balances",
+    "201",
+    "/result"
+  ]
+]

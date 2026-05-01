@@ -1,0 +1,8 @@
+[
+  [
+    "Group",
+    "GET /groups",
+    "200",
+    "/value"
+  ]
+]
