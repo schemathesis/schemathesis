@@ -18,6 +18,7 @@ from schemathesis.checks import CheckContext
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
+from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
     AuthenticationError,
@@ -122,6 +123,9 @@ def run_test(
         transport_kwargs=transport_kwargs,
         recorder=recorder,
     )
+
+    if ctx.error_feedback is not None:
+        ctx.error_feedback.checkpoint()
 
     try:
         setup_hypothesis_database_key(test_function, operation)
@@ -480,6 +484,13 @@ def test_func(
             recorder.record_request(case_id=case.id, request=error.request)
         raise
     recorder.record_response(case_id=case.id, response=response)
+    if ctx.error_feedback is not None:
+        record_response(
+            store=ctx.error_feedback,
+            operation=case.operation,
+            case=case,
+            response=response,
+        )
     # Record DELETE attempts immediately to influence subsequent strategy draws.
     # Include both successful (2xx) and 404 responses - each attempt increases decay
     # to avoid hammering the same resource repeatedly.

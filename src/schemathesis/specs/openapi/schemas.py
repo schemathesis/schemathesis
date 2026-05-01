@@ -59,6 +59,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful import APIStateMachine
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace", "query"})
@@ -532,6 +533,7 @@ class OpenApiSchema(BaseSchema):
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
         extra_data_source: ExtraDataSource | None = None,
+        error_feedback: ErrorFeedbackStore | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
@@ -540,6 +542,7 @@ class OpenApiSchema(BaseSchema):
             auth_storage=auth_storage,
             generation_mode=generation_mode,
             extra_data_source=extra_data_source,
+            error_feedback=error_feedback,
             **kwargs,
         )
 

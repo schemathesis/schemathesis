@@ -15,6 +15,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
+from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
     InvalidSchema,
@@ -95,6 +96,7 @@ def openapi_cases(
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
     extra_data_source: ExtraDataSource | None = None,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -127,6 +129,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
     headers_ = generate_parameter(
@@ -139,6 +142,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
     cookies_ = generate_parameter(
@@ -151,6 +155,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
     query_ = generate_parameter(
@@ -163,6 +168,7 @@ def openapi_cases(
         generation_mode,
         generation_config,
         extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
 
@@ -186,6 +192,7 @@ def openapi_cases(
                 draw,
                 body_generator,
                 extra_data_source=extra_data_source,
+                error_feedback=error_feedback,
                 mix_examples=mix_examples,
             )
             strategy = apply_hooks(operation, ctx, hooks, strategy, ParameterLocation.BODY)
@@ -585,6 +592,7 @@ def _get_body_strategy(
     generation_mode: GenerationMode,
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> st.SearchStrategy:
     # Check for custom encoding in form bodies (multipart/form-data or application/x-www-form-urlencoded)
     if parameter.media_type in FORM_MEDIA_TYPES:
@@ -602,7 +610,12 @@ def _get_body_strategy(
 
     # Use the cached strategy from the parameter
     strategy = parameter.get_strategy(
-        operation, generation_config, generation_mode, extra_data_source=extra_data_source, mix_examples=mix_examples
+        operation,
+        generation_config,
+        generation_mode,
+        extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
+        mix_examples=mix_examples,
     )
     return _maybe_set_optional_body(strategy, parameter, draw)
 
@@ -618,6 +631,7 @@ def get_parameters_value(
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> tuple[dict[str, Any] | None, Any]:
     """Get the final value for the specified location.
 
@@ -632,6 +646,7 @@ def get_parameters_value(
             generation_config,
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
+            error_feedback=error_feedback,
         )
         strategy = apply_hooks(operation, ctx, hooks, strategy, location)
         result = _draw(draw, strategy, operation)
@@ -646,6 +661,7 @@ def get_parameters_value(
         generation_config,
         exclude=value.keys(),
         extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
     strategy = apply_hooks(operation, ctx, hooks, strategy, location)
@@ -694,6 +710,7 @@ def generate_parameter(
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> ValueContainer:
     """Generate a value for a parameter.
 
@@ -716,6 +733,7 @@ def generate_parameter(
         generator,
         generation_config,
         extra_data_source=extra_data_source,
+        error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
     if value is not None and location == ParameterLocation.PATH:
@@ -757,6 +775,7 @@ def get_parameters_strategy(
     exclude: Iterable[str] = (),
     extra_data_source: ExtraDataSource | None = None,
     mix_examples: bool = True,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = getattr(operation, location.container_name)
@@ -768,6 +787,7 @@ def get_parameters_strategy(
             exclude,
             extra_data_source=extra_data_source,
             mix_examples=mix_examples,
+            error_feedback=error_feedback,
         )
     # No parameters defined for this location
     return st.none()

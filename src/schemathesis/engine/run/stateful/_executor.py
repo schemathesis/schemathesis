@@ -14,6 +14,7 @@ from hypothesis.stateful import Rule
 from requests.exceptions import ChunkedEncodingError
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
@@ -158,6 +159,14 @@ def execute_state_machine_loop(
             ctx.collect_metric(case, response)
             ctx.current_response = response
 
+            if engine.error_feedback is not None:
+                record_response(
+                    store=engine.error_feedback,
+                    operation=case.operation,
+                    case=case,
+                    response=response,
+                )
+
             cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")
 
             check_ctx = CheckContext(
@@ -202,6 +211,8 @@ def execute_state_machine_loop(
 
     while True:
         # This loop is running until no new failures are found in a single iteration
+        if engine.error_feedback is not None:
+            engine.error_feedback.checkpoint()
         suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
         suite_id = suite_started.id
         event_queue.put(suite_started)
