@@ -21,6 +21,7 @@ class ObservationKind(str, Enum):
     NUMERIC_BOUND = "numeric_bound"
     PATTERN = "pattern"
     TYPE_MISMATCH = "type_mismatch"
+    ENUM = "enum"
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,8 +86,18 @@ class TypeMismatchPayload:
     java_type: str
 
 
+@dataclass(frozen=True, slots=True)
+class EnumPayload:
+    """Enum value list extracted from a Jackson `not one of the values accepted for Enum class: [...]` message.
+
+    The consumer writes it as `enum: [...]` onto the property.
+    """
+
+    values: tuple[str, ...]
+
+
 ObservationPayload = (
-    SizeBoundPayload | FormatPayload | NumericBoundPayload | PatternPayload | TypeMismatchPayload | None
+    SizeBoundPayload | FormatPayload | NumericBoundPayload | PatternPayload | TypeMismatchPayload | EnumPayload | None
 )
 
 

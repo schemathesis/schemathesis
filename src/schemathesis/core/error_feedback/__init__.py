@@ -2,6 +2,7 @@ from schemathesis.core.error_feedback.store import (
     MAX_ENTRIES_PER_BUCKET,
     MIN_OBSERVATIONS,
     BoundDirection,
+    EnumPayload,
     ErrorFeedbackStore,
     FormatPayload,
     NumericBoundPayload,
@@ -15,6 +16,7 @@ from schemathesis.core.error_feedback.store import (
 
 __all__ = [
     "BoundDirection",
+    "EnumPayload",
     "ErrorFeedbackStore",
     "FormatPayload",
     "MAX_ENTRIES_PER_BUCKET",
