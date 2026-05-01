@@ -435,6 +435,96 @@ def test_substitution_skips_fragment_spreads_inside_selection(rng):
     assert "captured-id" in graphql.print_ast(operation)
 
 
+@pytest.mark.parametrize(
+    ("arg_name", "scalar_type"),
+    [
+        ("ids", "BookID"),
+        ("bookIds", "ID"),
+        ("bookIDs", "ID"),
+        ("book_ids", "ID"),
+    ],
+    ids=["bespoke-list", "camelCase-Ids", "camelCase-IDs", "snake_case-_ids"],
+)
+def test_substitution_into_list_argument(arg_name, scalar_type, rng):
+    sdl = f"""
+    scalar BookID
+    type Book {{ id: BookID! }}
+    type Query {{ books({arg_name}: [{scalar_type}!]!): [Book!]! }}
+    type Mutation {{ addBook(title: String!): Book! }}
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    for value in ("id-1", "id-2"):
+        pool.capture(
+            operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+            response_data={"addBook": {"id": value}},
+        )
+    operation = _parse(f'query {{ books({arg_name}: ["a", "b"]) {{ id }} }}')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    printed = graphql.print_ast(operation)
+    # Both list elements get replaced by captured ids; original placeholders are gone.
+    assert '"a"' not in printed and '"b"' not in printed
+    assert any(captured in printed for captured in ("id-1", "id-2"))
+
+
+def test_substitution_skips_list_of_non_id_scalars(rng):
+    sdl = """
+    scalar BookID
+    type Book { id: BookID! }
+    type Query { books(titles: [String!]!): [Book!]! }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse('query { books(titles: ["a", "b"]) { id } }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    printed = graphql.print_ast(operation)
+    assert '"a"' in printed and '"b"' in printed
+
+
+def test_substitution_into_empty_list_argument_is_noop(rng):
+    sdl = """
+    scalar BookID
+    type Book { id: BookID! }
+    type Query { books(ids: [BookID!]!): [Book!]! }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse("query { books(ids: []) { id } }")
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "captured-id" not in graphql.print_ast(operation)
+
+
+def test_substitution_into_list_of_input_objects(rng):
+    sdl = """
+    scalar BookID
+    input BookRef { id: BookID! }
+    type Book { id: BookID! }
+    type Query { lookup(refs: [BookRef!]!): [Book!]! }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse('query { lookup(refs: [{id: "a"}, {id: "b"}]) { id } }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    printed = graphql.print_ast(operation)
+    assert '"a"' not in printed and '"b"' not in printed
+    assert "captured-id" in printed
+
+
 def test_substitution_walks_into_nested_object_selections(rng):
     sdl = """
     scalar BookID

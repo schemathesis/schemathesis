@@ -332,6 +332,16 @@ def buggy_input_object_graphql_url(graphql_path, app_runner):
 
 
 @pytest.fixture
+def buggy_list_graphql_url(graphql_path, app_runner):
+    from .apps._graphql import _flask, buggy_schema_list
+
+    buggy_schema_list.BUGGY_BOOKS.clear()
+    app = _flask.create_app(graphql_path, schema=buggy_schema_list.schema)
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}{graphql_path}"
+
+
+@pytest.fixture
 def graphql_schema(graphql_url):
     return schemathesis.graphql.from_url(graphql_url)
 

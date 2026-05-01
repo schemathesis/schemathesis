@@ -31,8 +31,18 @@ _POOL_DISABLED_CONFIG = {"phases": {"fuzzing": {"extra-data-sources": {"response
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_planted_bug_findability(cli, buggy_graphql_url, snapshot_cli, filter_arg, config):
+    # Positive-only: negative queries fail server validation before capture, so they never exercise the pool.
     assert (
-        cli.run(buggy_graphql_url, "--max-examples=10", "-c", "not_a_server_error", filter_arg, config=config)
+        cli.run(
+            buggy_graphql_url,
+            "--max-examples=10",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+            filter_arg,
+            config=config,
+        )
         == snapshot_cli
     )
 
@@ -50,7 +60,14 @@ def test_planted_bug_findability(cli, buggy_graphql_url, snapshot_cli, filter_ar
 def test_generic_id_planted_bug_findability(cli, buggy_generic_id_graphql_url, snapshot_cli, filter_args, config):
     assert (
         cli.run(
-            buggy_generic_id_graphql_url, "--max-examples=10", "-c", "not_a_server_error", *filter_args, config=config
+            buggy_generic_id_graphql_url,
+            "--max-examples=10",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+            *filter_args,
+            config=config,
         )
         == snapshot_cli
     )
@@ -64,6 +81,35 @@ def test_generic_id_planted_bug_findability(cli, buggy_generic_id_graphql_url, s
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_input_object_planted_bug_findability(cli, buggy_input_object_graphql_url, snapshot_cli, config):
     assert (
-        cli.run(buggy_input_object_graphql_url, "--max-examples=10", "-c", "not_a_server_error", config=config)
+        cli.run(
+            buggy_input_object_graphql_url,
+            "--max-examples=10",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+            config=config,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize(
+    "config",
+    [_DEFAULT_CONFIG, _POOL_DISABLED_CONFIG],
+    ids=["pool-enabled", "pool-disabled-via-config"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_list_argument_planted_bug_findability(cli, buggy_list_graphql_url, snapshot_cli, config):
+    assert (
+        cli.run(
+            buggy_list_graphql_url,
+            "--max-examples=10",
+            "-m",
+            "positive",
+            "-c",
+            "not_a_server_error",
+            config=config,
+        )
         == snapshot_cli
     )
