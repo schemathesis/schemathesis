@@ -6,8 +6,6 @@ import enum
 import re
 from typing import Final
 
-from schemathesis.specs.graphql.schemas import RootType
-
 PRODUCER_PREFIXES: Final = frozenset(
     {"create", "add", "register", "new", "insert", "make", "clone", "duplicate", "import", "upload"}
 )
@@ -20,6 +18,13 @@ CLEANUP_PREFIXES: Final = frozenset({"delete", "remove", "destroy", "purge", "cl
 # (CREATEbook -> CREATE, productCREATE -> CREATE).
 _LEADING_TOKEN_RE: Final = re.compile(r"^(?:[A-Z]?[a-z]+|[A-Z]+)")
 _TRAILING_TOKEN_RE: Final = re.compile(r"(?:[A-Z]?[a-z]+|[A-Z]+)$")
+
+
+class RootType(enum.Enum):
+    """GraphQL root operation type."""
+
+    QUERY = enum.auto()
+    MUTATION = enum.auto()
 
 
 @enum.unique

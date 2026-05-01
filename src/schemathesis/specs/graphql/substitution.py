@@ -14,9 +14,10 @@ from typing import TYPE_CHECKING, Final
 
 import graphql
 
-from schemathesis.specs.graphql.extra_data_source import _root_type_for, _unwrap
+from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from random import Random
 
     from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
@@ -155,3 +156,69 @@ def _substitute_value(
                 replaced_any = True
         return graphql.ObjectValueNode(fields=tuple(new_fields)) if replaced_any else None
     return None
+
+
+def iter_operation_pool_values(
+    operation_node: graphql.OperationDefinitionNode,
+    client_schema: graphql.GraphQLSchema,
+) -> Iterator[tuple[str, str]]:
+    """Yield `(parent_type_name, value)` tuples for id-typed scalar literals in an operation's arguments."""
+    root = _root_type_for(client_schema, operation_node.operation)
+    if root is None:
+        return
+    yield from _iter_walk(operation_node.selection_set, root)
+
+
+def _iter_walk(
+    selection_set: graphql.SelectionSetNode | None,
+    parent_type: graphql.GraphQLObjectType,
+) -> Iterator[tuple[str, str]]:
+    if selection_set is None:
+        return
+    for selection in selection_set.selections:
+        if not isinstance(selection, graphql.FieldNode):
+            continue
+        field_def = parent_type.fields.get(selection.name.value)
+        if field_def is None:
+            continue
+        unwrapped_return = _unwrap(field_def.type)
+        enclosing_field_type = (
+            unwrapped_return.name if isinstance(unwrapped_return, graphql.GraphQLObjectType) else None
+        )
+        for argument in selection.arguments:
+            arg_def = field_def.args.get(argument.name.value)
+            if arg_def is None:
+                continue
+            yield from _iter_value(argument.value, arg_def.type, argument.name.value, enclosing_field_type)
+        if isinstance(unwrapped_return, graphql.GraphQLObjectType):
+            yield from _iter_walk(selection.selection_set, unwrapped_return)
+
+
+def _iter_value(
+    value: graphql.ValueNode,
+    value_type: graphql.GraphQLType,
+    name: str,
+    enclosing_field_type: str | None,
+) -> Iterator[tuple[str, str]]:
+    inner = value_type
+    while isinstance(inner, graphql.GraphQLNonNull):
+        inner = inner.of_type
+    if isinstance(inner, graphql.GraphQLList) and isinstance(value, graphql.ListValueNode):
+        for element in value.values:
+            yield from _iter_value(element, inner.of_type, name, enclosing_field_type)
+        return
+    if isinstance(inner, graphql.GraphQLScalarType) and isinstance(value, graphql.StringValueNode):
+        parent_type_name = _candidate_parent_type(
+            scalar_name=inner.name,
+            argument_name=name,
+            enclosing_field_type=enclosing_field_type,
+        )
+        if parent_type_name is not None:
+            yield parent_type_name, value.value
+        return
+    if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
+        for field_node in value.fields:
+            field_def = inner.fields.get(field_node.name.value)
+            if field_def is None:
+                continue
+            yield from _iter_value(field_node.value, field_def.type, field_node.name.value, None)

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import enum
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
 from dataclasses import dataclass
 from difflib import get_close_matches
-from enum import unique
 from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
@@ -45,6 +43,7 @@ from schemathesis.schemas import (
 )
 
 from .extra_data_source import GraphQLResourcePool
+from .inference import RootType
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 from .substitution import SUBSTITUTION_PROBABILITY, substitute_pool_values
 
@@ -55,12 +54,6 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.resources import ExtraDataSource
-
-
-@unique
-class RootType(enum.Enum):
-    QUERY = enum.auto()
-    MUTATION = enum.auto()
 
 
 @dataclass(repr=False)

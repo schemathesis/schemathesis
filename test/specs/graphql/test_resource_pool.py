@@ -7,7 +7,7 @@ import graphql
 import pytest
 
 from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
-from schemathesis.specs.graphql.substitution import substitute_pool_values
+from schemathesis.specs.graphql.substitution import iter_operation_pool_values, substitute_pool_values
 
 
 @pytest.fixture
@@ -542,3 +542,113 @@ def test_substitution_walks_into_nested_object_selections(rng):
     operation = _parse('query { author { books(bookId: "placeholder") } }')
     substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
     assert "captured-id" in graphql.print_ast(operation)
+
+
+def test_tombstone_evicts_value_from_pool(gql_schema, rng):
+    pool = GraphQLResourcePool(client_schema=gql_schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x", authorId: "1") { id } }'),
+        response_data={"addBook": {"id": "abc"}},
+    )
+    pool.tombstone(parent_type_name="Book", value="abc")
+    assert pool.draw(parent_type_name="Book", random=rng) is None
+
+
+def test_tombstone_blocks_subsequent_capture(gql_schema, rng):
+    pool = GraphQLResourcePool(client_schema=gql_schema)
+    pool.tombstone(parent_type_name="Book", value="abc")
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x", authorId: "1") { id } }'),
+        response_data={"addBook": {"id": "abc"}},
+    )
+    assert pool.draw(parent_type_name="Book", random=rng) is None
+
+
+def test_tombstone_preserves_other_values(gql_schema, rng):
+    pool = GraphQLResourcePool(client_schema=gql_schema)
+    operation = _parse("query { authors { id } }")
+    pool.capture(
+        operation_node=operation,
+        response_data={"authors": [{"id": "a-1"}, {"id": "a-2"}, {"id": "a-3"}]},
+    )
+    pool.tombstone(parent_type_name="Author", value="a-2")
+    drawn = {pool.draw(parent_type_name="Author", random=rng) for _ in range(20)}
+    assert drawn == {"a-1", "a-3"}
+
+
+_TOMBSTONE_SDL = """
+scalar BookID
+input BookRef { id: BookID! }
+type Book { id: BookID! }
+type Query { _: Int }
+type Mutation {
+    addBook(title: String!): Book!
+    deleteBook(id: BookID!): Boolean
+    deleteBooks(ids: [BookID!]!): Boolean
+    deleteBookByRef(ref: BookRef!): Boolean
+    deleteByName(name: String!): Boolean
+}
+"""
+
+_TOMBSTONE_NESTED_SDL = """
+scalar AuthorID
+scalar BookID
+type Author { id: AuthorID! }
+type Book { id: BookID! relatedAuthor(authorId: AuthorID!): Author }
+type Query { _: Int }
+type Mutation { deleteBook(id: BookID!): Book }
+"""
+
+_TOMBSTONE_SUBSCRIPTION_SDL = """
+type Query { _: Int }
+type Subscription { event(id: ID!): String! }
+"""
+
+
+@pytest.mark.parametrize(
+    ("sdl", "query", "expected"),
+    [
+        (_TOMBSTONE_SDL, 'mutation { deleteBook(id: "abc") }', [("Book", "abc")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteBooks(ids: ["a", "b"]) }', [("Book", "a"), ("Book", "b")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteBookByRef(ref: {id: "abc"}) }', [("Book", "abc")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteByName(name: "foo") }', []),
+        (_TOMBSTONE_SDL, "mutation { deleteBook(id: $var) }", []),
+        (_TOMBSTONE_SDL, 'mutation { deleteBook(unknownArg: "noise", id: "x") }', [("Book", "x")]),
+        (_TOMBSTONE_SDL, 'mutation { deleteBookByRef(ref: {id: "x", noise: "y"}) }', [("Book", "x")]),
+        (_TOMBSTONE_SDL, 'mutation { unknownTopLevelField(id: "x") }', []),
+        (
+            _TOMBSTONE_NESTED_SDL,
+            'mutation { deleteBook(id: "x") { relatedAuthor(authorId: "y") { id } } }',
+            [("Book", "x"), ("Author", "y")],
+        ),
+        (
+            _TOMBSTONE_NESTED_SDL,
+            'mutation { deleteBook(id: "x") { ...Frag } } fragment Frag on Book { id }',
+            [("Book", "x")],
+        ),
+        (
+            _TOMBSTONE_NESTED_SDL,
+            'mutation { deleteBook(id: "x") { unknownNestedField } }',
+            [("Book", "x")],
+        ),
+        (_TOMBSTONE_SUBSCRIPTION_SDL, 'subscription { event(id: "abc") }', []),
+    ],
+    ids=[
+        "scalar",
+        "list",
+        "input-object",
+        "non-id-arg",
+        "variable-not-literal",
+        "unknown-arg",
+        "unknown-input-field",
+        "unknown-top-level-field",
+        "nested-object-recursion",
+        "fragment-spread-skipped",
+        "unknown-nested-field",
+        "subscription",
+    ],
+)
+def test_iter_operation_pool_values(sdl, query, expected):
+    schema = graphql.build_schema(sdl)
+    operation = _parse(query)
+    assert list(iter_operation_pool_values(operation, schema)) == expected
