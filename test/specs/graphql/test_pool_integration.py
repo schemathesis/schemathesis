@@ -35,3 +35,22 @@ def test_planted_bug_findability(cli, buggy_graphql_url, snapshot_cli, filter_ar
         cli.run(buggy_graphql_url, "--max-examples=10", "-c", "not_a_server_error", filter_arg, config=config)
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    ("filter_args", "config"),
+    [
+        (("--include-name=Mutation.addUser", "--include-name=Query.user"), _DEFAULT_CONFIG),
+        (("--include-name=Mutation.addAuthor", "--include-name=Query.postsByAuthor"), _DEFAULT_CONFIG),
+        (("--include-name=Mutation.addUser", "--include-name=Query.user"), _POOL_DISABLED_CONFIG),
+    ],
+    ids=["bare-id-via-return-type", "arg-name-token", "pool-disabled-via-config"],
+)
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_generic_id_planted_bug_findability(cli, buggy_generic_id_graphql_url, snapshot_cli, filter_args, config):
+    assert (
+        cli.run(
+            buggy_generic_id_graphql_url, "--max-examples=10", "-c", "not_a_server_error", *filter_args, config=config
+        )
+        == snapshot_cli
+    )

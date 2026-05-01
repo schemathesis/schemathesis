@@ -91,7 +91,7 @@ type Query { book(id: BookID!): Book }
 type Mutation { addBook(title: String!): Book! }
 """
 
-_GENERIC_ID_SDL = """
+_GENERIC_ID_BARE_ARG_SDL = """
 type Book { id: ID! }
 type Query { book(id: ID!): Book }
 type Mutation { addBook(title: String!): Book! }
@@ -103,9 +103,9 @@ type Mutation { addBook(title: String!): Book! }
     [
         (_BESPOKE_ID_SDL, True, True),
         (_BESPOKE_ID_SDL, False, False),
-        (_GENERIC_ID_SDL, True, False),
+        (_GENERIC_ID_BARE_ARG_SDL, True, True),
     ],
-    ids=["bespoke-scalar-substitutes", "empty-pool-skips", "generic-id-no-match"],
+    ids=["bespoke-scalar-substitutes", "empty-pool-skips", "bare-id-via-return-type"],
 )
 def test_substitution_type_match(sdl, captured, should_substitute, rng):
     schema = graphql.build_schema(sdl)
@@ -124,6 +124,76 @@ def test_substitution_type_match(sdl, captured, should_substitute, rng):
     else:
         assert "placeholder" in printed
         assert "captured-id" not in printed
+
+
+@pytest.mark.parametrize("arg_name", ["bookId", "bookID", "book_id"])
+def test_substitution_via_argument_name_token(arg_name, rng):
+    sdl = f"""
+    type Book {{ id: ID! }}
+    type Query {{ lookup({arg_name}: ID!): String }}
+    type Mutation {{ addBook(title: String!): Book! }}
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse(f'query {{ lookup({arg_name}: "placeholder") }}')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "captured-id" in graphql.print_ast(operation)
+
+
+def test_substitution_skips_bare_id_when_field_returns_scalar(rng):
+    sdl = """
+    type Book { id: ID! }
+    type Query { lookup(id: ID!): String }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse('query { lookup(id: "placeholder") }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "placeholder" in graphql.print_ast(operation)
+
+
+def test_substitution_skips_generic_id_arg_with_non_id_name(rng):
+    sdl = """
+    type Book { id: ID! }
+    type Query { lookup(filter: ID!): String }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse('query { lookup(filter: "placeholder") }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "placeholder" in graphql.print_ast(operation)
+
+
+def test_substitution_isolates_by_argument_name_token(rng):
+    sdl = """
+    type Book { id: ID! }
+    type Author { id: ID! }
+    type Query { lookup(authorId: ID!): String }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "book-id"}},
+    )
+    operation = _parse('query { lookup(authorId: "placeholder") }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "placeholder" in graphql.print_ast(operation)
 
 
 def test_substitution_isolates_by_parent_type(rng):
