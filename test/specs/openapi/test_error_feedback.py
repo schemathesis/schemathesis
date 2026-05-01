@@ -8,6 +8,7 @@ import pytest
 from schemathesis.core.error_feedback import (
     MAX_ENTRIES_PER_BUCKET,
     BoundDirection,
+    EnumPayload,
     ErrorFeedbackStore,
     FormatPayload,
     NumericBoundPayload,
@@ -33,6 +34,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.specs.openapi.error_feedback import (
+    EnumAdjustment,
     FormatAdjustment,
     NumericBoundAdjustment,
     PatternAdjustment,
@@ -478,6 +480,19 @@ _JACKSON_ARRAY_ELEMENT = (
     'Cannot deserialize value of type `java.time.LocalDate` from String "x" '
     'through reference chain: User["addresses"]->java.util.ArrayList[0]->Address["created_on"]'
 )
+# Jackson enum-deserialization: the `not one of the values accepted` clause
+# names the valid literals inline. A single message carries both the offending
+# Java type and the accepted value list — parser emits both kinds of observation.
+_JACKSON_ENUM_USERTYPE = (
+    "JSON parse error: Cannot deserialize value of type "
+    '`com.example.demo.auth.model.enums.UserType` from String "AAA": '
+    "not one of the values accepted for Enum class: [USER, ADMIN] "
+    'through reference chain: RegisterRequest["userType"]'
+)
+_JACKSON_ENUM_BARE = (
+    "not one of the values accepted for Enum class: [PENDING, ACTIVE, ARCHIVED] "
+    'through reference chain: Subscription["status"]'
+)
 
 
 @pytest.mark.parametrize(
@@ -511,6 +526,53 @@ def test_jackson_parser_extracts_observations(carrier_key, message, expected_pat
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (expected_path, ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(java_type=expected_type)),
     ]
+
+
+def test_jackson_parser_emits_both_type_and_enum_for_enum_message():
+    body = {"msg": _JACKSON_ENUM_USERTYPE}
+    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.kind, o.payload) for o in obs] == [
+        (
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(java_type="com.example.demo.auth.model.enums.UserType"),
+        ),
+        (ObservationKind.ENUM, EnumPayload(values=("USER", "ADMIN"))),
+    ]
+    assert all(o.parameter_path == ("userType",) for o in obs)
+
+
+def test_jackson_parser_emits_enum_only_when_type_clause_is_absent():
+    body = {"msg": _JACKSON_ENUM_BARE}
+    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("status",),
+            ObservationKind.ENUM,
+            EnumPayload(values=("PENDING", "ACTIVE", "ARCHIVED")),
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "values_blob, expected",
+    [
+        ("USER, ADMIN", ("USER", "ADMIN")),
+        ("USER,ADMIN", ("USER", "ADMIN")),
+        ("ONE", ("ONE",)),
+        ("  USER ,  ADMIN  ", ("USER", "ADMIN")),
+        ("LOW, MEDIUM, HIGH, CRITICAL", ("LOW", "MEDIUM", "HIGH", "CRITICAL")),
+    ],
+    ids=["space-separated", "no-spaces", "single-value", "extra-whitespace", "many-values"],
+)
+def test_jackson_parser_enum_value_list_variants(values_blob, expected):
+    message = (
+        f'Cannot deserialize value of type `Status` from String "x": '
+        f"not one of the values accepted for Enum class: [{values_blob}] "
+        f'through reference chain: Order["status"]'
+    )
+    obs = JacksonParser().parse(operation_label="POST /api/users", body={"msg": message})
+    enum_payloads = [o.payload for o in obs if o.kind is ObservationKind.ENUM]
+    assert enum_payloads == [EnumPayload(values=expected)]
 
 
 @pytest.mark.parametrize(
@@ -2089,6 +2151,139 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
         location=ParameterLocation.BODY,
         schema=input_schema,
         observations=_build_type_mismatch_observations(*items),
+    )
+    assert out == expected
+
+
+def _build_enum_observations(*items: tuple[tuple[str | int, ...], tuple[str, ...]]) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.ENUM,
+            raw_message=f"not one of the values accepted for Enum class: [{', '.join(values)}]",
+            payload=EnumPayload(values=values),
+        )
+        for path, values in items
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+            [(("role",), ("USER", "ADMIN"))],
+            {
+                "type": "object",
+                "properties": {"role": {"type": "string", "enum": ["USER", "ADMIN"]}},
+                "required": [],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"role": {"type": "string", "enum": ["GUEST"]}},
+                "required": [],
+            },
+            [(("role",), ("USER", "ADMIN"))],
+            {
+                "type": "object",
+                "properties": {"role": {"type": "string", "enum": ["GUEST"]}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"role": {"type": "integer"}}, "required": []},
+            [(("role",), ("USER", "ADMIN"))],
+            {"type": "object", "properties": {"role": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"role": {"type": ["string", "null"]}}, "required": []},
+            [(("role",), ("USER", "ADMIN"))],
+            {
+                "type": "object",
+                "properties": {"role": {"type": ["string", "null"], "enum": ["USER", "ADMIN"]}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [(("role",), ("USER", "ADMIN"))],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (True, [(("role",), ("USER", "ADMIN"))], True),
+        ({"type": "string"}, [(("role",), ("USER", "ADMIN"))], {"type": "string"}),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+                    {"type": "string"},
+                ]
+            },
+            [(("role",), ("USER", "ADMIN"))],
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {"role": {"type": "string", "enum": ["USER", "ADMIN"]}},
+                        "required": [],
+                    },
+                    {"type": "string"},
+                ]
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "account": {
+                        "type": "object",
+                        "properties": {"status": {"type": "string"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+            [(("account", "status"), ("ACTIVE", "ARCHIVED"))],
+            {
+                "type": "object",
+                "properties": {
+                    "account": {
+                        "type": "object",
+                        "properties": {"status": {"type": "string", "enum": ["ACTIVE", "ARCHIVED"]}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+            [((), ("USER",))],
+            {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+        ),
+    ],
+    ids=[
+        "string-property-enum-injected",
+        "existing-enum-preserved",
+        "non-string-property-skipped",
+        "type-union-with-null-enum-injected",
+        "absent-property-not-synthesised",
+        "bool-schema-passthrough",
+        "non-object-root-passthrough",
+        "oneof-applies-to-object-branch",
+        "nested-path-enum-injected",
+        "empty-path-observation-skipped",
+    ],
+)
+def test_enum_adjustment_applies_correctly(input_schema, items, expected, case_factory):
+    out = EnumAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_enum_observations(*items),
     )
     assert out == expected
 

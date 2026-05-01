@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
+    EnumPayload,
     ErrorFeedbackStore,
     FormatPayload,
     NumericBoundPayload,
@@ -445,6 +446,46 @@ class TypeMismatchAdjustment:
                 prop = _walk_to_property(target, observation.parameter_path)
                 if prop is not None:
                     _apply_format_to_property(prop, format_name)
+
+        return schema
+
+
+def _apply_enum_to_property(prop: dict[str, Any], values: tuple[str, ...]) -> None:
+    """Set `enum: [...]` on a string property when none is already declared."""
+    if "string" not in get_type(prop):
+        return
+    if "enum" in prop:
+        return
+    prop["enum"] = list(values)
+
+
+@ADJUSTMENTS.register
+class EnumAdjustment:
+    """Inject `enum` from a Jackson enum-deserialization message onto the resolved property."""
+
+    handles = frozenset({ObservationKind.ENUM})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        for observation in observations:
+            assert isinstance(observation.payload, EnumPayload)
+            for target in targets:
+                prop = _walk_to_property(target, observation.parameter_path)
+                if prop is not None:
+                    _apply_enum_to_property(prop, observation.payload.values)
 
         return schema
 

@@ -470,3 +470,71 @@ def test_feedback_unmasks_planted_bug_via_type_mismatch(cli, jackson_planted_bug
         )
         == snapshot_cli
     )
+
+
+# One enum-typed field per carrier key so observations cross the threshold during coverage.
+ENUM_TYPED_FIELDS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("user_type", "com.example.UserType", "msg", ("USER", "ADMIN")),
+    ("status", "com.example.Status", "message", ("PENDING", "ACTIVE", "ARCHIVED")),
+    ("priority", "com.example.Priority", "error", ("LOW", "HIGH")),
+)
+
+
+@pytest.fixture
+def jackson_enum_planted_bug_app(ctx, app_runner):
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {field: {"type": "string"} for field, _, _, _ in ENUM_TYPED_FIELDS}
+                        | {"tags": {"type": "array", "items": {"type": "string"}}},
+                        "required": [field for field, _, _, _ in ENUM_TYPED_FIELDS],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"msg": "JSON parse error"}), 400
+        envelope: dict[str, str] = {}
+        for field, java_type, carrier_key, accepted in ENUM_TYPED_FIELDS:
+            value = body.get(field)
+            if value not in accepted:
+                envelope[carrier_key] = (
+                    f"JSON parse error: Cannot deserialize value of type "
+                    f'`{java_type}` from String "{value}": '
+                    f"not one of the values accepted for Enum class: [{', '.join(accepted)}] "
+                    f'through reference chain: User["{field}"]'
+                )
+        if envelope:
+            return jsonify(envelope), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_enum(cli, jackson_enum_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            jackson_enum_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )

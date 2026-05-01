@@ -3,7 +3,12 @@ from __future__ import annotations
 import re
 
 from schemathesis.core.error_feedback.parsers import PARSERS
-from schemathesis.core.error_feedback.store import Observation, ObservationKind, TypeMismatchPayload
+from schemathesis.core.error_feedback.store import (
+    EnumPayload,
+    Observation,
+    ObservationKind,
+    TypeMismatchPayload,
+)
 from schemathesis.core.parameters import ParameterLocation
 
 # Jackson `MismatchedInputException` / `InvalidFormatException` text. The verb
@@ -24,6 +29,10 @@ _JACKSON_TYPE_PATTERNS: tuple[re.Pattern[str], ...] = (
 # index — e.g. `java.util.ArrayList[0]` for a failure inside a list element).
 _REFERENCE_CHAIN = re.compile(r"through reference chain: (?P<chain>[^\n)]+)")
 _CHAIN_STEP = re.compile(r'\["(?P<name>[^"]+)"\]|\[(?P<index>\d+)\]')
+
+# Jackson lists the enum's accepted values inline when a deserialization fails
+# on a non-matching string: "not one of the values accepted for Enum class: [USER, ADMIN]".
+_JACKSON_ENUM = re.compile(r"not one of the values accepted for Enum class:\s*\[(?P<values>[^\]]+)\]")
 
 # Top-level keys we look for the Jackson message under. Spring wraps Jackson
 # errors in its own envelope (`{"detail": "..."}` / `{"message": "..."}`);
@@ -68,6 +77,14 @@ def _match_type(message: str) -> str | None:
     return None
 
 
+def _match_enum_values(message: str) -> tuple[str, ...] | None:
+    match = _JACKSON_ENUM.search(message)
+    if match is None:
+        return None
+    values = tuple(value.strip() for value in match.group("values").split(",") if value.strip())
+    return values or None
+
+
 @PARSERS.register
 class JacksonParser:
     """Parser for Jackson `InvalidFormatException` messages naming the offending Java type.
@@ -83,7 +100,7 @@ class JacksonParser:
         if not isinstance(body, dict):
             return False
         return any(
-            "Cannot deserialize value of type" in s or "Can not deserialize instance of" in s
+            "Cannot deserialize value of type" in s or "Can not deserialize instance of" in s or "Enum class:" in s
             for s in _carrier_strings(body)
         )
 
@@ -97,20 +114,35 @@ class JacksonParser:
             return ()
         observations: list[Observation] = []
         for message in _carrier_strings(body):
-            type_match = _match_type(message)
-            if type_match is None:
-                continue
             path = _extract_path(message)
             if path is None:
                 continue
-            observations.append(
-                Observation(
-                    operation_label=operation_label,
-                    location=ParameterLocation.BODY,
-                    parameter_path=path,
-                    kind=ObservationKind.TYPE_MISMATCH,
-                    raw_message=message,
-                    payload=TypeMismatchPayload(java_type=type_match),
+            # A single Jackson enum-deserialization error carries both the
+            # offending Java type AND the accepted values; emit both kinds so
+            # the consumers (TypeMismatchAdjustment + EnumAdjustment) each get
+            # what they need.
+            type_match = _match_type(message)
+            if type_match is not None:
+                observations.append(
+                    Observation(
+                        operation_label=operation_label,
+                        location=ParameterLocation.BODY,
+                        parameter_path=path,
+                        kind=ObservationKind.TYPE_MISMATCH,
+                        raw_message=message,
+                        payload=TypeMismatchPayload(java_type=type_match),
+                    )
                 )
-            )
+            enum_values = _match_enum_values(message)
+            if enum_values is not None:
+                observations.append(
+                    Observation(
+                        operation_label=operation_label,
+                        location=ParameterLocation.BODY,
+                        parameter_path=path,
+                        kind=ObservationKind.ENUM,
+                        raw_message=message,
+                        payload=EnumPayload(values=enum_values),
+                    )
+                )
         return tuple(observations)
