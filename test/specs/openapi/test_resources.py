@@ -1351,6 +1351,102 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
     t()
 
 
+def test_nested_body_pool_overlay_lands_pool_values(ctx):
+    # End-to-end via the body strategy: when a body has a nested object holding a foreign-key
+    # field the pool can satisfy, the pool value must reach the wire under the right path.
+    spec = ctx.openapi.build_schema(
+        {
+            "/locations": {
+                "post": {
+                    "operationId": "createLocation",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/departments": {
+                "post": {
+                    "operationId": "createDepartment",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "shipping": {
+                                            "type": "object",
+                                            "properties": {
+                                                "location_id": {"type": "integer"},
+                                                "note": {"type": "string"},
+                                            },
+                                            # `note` is required so random nested generation always
+                                            # includes it; under deep-merge the overlay must keep
+                                            # it in place when it injects `location_id`.
+                                            "required": ["note"],
+                                        },
+                                    },
+                                    "required": ["shipping"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(spec)
+    data_source = schema.create_extra_data_source()
+
+    pooled_ids = {1, 2, 3}
+    for i in pooled_ids:
+        data_source.repository.record_response(operation="POST /locations", status_code=201, payload={"id": i})
+
+    operation = schema["/departments"]["POST"]
+    body = operation.body[0]
+    config = GenerationConfig()
+    strategy = body.get_strategy(operation, config, GenerationMode.POSITIVE, extra_data_source=data_source)
+
+    pool_hits_with_note = 0
+    pool_hits = 0
+
+    @given(strategy)
+    @settings(max_examples=100, database=None, deadline=None)
+    def collect(value):
+        nonlocal pool_hits_with_note, pool_hits
+        if not isinstance(value, dict):
+            return
+        shipping = value.get("shipping")
+        if not isinstance(shipping, dict):
+            return
+        if shipping.get("location_id") in pooled_ids:
+            pool_hits += 1
+            if "note" in shipping:
+                pool_hits_with_note += 1
+
+    collect()
+
+    assert pool_hits > 0, "Pool's Location.id values never landed under shipping.location_id"
+    # Deep-merge guard: when the overlay injects location_id, the generated `note`
+    # sibling (required by the nested schema) must survive the merge.
+    assert pool_hits_with_note == pool_hits, (
+        f"{pool_hits - pool_hits_with_note} of {pool_hits} pool-overlaid bodies dropped the "
+        "generated `note` sibling — nested overlay replaced the whole `shipping` object."
+    )
+
+
 def test_negative_aware_strategy_with_captured_values_body(ctx):
     spec = ctx.openapi.build_schema(
         {

@@ -112,7 +112,7 @@ def build_hybrid_strategy(
         # Single variant: no selection needed
         if n_variants == 1:
             usage_tracker.record_draw(variant_keys[0])
-            base.update(captured_variants[0])
+            _deep_merge_overlay(base, captured_variants[0])
             return base
 
         # Shuffle indices before weighted selection to avoid Hypothesis's bias
@@ -121,10 +121,19 @@ def build_hybrid_strategy(
 
         # Record this draw for future weighting
         usage_tracker.record_draw(variant_keys[idx])
-        base.update(captured_variants[idx])
+        _deep_merge_overlay(base, captured_variants[idx])
         return base
 
     return hybrid()
+
+
+def _deep_merge_overlay(target: dict[str, Any], overlay: dict[str, Any]) -> None:
+    """Apply `overlay` onto `target` in place, recursing into nested dicts so leaf overlays don't drop generated siblings."""
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(target.get(key), dict):
+            _deep_merge_overlay(target[key], value)
+        else:
+            target[key] = value
 
 
 def _schema_has_integer_properties(schema: JsonSchemaObject) -> bool:
