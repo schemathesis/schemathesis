@@ -13,6 +13,7 @@ from schemathesis.core.error_feedback import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    PatternPayload,
     SizeBoundPayload,
 )
 from schemathesis.core.error_feedback.collector import record_response
@@ -32,10 +33,12 @@ from schemathesis.generation.meta import (
 from schemathesis.specs.openapi.error_feedback import (
     FormatAdjustment,
     NumericBoundAdjustment,
+    PatternAdjustment,
     RequiredFieldAdjustment,
     SizeBoundAdjustment,
     apply_adjustments,
 )
+from schemathesis.specs.openapi.patterns import normalize_regex
 
 
 def _obs(field: str, *, op: str = "POST /api/users") -> Observation:
@@ -393,6 +396,24 @@ def test_spring_parser_recognizes_numeric_bound_message_variants(
             ObservationKind.NUMERIC_BOUND,
             NumericBoundPayload(bound=expected_bound, direction=expected_direction, exclusive=expected_exclusive),
         ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "message, expected_regex",
+    [
+        ('must match "[A-Z]+"', "[A-Z]+"),
+        ('must match "^\\d{3,4}$"', "^\\d{3,4}$"),
+        ('must match "[A-Za-z][A-Za-z0-9_-]{2,15}"', "[A-Za-z][A-Za-z0-9_-]{2,15}"),
+        ('must match "\\p{L}+"', "\\p{L}+"),
+    ],
+    ids=["simple-charclass", "anchored-quantifier", "username-style", "pcre-unicode-property"],
+)
+def test_spring_parser_recognizes_pattern_message_variants(message, expected_regex):
+    body = {"subErrors": [{"field": "code", "message": message}]}
+    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (("code",), ObservationKind.PATTERN, PatternPayload(regex=expected_regex)),
     ]
 
 
@@ -1533,6 +1554,161 @@ def test_numeric_bound_adjustment_applies_correctly_draft2020(input_schema, item
         location=ParameterLocation.BODY,
         schema=input_schema,
         observations=_build_numeric_bound_observations(*items),
+    )
+    assert out == expected
+
+
+def _build_pattern_observations(*items: tuple[tuple[str | int, ...], str]) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.PATTERN,
+            raw_message=f'must match "{regex}"',
+            payload=PatternPayload(regex=regex),
+        )
+        for path, regex in items
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            [(("code",), "[A-Z]{2,4}")],
+            {
+                "type": "object",
+                "properties": {"code": {"type": "string", "pattern": "[A-Z]{2,4}"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"code": {"type": "string", "pattern": "[a-z]+"}}, "required": []},
+            [(("code",), "[A-Z]+")],
+            {
+                "type": "object",
+                "properties": {"code": {"type": "string", "pattern": "[a-z]+"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            [(("age",), "[0-9]+")],
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"code": {"type": ["string", "null"]}}, "required": []},
+            [(("code",), "[A-Z]+")],
+            {
+                "type": "object",
+                "properties": {"code": {"type": ["string", "null"], "pattern": "[A-Z]+"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [(("code",), "[A-Z]+")],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (True, [(("code",), "[A-Z]+")], True),
+        ({"type": "string"}, [(("code",), "[A-Z]+")], {"type": "string"}),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+                    {"type": "string"},
+                ]
+            },
+            [(("code",), "[A-Z]+")],
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {"code": {"type": "string", "pattern": "[A-Z]+"}},
+                        "required": [],
+                    },
+                    {"type": "string"},
+                ]
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {"phone": {"type": "string"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+            [(("contact", "phone"), "\\+?\\d{3,15}")],
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {"phone": {"type": "string", "pattern": "\\+?\\d{3,15}"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            [(("code",), "\\p{L}+")],
+            {
+                "type": "object",
+                "properties": {"code": {"type": "string", "pattern": normalize_regex("\\p{L}+")}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            [(("code",), "\\A[A-Z]+\\Z")],
+            {
+                "type": "object",
+                "properties": {"code": {"type": "string", "pattern": "^[A-Z]+$"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            [(("code",), "[A-Z(unbalanced")],
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            [((), "[A-Z]+")],
+            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+        ),
+    ],
+    ids=[
+        "string-property-pattern-injected",
+        "existing-pattern-preserved",
+        "non-string-property-skipped",
+        "type-union-with-null-pattern-injected",
+        "absent-property-not-synthesised",
+        "bool-schema-passthrough",
+        "non-object-root-passthrough",
+        "oneof-applies-to-object-branch",
+        "nested-path-pattern-injected",
+        "pcre-unicode-property-translated",
+        "python-anchors-translated-to-ecma",
+        "invalid-untranslatable-pattern-skipped",
+        "empty-path-observation-skipped",
+    ],
+)
+def test_pattern_adjustment_applies_correctly(input_schema, items, expected, case_factory):
+    out = PatternAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_pattern_observations(*items),
     )
     assert out == expected
 

@@ -9,6 +9,7 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    PatternPayload,
     SizeBoundPayload,
 )
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
@@ -16,6 +17,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
 from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.adapter import v3_1
+from schemathesis.specs.openapi.patterns import is_valid_python_regex, normalize_regex
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -335,6 +337,54 @@ class NumericBoundAdjustment:
                 prop = _walk_to_property(target, observation.parameter_path)
                 if prop is not None:
                     _apply_numeric_bound_to_property(prop, observation.payload, is_2020_12=is_2020_12)
+
+        return schema
+
+
+def _apply_pattern_to_property(prop: dict[str, Any], regex: str) -> None:
+    """Write `pattern: <regex>` on a string property when none is already declared."""
+    if "string" not in get_type(prop):
+        return
+    if "pattern" in prop:
+        return
+    # `is_valid_python_regex` accepts `\A`/`\Z` (Python-only anchors that
+    # `jsonschema_rs` rejects), so route those through `normalize_regex` too.
+    needs_translation = not is_valid_python_regex(regex) or regex.startswith("\\A") or regex.endswith("\\Z")
+    if not needs_translation:
+        prop["pattern"] = regex
+        return
+    translated = normalize_regex(regex)
+    if translated is not None:
+        prop["pattern"] = translated
+
+
+@ADJUSTMENTS.register
+class PatternAdjustment:
+    """Inject `pattern` onto string properties when the server reveals it via `@Pattern` 4xx."""
+
+    handles = frozenset({ObservationKind.PATTERN})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        for observation in observations:
+            assert isinstance(observation.payload, PatternPayload)
+            for target in targets:
+                prop = _walk_to_property(target, observation.parameter_path)
+                if prop is not None:
+                    _apply_pattern_to_property(prop, observation.payload.regex)
 
         return schema
 

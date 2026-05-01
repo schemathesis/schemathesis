@@ -11,6 +11,7 @@ from schemathesis.core.error_feedback.store import (
     Observation,
     ObservationKind,
     ObservationPayload,
+    PatternPayload,
     SizeBoundPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
@@ -55,6 +56,11 @@ _NUMERIC_BOUND = re.compile(
     re.IGNORECASE,
 )
 
+# Bean-validation `@Pattern(regexp = "...")` — Hibernate emits the regex
+# verbatim between double quotes. Java regex syntax is a superset of ECMA-262;
+# the consumer normalizes Java-only constructs before writing it to the schema.
+_PATTERN = re.compile(r'\bmust match "(?P<regex>[^"]+)"')
+
 
 # Custom `@ControllerAdvice` shape: each entry of `messages: [...]` is a string
 # of the form `<field> - <message>` (e.g. blog API).
@@ -90,6 +96,9 @@ def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None
             direction=direction,
             exclusive=numeric_match.group("inclusive") is None,
         )
+    pattern_match = _PATTERN.search(message)
+    if pattern_match:
+        return ObservationKind.PATTERN, PatternPayload(regex=pattern_match.group("regex"))
     for pattern, name in _FORMAT_PATTERNS:
         if pattern.search(message):
             return ObservationKind.FORMAT, FormatPayload(name=name)
