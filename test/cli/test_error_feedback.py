@@ -4,6 +4,7 @@ import pytest
 from flask import jsonify, request
 
 from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
+from schemathesis.core.jsonschema import is_valid
 
 REQUIRED_FIELDS = ("email", "username", "password")
 
@@ -16,9 +17,7 @@ def _reset_feedback_pipeline():
 
 @pytest.fixture
 def planted_bug_app(ctx, app_runner):
-    # Server requires email/username/password — fields the schema below never declares.
-    # The 4xx gate hides a planted 500: schemathesis sees only "API rejected schema-compliant
-    # request" until feedback mutates the body schema to satisfy the gate.
+    # 4xx gate hides a planted 500 until feedback mutates the schema.
     schema_body = {
         "requestBody": {
             "required": True,
@@ -86,7 +85,6 @@ def test_feedback_toggles_planted_bug_visibility(cli, planted_bug_app, snapshot_
 
 @pytest.fixture
 def nested_planted_bug_app(ctx, app_runner):
-    # Server demands `contact.email`, fed back via Spring's dotted-path message shape.
     schema_body = {
         "requestBody": {
             "required": True,
@@ -146,9 +144,7 @@ SIZE_BOUNDED_FIELDS = (
 
 @pytest.fixture
 def size_bound_planted_bug_app(ctx, app_runner):
-    # Server enforces length bounds the schema doesn't declare. Multiple bounded
-    # fields so each rejected case emits one message per field — enough observations
-    # cross the calibration threshold by the time fuzzing builds its strategy.
+    # Multiple bounded fields so observations cross the calibration threshold during coverage.
     schema_body = {
         "requestBody": {
             "required": True,
@@ -197,6 +193,69 @@ def test_feedback_unmasks_planted_bug_via_size_bound(cli, size_bound_planted_bug
     assert (
         cli.run(
             size_bound_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
+FORMAT_FIELDS: tuple[tuple[str, str, str], ...] = (
+    ("email", "email", "must be a well-formed email address"),
+    ("website", "uri", "must be a valid URL"),
+    ("token", "uuid", "must be a valid UUID"),
+)
+
+
+@pytest.fixture
+def format_planted_bug_app(ctx, app_runner):
+    # Multiple format-bounded fields so observations cross the threshold during coverage.
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {field: {"type": "string"} for field, _, _ in FORMAT_FIELDS}
+                        | {"tags": {"type": "array", "items": {"type": "string"}}},
+                        "required": [field for field, _, _ in FORMAT_FIELDS],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        issues = [
+            f"{field} - {message}"
+            for field, format_name, message in FORMAT_FIELDS
+            if not is_valid(body.get(field), {"type": "string", "format": format_name})
+        ]
+        if issues:
+            return jsonify({"messages": issues}), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_format(cli, format_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            format_planted_bug_app,
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",

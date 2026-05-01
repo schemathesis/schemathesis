@@ -17,6 +17,7 @@ class ObservationKind(str, Enum):
 
     MUST_NOT_BE_BLANK = "must_not_be_blank"
     SIZE_BOUND = "size_bound"
+    FORMAT = "format"
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +33,19 @@ class SizeBoundPayload:
     max: int
 
 
-ObservationPayload = SizeBoundPayload | None
+@dataclass(frozen=True, slots=True)
+class FormatPayload:
+    """JSON-Schema `format` name inferred from a Bean-validation message.
+
+    The string is a JSON-Schema format name (`email`, `uri`, `uuid`, ...). The
+    consumer adjustment writes it as `format: <name>` on the resolved property,
+    only when no format is already declared.
+    """
+
+    name: str
+
+
+ObservationPayload = SizeBoundPayload | FormatPayload | None
 
 
 @dataclass(frozen=True, slots=True)

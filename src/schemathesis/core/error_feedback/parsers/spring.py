@@ -5,6 +5,7 @@ from collections.abc import Iterable
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
+    FormatPayload,
     Observation,
     ObservationKind,
     ObservationPayload,
@@ -26,6 +27,21 @@ _NON_BLANK = re.compile(
 _SIZE_BOUND = re.compile(
     r"\b(?:size|length) must be between (\d+) and (\d+)\b",
     re.IGNORECASE,
+)
+
+# Bean-validation format constraints. Hibernate's `@Email` emits
+# "must be a well-formed email address"; the `@URL`/`@UUID` extensions emit
+# "must be a valid URL"/"must be a valid UUID". The phrasing varies between
+# stdlib and custom annotations, hence the optional `well-formed`/`valid`.
+# Order matters: UUID before URI so the more specific phrase wins on edge
+# strings, and email last because its token is short and easiest to misclassify.
+_FORMAT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bmust be (?:a |an )?(?:well-formed |valid )?UUID\b", re.IGNORECASE), "uuid"),
+    (re.compile(r"\bmust be (?:a |an )?(?:well-formed |valid )?(?:URL|URI)\b", re.IGNORECASE), "uri"),
+    (
+        re.compile(r"\bmust be (?:a |an )?(?:well-formed |valid )?email(?:\s+address)?\b", re.IGNORECASE),
+        "email",
+    ),
 )
 
 # Custom `@ControllerAdvice` shape: each entry of `messages: [...]` is a string
@@ -54,6 +70,9 @@ def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None
             min=int(size_match.group(1)),
             max=int(size_match.group(2)),
         )
+    for pattern, name in _FORMAT_PATTERNS:
+        if pattern.search(message):
+            return ObservationKind.FORMAT, FormatPayload(name=name)
     return None
 
 

@@ -2,6 +2,7 @@ from schemathesis.core.error_feedback.store import (
     MAX_ENTRIES_PER_BUCKET,
     MIN_OBSERVATIONS,
     ErrorFeedbackStore,
+    FormatPayload,
     Observation,
     ObservationKind,
     ObservationPayload,
@@ -10,6 +11,7 @@ from schemathesis.core.error_feedback.store import (
 
 __all__ = [
     "ErrorFeedbackStore",
+    "FormatPayload",
     "MAX_ENTRIES_PER_BUCKET",
     "MIN_OBSERVATIONS",
     "Observation",
