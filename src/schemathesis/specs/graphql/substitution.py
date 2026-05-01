@@ -3,7 +3,8 @@
 Match priority for a scalar argument: (1) bespoke `<Type>ID` scalar names
 the parent type directly; (2) for generic `ID!` arguments, the argument
 name's `<entity>Id`/`<entity>_id` token names the parent; (3) a bare `id`
-argument falls back to the enclosing field's return type.
+argument falls back to the enclosing field's return type. The same rules
+apply recursively to fields of input-object arguments.
 """
 
 from __future__ import annotations
@@ -95,23 +96,29 @@ def _candidate_parent_type(
 
 
 def _maybe_substitute(
-    argument: graphql.ArgumentNode,
+    argument: graphql.ArgumentNode | graphql.ObjectFieldNode,
     arg_type: graphql.GraphQLType,
     enclosing_field_type: str | None,
     pool: GraphQLResourcePool,
     random: Random,
 ) -> None:
     unwrapped = _unwrap(arg_type)
-    if not isinstance(unwrapped, graphql.GraphQLScalarType):
+    if isinstance(unwrapped, graphql.GraphQLScalarType):
+        parent_type_name = _candidate_parent_type(
+            scalar_name=unwrapped.name,
+            argument_name=argument.name.value,
+            enclosing_field_type=enclosing_field_type,
+        )
+        if parent_type_name is None:
+            return
+        candidate = pool.draw(parent_type_name=parent_type_name, random=random)
+        if candidate is None:
+            return
+        argument.value = graphql.StringValueNode(value=candidate)
         return
-    parent_type_name = _candidate_parent_type(
-        scalar_name=unwrapped.name,
-        argument_name=argument.name.value,
-        enclosing_field_type=enclosing_field_type,
-    )
-    if parent_type_name is None:
-        return
-    candidate = pool.draw(parent_type_name=parent_type_name, random=random)
-    if candidate is None:
-        return
-    argument.value = graphql.StringValueNode(value=candidate)
+    if isinstance(unwrapped, graphql.GraphQLInputObjectType) and isinstance(argument.value, graphql.ObjectValueNode):
+        for field_node in argument.value.fields:
+            field_def = unwrapped.fields.get(field_node.name.value)
+            if field_def is None:
+                continue
+            _maybe_substitute(field_node, field_def.type, None, pool, random)

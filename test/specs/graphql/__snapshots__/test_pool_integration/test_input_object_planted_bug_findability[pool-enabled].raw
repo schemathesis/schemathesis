@@ -1,0 +1,60 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/graphql (in 0.00s)
+
+     Base URL:         http://127.0.0.1/graphql
+     Specification:    GraphQL
+     Operations:       3 selected / 3 total
+     Configuration:    /tmp/config.toml
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ 2 passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+____________________________ Mutation.updateAuthor _____________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- GraphQL server error
+
+    planted: input-object-update
+
+[200] OK:
+
+    `{"data": {"updateAuthor": null}, "errors": [{"message": "planted: input-object-update", "locations": [{"line": 2, "column": 3}], "path": ["updateAuthor"]}]}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 3/3
+  Tested: 3
+
+Test Phases:
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ❌ Fuzzing
+  ⏭  Stateful (not supported)
+
+Failures:
+  ❌ GraphQL server error: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================== 1 failure in 1.00s ==============================

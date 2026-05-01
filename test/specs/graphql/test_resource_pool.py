@@ -306,7 +306,7 @@ def test_substitution_skips_non_id_scalar_arguments(rng):
     assert "placeholder" in graphql.print_ast(operation)
 
 
-def test_substitution_skips_input_object_arguments(rng):
+def test_substitution_leaves_non_id_input_fields_untouched(rng):
     sdl = """
     scalar BookID
     input BookFilter { title: String }
@@ -322,7 +322,96 @@ def test_substitution_skips_input_object_arguments(rng):
     )
     operation = _parse('query { books(filter: {title: "placeholder"}) { id } }')
     substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
-    # Input-object argument types aren't scalars; substitution short-circuits.
+    assert "placeholder" in graphql.print_ast(operation)
+
+
+@pytest.mark.parametrize(
+    ("input_field", "field_type"),
+    [
+        ("id", "BookID"),
+        ("bookId", "ID!"),
+        ("book_id", "ID!"),
+    ],
+    ids=["bespoke-scalar", "camelCase-name-token", "snake_case-name-token"],
+)
+def test_substitution_descends_into_input_object(input_field, field_type, rng):
+    sdl = f"""
+    scalar BookID
+    input BookRef {{ {input_field}: {field_type} }}
+    type Book {{ id: BookID! }}
+    type Query {{ lookup(ref: BookRef!): String }}
+    type Mutation {{ addBook(title: String!): Book! }}
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse(f'query {{ lookup(ref: {{{input_field}: "placeholder"}}) }}')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "captured-id" in graphql.print_ast(operation)
+
+
+def test_substitution_skips_enum_typed_arguments(rng):
+    sdl = """
+    enum Status { ACTIVE INACTIVE }
+    type Book { id: ID! }
+    type Query { books(status: Status!): [Book!]! }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse("query { books(status: ACTIVE) { id } }")
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "ACTIVE" in graphql.print_ast(operation)
+
+
+def test_substitution_descends_into_nested_input_object(rng):
+    sdl = """
+    scalar BookID
+    input BookRef { id: BookID! }
+    input UpdateInput { ref: BookRef!, title: String! }
+    type Book { id: BookID! }
+    type Query { _: Int }
+    type Mutation {
+        addBook(title: String!): Book!
+        updateBook(input: UpdateInput!): Book
+    }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "captured-id"}},
+    )
+    operation = _parse('mutation { updateBook(input: {ref: {id: "placeholder"}, title: "t"}) { id } }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
+    assert "captured-id" in graphql.print_ast(operation)
+
+
+def test_substitution_isolates_input_object_field_by_type(rng):
+    sdl = """
+    scalar BookID
+    scalar AuthorID
+    input AuthorRef { id: AuthorID! }
+    type Book { id: BookID! }
+    type Author { id: AuthorID! }
+    type Query { authorPosts(ref: AuthorRef!): [String!]! }
+    type Mutation { addBook(title: String!): Book! }
+    """
+    schema = graphql.build_schema(sdl)
+    pool = GraphQLResourcePool(client_schema=schema)
+    pool.capture(
+        operation_node=_parse('mutation { addBook(title: "x") { id } }'),
+        response_data={"addBook": {"id": "book-id"}},
+    )
+    operation = _parse('query { authorPosts(ref: {id: "placeholder"}) }')
+    substitute_pool_values(operation_node=operation, client_schema=schema, pool=pool, random=rng)
     assert "placeholder" in graphql.print_ast(operation)
 
 
