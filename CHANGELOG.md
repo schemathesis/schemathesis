@@ -7,8 +7,7 @@
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
 - Capture every element of list-shaped responses into the pool, not just the first.
 - Analyse server 4xx field errors to subsequent generation.
-- Dispatch GraphQL operations in role order: producer mutations first, queries next, cleanup last.
-- Capture identifiers from successful GraphQL responses for reuse during fuzzing.
+- Chain GraphQL operations: dispatch producer mutations first and substitute captured identifiers into matching arguments.
 
 ### :bug: Fixed
 
