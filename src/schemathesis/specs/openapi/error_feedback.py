@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.error_feedback.store import (
     ErrorFeedbackStore,
+    FormatPayload,
     Observation,
     ObservationKind,
     SizeBoundPayload,
@@ -179,6 +180,50 @@ def _walk_to_property(schema: dict[str, Any], path: tuple[str | int, ...]) -> di
             return None
         current = nested
     return current
+
+
+def _apply_format_to_property(prop: dict[str, Any], name: str) -> None:
+    """Set `format: <name>` on a string property when none is already declared."""
+    if "string" not in get_type(prop):
+        return
+    if "format" in prop:
+        return
+    prop["format"] = name
+
+
+@ADJUSTMENTS.register
+class FormatAdjustment:
+    """Inject `format` onto string properties when the server reveals it via 4xx.
+
+    Writes `format: <name>` to the resolved property only when it's a string
+    (or includes string in a type union) and doesn't already declare a format.
+    """
+
+    handles = frozenset({ObservationKind.FORMAT})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation | None,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        for observation in observations:
+            assert isinstance(observation.payload, FormatPayload)
+            for target in targets:
+                prop = _walk_to_property(target, observation.parameter_path)
+                if prop is not None:
+                    _apply_format_to_property(prop, observation.payload.name)
+
+        return schema
 
 
 @ADJUSTMENTS.register

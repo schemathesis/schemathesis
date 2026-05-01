@@ -8,6 +8,7 @@ import pytest
 from schemathesis.core.error_feedback import (
     MAX_ENTRIES_PER_BUCKET,
     ErrorFeedbackStore,
+    FormatPayload,
     Observation,
     ObservationKind,
     SizeBoundPayload,
@@ -27,6 +28,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.specs.openapi.error_feedback import (
+    FormatAdjustment,
     RequiredFieldAdjustment,
     SizeBoundAdjustment,
     apply_adjustments,
@@ -307,6 +309,46 @@ def test_spring_parser_recognizes_size_bound_message_variants(message, expected_
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=expected_min, max=expected_max)),
     ]
+
+
+@pytest.mark.parametrize(
+    "message, expected_name",
+    [
+        ("must be a well-formed email address", "email"),
+        ("must be a valid email address", "email"),
+        ("must be a valid email", "email"),
+        ("MUST BE A WELL-FORMED EMAIL ADDRESS", "email"),
+        ("must be a valid URL", "uri"),
+        ("must be a valid URI", "uri"),
+        ("must be a valid UUID", "uuid"),
+        ("must be a well-formed UUID", "uuid"),
+    ],
+    ids=[
+        "email-well-formed",
+        "email-valid-address",
+        "email-valid-bare",
+        "email-case-insensitive",
+        "url",
+        "uri",
+        "uuid-valid",
+        "uuid-well-formed",
+    ],
+)
+def test_spring_parser_recognizes_format_message_variants(message, expected_name):
+    body = {"subErrors": [{"field": "contact", "message": message}]}
+    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (("contact",), ObservationKind.FORMAT, FormatPayload(name=expected_name)),
+    ]
+
+
+def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match():
+    # Defensive: a contrived "must be a valid URI UUID" string would match both
+    # the URI and UUID regexes. The classifier checks UUID first so the more
+    # specific format wins.
+    body = {"subErrors": [{"field": "x", "message": "must be a valid UUID"}]}
+    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    assert obs[0].payload == FormatPayload(name="uuid")
 
 
 SPRING_MESSAGES_MULTI = b'{"messages":["email - must not be blank","username - must not be null","age - is required"]}'
@@ -1109,6 +1151,145 @@ def test_size_bound_adjustment_applies_correctly(input_schema, items, expected, 
         location=ParameterLocation.BODY,
         schema=input_schema,
         observations=_build_size_bound_observations(*items),
+    )
+    assert out == expected
+
+
+def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.FORMAT,
+            raw_message=f"must be a valid {name}",
+            payload=FormatPayload(name=name),
+        )
+        for path, name in items
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"email": {"type": "string"}}, "required": []},
+            [(("email",), "email")],
+            {
+                "type": "object",
+                "properties": {"email": {"type": "string", "format": "email"}},
+                "required": [],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"email": {"type": "string", "format": "uri"}},
+                "required": [],
+            },
+            [(("email",), "email")],
+            {
+                "type": "object",
+                "properties": {"email": {"type": "string", "format": "uri"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            [(("age",), "email")],
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"email": {"type": ["string", "null"]}}, "required": []},
+            [(("email",), "email")],
+            {
+                "type": "object",
+                "properties": {"email": {"type": ["string", "null"], "format": "email"}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [(("email",), "email")],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (True, [(("email",), "email")], True),
+        ({"type": "string"}, [(("email",), "email")], {"type": "string"}),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"email": {"type": "string"}}, "required": []},
+                    {"type": "string"},
+                ]
+            },
+            [(("email",), "email")],
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {"email": {"type": "string", "format": "email"}},
+                        "required": [],
+                    },
+                    {"type": "string"},
+                ]
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {"email": {"type": "string"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+            [(("contact", "email"), "email")],
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {"email": {"type": "string", "format": "email"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            [((), "email")],
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            [((0,), "email")],
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+        ),
+    ],
+    ids=[
+        "string-property-format-injected",
+        "existing-format-preserved",
+        "non-string-property-skipped",
+        "type-union-with-null-format-injected",
+        "absent-property-not-synthesised",
+        "bool-schema-passthrough",
+        "non-object-root-passthrough",
+        "oneof-applies-to-object-branch",
+        "nested-path-format-injected",
+        "empty-path-observation-skipped",
+        "non-string-step-skipped",
+    ],
+)
+def test_format_adjustment_applies_correctly(input_schema, items, expected, case_factory):
+    out = FormatAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_format_observations(*items),
     )
     assert out == expected
 
