@@ -6,12 +6,10 @@ import uuid
 from typing import NewType
 
 import strawberry
+from strawberry.schema.config import StrawberryConfig
+from strawberry.types.scalar import ScalarDefinition
 
-BookID = strawberry.scalar(
-    NewType("BookID", str),
-    serialize=lambda v: v,
-    parse_value=lambda v: v,
-)
+BookID = NewType("BookID", str)
 
 
 @strawberry.type
@@ -51,4 +49,19 @@ class Mutation:
         return None
 
 
-schema = strawberry.Schema(Query, Mutation)
+schema = strawberry.Schema(
+    Query,
+    Mutation,
+    config=StrawberryConfig(
+        scalar_map={
+            BookID: ScalarDefinition(
+                name="BookID",
+                description=None,
+                specified_by_url=None,
+                serialize=lambda v: v,
+                parse_value=lambda v: v,
+                parse_literal=None,
+            ),
+        },
+    ),
+)
