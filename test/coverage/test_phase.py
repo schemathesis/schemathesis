@@ -5948,6 +5948,84 @@ def test_coverage_consumes_path_keyed_pool(cli, app_runner, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_coverage_param_mutation_preserves_nested_overlay_siblings(cli, ctx, app_runner, snapshot_cli):
+    # Nested overlay must keep generator-produced siblings (`note`) when the pool seeds a foreign-key leaf (`location_id`).
+    paths = {
+        "/locations": {
+            "post": {
+                "operationId": "createLocation",
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": ["id"],
+                                    "properties": {"id": {"type": "integer"}},
+                                }
+                            }
+                        }
+                    }
+                },
+            }
+        },
+        "/departments": {
+            "post": {
+                "operationId": "createDepartment",
+                "parameters": [
+                    {
+                        "name": "X-Required-Header",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    }
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["shipping"],
+                                "properties": {
+                                    "shipping": {
+                                        "type": "object",
+                                        "required": ["note"],
+                                        "properties": {
+                                            "location_id": {"type": "integer"},
+                                            "note": {"type": "string"},
+                                        },
+                                    }
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "OK"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/locations", methods=["POST"])
+    def locations():
+        return jsonify({"id": 42}), 201
+
+    @app.route("/departments", methods=["POST"])
+    def departments():
+        body = request.get_json(silent=True)
+        shipping = body.get("shipping") if isinstance(body, dict) else None
+        if not isinstance(shipping, dict) or not isinstance(shipping.get("note"), str):
+            return ("", 422)
+        return ("", 201)
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=coverage", "--continue-on-failure") == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_coverage_consumes_body_field_keyed_pool(cli, app_runner, snapshot_cli, ctx):
     paths = {
         "/sessions": {

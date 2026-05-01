@@ -1,0 +1,82 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Coverage (in 0.00s)
+
+     ✅ 1 passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+______________________________ POST /departments _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- API accepted schema-violating request
+
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 406, 422, 428, 5xx
+    Invalid component: Missing `X-Required-Header` at header
+
+- Missing header not rejected
+
+    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406
+
+[201] Created:
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 422
+    Documented: 201
+
+[422] Unprocessable Content:
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 2
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ❌ Coverage
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ API accepted schema-violating request: 1
+  ❌ Missing header not rejected: 1
+  ❌ Undocumented HTTP status code: 1
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 3 failures in 1.00s ==============================
