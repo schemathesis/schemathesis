@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.resources import ExtraDataSource
 
 
@@ -345,6 +346,7 @@ def graphql_cases(
     phase: TestPhase = TestPhase.FUZZING,
     # Not supported for GraphQL, passed here to unify interfaces
     extra_data_source: ExtraDataSource | None = None,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> Any:
     import graphql
     from hypothesis.errors import InvalidArgument

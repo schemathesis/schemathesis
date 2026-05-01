@@ -33,6 +33,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.core.compat import RefResolver
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.specs.openapi.extra_data_source import VariantUsageTracker
 
 
@@ -561,8 +562,8 @@ class OpenApiBody(OpenApiComponent):
 
     def __post_init__(self) -> None:
         super().__post_init__()
-        self._positive_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
-        self._negative_strategy_cache: st.SearchStrategy | NotSet = NOT_SET
+        self._positive_strategy_cache: tuple[st.SearchStrategy, int | None] | NotSet = NOT_SET
+        self._negative_strategy_cache: tuple[st.SearchStrategy, int | None] | NotSet = NOT_SET
         self._is_negatable: bool | NotSet = NOT_SET
 
     @property
@@ -606,21 +607,28 @@ class OpenApiBody(OpenApiComponent):
         generation_mode: GenerationMode,
         extra_data_source: ExtraDataSource | None = None,
         mix_examples: bool = True,
+        error_feedback: ErrorFeedbackStore | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this body parameter."""
         # Don't cache when mix_examples is False since we need different strategies
         # for EXAMPLES phase vs fuzzing/stateful phases
         use_cache = extra_data_source is None and mix_examples
+        feedback_generation = error_feedback.generation if error_feedback is not None else None
 
         # Check cache based on generation mode (only when extra data sources are not used)
         if use_cache:
             if generation_mode == GenerationMode.POSITIVE:
-                if self._positive_strategy_cache is not NOT_SET:
-                    assert not isinstance(self._positive_strategy_cache, NotSet)
-                    return self._positive_strategy_cache
-            elif self._negative_strategy_cache is not NOT_SET:
-                assert not isinstance(self._negative_strategy_cache, NotSet)
-                return self._negative_strategy_cache
+                cached = self._positive_strategy_cache
+                if cached is not NOT_SET and not isinstance(cached, NotSet):
+                    cached_strategy, cached_generation = cached
+                    if cached_generation == feedback_generation:
+                        return cached_strategy
+            else:
+                cached = self._negative_strategy_cache
+                if cached is not NOT_SET and not isinstance(cached, NotSet):
+                    cached_strategy, cached_generation = cached
+                    if cached_generation == feedback_generation:
+                        return cached_strategy
 
         # Import here to avoid circular dependency
         from schemathesis.specs.openapi._hypothesis import GENERATOR_MODE_TO_STRATEGY_FACTORY
@@ -641,6 +649,15 @@ class OpenApiBody(OpenApiComponent):
         # Build the strategy
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
         schema = self.optimized_schema
+        if error_feedback is not None:
+            from schemathesis.specs.openapi.error_feedback import apply_adjustments
+
+            schema = apply_adjustments(
+                operation=operation,
+                location=ParameterLocation.BODY,
+                schema=schema,
+                store=error_feedback,
+            )
         assert isinstance(operation.schema, OpenApiSchema)
         strategy = strategy_factory(
             schema,
@@ -672,12 +689,13 @@ class OpenApiBody(OpenApiComponent):
             else:
                 strategy = build_hybrid_strategy(strategy, captured_variants, usage_tracker)
 
-        # Cache the strategy
+        # Cache the strategy keyed by feedback generation
         if use_cache:
+            slot = (strategy, feedback_generation)
             if generation_mode == GenerationMode.POSITIVE:
-                self._positive_strategy_cache = strategy
+                self._positive_strategy_cache = slot
             else:
-                self._negative_strategy_cache = strategy
+                self._negative_strategy_cache = slot
 
         return strategy
 
@@ -1020,7 +1038,7 @@ class OpenApiParameterSet(ParameterSet):
         self.items = items or []
         self._schema: dict | NotSet = NOT_SET
         self._schema_cache: dict[frozenset[str], dict[str, Any]] = {}
-        self._strategy_cache: dict[tuple[frozenset[str], GenerationMode], st.SearchStrategy] = {}
+        self._strategy_cache: dict[tuple[frozenset[str], GenerationMode, int | None], st.SearchStrategy] = {}
         self._strict_validator: jsonschema_rs.Validator | NotSet = NOT_SET
 
     def get_strict_validator(self) -> jsonschema_rs.Validator:
@@ -1088,10 +1106,12 @@ class OpenApiParameterSet(ParameterSet):
         exclude: Iterable[str] = (),
         extra_data_source: ExtraDataSource | None = None,
         mix_examples: bool = True,
+        error_feedback: ErrorFeedbackStore | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
         exclude_key = frozenset(exclude)
-        cache_key = (exclude_key, generation_mode)
+        feedback_generation = error_feedback.generation if error_feedback is not None else None
+        cache_key = (exclude_key, generation_mode, feedback_generation)
 
         use_cache = extra_data_source is None and mix_examples
 
@@ -1122,6 +1142,15 @@ class OpenApiParameterSet(ParameterSet):
 
         # Get schema with exclusions
         schema: JsonSchema = self.get_schema_with_exclusions(exclude)
+        if error_feedback is not None:
+            from schemathesis.specs.openapi.error_feedback import apply_adjustments
+
+            schema = apply_adjustments(
+                operation=operation,
+                location=self.location,
+                schema=schema,
+                store=error_feedback,
+            )
 
         # Check for captured variants for hybrid approach
         captured_variants: list[dict[str, Any]] | None = None

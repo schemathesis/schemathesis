@@ -426,6 +426,9 @@
         },
         "extra-data-sources": {
           "$ref": "#/$defs/ExtraDataSourcesConfig"
+        },
+        "error-feedback": {
+          "$ref": "#/$defs/ErrorFeedbackConfig"
         }
       }
     },
@@ -522,6 +525,15 @@
       "additionalProperties": false,
       "properties": {
         "responses": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ErrorFeedbackConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
           "type": "boolean"
         }
       }

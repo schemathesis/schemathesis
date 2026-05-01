@@ -314,4 +314,7 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
     elif isinstance(phase_config, CoveragePhaseConfig) and ctx.extra_data_source is not None:
         kwargs["extra_data_source"] = ctx.extra_data_source
 
+    if ctx.error_feedback is not None:
+        kwargs["error_feedback"] = ctx.error_feedback
+
     return kwargs

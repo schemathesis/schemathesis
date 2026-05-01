@@ -40,6 +40,23 @@ class ExtraDataSourcesConfig(DiffBase):
         return self.responses
 
 
+@dataclass(repr=False)
+class ErrorFeedbackConfig(DiffBase):
+    """Configuration for the error-feedback subsystem (4xx response analysis)."""
+
+    is_enabled: bool
+
+    __slots__ = ("is_enabled", "_is_default")
+
+    def __init__(self, *, enabled: bool = True) -> None:
+        self.is_enabled = enabled
+        self._is_default = enabled
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ErrorFeedbackConfig:
+        return cls(enabled=data.get("enabled", True))
+
+
 class OperationOrdering(str, Enum):
     """Strategy for ordering API operations during test execution."""
 
@@ -57,6 +74,7 @@ class FuzzingPhaseConfig(DiffBase):
     checks: ChecksConfig
     operation_ordering: OperationOrdering
     extra_data_sources: ExtraDataSourcesConfig
+    error_feedback: ErrorFeedbackConfig
 
     __slots__ = (
         "enabled",
@@ -64,8 +82,10 @@ class FuzzingPhaseConfig(DiffBase):
         "checks",
         "operation_ordering",
         "extra_data_sources",
+        "error_feedback",
         "_checks_is_default",
         "_extra_data_sources_is_default",
+        "_error_feedback_is_default",
     )
 
     def __init__(
@@ -76,6 +96,7 @@ class FuzzingPhaseConfig(DiffBase):
         checks: ChecksConfig | None = None,
         operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
         extra_data_sources: ExtraDataSourcesConfig | None = None,
+        error_feedback: ErrorFeedbackConfig | None = None,
     ) -> None:
         self.enabled = enabled
         self.generation = generation or GenerationConfig()
@@ -84,9 +105,11 @@ class FuzzingPhaseConfig(DiffBase):
             OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
         )
         self.extra_data_sources = extra_data_sources or ExtraDataSourcesConfig()
+        self.error_feedback = error_feedback or ErrorFeedbackConfig()
         # Track whether nested configs were provided or created as defaults
         self._checks_is_default = checks is None
         self._extra_data_sources_is_default = extra_data_sources is None
+        self._error_feedback_is_default = error_feedback is None
 
     @property
     def _is_default(self) -> bool:
@@ -101,6 +124,7 @@ class FuzzingPhaseConfig(DiffBase):
             and self._checks_is_default
             and self.operation_ordering == OperationOrdering.AUTO
             and self._extra_data_sources_is_default
+            and self._error_feedback_is_default
         )
 
     @classmethod
@@ -111,6 +135,7 @@ class FuzzingPhaseConfig(DiffBase):
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
             extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {})),
+            error_feedback=ErrorFeedbackConfig.from_dict(data.get("error-feedback", {})),
         )
 
 

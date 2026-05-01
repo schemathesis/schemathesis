@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.observations import Observations
 from schemathesis.generation.case import Case
@@ -40,6 +41,8 @@ class EngineContext:
         "_transport_kwargs_cache",
         "_extra_data_source",
         "_extra_data_source_lock",
+        "_error_feedback",
+        "_error_feedback_lock",
     )
 
     def __init__(
@@ -64,6 +67,8 @@ class EngineContext:
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
         self._extra_data_source: ExtraDataSource | None = None
         self._extra_data_source_lock = threading.Lock()
+        self._error_feedback: ErrorFeedbackStore | None = None
+        self._error_feedback_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -166,6 +171,17 @@ class EngineContext:
                 if self._extra_data_source is None:
                     self._extra_data_source = self.schema.create_extra_data_source()
         return self._extra_data_source
+
+    @property
+    def error_feedback(self) -> ErrorFeedbackStore | None:
+        """Store of parser observations from 4xx responses."""
+        if not self.config.phases.fuzzing.error_feedback.is_enabled:
+            return None
+        if self._error_feedback is None:
+            with self._error_feedback_lock:
+                if self._error_feedback is None:
+                    self._error_feedback = ErrorFeedbackStore()
+        return self._error_feedback
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:
