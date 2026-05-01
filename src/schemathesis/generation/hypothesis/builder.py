@@ -938,8 +938,6 @@ def _iter_coverage_cases(
                 template_time += elapsed
                 if value.generation_mode == GenerationMode.POSITIVE:
                     template.set_body(value, body.media_type)
-                    if body_overlays and isinstance(template._template.get("body"), dict):
-                        template._template["body"].update(body_overlays)
                 else:
                     # The template must be a valid positive baseline so that
                     # parameter-mutation cases (e.g. missing required header) only
@@ -964,8 +962,6 @@ def _iter_coverage_cases(
                         value if isinstance(first_positive, NotSet) else first_positive,
                         body.media_type,
                     )
-                    if body_overlays and isinstance(template._template.get("body"), dict):
-                        template._template["body"].update(body_overlays)
             data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
                 **data.kwargs,
