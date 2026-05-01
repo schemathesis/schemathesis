@@ -378,6 +378,19 @@ FK_SUFFIX_MAP: dict[str, tuple[str, bool]] = {
     "_guid": ("guid", False),
 }
 
+# camelCase boundaries; longest plural suffix first so `Ids` matches before `Id`.
+_CAMEL_FK_SUFFIXES: tuple[tuple[str, str, bool], ...] = (
+    ("Ids", "id", True),
+    ("Uuids", "uuid", True),
+    ("Guids", "guid", True),
+    ("Id", "id", False),
+    ("Uuid", "uuid", False),
+    ("Guid", "guid", False),
+)
+# Floor below which the leading lowercase run is unlikely to name a real resource;
+# blocks `bId`/`fId`/`lId` style fragments while still permitting names like `Order`.
+_CAMEL_FK_MIN_BASE_LEN = 3
+
 
 def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
     """Extract target resource name and field from a FK field name.
@@ -389,11 +402,13 @@ def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
         site_ids -> ("Site", "id", True)
         user_uuid -> ("User", "uuid", False)
         session_guids -> ("Session", "guid", True)
+        locationId -> ("Location", "id", False)
+        orderGuids -> ("Order", "guid", True)
 
     """
     field_lower = field.lower()
 
-    # Check suffixes (longer ones first to match _ids before _id)
+    # snake_case path. Check suffixes (longer ones first to match _ids before _id).
     for suffix, (target_field, is_array) in FK_SUFFIX_MAP.items():
         # Skip bare identifier fields (not FKs, they're primary identifiers)
         if field_lower == suffix.lstrip("_"):
@@ -402,6 +417,17 @@ def infer_fk_target(field: str) -> tuple[str, str, bool] | None:
             base_name = field[: -len(suffix)]
             if base_name:
                 return to_pascal_case(base_name), target_field, is_array
+
+    # camelCase path. Base must start with an ASCII lowercase letter; rules out
+    # PascalCase types and prevents the bare `Id` from matching as a FK.
+    if not field or not ("a" <= field[0] <= "z"):
+        return None
+    for suffix, target_field, is_array in _CAMEL_FK_SUFFIXES:
+        if not field.endswith(suffix):
+            continue
+        base_name = field[: -len(suffix)]
+        if len(base_name) >= _CAMEL_FK_MIN_BASE_LEN and base_name.isascii() and base_name.isalnum():
+            return to_pascal_case(base_name), target_field, is_array
 
     return None
 

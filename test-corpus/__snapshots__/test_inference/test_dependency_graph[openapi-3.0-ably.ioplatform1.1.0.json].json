@@ -587,6 +587,14 @@
         "region",
         "status"
       ],
+      "fk_fields": [
+        {
+          "field_name": "channelId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Channel"
+        }
+      ],
       "types": {
         "channelId": [
           "string"
@@ -644,6 +652,30 @@
         "platform",
         "push.recipient",
         "push.state"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "clientId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Client"
+        }
+      ],
+      "nested_fk_fields": [
+        {
+          "field_name": "clientId",
+          "is_array": false,
+          "pointer": "/push.recipient/clientId",
+          "target_field": "id",
+          "target_resource": "Client"
+        },
+        {
+          "field_name": "deviceId",
+          "is_array": false,
+          "pointer": "/push.recipient/deviceId",
+          "target_field": "id",
+          "target_resource": "Device"
+        }
       ],
       "types": {
         "clientId": [
@@ -705,6 +737,20 @@
         "name",
         "timestamp"
       ],
+      "fk_fields": [
+        {
+          "field_name": "clientId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Client"
+        },
+        {
+          "field_name": "connectionId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Connection"
+        }
+      ],
       "types": {
         "clientId": [
           "string"
@@ -743,6 +789,20 @@
         "id",
         "timestamp"
       ],
+      "fk_fields": [
+        {
+          "field_name": "clientId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Client"
+        },
+        {
+          "field_name": "connectionId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Connection"
+        }
+      ],
       "types": {
         "action": [
           "string"
@@ -777,6 +837,20 @@
         "deviceToken",
         "registrationToken",
         "transportType"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "clientId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Client"
+        },
+        {
+          "field_name": "deviceId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Device"
+        }
       ],
       "types": {
         "clientId": [

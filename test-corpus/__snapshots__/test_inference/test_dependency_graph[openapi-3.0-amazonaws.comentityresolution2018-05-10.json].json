@@ -454,6 +454,14 @@
       "fields": [
         "matchId"
       ],
+      "fk_fields": [
+        {
+          "field_name": "matchId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Match"
+        }
+      ],
       "types": {
         "matchId": [
           "array",
@@ -473,6 +481,14 @@
         "metrics",
         "startTime",
         "status"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "jobId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Job"
+        }
       ],
       "types": {
         "endTime": [
@@ -706,6 +722,14 @@
         "startTime",
         "status"
       ],
+      "fk_fields": [
+        {
+          "field_name": "jobId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Job"
+        }
+      ],
       "types": {
         "endTime": [
           "array",
@@ -804,6 +828,14 @@
     "StartMatchingJob": {
       "fields": [
         "jobId"
+      ],
+      "fk_fields": [
+        {
+          "field_name": "jobId",
+          "is_array": false,
+          "target_field": "id",
+          "target_resource": "Job"
+        }
       ],
       "types": {
         "jobId": [
