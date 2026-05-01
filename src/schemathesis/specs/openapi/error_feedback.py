@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
-from schemathesis.core.error_feedback.store import ErrorFeedbackStore, Observation, ObservationKind
+from schemathesis.core.error_feedback.store import (
+    ErrorFeedbackStore,
+    Observation,
+    ObservationKind,
+    SizeBoundPayload,
+)
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
@@ -29,7 +34,7 @@ class Adjustment(Protocol):
         schema: JsonSchema,
         observations: tuple[Observation, ...],
     ) -> JsonSchema:
-        """Return a new schema reflecting the observations. Must not mutate the input."""
+        """Mutate `schema` in place (or return a replacement) to reflect the observations."""
         ...  # pragma: no cover
 
 
@@ -50,7 +55,8 @@ def apply_adjustments(
     observations = store.observations(operation_label=operation.label, location=location)
     if not observations:
         return schema
-    current = schema
+    # Single clone shared across all adjustments.
+    current: JsonSchema = deepclone(schema) if isinstance(schema, dict) else schema
     for adjustment_cls in ADJUSTMENTS.get_all():
         adjustment = adjustment_cls()
         relevant = tuple(o for o in observations if o.kind in adjustment.handles)
@@ -71,6 +77,20 @@ def _is_object_schema(schema: dict[str, Any]) -> bool:
     if "type" in schema:
         return "object" in get_type(schema)
     return "properties" in schema or "required" in schema
+
+
+def _collect_object_targets(schema: dict[str, Any]) -> list[dict[str, Any]]:
+    """Root + every object branch of `oneOf`/`anyOf`/`allOf` worth descending into."""
+    targets: list[dict[str, Any]] = []
+    if _is_object_schema(schema):
+        targets.append(schema)
+    for keyword in ("oneOf", "anyOf", "allOf"):
+        branches = schema.get(keyword)
+        if isinstance(branches, list):
+            for branch in branches:
+                if isinstance(branch, dict) and _is_object_schema(branch):
+                    targets.append(branch)
+    return targets
 
 
 def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
@@ -99,23 +119,103 @@ def _ensure_required_in_object(obj: dict[str, Any], leaf: str) -> None:
 
 def _walk_and_apply(schema: dict[str, Any], path: tuple[str | int, ...]) -> None:
     """Descend into `schema.properties[...]` along `path` and mark the leaf as required."""
-    if not path:
+    # Bail before any mutation when the path can't be followed: empty paths or
+    # array indices (Spring parser only emits non-empty string-only paths today).
+    if not path or not all(isinstance(step, str) for step in path):
         return
     *prefix, leaf = path
+    assert isinstance(leaf, str)  # narrowed by the all-strings precondition above
     current = schema
     for step in prefix:
-        # Array indices in nested paths aren't supported yet — server messages we parse
-        # are field-name based, not item-index based.
-        if not isinstance(step, str):
-            return
+        assert isinstance(step, str)  # same precondition
         properties = current.setdefault("properties", {})
         nested = properties.get(step)
         if not isinstance(nested, dict):
             nested = {"type": "object", "properties": {}, "required": []}
             properties[step] = nested
         current = nested
-    if isinstance(leaf, str):
-        _ensure_required_in_object(current, leaf)
+    _ensure_required_in_object(current, leaf)
+
+
+# Per JSON-Schema container type, the keyword pair that mirrors a Bean-validation
+# `@Size`/`@Length` constraint. Numeric/boolean/null types have no length-like
+# keyword and are skipped at the consumer level.
+_SIZE_KEYWORDS: dict[str, tuple[str, str]] = {
+    "string": ("minLength", "maxLength"),
+    "array": ("minItems", "maxItems"),
+    "object": ("minProperties", "maxProperties"),
+}
+
+
+def _apply_size_bound_to_property(prop: dict[str, Any], payload: SizeBoundPayload) -> None:
+    """Layer min/max keywords onto `prop` for every applicable schema type."""
+    for prop_type in get_type(prop):
+        keywords = _SIZE_KEYWORDS.get(prop_type)
+        if keywords is None:
+            continue
+        min_keyword, max_keyword = keywords
+        # Tighter wins: server's bound only overrides if it's stricter than what
+        # the schema already declares. This keeps user-supplied constraints intact
+        # while still narrowing under-specified ones.
+        existing_min = prop.get(min_keyword)
+        if not isinstance(existing_min, int) or payload.min > existing_min:
+            prop[min_keyword] = payload.min
+        existing_max = prop.get(max_keyword)
+        if not isinstance(existing_max, int) or payload.max < existing_max:
+            prop[max_keyword] = payload.max
+
+
+def _walk_to_property(schema: dict[str, Any], path: tuple[str | int, ...]) -> dict[str, Any] | None:
+    """Descend `schema.properties[...]` along `path`; return the leaf prop dict or None."""
+    if not path or not all(isinstance(step, str) for step in path):
+        return None
+    current = schema
+    for step in path:
+        properties = current.get("properties")
+        if not isinstance(properties, dict):
+            return None
+        nested = properties.get(step)
+        if not isinstance(nested, dict):
+            return None
+        current = nested
+    return current
+
+
+@ADJUSTMENTS.register
+class SizeBoundAdjustment:
+    """Apply server-reported `@Size`/`@Length` bounds to declared properties.
+
+    Branches on the resolved schema's `type`: strings get `minLength`/`maxLength`,
+    arrays `minItems`/`maxItems`, objects `minProperties`/`maxProperties`. Other
+    types and missing properties are skipped — this adjustment narrows existing
+    declarations rather than synthesising new ones.
+    """
+
+    handles = frozenset({ObservationKind.SIZE_BOUND})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation | None,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        for observation in observations:
+            assert isinstance(observation.payload, SizeBoundPayload)
+            for target in targets:
+                prop = _walk_to_property(target, observation.parameter_path)
+                if prop is not None:
+                    _apply_size_bound_to_property(prop, observation.payload)
+
+        return schema
 
 
 @ADJUSTMENTS.register
@@ -138,24 +238,12 @@ class RequiredFieldAdjustment:
         if not isinstance(schema, dict):
             return schema
 
-        # Deep clone: callers cache the input schema; we must never mutate it in place.
-        result = deepclone(schema)
-
-        targets: list[dict[str, Any]] = []
-        if _is_object_schema(result):
-            targets.append(result)
-        for keyword in ("oneOf", "anyOf", "allOf"):
-            branches = result.get(keyword)
-            if isinstance(branches, list):
-                for branch in branches:
-                    if isinstance(branch, dict) and _is_object_schema(branch):
-                        targets.append(branch)
-
+        targets = _collect_object_targets(schema)
         if not targets:
-            return result
+            return schema
 
         for observation in observations:
             for target in targets:
                 _walk_and_apply(target, observation.parameter_path)
 
-        return result
+        return schema

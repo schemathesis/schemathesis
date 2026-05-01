@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback import (
     ErrorFeedbackStore,
     Observation,
     ObservationKind,
+    SizeBoundPayload,
 )
 from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.error_feedback.parsers import PARSERS
@@ -25,7 +26,11 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
-from schemathesis.specs.openapi.error_feedback import RequiredFieldAdjustment, apply_adjustments
+from schemathesis.specs.openapi.error_feedback import (
+    RequiredFieldAdjustment,
+    SizeBoundAdjustment,
+    apply_adjustments,
+)
 
 
 def _obs(field: str, *, op: str = "POST /api/users") -> Observation:
@@ -275,16 +280,33 @@ def test_spring_parser_recognizes_non_blank_message_variants(message):
     "message",
     [
         "Some random validation error",
-        "size must be between 50 and 100",
         "must match pattern '[A-Z]+'",
         "value out of range",
         "",
     ],
-    ids=["random", "size-constraint", "pattern", "range", "empty-string"],
+    ids=["random", "pattern", "range", "empty-string"],
 )
 def test_spring_parser_skips_unrecognized_messages(message):
     body = {"subErrors": [{"field": "x", "message": message}]}
     assert SpringParser().parse(operation_label="POST /api/users", body=body) == ()
+
+
+@pytest.mark.parametrize(
+    "message, expected_min, expected_max",
+    [
+        ("size must be between 0 and 15", 0, 15),
+        ("size must be between 50 and 100", 50, 100),
+        ("length must be between 5 and 64", 5, 64),
+        ("SIZE MUST BE BETWEEN 1 AND 32", 1, 32),
+    ],
+    ids=["size-zero-min", "size-non-zero-min", "hibernate-length", "case-insensitive"],
+)
+def test_spring_parser_recognizes_size_bound_message_variants(message, expected_min, expected_max):
+    body = {"subErrors": [{"field": "username", "message": message}]}
+    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=expected_min, max=expected_max)),
+    ]
 
 
 SPRING_MESSAGES_MULTI = b'{"messages":["email - must not be blank","username - must not be null","age - is required"]}'
@@ -824,6 +846,21 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
                 "required": [],
             },
         ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [()],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [("foo", 0, "bar")],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [("foo", 0)],
+            {"type": "object", "properties": {}, "required": []},
+        ),
     ],
     ids=[
         "string-property-bump-minlength",
@@ -841,6 +878,9 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
         "oneof-with-no-object-branches-no-targets-passthrough",
         "nested-path-tightens-and-marks-required",
         "nested-path-creates-missing-intermediate-object",
+        "empty-path-observation-skipped",
+        "non-string-step-in-prefix-skipped",
+        "non-string-leaf-skipped",
     ],
 )
 def test_required_field_adjustment_applies_correctly(input_schema, paths, expected, case_factory):
@@ -853,37 +893,27 @@ def test_required_field_adjustment_applies_correctly(input_schema, paths, expect
     assert out == expected
 
 
-def test_required_field_adjustment_does_not_mutate_input(case_factory):
-    original = {"type": "object", "properties": {}, "required": []}
-    snapshot = {"type": "object", "properties": {}, "required": []}
-
-    RequiredFieldAdjustment().apply(
-        operation=case_factory().operation,
-        location=ParameterLocation.BODY,
-        schema=original,
-        observations=_build_observations(("email",)),
-    )
-    assert original == snapshot
-
-
 def test_required_field_adjustment_idempotent(case_factory):
+    # `apply` mutates in place, so feed it the same dict twice and check
+    # the second pass doesn't drift from the first.
     schema = {"type": "object", "properties": {}, "required": []}
     obs = _build_observations(("email",))
     operation = case_factory().operation
 
-    once = RequiredFieldAdjustment().apply(
+    RequiredFieldAdjustment().apply(
         operation=operation,
         location=ParameterLocation.BODY,
         schema=schema,
         observations=obs,
     )
-    twice = RequiredFieldAdjustment().apply(
+    snapshot = {**schema, "properties": {**schema["properties"]}, "required": [*schema["required"]]}
+    RequiredFieldAdjustment().apply(
         operation=operation,
         location=ParameterLocation.BODY,
-        schema=once,
+        schema=schema,
         observations=obs,
     )
-    assert once == twice
+    assert schema == snapshot
 
 
 def test_apply_adjustments_returns_input_when_no_observations(case_factory):
@@ -896,3 +926,246 @@ def test_apply_adjustments_returns_input_when_no_observations(case_factory):
         store=store,
     )
     assert out is schema
+
+
+def _build_size_bound_observations(
+    *items: tuple[tuple[str | int, ...], int, int],
+) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message=f"size must be between {min_value} and {max_value}",
+            payload=SizeBoundPayload(min=min_value, max=max_value),
+        )
+        for path, min_value, max_value in items
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            [(("username",), 0, 15)],
+            {
+                "type": "object",
+                "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 15}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"tags": {"type": "array", "items": {"type": "string"}}}, "required": []},
+            [(("tags",), 1, 5)],
+            {
+                "type": "object",
+                "properties": {
+                    "tags": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 5},
+                },
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"meta": {"type": "object"}}, "required": []},
+            [(("meta",), 1, 10)],
+            {
+                "type": "object",
+                "properties": {"meta": {"type": "object", "minProperties": 1, "maxProperties": 10}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            [(("age",), 0, 100)],
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"username": {"type": "string", "minLength": 5, "maxLength": 50}},
+                "required": [],
+            },
+            [(("username",), 0, 15)],
+            {
+                "type": "object",
+                "properties": {"username": {"type": "string", "minLength": 5, "maxLength": 15}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"username": {"type": ["string", "null"]}}, "required": []},
+            [(("username",), 0, 15)],
+            {
+                "type": "object",
+                "properties": {"username": {"type": ["string", "null"], "minLength": 0, "maxLength": 15}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [(("username",), 0, 15)],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (
+            {"type": "string"},
+            [(("username",), 0, 15)],
+            {"type": "string"},
+        ),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+                    {"type": "string"},
+                ]
+            },
+            [(("username",), 0, 15)],
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 15}},
+                        "required": [],
+                    },
+                    {"type": "string"},
+                ]
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {"email": {"type": "string"}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+            [(("contact", "email"), 5, 64)],
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {"email": {"type": "string", "minLength": 5, "maxLength": 64}},
+                        "required": [],
+                    }
+                },
+                "required": [],
+            },
+        ),
+        (True, [(("username",), 0, 15)], True),
+        (
+            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            [((), 0, 15)],
+            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            [((0,), 0, 15)],
+            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {"type": "object", "properties": "broken"},
+                },
+                "required": [],
+            },
+            [(("contact", "email"), 5, 64)],
+            {
+                "type": "object",
+                "properties": {
+                    "contact": {"type": "object", "properties": "broken"},
+                },
+                "required": [],
+            },
+        ),
+    ],
+    ids=[
+        "string-property-applies-length-bounds",
+        "array-property-applies-item-bounds",
+        "object-property-applies-property-bounds",
+        "integer-property-no-applicable-keyword",
+        "tighter-server-bound-overrides-looser-existing",
+        "type-union-with-null-applies-length-bounds",
+        "absent-property-not-synthesised",
+        "non-object-root-passthrough",
+        "oneof-applies-to-object-branch",
+        "nested-path-applies-bounds",
+        "bool-schema-passthrough",
+        "empty-path-observation-skipped",
+        "non-string-step-skipped",
+        "non-dict-intermediate-properties-skipped",
+    ],
+)
+def test_size_bound_adjustment_applies_correctly(input_schema, items, expected, case_factory):
+    out = SizeBoundAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_size_bound_observations(*items),
+    )
+    assert out == expected
+
+
+def test_size_bound_adjustment_preserves_stricter_existing_bound(case_factory):
+    # Schema's `maxLength: 10` is tighter than server's `max: 15` — keep the schema's.
+    schema = {"type": "object", "properties": {"username": {"type": "string", "maxLength": 10}}, "required": []}
+    out = SizeBoundAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=schema,
+        observations=_build_size_bound_observations((("username",), 0, 15)),
+    )
+    assert out == {
+        "type": "object",
+        "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 10}},
+        "required": [],
+    }
+
+
+def test_apply_adjustments_does_not_mutate_caller_schema(case_factory):
+    # Callers cache the input schema; the dispatcher must clone before mutating
+    # so adjustment-internal mutation never leaks back to the caller.
+    original = {
+        "type": "object",
+        "properties": {"username": {"type": "string"}},
+        "required": [],
+    }
+    snapshot = json.loads(json.dumps(original))
+
+    case = case_factory()
+    store = ErrorFeedbackStore()
+    blank_observation = Observation(
+        operation_label=case.operation.label,
+        location=ParameterLocation.BODY,
+        parameter_path=("username",),
+        kind=ObservationKind.MUST_NOT_BE_BLANK,
+        raw_message="must not be blank",
+    )
+    size_observation = Observation(
+        operation_label=case.operation.label,
+        location=ParameterLocation.BODY,
+        parameter_path=("username",),
+        kind=ObservationKind.SIZE_BOUND,
+        raw_message="size must be between 3 and 8",
+        payload=SizeBoundPayload(min=3, max=8),
+    )
+    for o in (blank_observation, blank_observation, size_observation, size_observation):
+        store.record(o)
+
+    out = apply_adjustments(
+        operation=case.operation,
+        location=ParameterLocation.BODY,
+        schema=original,
+        store=store,
+    )
+    assert original == snapshot
+    assert out is not original
+    assert out["properties"]["username"] == {"type": "string", "minLength": 3, "maxLength": 8}
+    assert out["required"] == ["username"]
