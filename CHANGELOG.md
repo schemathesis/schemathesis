@@ -8,6 +8,7 @@
 - Capture every element of list-shaped responses into the pool, not just the first.
 - Analyse server 4xx field errors to subsequent generation.
 - Dispatch GraphQL operations in role order: producer mutations first, queries next, cleanup last.
+- Capture identifiers from successful GraphQL responses for reuse during fuzzing.
 
 ### :bug: Fixed
 

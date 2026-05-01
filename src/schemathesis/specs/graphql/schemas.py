@@ -44,7 +44,9 @@ from schemathesis.schemas import (
     OperationDefinition,
 )
 
+from .extra_data_source import GraphQLResourcePool
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
+from .substitution import SUBSTITUTION_PROBABILITY, substitute_pool_values
 
 if TYPE_CHECKING:
     import graphql
@@ -142,9 +144,8 @@ class GraphQLSchema(BaseSchema):
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         return False
 
-    def create_extra_data_source(self) -> None:
-        """Extra data sources are not supported for GraphQL schemas."""
-        return None
+    def create_extra_data_source(self) -> GraphQLResourcePool:
+        return GraphQLResourcePool(client_schema=self.client_schema)
 
     @property
     def client_schema(self) -> graphql.GraphQLSchema:
@@ -374,9 +375,9 @@ def graphql_cases(
         codec=generation.codec,
         mode=gql_mode,
     )
-    strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
+    strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body")
     try:
-        body = draw(strategy)
+        ast_node = draw(strategy)
     except InvalidArgument:
         # Negative mode is not possible for this operation (no required arguments or scalar types to violate)
         if generation.modes == [GenerationMode.NEGATIVE]:
@@ -393,10 +394,24 @@ def graphql_cases(
             codec=generation.codec,
             mode=GqlMode.POSITIVE,
         )
-        fallback_strategy = apply_to_all_dispatchers(operation, hook_context, hooks, fallback_strategy, "body").map(
-            graphql.print_ast
-        )
-        body = draw(fallback_strategy)
+        fallback_strategy = apply_to_all_dispatchers(operation, hook_context, hooks, fallback_strategy, "body")
+        ast_node = draw(fallback_strategy)
+
+    if isinstance(extra_data_source, GraphQLResourcePool):
+        random_source = draw(st.randoms())
+        if random_source.random() < SUBSTITUTION_PROBABILITY:
+            operation_node = next(
+                (d for d in ast_node.definitions if isinstance(d, graphql.OperationDefinitionNode)),
+                None,
+            )
+            if operation_node is not None:
+                substitute_pool_values(
+                    operation_node=operation_node,
+                    client_schema=operation.schema.client_schema,  # type: ignore[attr-defined]
+                    pool=extra_data_source,
+                    random=random_source,
+                )
+    body = graphql.print_ast(ast_node)
 
     path_parameters_ = _generate_parameter(
         ParameterLocation.PATH, path_parameters, draw, operation, hook_context, hooks
