@@ -18,6 +18,7 @@ class ObservationKind(str, Enum):
     MUST_NOT_BE_BLANK = "must_not_be_blank"
     SIZE_BOUND = "size_bound"
     FORMAT = "format"
+    NUMERIC_BOUND = "numeric_bound"
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,23 @@ class FormatPayload:
     name: str
 
 
-ObservationPayload = SizeBoundPayload | FormatPayload | None
+class BoundDirection(str, Enum):
+    """Which side of a numeric range a `NumericBoundPayload` constrains."""
+
+    MIN = "min"
+    MAX = "max"
+
+
+@dataclass(frozen=True, slots=True)
+class NumericBoundPayload:
+    """One half of a numeric range — `direction` picks which side, `exclusive` whether the bound itself is excluded."""
+
+    bound: float
+    direction: BoundDirection
+    exclusive: bool
+
+
+ObservationPayload = SizeBoundPayload | FormatPayload | NumericBoundPayload | None
 
 
 @dataclass(frozen=True, slots=True)

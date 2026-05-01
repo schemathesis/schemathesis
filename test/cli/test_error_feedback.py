@@ -263,3 +263,76 @@ def test_feedback_unmasks_planted_bug_via_format(cli, format_planted_bug_app, sn
         )
         == snapshot_cli
     )
+
+
+NUMERIC_BOUNDED_FIELDS: tuple[tuple[str, str, float, str], ...] = (
+    # field, message, server-bound, schema-type
+    ("score", "must be greater than or equal to 0", 0.0, "integer"),
+    ("rating", "must be less than or equal to 5", 5.0, "integer"),
+    ("price", "must be greater than 0", 0.0, "number"),
+)
+
+
+@pytest.fixture
+def numeric_bound_planted_bug_app(ctx, app_runner):
+    # Multiple bounded numeric fields so observations cross the threshold during coverage.
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "score": {"type": "integer"},
+                            "rating": {"type": "integer"},
+                            "price": {"type": "number"},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["score", "rating", "price"],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"messages": ["Please provide Request Body in valid JSON format"]}), 400
+        score = body.get("score")
+        rating = body.get("rating")
+        price = body.get("price")
+        issues = []
+        if not isinstance(score, int) or isinstance(score, bool) or score < 0:
+            issues.append(f"score - {NUMERIC_BOUNDED_FIELDS[0][1]}")
+        if not isinstance(rating, int) or isinstance(rating, bool) or rating > 5:
+            issues.append(f"rating - {NUMERIC_BOUNDED_FIELDS[1][1]}")
+        if not isinstance(price, (int, float)) or isinstance(price, bool) or price <= 0:
+            issues.append(f"price - {NUMERIC_BOUNDED_FIELDS[2][1]}")
+        if issues:
+            return jsonify({"messages": issues}), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_numeric_bound(cli, numeric_bound_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            numeric_bound_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
