@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 from schemathesis.core.error_feedback.store import (
+    BoundDirection,
     ErrorFeedbackStore,
     FormatPayload,
+    NumericBoundPayload,
     Observation,
     ObservationKind,
     SizeBoundPayload,
@@ -13,6 +15,7 @@ from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
 from schemathesis.core.transforms import deepclone
+from schemathesis.specs.openapi.adapter import v3_1
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -30,7 +33,7 @@ class Adjustment(Protocol):
     def apply(
         self,
         *,
-        operation: APIOperation | None,
+        operation: APIOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -204,7 +207,7 @@ class FormatAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation | None,
+        operation: APIOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -241,7 +244,7 @@ class SizeBoundAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation | None,
+        operation: APIOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],
@@ -263,6 +266,79 @@ class SizeBoundAdjustment:
         return schema
 
 
+def _coerce_numeric_bound(value: float, types: list[str]) -> int | float:
+    """Emit integers when the property is integer-typed and the bound is integral."""
+    if "integer" in types and "number" not in types and value.is_integer():
+        return int(value)
+    return value
+
+
+def _apply_numeric_bound_to_property(
+    prop: dict[str, Any],
+    payload: NumericBoundPayload,
+    *,
+    is_2020_12: bool,
+) -> None:
+    """Write one numeric bound onto `prop`; skip when an existing constraint covers this direction."""
+    types = get_type(prop)
+    if "number" not in types and "integer" not in types:
+        return
+    bound = _coerce_numeric_bound(payload.bound, types)
+    if payload.direction is BoundDirection.MIN:
+        if "minimum" in prop or "exclusiveMinimum" in prop:
+            return
+        if is_2020_12 and payload.exclusive:
+            prop["exclusiveMinimum"] = bound
+        else:
+            prop["minimum"] = bound
+            if payload.exclusive:
+                prop["exclusiveMinimum"] = True
+    else:
+        if "maximum" in prop or "exclusiveMaximum" in prop:
+            return
+        if is_2020_12 and payload.exclusive:
+            prop["exclusiveMaximum"] = bound
+        else:
+            prop["maximum"] = bound
+            if payload.exclusive:
+                prop["exclusiveMaximum"] = True
+
+
+@ADJUSTMENTS.register
+class NumericBoundAdjustment:
+    """Apply server-reported numeric bounds, picking the keyword shape from the operation's draft."""
+
+    handles = frozenset({ObservationKind.NUMERIC_BOUND})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+        assert isinstance(operation.schema, OpenApiSchema)
+        is_2020_12 = operation.schema.adapter is v3_1
+        for observation in observations:
+            assert isinstance(observation.payload, NumericBoundPayload)
+            for target in targets:
+                prop = _walk_to_property(target, observation.parameter_path)
+                if prop is not None:
+                    _apply_numeric_bound_to_property(prop, observation.payload, is_2020_12=is_2020_12)
+
+        return schema
+
+
 @ADJUSTMENTS.register
 class RequiredFieldAdjustment:
     """Mark fields the server told us are mandatory as `required` with `minLength: 1`.
@@ -275,7 +351,7 @@ class RequiredFieldAdjustment:
     def apply(
         self,
         *,
-        operation: APIOperation | None,
+        operation: APIOperation,
         location: ParameterLocation,
         schema: JsonSchema,
         observations: tuple[Observation, ...],

@@ -5,7 +5,9 @@ from collections.abc import Iterable
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
+    BoundDirection,
     FormatPayload,
+    NumericBoundPayload,
     Observation,
     ObservationKind,
     ObservationPayload,
@@ -44,6 +46,16 @@ _FORMAT_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
 )
 
+# Bean-validation numeric bounds. Hibernate's stdlib emits this single shape
+# for `@Min`/`@Max`/`@DecimalMin`/`@DecimalMax` and `@Positive`/`@Negative`/
+# `@PositiveOrZero`/`@NegativeOrZero` (the last four expand to "greater/less
+# than 0" with the appropriate `or equal to` suffix).
+_NUMERIC_BOUND = re.compile(
+    r"\bmust be (?P<dir>greater|less) than(?P<inclusive>\s+or\s+equal\s+to)?\s+(?P<value>-?\d+(?:\.\d+)?)\b",
+    re.IGNORECASE,
+)
+
+
 # Custom `@ControllerAdvice` shape: each entry of `messages: [...]` is a string
 # of the form `<field> - <message>` (e.g. blog API).
 _MESSAGE_LINE = re.compile(r"^\s*([\w.]+)\s*-\s*(.+?)\s*$")
@@ -69,6 +81,14 @@ def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None
         return ObservationKind.SIZE_BOUND, SizeBoundPayload(
             min=int(size_match.group(1)),
             max=int(size_match.group(2)),
+        )
+    numeric_match = _NUMERIC_BOUND.search(message)
+    if numeric_match:
+        direction = BoundDirection.MIN if numeric_match.group("dir").lower() == "greater" else BoundDirection.MAX
+        return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
+            bound=float(numeric_match.group("value")),
+            direction=direction,
+            exclusive=numeric_match.group("inclusive") is None,
         )
     for pattern, name in _FORMAT_PATTERNS:
         if pattern.search(message):

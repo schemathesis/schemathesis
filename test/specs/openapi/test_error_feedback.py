@@ -7,8 +7,10 @@ import pytest
 
 from schemathesis.core.error_feedback import (
     MAX_ENTRIES_PER_BUCKET,
+    BoundDirection,
     ErrorFeedbackStore,
     FormatPayload,
+    NumericBoundPayload,
     Observation,
     ObservationKind,
     SizeBoundPayload,
@@ -29,6 +31,7 @@ from schemathesis.generation.meta import (
 )
 from schemathesis.specs.openapi.error_feedback import (
     FormatAdjustment,
+    NumericBoundAdjustment,
     RequiredFieldAdjustment,
     SizeBoundAdjustment,
     apply_adjustments,
@@ -349,6 +352,48 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match():
     body = {"subErrors": [{"field": "x", "message": "must be a valid UUID"}]}
     obs = SpringParser().parse(operation_label="POST /api/users", body=body)
     assert obs[0].payload == FormatPayload(name="uuid")
+
+
+@pytest.mark.parametrize(
+    "message, expected_bound, expected_direction, expected_exclusive",
+    [
+        # `@Min` / `@Max` / `@DecimalMin` / `@DecimalMax` defaults.
+        ("must be greater than or equal to 0", 0.0, BoundDirection.MIN, False),
+        ("must be less than or equal to 100", 100.0, BoundDirection.MAX, False),
+        ("must be greater than 0.5", 0.5, BoundDirection.MIN, True),
+        ("must be less than 99.99", 99.99, BoundDirection.MAX, True),
+        ("must be greater than -50", -50.0, BoundDirection.MIN, True),
+        # `@Positive` / `@Negative` / `@PositiveOrZero` / `@NegativeOrZero` —
+        # Hibernate expands these to "greater/less than 0" with the matching suffix.
+        ("must be greater than 0", 0.0, BoundDirection.MIN, True),
+        ("must be less than 0", 0.0, BoundDirection.MAX, True),
+        ("must be less than or equal to 0", 0.0, BoundDirection.MAX, False),
+        ("MUST BE GREATER THAN 5", 5.0, BoundDirection.MIN, True),
+    ],
+    ids=[
+        "min-inclusive",
+        "max-inclusive",
+        "decimal-min-exclusive",
+        "decimal-max-exclusive",
+        "negative-bound",
+        "positive",
+        "negative",
+        "negative-or-zero",
+        "case-insensitive",
+    ],
+)
+def test_spring_parser_recognizes_numeric_bound_message_variants(
+    message, expected_bound, expected_direction, expected_exclusive
+):
+    body = {"subErrors": [{"field": "score", "message": message}]}
+    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("score",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=expected_bound, direction=expected_direction, exclusive=expected_exclusive),
+        ),
+    ]
 
 
 SPRING_MESSAGES_MULTI = b'{"messages":["email - must not be blank","username - must not be null","age - is required"]}'
@@ -1290,6 +1335,204 @@ def test_format_adjustment_applies_correctly(input_schema, items, expected, case
         location=ParameterLocation.BODY,
         schema=input_schema,
         observations=_build_format_observations(*items),
+    )
+    assert out == expected
+
+
+def _build_numeric_bound_observations(
+    *items: tuple[tuple[str | int, ...], float, BoundDirection, bool],
+) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=path,
+            kind=ObservationKind.NUMERIC_BOUND,
+            raw_message=f"must be {direction.value} {bound}",
+            payload=NumericBoundPayload(bound=bound, direction=direction, exclusive=exclusive),
+        )
+        for path, bound, direction, exclusive in items
+    )
+
+
+@pytest.fixture
+def openapi_31_case_factory(openapi_31):
+    def factory():
+        return openapi_31["/users"]["GET"].Case(method="GET", media_type="application/json")
+
+    return factory
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            [(("score",), 0.0, BoundDirection.MIN, False)],
+            {"type": "object", "properties": {"score": {"type": "integer", "minimum": 0}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            [(("score",), 100.0, BoundDirection.MAX, True)],
+            {
+                "type": "object",
+                "properties": {"score": {"type": "integer", "maximum": 100, "exclusiveMaximum": True}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"price": {"type": "number"}}, "required": []},
+            [(("price",), 0.5, BoundDirection.MIN, True)],
+            {
+                "type": "object",
+                "properties": {"price": {"type": "number", "minimum": 0.5, "exclusiveMinimum": True}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": "integer", "minimum": -10}}, "required": []},
+            [(("score",), 0.0, BoundDirection.MIN, False)],
+            {
+                "type": "object",
+                "properties": {"score": {"type": "integer", "minimum": -10}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": "integer", "maximum": 999}}, "required": []},
+            [(("score",), 100.0, BoundDirection.MAX, True)],
+            {
+                "type": "object",
+                "properties": {"score": {"type": "integer", "maximum": 999}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            [(("score",), 100.0, BoundDirection.MAX, False)],
+            {"type": "object", "properties": {"score": {"type": "integer", "maximum": 100}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"name": {"type": "string"}}, "required": []},
+            [(("name",), 0.0, BoundDirection.MIN, False)],
+            {"type": "object", "properties": {"name": {"type": "string"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": ["integer", "null"]}}, "required": []},
+            [(("score",), 0.0, BoundDirection.MIN, False)],
+            {
+                "type": "object",
+                "properties": {"score": {"type": ["integer", "null"], "minimum": 0}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {}, "required": []},
+            [(("score",), 0.0, BoundDirection.MIN, False)],
+            {"type": "object", "properties": {}, "required": []},
+        ),
+        (True, [(("score",), 0.0, BoundDirection.MIN, False)], True),
+        ({"type": "string"}, [(("score",), 0.0, BoundDirection.MIN, False)], {"type": "string"}),
+        (
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+                    {"type": "string"},
+                ]
+            },
+            [(("score",), 0.0, BoundDirection.MIN, False)],
+            {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {"score": {"type": "integer", "minimum": 0}},
+                        "required": [],
+                    },
+                    {"type": "string"},
+                ]
+            },
+        ),
+        (
+            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+            [((), 0.0, BoundDirection.MIN, False)],
+            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+        ),
+    ],
+    ids=[
+        "integer-min-inclusive",
+        "integer-max-exclusive-draft4",
+        "number-decimal-bound",
+        "existing-min-not-overwritten",
+        "existing-max-not-overwritten",
+        "max-inclusive-draft4",
+        "non-numeric-property-skipped",
+        "type-union-with-null-applies",
+        "absent-property-not-synthesised",
+        "bool-schema-passthrough",
+        "non-object-root-passthrough",
+        "oneof-applies-to-object-branch",
+        "empty-path-observation-skipped",
+    ],
+)
+def test_numeric_bound_adjustment_applies_correctly_draft4(input_schema, items, expected, case_factory):
+    out = NumericBoundAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_numeric_bound_observations(*items),
+    )
+    assert out == expected
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            [(("score",), 0.0, BoundDirection.MIN, False)],
+            {"type": "object", "properties": {"score": {"type": "integer", "minimum": 0}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            [(("score",), 0.0, BoundDirection.MIN, True)],
+            {
+                "type": "object",
+                "properties": {"score": {"type": "integer", "exclusiveMinimum": 0}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            [(("score",), 100.0, BoundDirection.MAX, True)],
+            {
+                "type": "object",
+                "properties": {"score": {"type": "integer", "exclusiveMaximum": 100}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"price": {"type": "number"}}, "required": []},
+            [(("price",), 0.5, BoundDirection.MIN, True)],
+            {
+                "type": "object",
+                "properties": {"price": {"type": "number", "exclusiveMinimum": 0.5}},
+                "required": [],
+            },
+        ),
+    ],
+    ids=[
+        "integer-min-inclusive",
+        "integer-min-exclusive-draft2020",
+        "integer-max-exclusive-draft2020",
+        "number-decimal-exclusive-draft2020",
+    ],
+)
+def test_numeric_bound_adjustment_applies_correctly_draft2020(input_schema, items, expected, openapi_31_case_factory):
+    out = NumericBoundAdjustment().apply(
+        operation=openapi_31_case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_numeric_bound_observations(*items),
     )
     assert out == expected
 
