@@ -4,33 +4,29 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
- ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/graphql (in 0.00s)
 
-     Base URL:         http://127.0.0.1/
-     Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
+     Base URL:         http://127.0.0.1/graphql
+     Specification:    GraphQL
+     Operations:       0 selected / 4 total
 
  ✅  API capabilities:
 
      Supports NULL byte in headers:    ✓
 
- ⏭   Examples (in 0.00s)
-
-     ⏭  2 skipped
+     No tests were run
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
+  Selected: 0/4
   Tested: 0
-  Skipped: 2
-    - No examples in schema
 
 Test Phases:
-  ⏭  Examples
-  ⏭  Coverage (disabled)
-  ⏭  Fuzzing (disabled)
-  ⏭  Stateful (disabled)
+  ⏭  Examples (not supported)
+  ⏭  Coverage (not supported)
+  ⏭  Fuzzing (nothing to test)
+  ⏭  Stateful (not supported)
 
 Test cases:
   No test cases were generated

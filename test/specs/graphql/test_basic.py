@@ -295,7 +295,14 @@ def test_schema_error(testdir, cli, snapshot_cli, schema, extension, graphql_url
     assert cli.run(str(schema_file), f"--url={graphql_url}") == snapshot_cli
 
 
-@pytest.mark.parametrize("arg", ["--include-name=Query.getBooks", "--exclude-name=Query.getBooks"])
+@pytest.mark.parametrize(
+    "arg",
+    [
+        "--include-name=Query.getBooks",
+        "--exclude-name=Query.getBooks",
+        "--include-name=DoesNotExist",
+    ],
+)
 def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
     assert cli.run(graphql_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
 

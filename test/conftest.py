@@ -537,8 +537,12 @@ class CliSnapshotConfig:
             ):
                 continue
             lines.append(line.rstrip())
-        if "Stop reason:" in data:
-            # Fuzz live-display leaves extra blank lines on non-TTY; collapse consecutive blanks to one
+        if "Stop reason:" in data or "Empty test suite" in data:
+            # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
+            # collapse runs of consecutive blanks to one. Triggers on st fuzz output
+            # (after "Stop reason:") and on the st run "no tests ran" path
+            # ("Empty test suite") where the probing progress doesn't clean up
+            # identically across platforms.
             collapsed = []
             for line in lines:
                 if line == "" and collapsed and collapsed[-1] == "":

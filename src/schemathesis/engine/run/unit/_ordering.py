@@ -45,21 +45,12 @@ def _compute_restful_layers(operations: Iterable[APIOperation]) -> list[list[API
 
     This ordering provides better test coverage even without explicit dependencies,
     as operations that create resources run before operations that read them.
-
-    Args:
-        operations: Iterable of API operations
-
-    Returns:
-        List of three layers, each containing operations for that layer's methods.
-        Empty layers are omitted.
-
     """
     by_priority: dict[int, list[APIOperation]] = defaultdict(list)
     for op in operations:
         by_priority[restful_method_priority(op.method)].append(op)
 
     result: list[list[APIOperation]] = []
-    # Sort each layer for so the execution order is deterministic
     for priority in sorted(by_priority):
         layer = by_priority[priority]
         layer.sort(key=lambda op: (op.path, op.method))
