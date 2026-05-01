@@ -3182,6 +3182,154 @@ def test_dependency_graph(request, ctx, paths, components, snapshot_json):
     )
 
 
+def test_nested_fk_inference_independent_of_path_order(ctx):
+    # Inference must register a nested-body FK input slot regardless of whether the consumer
+    # appears before or after its producer in the spec's `paths` order.
+    location_response = {
+        "type": "object",
+        "properties": {"id": {"type": "integer"}},
+        "required": ["id"],
+    }
+    department_body = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "shipping": {
+                "type": "object",
+                "properties": {"location_id": {"type": "integer"}},
+            },
+        },
+    }
+    consumer_path = {
+        "/departments": {
+            "post": {
+                "operationId": "createDepartment",
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": department_body}},
+                },
+                "responses": {"201": {"description": "OK"}},
+            }
+        }
+    }
+    producer_path = {
+        "/locations": {
+            "post": {
+                "operationId": "createLocation",
+                "responses": {"201": {"content": {"application/json": {"schema": location_response}}}},
+            }
+        }
+    }
+
+    def _slot_for(graph):
+        for op in graph.operations.values():
+            for slot in op.inputs:
+                if slot.parameter_name == "shipping/location_id":
+                    return slot.resource.name, slot.resource_field
+        return None
+
+    producer_first = ctx.openapi.build_schema({**producer_path, **consumer_path})
+    consumer_first = ctx.openapi.build_schema({**consumer_path, **producer_path})
+
+    expected = ("Location", "id")
+    assert _slot_for(analyze(schemathesis.openapi.from_dict(producer_first))) == expected
+    assert _slot_for(analyze(schemathesis.openapi.from_dict(consumer_first))) == expected
+
+
+def test_nested_fk_inference_array_items_consumer_first(ctx):
+    # Consumer references the producer through an array of nested objects (`items: [{location_id}]`),
+    # not a sibling object. The replay path must land the array-branch FK regardless of declaration order.
+    bulk_body = {
+        "type": "object",
+        "properties": {
+            "rows": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"location_id": {"type": "integer"}},
+                },
+            }
+        },
+    }
+    consumer_path = {
+        "/bulk-departments": {
+            "post": {
+                "operationId": "createBulkDepartments",
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": bulk_body}},
+                },
+                "responses": {"201": {"description": "OK"}},
+            }
+        }
+    }
+    producer_path = {
+        "/locations": {
+            "post": {
+                "operationId": "createLocation",
+                "responses": {
+                    "201": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}},
+                                    "required": ["id"],
+                                }
+                            }
+                        }
+                    }
+                },
+            }
+        }
+    }
+    spec = ctx.openapi.build_schema({**consumer_path, **producer_path})
+    graph = analyze(schemathesis.openapi.from_dict(spec))
+
+    array_slot = next(
+        (slot for op in graph.operations.values() for slot in op.inputs if slot.parameter_name == "rows/0/location_id"),
+        None,
+    )
+    assert array_slot is not None
+    assert (array_slot.resource.name, array_slot.resource_field) == ("Location", "id")
+
+
+def test_nested_fk_inference_drops_slot_when_target_never_registered(ctx):
+    # A nested FK whose target resource is never declared anywhere stays dropped:
+    # the replay loop sees `resources.get(target) is None` and skips it.
+    consumer_only = {
+        "/orders": {
+            "post": {
+                "operationId": "createOrder",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "shipping": {
+                                        "type": "object",
+                                        "properties": {"phantom_id": {"type": "integer"}},
+                                    }
+                                },
+                            }
+                        }
+                    },
+                },
+                "responses": {"201": {"description": "OK"}},
+            }
+        }
+    }
+    spec = ctx.openapi.build_schema(consumer_only)
+    graph = analyze(schemathesis.openapi.from_dict(spec))
+
+    assert "Phantom" not in graph.resources
+    for op in graph.operations.values():
+        for slot in op.inputs:
+            assert slot.parameter_name != "shipping/phantom_id"
+
+
 @pytest.mark.parametrize(
     ["paths", "kwargs", "version"],
     [

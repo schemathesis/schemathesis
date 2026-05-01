@@ -12,6 +12,7 @@ from schemathesis.core import NOT_SET
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
+from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     extract_inputs,
@@ -60,10 +61,15 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # Cache for expensive canonicalize() calls - same schemas are often processed multiple times
     canonicalization_cache: CanonicalizationCache = {}
 
+    # Nested-body FK lookups whose target resource wasn't yet registered when the consumer
+    # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
+    deferred_nested_fks: dict[str, list[tuple[str, str, str]]] = {}
+
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
             try:
+                pending: list[tuple[str, str, str]] = []
                 inputs = list(
                     extract_inputs(
                         operation=operation,
@@ -71,6 +77,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                         updated_resources=updated_resources,
                         resolver=schema.resolver,
                         canonicalization_cache=canonicalization_cache,
+                        deferred_nested_fks=pending,
                     )
                 )
                 outputs = extract_outputs(
@@ -87,10 +94,29 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                     inputs=inputs,
                     outputs=list(outputs),
                 )
+                if pending:
+                    deferred_nested_fks[operation.label] = pending
             except RefResolutionError:
                 # Skip operations with unresolvable $refs (e.g., unavailable external references or references with typos)
                 # These won't participate in dependency detection
                 continue
+
+    # Replay nested-FK lookups whose target resource was registered later in the scan -
+    # producer paths can sort after their consumers (e.g. /departments alphabetises before
+    # /locations) and the per-operation pass would otherwise drop those slots.
+    for label, items in deferred_nested_fks.items():
+        for target_resource_name, target_field, parameter_name in items:
+            target_resource = resources.get(target_resource_name)
+            if target_resource is None:
+                continue
+            operations[label].inputs.append(
+                InputSlot(
+                    resource=target_resource,
+                    resource_field=target_field,
+                    parameter_name=parameter_name,
+                    parameter_location=ParameterLocation.BODY,
+                )
+            )
 
     # Update input slots with improved resource definitions discovered during extraction
     #
