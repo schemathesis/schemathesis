@@ -3,7 +3,9 @@ from __future__ import annotations
 import re
 
 import pytest
+from fastapi import FastAPI, HTTPException
 from flask import jsonify, request
+from pydantic import BaseModel, Field
 
 from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
 from schemathesis.core.jsonschema import is_valid
@@ -585,6 +587,72 @@ def test_feedback_unmasks_planted_bug_via_missing_query_parameter(cli, missing_q
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
+class CreateUser(BaseModel):
+    name: str = Field(min_length=3, max_length=8)
+    code: str = Field(min_length=5, max_length=20)
+    nickname: str = Field(min_length=10, max_length=50)
+
+
+# Constraint keywords removed from the served schema to mimic generator drift.
+_DROPPED_KEYWORDS = (
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "exclusiveMinimum",
+    "exclusiveMaximum",
+    "pattern",
+    "enum",
+)
+
+
+def _drop_constraints(node: object) -> None:
+    if isinstance(node, dict):
+        for keyword in _DROPPED_KEYWORDS:
+            node.pop(keyword, None)
+        for value in node.values():
+            _drop_constraints(value)
+    elif isinstance(node, list):
+        for item in node:
+            _drop_constraints(item)
+
+
+@pytest.fixture
+def pydantic_planted_bug_app(app_runner):
+    # Mirror generator drift: the model still enforces its constraints,
+    # the served schema has them dropped (e.g. Pydantic 2.10 HttpUrl).
+    app = FastAPI()
+
+    @app.post("/users")
+    def create(user: CreateUser):
+        raise HTTPException(500)
+
+    original_openapi = app.openapi
+
+    def drifted_openapi() -> dict:
+        schema = original_openapi()
+        _drop_constraints(schema.get("components", {}).get("schemas", {}))
+        return schema
+
+    app.openapi = drifted_openapi  # type: ignore[method-assign]  # FastAPI overrides via attribute assignment
+    port = app_runner.run_asgi_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_recovers_constraints_dropped_from_pydantic_schema(cli, pydantic_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            pydantic_planted_bug_app,
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+            "--seed=100",
         )
         == snapshot_cli
     )

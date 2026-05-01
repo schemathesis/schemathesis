@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from schemathesis.core.parameters import ParameterLocation
@@ -26,15 +26,17 @@ class ObservationKind(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class SizeBoundPayload:
-    """Numeric size bounds extracted from a Bean-validation `@Size`/`@Length` message.
+    """Numeric size bounds extracted from a size-constraint validation error.
 
-    Applies to whatever JSON-Schema container the field resolves to: strings
-    (`minLength`/`maxLength`), arrays (`minItems`/`maxItems`), or objects
-    (`minProperties`/`maxProperties`).
+    Either bound may be `None` when the source error reports only the violated
+    side; complementary observations are merged into a single canonical entry
+    by the store. Applies to whatever JSON-Schema container the field resolves
+    to: strings (`minLength`/`maxLength`), arrays (`minItems`/`maxItems`), or
+    objects (`minProperties`/`maxProperties`).
     """
 
-    min: int
-    max: int
+    min: int | None
+    max: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,8 +115,16 @@ class Observation:
     payload: ObservationPayload = None
 
 
-_EntryKey = tuple[tuple[str | int, ...], ObservationKind]
+_EntryKey = tuple[tuple[str | int, ...], ObservationKind, object]
 _BucketKey = tuple[str, ParameterLocation]
+
+
+def _entry_key(observation: Observation) -> _EntryKey:
+    # MIN and MAX numeric bounds for the same path are independent constraints —
+    # discriminate them so both sides survive dedup.
+    if isinstance(observation.payload, NumericBoundPayload):
+        return (observation.parameter_path, observation.kind, observation.payload.direction)
+    return (observation.parameter_path, observation.kind, None)
 
 
 @dataclass(slots=True)
@@ -156,9 +166,9 @@ class ErrorFeedbackStore:
             self._generation += 1
 
     def record(self, observation: Observation) -> None:
-        """Insert with dedup on (path, kind); evicts the lowest-count entry when full."""
+        """Insert with dedup on (path, kind, payload-discriminator); evicts the lowest-count entry when full."""
         bucket_key: _BucketKey = (observation.operation_label, observation.location)
-        entry_key: _EntryKey = (observation.parameter_path, observation.kind)
+        entry_key = _entry_key(observation)
         with self._lock:
             bucket = self._buckets.setdefault(bucket_key, _Bucket())
             entry = bucket.entries.get(entry_key)
@@ -175,6 +185,22 @@ class ErrorFeedbackStore:
             else:
                 entry.count += 1
                 entry.last_message = observation.raw_message
+                # Some validators report only the violated side of a size bound;
+                # fold complementary observations together so the canonical payload
+                # carries both edges once they have both been seen.
+                if isinstance(observation.payload, SizeBoundPayload) and isinstance(
+                    entry.canonical.payload, SizeBoundPayload
+                ):
+                    merged = SizeBoundPayload(
+                        min=observation.payload.min
+                        if observation.payload.min is not None
+                        else entry.canonical.payload.min,
+                        max=observation.payload.max
+                        if observation.payload.max is not None
+                        else entry.canonical.payload.max,
+                    )
+                    if merged != entry.canonical.payload:
+                        entry.canonical = replace(entry.canonical, payload=merged)
 
     def observations(
         self,
