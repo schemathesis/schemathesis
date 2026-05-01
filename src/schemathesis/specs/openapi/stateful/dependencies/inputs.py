@@ -35,11 +35,16 @@ def extract_inputs(
     updated_resources: set[str],
     resolver: RefResolver,
     canonicalization_cache: CanonicalizationCache,
+    deferred_nested_fks: list[tuple[str, str, str]] | None = None,
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
 
     Connects each parameter (e.g., `userId`) to its resource definition (`User`),
     creating placeholder resources if not yet discovered from their schemas.
+
+    `deferred_nested_fks` collects nested-body FK lookups whose target resource
+    isn't yet registered. The caller replays them after every operation has been
+    scanned so the slot lands once the producer has been seen.
     """
     known_dependencies = set()
     for param in operation.iter_parameters():
@@ -61,7 +66,11 @@ def extract_inputs(
         try:
             if media_types.is_json(body.media_type):
                 yield from _resolve_body_dependencies(
-                    body=body, operation=operation, resources=resources, known_dependencies=known_dependencies
+                    body=body,
+                    operation=operation,
+                    resources=resources,
+                    known_dependencies=known_dependencies,
+                    deferred_nested_fks=deferred_nested_fks,
                 )
         except MalformedMediaType:
             continue
@@ -265,6 +274,7 @@ def _resolve_body_dependencies(
     operation: APIOperation,
     resources: ResourceMap,
     known_dependencies: set[str],
+    deferred_nested_fks: list[tuple[str, str, str]] | None = None,
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
     if not isinstance(schema, dict):
@@ -355,7 +365,7 @@ def _resolve_body_dependencies(
         )
 
     # Recursively find nested FK fields in request body
-    yield from _extract_nested_body_fk_fields(resolved, resources, path="")
+    yield from _extract_nested_body_fk_fields(resolved, resources, path="", deferred=deferred_nested_fks)
 
 
 def _extract_nested_body_fk_fields(
@@ -363,6 +373,7 @@ def _extract_nested_body_fk_fields(
     resources: ResourceMap,
     path: str,
     max_depth: int = 5,
+    deferred: list[tuple[str, str, str]] | None = None,
 ) -> Iterator[InputSlot]:
     """Recursively extract FK fields from nested request body schemas.
 
@@ -370,6 +381,8 @@ def _extract_nested_body_fk_fields(
     - {shipping: {warehouse_id: "..."}} -> InputSlot for warehouse_id
     - {items: [{product_id: "..."}]} -> InputSlot for product_id
 
+    When the FK target resource isn't yet registered, the lookup is appended to
+    `deferred` so the caller can replay it once every operation has been scanned.
     """
     if max_depth <= 0:
         return
@@ -409,11 +422,15 @@ def _extract_nested_body_fk_fields(
                             parameter_name=nested_path,
                             parameter_location=ParameterLocation.BODY,
                         )
+                    elif deferred is not None:
+                        deferred.append((target_resource_name, target_field, nested_path))
                     continue
 
                 # Recurse deeper
                 if nested_schema.get("type") == "object" or "properties" in nested_schema:
-                    yield from _extract_nested_body_fk_fields(nested_schema, resources, nested_path, max_depth - 1)
+                    yield from _extract_nested_body_fk_fields(
+                        nested_schema, resources, nested_path, max_depth - 1, deferred=deferred
+                    )
 
         elif prop_type == "array":
             # Check array items for FK fields
@@ -441,10 +458,14 @@ def _extract_nested_body_fk_fields(
                                 parameter_name=item_path,
                                 parameter_location=ParameterLocation.BODY,
                             )
+                        elif deferred is not None:
+                            deferred.append((target_resource_name, target_field, item_path))
 
                 # Recurse into array items
                 if items.get("type") == "object" or "properties" in items:
-                    yield from _extract_nested_body_fk_fields(items, resources, items_path, max_depth - 1)
+                    yield from _extract_nested_body_fk_fields(
+                        items, resources, items_path, max_depth - 1, deferred=deferred
+                    )
 
 
 def update_input_field_bindings(resource_name: str, operations: OperationMap) -> None:

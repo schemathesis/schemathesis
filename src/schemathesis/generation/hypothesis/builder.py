@@ -900,9 +900,9 @@ def _iter_coverage_cases(
                         # Splice per leaf so the coverage generator still fills sibling fields.
                         sub_props = dict(prop_schema.get("properties") or {})
                         for sub_name, sub_value in value.items():
-                            sub_schema = sub_props.get(sub_name)
-                            if isinstance(sub_schema, dict):
-                                sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}
+                            sub_schema = sub_props[sub_name]
+                            assert isinstance(sub_schema, dict), "_nested_body_pool_overlay only emits dict-schema keys"
+                            sub_props[sub_name] = {**sub_schema, "examples": [sub_value]}
                         schema_properties[prop_name] = {**prop_schema, "properties": sub_props}
                     else:
                         schema_properties[prop_name] = {**prop_schema, "examples": [value]}
