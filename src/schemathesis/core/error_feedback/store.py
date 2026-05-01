@@ -20,6 +20,7 @@ class ObservationKind(str, Enum):
     FORMAT = "format"
     NUMERIC_BOUND = "numeric_bound"
     PATTERN = "pattern"
+    TYPE_MISMATCH = "type_mismatch"
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,7 +75,19 @@ class PatternPayload:
     regex: str
 
 
-ObservationPayload = SizeBoundPayload | FormatPayload | NumericBoundPayload | PatternPayload | None
+@dataclass(frozen=True, slots=True)
+class TypeMismatchPayload:
+    """Java type extracted from a Jackson `Cannot deserialize value of type ...` message.
+
+    The consumer maps the type to a JSON-Schema `format` (e.g. `java.time.LocalDate` -> `date`).
+    """
+
+    java_type: str
+
+
+ObservationPayload = (
+    SizeBoundPayload | FormatPayload | NumericBoundPayload | PatternPayload | TypeMismatchPayload | None
+)
 
 
 @dataclass(frozen=True, slots=True)
