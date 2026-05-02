@@ -861,6 +861,17 @@ OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
 
 
+def _validated_parameters(definition: Mapping[str, Any]) -> Sequence[Mapping[str, Any]]:
+    """Return the operation's `parameters` list, validating its shape."""
+    parameters = definition.get("parameters", [])
+    if not isinstance(parameters, list):
+        raise InvalidSchema("'parameters' must be a list of parameter objects")
+    for index, parameter in enumerate(parameters):
+        if not isinstance(parameter, dict):
+            raise InvalidSchema(f"'parameters[{index}]' must be a parameter object")
+    return parameters
+
+
 def iter_parameters_v2(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
@@ -878,9 +889,11 @@ def iter_parameters_v2(
     # the default because it is broader since it allows us to upload files.
     form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
 
+    operation_parameters = _validated_parameters(definition)
+
     form_parameters = []
     form_name_to_uri = {}
-    for parameter in chain(definition.get("parameters", []), shared_parameters):
+    for parameter in chain(operation_parameters, shared_parameters):
         parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
         location = parameter.get("in")
         if not isinstance(location, str):
@@ -895,7 +908,7 @@ def iter_parameters_v2(
         elif location == ParameterLocation.BODY:
             # Take the original definition & extract the resource_name from there
             resource_name = None
-            for param in chain(definition.get("parameters", []), shared_parameters):
+            for param in chain(operation_parameters, shared_parameters):
                 _, param = maybe_resolve(param, resolver, "")
                 if param.get("in") == ParameterLocation.BODY:
                     if "$ref" in param["schema"]:
@@ -937,7 +950,9 @@ def iter_parameters_v3(
     seen_querystring = False
     seen_query = False
 
-    for parameter in chain(definition.get("parameters", []), shared_parameters):
+    operation_parameters = _validated_parameters(definition)
+
+    for parameter in chain(operation_parameters, shared_parameters):
         parameter, name_to_uri = _bundle_parameter(parameter, resolver, bundler, bundle_cache)
         location = parameter.get("in")
         if not isinstance(location, str):
