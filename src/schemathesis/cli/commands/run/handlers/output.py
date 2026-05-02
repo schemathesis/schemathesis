@@ -144,6 +144,7 @@ class WarningData:
     missing_deserializer: dict[str, set[str]]
     unused_openapi_auth: set[str]
     unsupported_regex: dict[str, set[str]]
+    method_not_allowed: set[str]
 
     __slots__ = (
         "missing_auth",
@@ -152,6 +153,7 @@ class WarningData:
         "missing_deserializer",
         "unused_openapi_auth",
         "unsupported_regex",
+        "method_not_allowed",
     )
 
     def __init__(
@@ -162,6 +164,7 @@ class WarningData:
         missing_deserializer: dict[str, set[str]] | None = None,
         unused_openapi_auth: set[str] | None = None,
         unsupported_regex: dict[str, set[str]] | None = None,
+        method_not_allowed: set[str] | None = None,
     ) -> None:
         self.missing_auth = missing_auth or {}
         self.missing_test_data = missing_test_data or set()
@@ -169,6 +172,7 @@ class WarningData:
         self.missing_deserializer = missing_deserializer or {}
         self.unused_openapi_auth = unused_openapi_auth or set()
         self.unsupported_regex = unsupported_regex or {}
+        self.method_not_allowed = method_not_allowed or set()
 
     @property
     def is_empty(self) -> bool:
@@ -179,6 +183,7 @@ class WarningData:
             or self.missing_deserializer
             or self.unused_openapi_auth
             or self.unsupported_regex
+            or self.method_not_allowed
         )
 
     @property
@@ -193,6 +198,7 @@ class WarningData:
                 self.missing_deserializer,
                 self.unused_openapi_auth,
                 self.unsupported_regex,
+                self.method_not_allowed,
             )
             if warnings
         )
@@ -881,6 +887,11 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             self._check_stateful_warnings(ctx, event)
 
     def _check_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
+        if event.skip_warning is not None and event.label is not None:
+            self._record_skip_warning(ctx, event)
+            # Synthetic skip scenarios carry no interactions to inspect.
+            return
+
         statistic = aggregate_status_codes(event.recorder.interactions.values())
 
         if statistic.total == 0:
@@ -963,6 +974,20 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
         record_callback()
         if self.config.warnings.should_fail(kind):
             ctx.exit_code = 1
+
+    def _record_skip_warning(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
+        """Record a warning surfaced via a supervisor-driven scenario skip."""
+        assert event.skip_warning is not None
+        assert event.label is not None
+        assert ctx.find_operation_by_label is not None
+        operation = ctx.find_operation_by_label(event.label)
+        warnings = self.config.warnings_for(operation=operation)
+        if event.skip_warning is SchemathesisWarning.METHOD_NOT_ALLOWED and warnings.should_display(
+            SchemathesisWarning.METHOD_NOT_ALLOWED
+        ):
+            self.warnings.method_not_allowed.add(event.label)
+            if warnings.should_fail(SchemathesisWarning.METHOD_NOT_ALLOWED):
+                ctx.exit_code = 1
 
     def _record_missing_deserializer_warning(self, operation_label: str, message: str) -> Callable[[], None]:
         """Create a callback that records a missing deserializer warning."""
@@ -1178,6 +1203,16 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 suffix_text=" not defined in the schema",
                 tips=[],
                 entity_name="configured auth scheme",
+            )
+
+        if self.warnings.method_not_allowed:
+            self._display_warning_block(
+                title="Method Not Allowed",
+                operations=self.warnings.method_not_allowed,
+                suffix_text=" consistently returned `405 Method Not Allowed` — skipped from later phases",
+                tips=[
+                    "💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported"
+                ],
             )
 
         if self.warnings.unsupported_regex:
@@ -1426,6 +1461,16 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
                 click.echo(
                     _style(
                         f"  ⚠️ Unsupported regex: {bold(str(count))} operation{suffix} had regex patterns removed",
+                        fg="yellow",
+                    )
+                )
+
+            if self.warnings.method_not_allowed:
+                count = len(self.warnings.method_not_allowed)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Method Not Allowed: {bold(str(count))} operation{suffix} skipped after consistent 405 responses",
                         fg="yellow",
                     )
                 )

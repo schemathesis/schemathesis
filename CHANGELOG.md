@@ -8,6 +8,7 @@
 - Capture every element of list-shaped responses into the pool, not just the first.
 - Analyse server 4xx field errors to subsequent generation.
 - Chain GraphQL operations: dispatch producer mutations first and substitute captured identifiers into matching arguments.
+- Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
 
 ### :bug: Fixed
 

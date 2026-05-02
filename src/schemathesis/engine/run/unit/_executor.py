@@ -355,16 +355,20 @@ def run_test(
             if extra_data_source.should_record(operation=operation.label):
                 extra_data_source.record_response(operation=operation, response=response, case=case)
             # Record request data so identifiers from path/body land in the same pool.
-            # Skip method-mutated cases (e.g. coverage's METHOD scenario) — their 2xx may come
-            # from a route registered for a different method and tells us nothing about whether
-            # the captured value is valid for the operation under test.
-            if (
-                extra_data_source.should_record_request(operation=operation.label)
-                and case.method.lower() == operation.method.lower()
-            ):
+            if extra_data_source.should_record_request(operation=operation.label) and _targets_declared_method(case):
                 extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
 
     yield scenario_finished(status)
+
+
+def _targets_declared_method(case: Case) -> bool:
+    """True when `case` exercises the operation's declared HTTP method.
+
+    Method-mutated cases (e.g. coverage's `METHOD` scenario sending POST to a GET-only route)
+    yield 2xx/4xx that describe the mutated method's path, not the operation under test —
+    response-driven signal must be filtered through this check before being attributed to it.
+    """
+    return case.method.lower() == case.operation.method.lower()
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:
@@ -490,6 +494,13 @@ def test_func(
             operation=case.operation,
             case=case,
             response=response,
+        )
+    if _targets_declared_method(case):
+        is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None
+        ctx.supervisor.record_response(
+            operation_label=case.operation.label,
+            status_code=response.status_code,
+            is_documented_status=is_documented_status,
         )
     # Record DELETE attempts immediately to influence subsequent strategy draws.
     # Include both successful (2xx) and 404 responses - each attempt increases decay
