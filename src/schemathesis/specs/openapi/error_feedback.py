@@ -14,6 +14,7 @@ from schemathesis.core.error_feedback.store import (
     SizeBoundPayload,
     TypeMismatchPayload,
 )
+from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.jsonschema.types import JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
@@ -89,6 +90,7 @@ def _is_object_schema(schema: dict[str, Any]) -> bool:
 
 def _collect_object_targets(schema: dict[str, Any]) -> list[dict[str, Any]]:
     """Root + every object branch of `oneOf`/`anyOf`/`allOf` worth descending into."""
+    schema = maybe_resolve_bundled(schema)
     targets: list[dict[str, Any]] = []
     if _is_object_schema(schema):
         targets.append(schema)

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import MalformedMediaType
-from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
+from schemathesis.core.jsonschema import maybe_resolve_bundled
 from schemathesis.core.jsonschema.types import get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
@@ -260,14 +260,6 @@ GENERIC_FIELD_NAMES = frozenset(
 )
 
 
-def _maybe_resolve_bundled(root: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
-    # Right now, the body schema comes bundled to dependency analysis
-    if BUNDLE_STORAGE_KEY in root and "$ref" in schema:
-        key = schema["$ref"].split("/")[-1]
-        return root[BUNDLE_STORAGE_KEY][key]
-    return schema
-
-
 def _resolve_body_dependencies(
     *,
     body: OpenApiBody,
@@ -280,7 +272,7 @@ def _resolve_body_dependencies(
     if not isinstance(schema, dict):
         return
 
-    resolved = _maybe_resolve_bundled(schema, schema)
+    resolved = maybe_resolve_bundled(schema)
 
     # For `items`, we'll inject an array with extracted resource
     items = resolved.get("items", {})

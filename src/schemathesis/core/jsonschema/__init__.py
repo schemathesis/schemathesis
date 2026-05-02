@@ -61,6 +61,16 @@ def schema_with_bundle(schema: Any, root_schema: Any) -> Any:
     return {**schema, BUNDLE_STORAGE_KEY: bundled}
 
 
+def maybe_resolve_bundled(schema: dict[str, Any]) -> dict[str, Any]:
+    """Follow `$ref` into a sibling `x-bundled` map; return `schema` as-is when not a bundled-ref node."""
+    ref = schema.get("$ref")
+    bundled = schema.get(BUNDLE_STORAGE_KEY)
+    if not isinstance(ref, str) or not isinstance(bundled, dict):
+        return schema
+    target = bundled.get(ref.rsplit("/", 1)[-1])
+    return target if isinstance(target, dict) else schema
+
+
 def is_valid(value: Any, schema: dict[str, Any]) -> bool:
     """Return True if value satisfies schema, False if it does not.
 
@@ -84,6 +94,7 @@ __all__ = [
     "is_valid",
     "make_validator",
     "make_validator_for",
+    "maybe_resolve_bundled",
     "schema_with_bundle",
     "REFERENCE_TO_BUNDLE_PREFIX",
     "BUNDLE_STORAGE_KEY",

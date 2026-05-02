@@ -474,6 +474,69 @@ def test_feedback_unmasks_planted_bug_via_type_mismatch(cli, jackson_planted_bug
     )
 
 
+@pytest.fixture
+def jackson_planted_bug_app_ref_bundled(ctx, app_runner):
+    # Body schema references `components.schemas.User`, which itself $refs another component —
+    # this two-hop chain is what schemathesis's loader turns into the `x-bundled` form
+    # observed on real Spring/PTS specs.
+    address_schema = {"type": "object", "properties": {"street": {"type": "string"}}}
+    user_schema = {
+        "type": "object",
+        "properties": {field: {"type": "string"} for field, _, _, _ in JACKSON_TYPED_FIELDS}
+        | {"address": {"$ref": "#/components/schemas/Address"}},
+        "required": [field for field, _, _, _ in JACKSON_TYPED_FIELDS],
+    }
+    paths = {
+        "/users": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                },
+                "responses": {"400": {"description": "Bad"}, "500": {"description": "Server Error"}},
+            }
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(paths, components={"schemas": {"User": user_schema, "Address": address_schema}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"msg": "JSON parse error"}), 400
+        envelope: dict[str, str] = {}
+        for field, java_type, carrier_key, format_name in JACKSON_TYPED_FIELDS:
+            value = body.get(field)
+            if not is_valid(value, {"type": "string", "format": format_name}):
+                envelope[carrier_key] = (
+                    f"JSON parse error: Cannot deserialize value of type "
+                    f'`{java_type}` from String "{value}" through reference chain: User["{field}"]'
+                )
+        if envelope:
+            return jsonify(envelope), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_type_mismatch_ref_bundled(
+    cli, jackson_planted_bug_app_ref_bundled, snapshot_cli
+):
+    # Adjustment must reach the body schema even when bundled behind $ref / x-bundled.
+    assert (
+        cli.run(
+            jackson_planted_bug_app_ref_bundled,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
 # Multiple int fields so overflow observations cross the calibration threshold during coverage.
 JACKSON_OVERFLOW_FIELDS: tuple[tuple[str, str], ...] = (
     ("availableBeds", "msg"),
