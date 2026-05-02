@@ -824,6 +824,51 @@ def test_jackson_parser_extracts_one_observation_per_carrier_key():
     ]
 
 
+_JACKSON_OVERFLOW_INT = (
+    "JSON parse error: Numeric value (-8805630315124945371) out of range of int;\n"
+    "  nested exception is com.fasterxml.jackson.databind.JsonMappingException:\n"
+    "  Numeric value (-8805630315124945371) out of range of int\n"
+    " at [Source: (PushbackInputStream); line: 1, column: 557]\n"
+    ' (through reference chain: br.com.codenation.hospital.dto.HospitalDTO["availableBeds"])'
+)
+
+
+def test_jackson_numeric_overflow_int():
+    obs = JacksonParser().parse(operation_label="POST /api/users", body={"msg": _JACKSON_OVERFLOW_INT})
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("availableBeds",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=-2_147_483_648.0, direction=BoundDirection.MIN, exclusive=False),
+        ),
+        (
+            ("availableBeds",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=2_147_483_647.0, direction=BoundDirection.MAX, exclusive=False),
+        ),
+    ]
+
+
+def test_jackson_numeric_overflow_long():
+    message = (
+        "JSON parse error: Numeric value (99999999999999999999) out of range of long "
+        'through reference chain: Order["quantity"]'
+    )
+    obs = JacksonParser().parse(operation_label="POST /api/users", body={"msg": message})
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("quantity",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=-9_223_372_036_854_775_808.0, direction=BoundDirection.MIN, exclusive=False),
+        ),
+        (
+            ("quantity",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=9_223_372_036_854_775_807.0, direction=BoundDirection.MAX, exclusive=False),
+        ),
+    ]
+
+
 SPRING_MESSAGES_MULTI = b'{"messages":["email - must not be blank","username - must not be null","age - is required"]}'
 SPRING_SUBERRORS_MULTI = (
     b'{"subErrors":[{"field":"email","message":"must not be blank"},{"field":"username","message":"is required"}]}'
