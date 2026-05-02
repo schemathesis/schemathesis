@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Final
 
 import hypothesis
 from hypothesis.errors import InvalidDefinition
@@ -37,6 +37,10 @@ DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
     stateful_step_count=DEFAULT_MAX_SCENARIO_STEPS,
     suppress_health_check=list(hypothesis.HealthCheck),
 )
+
+# Probability that a stateful rule generates a fresh value for an id-typed argument
+# instead of drawing from the bundle. Forces discovery of bugs that need unknown ids.
+BASE_EXPLORATION_RATE: Final = 0.15
 
 
 @dataclass
