@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from schemathesis.core.error_feedback.store import Observation
 from schemathesis.core.registries import Registry
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 
 class ResponseParser(Protocol):
@@ -18,7 +21,7 @@ class ResponseParser(Protocol):
     def parse(
         self,
         *,
-        operation_label: str,
+        operation: APIOperation,
         body: object,
     ) -> tuple[Observation, ...]:
         """Extract observations from the body. Empty tuple means no signal."""
@@ -29,4 +32,4 @@ PARSERS: Registry[type[ResponseParser]] = Registry()
 
 
 # Bundled parsers self-register on import.
-from schemathesis.core.error_feedback.parsers import jackson, pydantic, spring  # noqa: F401, E402
+from schemathesis.core.error_feedback.parsers import drf, jackson, pydantic, spring  # noqa: F401, E402

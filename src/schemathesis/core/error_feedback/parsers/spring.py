@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
+from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
@@ -16,6 +17,9 @@ from schemathesis.core.error_feedback.store import (
     TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 # Bean Validation messages we recognize as "this field is required and non-blank":
 # Spring's stdlib `must not be blank/null/empty`, plus common custom variants
@@ -178,11 +182,12 @@ class SpringParser:
     def parse(
         self,
         *,
-        operation_label: str,
+        operation: APIOperation,
         body: object,
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
             return ()
+        operation_label = operation.label
         observations: list[Observation] = []
         observations.extend(self._extract_messages(operation_label, body))
         observations.extend(self._extract_sub_errors(operation_label, body))
@@ -293,7 +298,7 @@ class SpringParser:
                 # the parameter was bound from the path or query, so we emit on
                 # both — the consumer's `_walk_to_property` ignores locations
                 # whose schema doesn't declare the field.
-                payload = TypeMismatchPayload(java_type=coercion_match.group("to"))
+                payload = TypeMismatchPayload(type_name=coercion_match.group("to"))
                 for location in (ParameterLocation.PATH, ParameterLocation.QUERY):
                     yield Observation(
                         operation_label=operation_label,

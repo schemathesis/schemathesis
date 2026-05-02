@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
@@ -12,6 +13,9 @@ from schemathesis.core.error_feedback.store import (
     TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 # Jackson `MismatchedInputException` / `InvalidFormatException` text. The verb
 # spelling (`Can not` -> `Cannot`) and type wrapping (bare -> backticks) changed
@@ -132,11 +136,12 @@ class JacksonParser:
     def parse(
         self,
         *,
-        operation_label: str,
+        operation: APIOperation,
         body: object,
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
             return ()
+        operation_label = operation.label
         observations: list[Observation] = []
         for message in _carrier_strings(body):
             path = _extract_path(message)
@@ -155,7 +160,7 @@ class JacksonParser:
                         parameter_path=path,
                         kind=ObservationKind.TYPE_MISMATCH,
                         raw_message=message,
-                        payload=TypeMismatchPayload(java_type=type_match),
+                        payload=TypeMismatchPayload(type_name=type_match),
                     )
                 )
             enum_values = _match_enum_values(message)

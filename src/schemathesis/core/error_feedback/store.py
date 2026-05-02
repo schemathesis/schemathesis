@@ -80,12 +80,13 @@ class PatternPayload:
 
 @dataclass(frozen=True, slots=True)
 class TypeMismatchPayload:
-    """Java type extracted from a Jackson `Cannot deserialize value of type ...` message.
+    """Framework-specific type identifier — Java FQN from Jackson/Spring, JSON-Schema type token from DRF.
 
-    The consumer maps the type to a JSON-Schema `format` (e.g. `java.time.LocalDate` -> `date`).
+    The consumer dispatches by inspecting the value: closed-set JSON-Schema types correct schema
+    `type`; anything else is treated as a Java FQN and mapped to JSON-Schema `format`.
     """
 
-    java_type: str
+    type_name: str
 
 
 @dataclass(frozen=True, slots=True)

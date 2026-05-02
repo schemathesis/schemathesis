@@ -60,14 +60,14 @@ class FeedbackPipeline:
         # Same-shape consecutive calls go through the MRU slot only.
         last = self._last_match
         if last is not None and last.can_parse(body=body):
-            observations = last.parse(operation_label=operation.label, body=body)
+            observations = last.parse(operation=operation, body=body)
             if observations:
                 return observations
         # It is possible to have different parsers applied for API gateways, where the actual backends are different
         for parser in self._parsers:
             if parser is last or not parser.can_parse(body=body):
                 continue
-            observations = parser.parse(operation_label=operation.label, body=body)
+            observations = parser.parse(operation=operation, body=body)
             if observations:
                 with self._lock:
                     self._last_match = parser
