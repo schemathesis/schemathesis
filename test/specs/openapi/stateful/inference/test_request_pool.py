@@ -261,7 +261,6 @@ def test_request_pool_captures_body_fields(cli, app_runner, snapshot_cli, ctx):
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
             "-c response_schema_conformance",
-            "--max-examples=10",
         )
         == snapshot_cli
     )
