@@ -32,6 +32,7 @@ from schemathesis.generation.meta import (
     FuzzingPhaseData,
     GenerationInfo,
     PhaseInfo,
+    StatefulPhaseData,
     TestPhase,
 )
 from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
@@ -49,14 +50,18 @@ from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 from .substitution import SUBSTITUTION_PROBABILITY, substitute_pool_values
 
 if TYPE_CHECKING:
+    from random import Random
+
     import graphql
     from hypothesis.strategies import SearchStrategy
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.engine.run.unit._pool import DefaultScheduler
+    from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.resources import ExtraDataSource
 
 
@@ -89,6 +94,12 @@ class GraphQLResponses:
 
 @dataclass
 class GraphQLSchema(BaseSchema):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        from schemathesis.specs.graphql.analysis import GraphQLAnalysis
+
+        self.analysis = GraphQLAnalysis(self)
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
@@ -140,6 +151,17 @@ class GraphQLSchema(BaseSchema):
 
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         return False
+
+    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
+        # `error_feedback` is OpenAPI-specific; `hypothesis-graphql` strategies have no hook to consume it.
+        from schemathesis.specs.graphql.stateful import create_state_machine
+
+        return create_state_machine(self)
+
+    def apply_stateful_inference(self, ctx: EngineContext) -> int:
+        # All GraphQL transitions are derived from schema structure (no `links` keyword equivalent),
+        # so the entire selected count is reported through the engine's `inferred` channel.
+        return self.analysis.transition_count
 
     def create_extra_data_source(self) -> GraphQLResourcePool:
         return GraphQLResourcePool(client_schema=self.client_schema)
@@ -377,6 +399,7 @@ def graphql_cases(
     # Not supported for GraphQL, passed here to unify interfaces
     extra_data_source: ExtraDataSource | None = None,
     error_feedback: ErrorFeedbackStore | None = None,
+    mutate_ast: Callable[[graphql.OperationDefinitionNode, Random], None] | None = None,
 ) -> Any:
     import graphql
     from hypothesis.errors import InvalidArgument
@@ -391,7 +414,7 @@ def graphql_cases(
     }[definition.root_type]
     hook_context = HookContext(operation=operation)
     custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
-    generation = operation.schema.config.generation_for(operation=operation, phase="fuzzing")
+    generation = operation.schema.config.generation_for(operation=operation, phase=phase.value)
     gql_mode = GqlMode.NEGATIVE if generation_mode == GenerationMode.NEGATIVE else GqlMode.POSITIVE
     effective_mode = generation_mode
     strategy = strategy_factory(
@@ -426,20 +449,22 @@ def graphql_cases(
         fallback_strategy = apply_to_all_dispatchers(operation, hook_context, hooks, fallback_strategy, "body")
         ast_node = draw(fallback_strategy)
 
-    if isinstance(extra_data_source, GraphQLResourcePool):
-        random_source = draw(st.randoms())
-        if random_source.random() < SUBSTITUTION_PROBABILITY:
-            operation_node = next(
-                (d for d in ast_node.definitions if isinstance(d, graphql.OperationDefinitionNode)),
-                None,
-            )
-            if operation_node is not None:
+    operation_node = next(
+        (d for d in ast_node.definitions if isinstance(d, graphql.OperationDefinitionNode)),
+        None,
+    )
+    if operation_node is not None:
+        if isinstance(extra_data_source, GraphQLResourcePool):
+            random_source = draw(st.randoms())
+            if random_source.random() < SUBSTITUTION_PROBABILITY:
                 substitute_pool_values(
                     operation_node=operation_node,
                     client_schema=operation.schema.client_schema,  # type: ignore[attr-defined]
                     pool=extra_data_source,
                     random=random_source,
                 )
+        if mutate_ast is not None:
+            mutate_ast(operation_node, draw(st.randoms()))
     body = graphql.print_ast(ast_node)
 
     path_parameters_ = _generate_parameter(
@@ -463,8 +488,14 @@ def graphql_cases(
             parameter_location=None,
             location=None,
         ),
+        TestPhase.STATEFUL: StatefulPhaseData(
+            description=description,
+            parameter=None,
+            parameter_location=None,
+            location=None,
+        ),
     }[phase]
-    phase_data = cast(ExamplesPhaseData | FuzzingPhaseData, _phase_data)
+    phase_data = cast(ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData, _phase_data)
     instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,

@@ -5,9 +5,10 @@ from __future__ import annotations
 import graphql
 
 
-def _unwrap(t: graphql.GraphQLType) -> graphql.GraphQLType:
+def _unwrap(t: graphql.GraphQLType) -> graphql.GraphQLNamedType:
     while isinstance(t, (graphql.GraphQLNonNull, graphql.GraphQLList)):
         t = t.of_type
+    assert isinstance(t, graphql.GraphQLNamedType)
     return t
 
 

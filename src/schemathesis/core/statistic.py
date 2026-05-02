@@ -19,13 +19,13 @@ class FilteredCount:
 
 @dataclass
 class ApiStatistic:
-    """Statistics about API operations and links."""
+    """Statistics about API operations and inferable stateful transitions."""
 
     operations: FilteredCount
-    links: FilteredCount
+    transitions: FilteredCount
 
-    __slots__ = ("operations", "links")
+    __slots__ = ("operations", "transitions")
 
     def __init__(self) -> None:
         self.operations = FilteredCount()
-        self.links = FilteredCount()
+        self.transitions = FilteredCount()

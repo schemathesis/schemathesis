@@ -161,7 +161,7 @@ class CaseNode:
     value: Case
     parent_id: str | None
     # Transition may be absent if `parent_id` is present for cases when a case is derived inside a check
-    # and outside of the implemented transition logic (e.g. Open API links)
+    # and outside of the implemented transition logic (e.g. spec-specific stateful transitions)
     transition: Transition | None
     is_transition_applied: bool
 

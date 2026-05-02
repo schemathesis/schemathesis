@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -11,7 +12,38 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from schemathesis.generation.stateful.state_machine import StepInput
-    from schemathesis.generation.stateful.transitions import Transitions
+
+
+class _Endpoint(Protocol):
+    @property
+    def label(self) -> str: ...  # pragma: no cover
+
+
+class _Edge(Protocol):
+    @property
+    def source(self) -> _Endpoint: ...  # pragma: no cover
+
+    @property
+    def target(self) -> _Endpoint: ...  # pragma: no cover
+
+
+class _OperationTransitions(Protocol):
+    @property
+    def incoming(self) -> Sequence[_Edge]: ...  # pragma: no cover
+
+    @property
+    def outgoing(self) -> Sequence[_Edge]: ...  # pragma: no cover
+
+
+class Transitions(Protocol):
+    """Spec-agnostic transition graph contract."""
+
+    @property
+    def operations(self) -> Mapping[str, _OperationTransitions]: ...  # pragma: no cover
+
+    def producer_labels_for_bundle(self, bundle_name: str) -> Iterable[str]:  # pragma: no cover
+        """Yield operation labels that emit values into the named bundle."""
+        ...
 
 
 # It is enough to be able to catch double-click type of issues
@@ -71,7 +103,10 @@ class TransitionController:
             return True
 
         # If all non-root operations are blocked, then allow root ones to make progress
-        history = {name.split("->")[0].strip() for name, values in bundles.items() if values}
+        history: set[str] = set()
+        for name, values in bundles.items():
+            if values:
+                history.update(self.transitions.producer_labels_for_bundle(name))
         return all(
             incoming.source.label not in history
             or not self.allow_transition(incoming.source.label, incoming.target.label)

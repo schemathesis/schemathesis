@@ -472,8 +472,8 @@ class BaseSchema(Mapping):
 
         return DefaultScheduler(operations=operations)
 
-    def apply_stateful_links(self, ctx: EngineContext) -> int:
-        """Inject spec-specific stateful links from runtime observations; return the number injected."""
+    def apply_stateful_inference(self, ctx: EngineContext) -> int:
+        """Discover spec-specific stateful transitions; return the number available."""
         return 0
 
     def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]:

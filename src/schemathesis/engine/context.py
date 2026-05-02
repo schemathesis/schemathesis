@@ -111,9 +111,9 @@ class EngineContext:
         if self.observations is not None:
             self.observations.extract_observations_from(recorder)
 
-    def inject_links(self) -> int:
-        """Inject spec-specific stateful links into API operations based on collected observations."""
-        return self.schema.apply_stateful_links(self)
+    def apply_stateful_inference(self) -> int:
+        """Discover spec-specific stateful transitions; return the number available."""
+        return self.schema.apply_stateful_inference(self)
 
     def stop(self) -> None:
         self.control.stop()

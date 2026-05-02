@@ -7,7 +7,8 @@
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
 - Capture every element of list-shaped responses into the pool, not just the first.
 - Analyze server 4xx field errors to subsequent generation (Spring, Pydantic, DRF shapes are supported).
-- Chain GraphQL operations: dispatch producer mutations first and substitute captured identifiers into matching arguments.
+- GraphQL fuzzing: dispatch producer mutations first and reuse captured identifiers across test cases.
+- GraphQL stateful phase: chained operation scenarios.
 - Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
 
 ### :bug: Fixed

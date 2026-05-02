@@ -54,27 +54,27 @@ class Engine:
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""
         phases = [
-            self.get_phase_config(PhaseName.PROBING, is_supported=True, requires_links=False),
+            self.get_phase_config(PhaseName.PROBING, is_supported=True, requires_transitions=False),
             self.get_phase_config(
                 PhaseName.SCHEMA_ANALYSIS,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.SCHEMA_ANALYSIS),
-                requires_links=False,
+                requires_transitions=False,
             ),
             self.get_phase_config(
                 PhaseName.EXAMPLES,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.EXAMPLES),
-                requires_links=False,
+                requires_transitions=False,
             ),
             self.get_phase_config(
                 PhaseName.COVERAGE,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.COVERAGE),
-                requires_links=False,
+                requires_transitions=False,
             ),
-            self.get_phase_config(PhaseName.FUZZING, is_supported=True, requires_links=False),
+            self.get_phase_config(PhaseName.FUZZING, is_supported=True, requires_transitions=False),
             self.get_phase_config(
                 PhaseName.STATEFUL_TESTING,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.STATEFUL_TESTING),
-                requires_links=True,
+                requires_transitions=True,
             ),
         ]
         return ExecutionPlan(phases)
@@ -84,7 +84,7 @@ class Engine:
         phase_name: PhaseName,
         *,
         is_supported: bool = True,
-        requires_links: bool = False,
+        requires_transitions: bool = False,
     ) -> Phase:
         """Helper to determine phase configuration with proper skip reasons."""
         # Check if feature is supported by the schema
@@ -108,7 +108,7 @@ class Engine:
                 skip_reason=PhaseSkipReason.DISABLED,
             )
 
-        if requires_links and self.schema.statistic.links.total == 0:
+        if requires_transitions and self.schema.statistic.transitions.total == 0:
             return Phase(
                 name=phase_name,
                 is_supported=True,
@@ -180,11 +180,11 @@ class ExecutionPlan:
             phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
         # Phase can be enabled if certain conditions are met
         if phase.name == PhaseName.STATEFUL_TESTING:
-            inferred = engine.inject_links()
-            # Enable stateful testing if we successfully generated any links
+            inferred = engine.apply_stateful_inference()
+            # Enable stateful testing if we successfully inferred any transitions
             if inferred:
                 phase.enable()
-            return StatefulPhasePayload(inferred_links=inferred)
+            return StatefulPhasePayload(inferred_transitions=inferred)
         return None
 
 

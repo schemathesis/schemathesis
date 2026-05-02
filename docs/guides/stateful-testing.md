@@ -9,13 +9,15 @@ This guide shows how to customize Schemathesis's stateful testing to handle non-
 
 Stateful testing only runs when Schemathesis can discover relationships between your operations.
 
-This can happen in three ways:
+For **OpenAPI** schemas, this can happen in three ways:
 
 - **Automatic analysis.** Schemathesis infers links from your response schemas and path parameters.
 - **`Location` headers.** When earlier phases (examples, coverage, fuzzing) encounter `Location` headers, the CLI learns new links and reuses them in the later stateful phase.
 - **Manual OpenAPI links.** You explicitly describe the relationship in your schema.
 
-If none of these mechanisms applies, the stateful phase has nothing to execute (see [Running stateful tests from the CLI](#running-stateful-tests-from-the-cli) for details). Add explicit links (see below) or adjust the schema so automatic inference becomes possible.
+For **GraphQL** schemas, the type graph encodes the connections directly. A mutation returning `Book!` is automatically chained to queries and mutations taking a `Book` id. Stateful testing runs automatically when the schema has at least one producer mutation.
+
+If no producers/links are discovered, the stateful phase has nothing to execute. For OpenAPI, add explicit links (see below) or adjust the schema so automatic inference becomes possible. For GraphQL, ensure at least one mutation returns an Object type with an `id` field.
 
 !!! info
     Automatic dependency analysis runs automatically when you call `schema.as_state_machine()` in Python or pytest, respecting your configuration settings. `Location` header inference still requires the CLI, as it needs to collect headers from test runs.
