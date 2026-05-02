@@ -18,6 +18,7 @@
 - Pool keeps re-feeding successfully-deleted resource identifiers to subsequent operations.
 - Apply pool overlay to foreign-key fields nested inside request body objects.
 - Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
+- Drop spec examples invalidated by inferred constraints from the example mixer.
 
 ### :wrench: Changed
 

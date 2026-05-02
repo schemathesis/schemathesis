@@ -681,9 +681,22 @@ class OpenApiBody(OpenApiComponent):
         # Mix in schema examples for positive mode (20% example, 80% generated)
         # Skip during EXAMPLES phase since examples are handled separately there
         if mix_examples and generation_mode == GenerationMode.POSITIVE:
+            # Filter against the adjustment-applied schema so spec examples that the SUT
+            # has demonstrated to be invalid (e.g. `"dd-MM-yyyy"` after format inference)
+            # don't leak into the mixer.
+            validation_schema = self.validation_schema
+            if error_feedback is not None:
+                from schemathesis.specs.openapi.error_feedback import apply_adjustments
+
+                validation_schema = apply_adjustments(
+                    operation=operation,
+                    location=ParameterLocation.BODY,
+                    schema=validation_schema,
+                    store=error_feedback,
+                )
             strategy_examples = filter_schema_valid_examples(
                 self._get_strategy_examples(operation),
-                self.validation_schema,
+                validation_schema,
                 self.adapter.jsonschema_validator_cls,
             )
             if strategy_examples:
@@ -1211,11 +1224,19 @@ class OpenApiParameterSet(ParameterSet):
             # Skip during EXAMPLES phase since examples are handled separately there
             if mix_examples and not is_negative:
                 validator_cls = operation.schema.adapter.jsonschema_validator_cls
+                # Splice inferred constraints (format / min / max etc.) onto each parameter's
+                # validation schema so examples the SUT has demonstrated to be invalid get evicted.
+                adjusted_properties = schema_obj.get("properties") if isinstance(schema_obj, dict) else None
                 parameter_examples: dict[str, list[Any]] = {}
                 for param in self.items:
                     if param.name in exclude_key or not param.examples:
                         continue
-                    valid = filter_schema_valid_examples(param.examples, param.validation_schema, validator_cls)
+                    validation_schema = param.validation_schema
+                    if isinstance(adjusted_properties, dict) and isinstance(validation_schema, dict):
+                        inferred = adjusted_properties.get(param.name)
+                        if isinstance(inferred, dict):
+                            validation_schema = {**validation_schema, **inferred}
+                    valid = filter_schema_valid_examples(param.examples, validation_schema, validator_cls)
                     if valid:
                         parameter_examples[param.name] = valid
                 if parameter_examples:
