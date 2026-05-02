@@ -380,6 +380,11 @@ def app_factory(ctx):
         reuse_deleted_ids: bool = False,
     ):
         config.use_after_free = use_after_free
+        if use_after_free:
+            # Names with `len < 10` are actually deleted, names with `len >= 10` aren't —
+            # pin the schema to the latter so every POST-then-DELETE-then-GET triggers the
+            # check, leaving discovery up to state-machine exploration alone.
+            schema["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 10
         config.reuse_deleted_ids = reuse_deleted_ids
         config.ensure_resource_availability = ensure_resource_availability
         config.auth_token = auth_token
