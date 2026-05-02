@@ -173,11 +173,11 @@ class OpenApiSchema(BaseSchema):
             else:
                 meta.generation.mode = GenerationMode.NEGATIVE
 
-    def as_state_machine(self) -> type[APIStateMachine]:
+    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
             self.analysis.inject_links()
-        return create_state_machine(self)
+        return create_state_machine(self, error_feedback=error_feedback)
 
     def get_unit_scheduler(
         self,

@@ -913,3 +913,212 @@ def test_stale_example_evicted_after_format_inference_on_query_param(ctx, app_ru
     assert fuzzing_token_values, "No fuzzing query draws collected"
     stale = [v for v in fuzzing_token_values if v == "NOT_A_UUID"]
     assert not stale, f"Stale `token`: {len(stale)}/{len(fuzzing_token_values)} fuzzing draws"
+
+
+_STALE_DATES = ("dd-MM-yyyy", "MM/dd/yyyy")
+_STALE_TOKENS = ("NOT_A_UUID_1", "NOT_A_UUID_2")
+
+
+def test_stale_body_example_evicted_in_coverage_after_examples_observations(ctx, app_runner):
+    paths = {
+        "/events": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["commitDate"],
+                                "properties": {"commitDate": {"type": "string"}},
+                            },
+                            "examples": {
+                                "alpha": {"value": {"commitDate": _STALE_DATES[0]}},
+                                "beta": {"value": {"commitDate": _STALE_DATES[1]}},
+                            },
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/events", methods=["POST"])
+    def create_event():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"msg": "JSON parse error"}), 400
+        value = body.get("commitDate")
+        if not isinstance(value, str) or not _ISO_DATETIME.match(value):
+            return jsonify(
+                {
+                    "msg": (
+                        f"JSON parse error: Cannot deserialize value of type `java.time.LocalDateTime` "
+                        f'from String "{value}" through reference chain: Event["commitDate"]'
+                    )
+                }
+            ), 400
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["examples", "coverage"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=20)
+
+    coverage_commit_dates: list[str] = []
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.COVERAGE:
+            for case_node in event.recorder.cases.values():
+                body = case_node.value.body
+                if isinstance(body, dict) and isinstance(body.get("commitDate"), str):
+                    coverage_commit_dates.append(body["commitDate"])
+
+    assert coverage_commit_dates, "No coverage body draws collected"
+    stale = [v for v in coverage_commit_dates if v in _STALE_DATES]
+    assert not stale, f"Stale `commitDate`: {len(stale)}/{len(coverage_commit_dates)} coverage draws"
+
+
+def test_stale_query_example_evicted_in_coverage_after_examples_observations(ctx, app_runner):
+    paths = {
+        "/items": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "string"},
+                        "examples": {
+                            "alpha": {"value": _STALE_TOKENS[0]},
+                            "beta": {"value": _STALE_TOKENS[1]},
+                        },
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/items", methods=["GET"])
+    def items():
+        value = request.args.get("token", "")
+        try:
+            uuid.UUID(value)
+        except (ValueError, AttributeError):
+            return jsonify(
+                {
+                    "detail": (
+                        "Method parameter 'token': Failed to convert value of type "
+                        "'java.lang.String' to required type 'java.util.UUID'"
+                    )
+                }
+            ), 400
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["examples", "coverage"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=20)
+
+    coverage_token_values: list[str] = []
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.COVERAGE:
+            for case_node in event.recorder.cases.values():
+                query = case_node.value.query
+                if isinstance(query, dict) and isinstance(query.get("token"), str):
+                    coverage_token_values.append(query["token"])
+
+    assert coverage_token_values, "No coverage query draws collected"
+    stale = [v for v in coverage_token_values if v in _STALE_TOKENS]
+    assert not stale, f"Stale `token`: {len(stale)}/{len(coverage_token_values)} coverage draws"
+
+
+def test_stateful_body_generation_consumes_format_inferred_during_fuzzing(ctx, app_runner):
+    paths = {
+        "/events": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["commitDate"],
+                                "properties": {"commitDate": {"type": "string"}},
+                            },
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {"schema": {"type": "object", "properties": {"id": {"type": "string"}}}}
+                        },
+                        "links": {
+                            "GetEventById": {
+                                "operationId": "getEvent",
+                                "parameters": {"eventId": "$response.body#/id"},
+                            }
+                        },
+                    },
+                    "400": {"description": "Bad Request"},
+                },
+            }
+        },
+        "/events/{eventId}": {
+            "get": {
+                "operationId": "getEvent",
+                "parameters": [{"name": "eventId", "in": "path", "required": True, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+            }
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/events", methods=["POST"])
+    def create_event():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"msg": "JSON parse error"}), 400
+        value = body.get("commitDate")
+        if not isinstance(value, str) or not _ISO_DATETIME.match(value):
+            return jsonify(
+                {
+                    "msg": (
+                        f"JSON parse error: Cannot deserialize value of type `java.time.LocalDateTime` "
+                        f'from String "{value}" through reference chain: Event["commitDate"]'
+                    )
+                }
+            ), 400
+        return jsonify({"id": "evt-1"}), 200
+
+    @app.route("/events/<event_id>", methods=["GET"])
+    def get_event(event_id: str):
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["fuzzing", "stateful"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=50)
+
+    stateful_commit_dates: list[str] = []
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.STATEFUL_TESTING:
+            for case_node in event.recorder.cases.values():
+                body = case_node.value.body
+                if isinstance(body, dict) and isinstance(body.get("commitDate"), str):
+                    stateful_commit_dates.append(body["commitDate"])
+
+    assert stateful_commit_dates, "No stateful POST body draws collected"
+    iso_matches = [v for v in stateful_commit_dates if _ISO_DATETIME.match(v)]
+    assert iso_matches, (
+        f"None of {len(stateful_commit_dates)} stateful `commitDate` draws match the inferred date-time format; "
+        f"first few: {stateful_commit_dates[:5]}"
+    )

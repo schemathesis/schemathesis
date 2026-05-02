@@ -12,6 +12,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.resources import ExtraDataSource
     from schemathesis.specs.openapi.adapter.parameters import OpenApiBody
 
@@ -434,6 +435,7 @@ def generate_coverage_cases(
         app=operation.app,
     )
     extra_data_source = as_strategy_kwargs.get("extra_data_source")
+    error_feedback = as_strategy_kwargs.get("error_feedback")
     overrides = {
         container: as_strategy_kwargs[container]
         for container in LOCATION_TO_CONTAINER.values()
@@ -455,6 +457,7 @@ def generate_coverage_cases(
             generation_config=generation_config,
             extra_data_source=extra_data_source,
             unexpected_methods_seen=unexpected_methods_seen,
+            error_feedback=error_feedback,
         ):
             if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
                 continue
@@ -735,6 +738,7 @@ def _iter_coverage_cases(
     generation_config: GenerationConfig,
     extra_data_source: ExtraDataSource | None = None,
     unexpected_methods_seen: set[tuple[str, str]] | None = None,
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> Generator[Case, None, None]:
     generators: dict[tuple[ParameterLocation, str], Generator[coverage.GeneratedValue, None, None]] = {}
     serializers = operation.get_parameter_serializers()
@@ -760,15 +764,64 @@ def _iter_coverage_cases(
     else:
         correlated = {}
 
+    inferred_properties_per_location: dict[ParameterLocation, dict[str, Any] | None] = {}
+
+    def _inferred_properties(target_location: ParameterLocation) -> dict[str, Any] | None:
+        if target_location in inferred_properties_per_location:
+            return inferred_properties_per_location[target_location]
+        # Caller guards with `error_feedback is not None`; the narrowing is invisible inside the closure.
+        assert error_feedback is not None
+        from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
+        from schemathesis.specs.openapi.error_feedback import apply_adjustments
+
+        container = getattr(operation, target_location.container_name, None)
+        result: dict[str, Any] | None = None
+        if isinstance(container, OpenApiParameterSet):
+            base = container.schema
+            adjusted = apply_adjustments(
+                operation=operation,
+                location=target_location,
+                schema=base,
+                store=error_feedback,
+            )
+            # `apply_adjustments` returns the input unchanged when there are no observations;
+            # only splice when something was actually inferred.
+            if adjusted is not base and isinstance(adjusted, dict):
+                properties = adjusted.get("properties")
+                if isinstance(properties, dict):
+                    result = properties
+        inferred_properties_per_location[target_location] = result
+        return result
+
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
         schema = parameter.unoptimized_schema
+        schema_is_clone = False
+        if error_feedback is not None and isinstance(schema, dict):
+            inferred_properties = _inferred_properties(location)
+            if inferred_properties is not None:
+                inferred = inferred_properties.get(name)
+                if isinstance(inferred, dict):
+                    schema = {**schema, **inferred}
+                    schema_is_clone = True
         examples = parameter.examples
+        if examples and schema_is_clone:
+            try:
+                parameter_validator = make_validator(schema, validator_cls)
+            except Exception:
+                parameter_validator = None
+            if parameter_validator is not None:
+                examples = [example for example in examples if parameter_validator.is_valid(example)]
         if examples:
-            schema = dict(schema)
+            if not schema_is_clone:
+                schema = dict(schema)
+                schema_is_clone = True
             schema["examples"] = examples
         for value in find_matching_in_responses(responses, parameter.name):
+            if not schema_is_clone:
+                schema = dict(schema)
+                schema_is_clone = True
             schema.setdefault("examples", []).append(value)
         if _is_pool_eligible(schema):
             pool_value = correlated.get((location, name))
@@ -875,9 +928,31 @@ def _iter_coverage_cases(
                 continue
 
             schema = body.unoptimized_schema
+            schema_is_clone = False
+            if error_feedback is not None:
+                from schemathesis.specs.openapi.error_feedback import apply_adjustments
+
+                adjusted = apply_adjustments(
+                    operation=operation,
+                    location=ParameterLocation.BODY,
+                    schema=schema,
+                    store=error_feedback,
+                )
+                if adjusted is not schema:
+                    schema = adjusted
+                    schema_is_clone = True
             examples = body.examples
+            if examples and schema_is_clone:
+                # Drop examples invalidated by inferred constraints so coverage falls back to schema generation.
+                try:
+                    body_validator = make_validator(schema, validator_cls)
+                except Exception:
+                    body_validator = None
+                if body_validator is not None:
+                    examples = [example for example in examples if body_validator.is_valid(example)]
             if examples:
-                schema = dict(schema)
+                if not schema_is_clone:
+                    schema = dict(schema)
                 # User-registered media types should only handle text / binary data
                 if body.media_type in MEDIA_TYPE_STRATEGIES:
                     schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]

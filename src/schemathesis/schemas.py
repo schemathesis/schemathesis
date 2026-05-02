@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext
     from schemathesis.core import SpecificationMetadata
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run import Phase
@@ -419,7 +420,7 @@ class BaseSchema(Mapping):
     ) -> SearchStrategy:
         raise NotImplementedError
 
-    def as_state_machine(self) -> type[APIStateMachine]:
+    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
         """Create a state machine class for stateful testing of linked API operations.
 
         Returns:

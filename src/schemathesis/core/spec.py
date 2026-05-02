@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig, ProjectConfig
     from schemathesis.core import NotSet, SpecificationMetadata
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.result import Result
     from schemathesis.core.schema_analysis import SchemaWarning
@@ -109,7 +110,7 @@ class Specification(Protocol):
 
     def revalidate_case_metadata(self, case: Case) -> None: ...
 
-    def as_state_machine(self) -> type[APIStateMachine]: ...
+    def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]: ...
 
     def create_extra_data_source(self) -> ExtraDataSource | None: ...
 

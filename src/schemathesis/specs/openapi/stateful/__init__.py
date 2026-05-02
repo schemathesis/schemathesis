@@ -27,6 +27,7 @@ from schemathesis.specs.openapi.stateful.links import OpenApiLink
 from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
+    from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.generation.stateful.state_machine import StepOutput
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -136,7 +137,9 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     return transitions
 
 
-def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
+def create_state_machine(
+    schema: OpenApiSchema, *, error_feedback: ErrorFeedbackStore | None = None
+) -> type[APIStateMachine]:
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
     transitions = collect_transitions(operations)
@@ -197,17 +200,28 @@ def create_state_machine(schema: OpenApiSchema) -> type[APIStateMachine]:
                             name=name,
                             target=catch_all,
                             input=bundles[bundle_name].flatmap(
-                                into_step_input(target=target, link=link, modes=config.modes)
+                                into_step_input(
+                                    target=target,
+                                    link=link,
+                                    modes=config.modes,
+                                    error_feedback=error_feedback,
+                                )
                             ),
                         )
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
                 name = _normalize_name(f"RANDOM -> {target.label}")
                 if len(config.modes) == 1:
-                    case_strategy = target.as_strategy(generation_mode=config.modes[0], phase=TestPhase.STATEFUL)
+                    case_strategy = target.as_strategy(
+                        generation_mode=config.modes[0],
+                        phase=TestPhase.STATEFUL,
+                        error_feedback=error_feedback,
+                    )
                 else:
                     _strategies = {
-                        method: target.as_strategy(generation_mode=method, phase=TestPhase.STATEFUL)
+                        method: target.as_strategy(
+                            generation_mode=method, phase=TestPhase.STATEFUL, error_feedback=error_feedback
+                        )
                         for method in config.modes
                     }
 
@@ -270,7 +284,11 @@ def is_likely_root_transition(operation: APIOperation) -> bool:
 
 
 def into_step_input(
-    *, target: APIOperation, link: OpenApiLink, modes: list[GenerationMode]
+    *,
+    target: APIOperation,
+    link: OpenApiLink,
+    modes: list[GenerationMode],
+    error_feedback: ErrorFeedbackStore | None = None,
 ) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
     """A single transition between API operations."""
 
@@ -343,7 +361,15 @@ def into_step_input(
                     applied_parameters.append("body")
 
             cases = st.one_of(
-                [target.as_strategy(generation_mode=mode, phase=TestPhase.STATEFUL, **overrides) for mode in modes]
+                [
+                    target.as_strategy(
+                        generation_mode=mode,
+                        phase=TestPhase.STATEFUL,
+                        error_feedback=error_feedback,
+                        **overrides,
+                    )
+                    for mode in modes
+                ]
             )
             case = draw(cases)
             if request_body is not NOT_SET and link.merge_body:
