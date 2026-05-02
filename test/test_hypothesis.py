@@ -18,7 +18,7 @@ from schemathesis.generation.hypothesis import examples, setup
 from schemathesis.generation.meta import CaseMetadata, FuzzingPhaseData, GenerationInfo, PhaseInfo, TestPhase
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, PayloadAlternatives
-from schemathesis.specs.openapi._hypothesis import jsonify_python_specific_types, quote_all
+from schemathesis.specs.openapi._hypothesis import jsonify_python_specific_types
 from schemathesis.specs.openapi.adapter import v2
 from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiBody,
@@ -26,7 +26,7 @@ from schemathesis.specs.openapi.adapter.parameters import (
     OpenApiParameterSet,
     form_data_to_json_schema,
 )
-from schemathesis.transport.serialization import Binary
+from schemathesis.transport.serialization import Binary, quote_all
 from test.utils import assert_requests_call
 
 

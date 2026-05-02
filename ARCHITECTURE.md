@@ -1,62 +1,50 @@
 # Architecture
 
-This document provides a high-level overview of Schemathesis for developers working on the codebase.
+Schemathesis is a property-based API testing framework. A run starts by loading
+an API description (OpenAPI or GraphQL) and discovering its *operations*.
 
-## Key Concepts
+The engine plans a sequence of *phases* (examples, coverage, fuzzing, stateful)
+and runs them in order. Each phase generates *cases*: concrete requests with
+positive (schema-conforming) or negative (constraint-violating) data.
 
-**Test Phases** - Schemathesis executes tests in phases:
+The engine sends each case, runs the configured *checks* against the response,
+and emits events that the `st run` command and the report writers consume.
 
-- **Examples**: Uses examples from the schema
-- **Coverage**: Systematically generates cases for schema constraints
-- **Fuzzing**: Random generation via Hypothesis
-- **Stateful**: Multi-step sequences using API links
+The pytest plugin is a separate test runner: instead of using the engine, it
+plugs the same generation, hook, and check machinery into pytest's own
+lifecycle.
 
-**Generation Modes** - Test cases are generated as:
+The phases differ in how they generate cases: examples uses schema-supplied
+values, coverage walks every constraint systematically, fuzzing is random
+Hypothesis-driven, and stateful drives multi-step scenarios as a state machine.
 
-- **Positive**: Valid data conforming to the schema
-- **Negative**: Invalid data violating schema constraints
+Cases reach the server through a configurable transport: live HTTP via
+`requests`, or direct calls into a mounted WSGI or ASGI application. Sending is
+decoupled from generation; the same case runs against any of these.
 
-Checks run independently on all generated cases regardless of mode.
+Events decouple production from consumption. The engine emits a uniform stream
+regardless of what is listening; consumers plug in without the engine knowing
+they exist.
 
 ## Layers
 
-| Layer | Purpose |
-|-------|---------|
-| **Core** | Framework-agnostic utilities: transport, config, error handling |
-| **Specs** | Parses OpenAPI/GraphQL schemas into `APIOperation` instances |
-| **Generation** | Creates `Case` instances from operations using Hypothesis |
-| **Engine** | Orchestrates test execution across phases, runs checks |
-| **Interface** | User-facing CLI and pytest plugin |
+The engine, case generation, and hook machinery are spec-agnostic: they work
+through an abstract schema interface and never depend on a concrete spec.
+Spec-specific logic lives in `specs/`.
 
-## Directory Structure
+`core/` is the foundation: transports, errors, JSON Schema utilities, primitive
+data types. Depends only on stdlib and third-party packages.
 
-```
-src/schemathesis/
-├── core/           # Core utilities
-├── specs/          # OpenAPI and GraphQL implementations
-├── generation/     # Test case generation
-├── engine/         # Test orchestration and phases
-├── cli/            # Command-line interface
-├── pytest/         # pytest plugin
-├── checks.py       # Validation checks
-├── hooks.py        # Extension points
-└── schemas.py      # Base schema classes
-```
+`schemas.py` defines the abstract schema class and the endpoint data type shared
+by every spec.
 
-## Data Flow
+`specs/openapi/` and `specs/graphql/` are the concrete schema implementations:
+parsing, spec-flavored generation, spec-specific checks.
 
-```
-Schema (file/URL)
-    ↓
-Specs Layer (parse)
-    ↓
-APIOperation
-    ↓
-Generation Layer (create test data)
-    ↓
-Case
-    ↓
-Engine (send request, run checks)
-    ↓
-Results → Interface Layer (report)
-```
+`generation/` and `hooks.py` produce cases and dispatch hooks.
+
+`engine/` is the test runner described above.
+
+`cli/` is the `st run` command. `reporting/` writes HAR, VCR, JUnit, and Allure
+reports from the engine's event stream. `pytest/` is the pytest plugin, which
+runs tests through pytest instead of the engine.

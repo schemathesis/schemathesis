@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, NoReturn, Protocol
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Generator
+
+    import jsonschema_rs
+    from hypothesis.strategies import SearchStrategy
+    from requests.structures import CaseInsensitiveDict
+
+    from schemathesis.auths import AuthContext, AuthStorage
+    from schemathesis.config import GenerationConfig, ProjectConfig
+    from schemathesis.core import NotSet, SpecificationMetadata
+    from schemathesis.core.errors import InvalidSchema
+    from schemathesis.core.result import Result
+    from schemathesis.core.schema_analysis import SchemaWarning
+    from schemathesis.core.transport import Response
+    from schemathesis.generation import GenerationMode
+    from schemathesis.generation.case import Case
+    from schemathesis.generation.meta import CaseMetadata
+    from schemathesis.generation.stateful.state_machine import APIStateMachine
+    from schemathesis.hooks import HookContext, HookDispatcher
+    from schemathesis.resources import ExtraDataSource
+    from schemathesis.schemas import APIOperation
+    from schemathesis.specs.graphql.schemas import GraphQLSchema
+    from schemathesis.specs.openapi.schemas import OpenApiSchema
+
+
+@dataclass
+class CoverageCapabilities:
+    """Coverage-phase data the engine asks of a specification.
+
+    Specs that do not participate in coverage generation can return an empty instance
+    (`format_strategies={}`, `update_pattern=None`, `validator_cls=None`).
+    """
+
+    format_strategies: dict[str, SearchStrategy[Any]]
+    update_pattern: Callable[[str, int | None, int | None], str] | None
+    validator_cls: type[jsonschema_rs.Validator] | None
+
+
+class Specification(Protocol):
+    """The contract every concrete schema implementation satisfies.
+
+    Annotate against this in framework code that only needs schema-level
+    operations; `_check_protocol_conformance` below makes mypy enforce that
+    concrete schemas provide every member.
+    """
+
+    config: ProjectConfig
+    hooks: HookDispatcher
+    auth: AuthStorage
+
+    @property
+    def specification(self) -> SpecificationMetadata: ...
+
+    def validate(self) -> None: ...
+
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]: ...
+
+    def find_operation_by_label(self, label: str) -> APIOperation | None: ...
+
+    def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn: ...
+
+    def get_tags(self, operation: APIOperation) -> list[str] | None: ...
+
+    def get_case_strategy(
+        self,
+        operation: APIOperation,
+        hooks: HookDispatcher | None = ...,
+        auth_storage: AuthStorage | None = ...,
+        generation_mode: GenerationMode = ...,
+        **kwargs: Any,
+    ) -> SearchStrategy[Case]: ...
+
+    def make_case(
+        self,
+        *,
+        operation: APIOperation,
+        method: str | None = ...,
+        path: str | None = ...,
+        path_parameters: dict[str, Any] | None = ...,
+        headers: dict[str, Any] | CaseInsensitiveDict | None = ...,
+        cookies: dict[str, Any] | None = ...,
+        query: dict[str, Any] | None = ...,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = ...,
+        media_type: str | None = ...,
+        multipart_content_types: dict[str, str] | None = ...,
+        meta: CaseMetadata | None = ...,
+    ) -> Case: ...
+
+    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]: ...
+
+    def validate_response(
+        self,
+        operation: APIOperation,
+        response: Response,
+        *,
+        case: Case | None = ...,
+    ) -> bool | None: ...
+
+    def get_coverage_capabilities(self) -> CoverageCapabilities: ...
+
+    def get_custom_format_strategies(
+        self, generation_config: GenerationConfig, mode: GenerationMode
+    ) -> dict[str, SearchStrategy]: ...
+
+    def revalidate_case_metadata(self, case: Case) -> None: ...
+
+    def as_state_machine(self) -> type[APIStateMachine]: ...
+
+    def create_extra_data_source(self) -> ExtraDataSource | None: ...
+
+    def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None: ...
+
+    def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]: ...
+
+    def iter_link_candidates(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+        response: Response,
+        operations_by_label: dict[str, APIOperation],
+        excluded_labels: set[str],
+    ) -> list[tuple[APIOperation, dict[str, Any]]]: ...
+
+    def iter_schema_warnings(self) -> list[SchemaWarning]: ...
+
+    def build_request_url(self, case: Case, base_url: str) -> str: ...
+
+    def prepare_request_body(
+        self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
+    ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet: ...
+
+    def adapt_to_null_byte_in_header_failure(self) -> None: ...
+
+    def apply_auth(self, case: Case, context: AuthContext) -> bool: ...
+
+    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None: ...
+
+    def prepare_multipart(
+        self,
+        form_data: dict[str, Any],
+        operation: APIOperation,
+        selected_content_types: dict[str, str] | None = ...,
+    ) -> tuple[list | None, dict[str, Any] | None]: ...
+
+    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]: ...
+
+
+if TYPE_CHECKING:
+    # Force the type checker to verify that concrete schema classes structurally satisfy
+    # `Specification`. If the Protocol changes (or a method is renamed/removed on a schema
+    # class) without updating both sides, mypy fails here.
+    def _check_protocol_conformance(
+        openapi: OpenApiSchema, graphql: GraphQLSchema
+    ) -> tuple[Specification, Specification]:
+        return openapi, graphql

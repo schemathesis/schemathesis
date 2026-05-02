@@ -9,7 +9,7 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.events import FuzzScenarioFinished
 
 if TYPE_CHECKING:
-    from schemathesis.schemas import ApiStatistic
+    from schemathesis.core.statistic import ApiStatistic
 
 
 @dataclass

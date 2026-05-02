@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any
@@ -54,6 +55,50 @@ class GeneratedValue:
     meta: MutationMetadata | None
 
     __slots__ = ("value", "meta")
+
+
+def wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:
+    """Adapter so user-supplied filter hooks see plain values when negative-mode wraps them.
+
+    The boolean result is returned directly so `strategy.filter()` can evaluate truthiness;
+    re-wrapping in `GeneratedValue` would make every result truthy and break filtering.
+    """
+
+    def wrapper(value: Any) -> bool:
+        if isinstance(value, GeneratedValue):
+            return hook(value.value)
+        return hook(value)
+
+    return wrapper
+
+
+def wrap_map_hook_for_generated_value(hook: Callable) -> Callable:
+    """Adapter so user-supplied map hooks see plain values when negative-mode wraps them."""
+
+    def wrapper(value: Any) -> Any:
+        if isinstance(value, GeneratedValue):
+            result = hook(value.value)
+            return GeneratedValue(value=result, meta=value.meta)
+        return hook(value)
+
+    return wrapper
+
+
+def wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
+    """Adapter so user-supplied flatmap hooks see plain values when negative-mode wraps them.
+
+    Unlike map hooks, flatmap hooks return a `SearchStrategy` — not a value. We unwrap
+    `GeneratedValue` before invoking the hook, then re-wrap each drawn result so the
+    `GeneratedValue` metadata is preserved through the flatmap.
+    """
+
+    def wrapper(value: Any) -> st.SearchStrategy:
+        if isinstance(value, GeneratedValue):
+            meta = value.meta
+            return hook(value.value).map(lambda v: GeneratedValue(value=v, meta=meta))
+        return hook(value)
+
+    return wrapper
 
 
 @dataclass

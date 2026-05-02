@@ -18,6 +18,7 @@ from schemathesis.generation.coverage import (
     cover_schema_iter,
 )
 from schemathesis.specs.openapi.formats import get_default_format_strategies
+from schemathesis.specs.openapi.patterns import update_quantifier
 
 PATTERN = "^\\d+$"
 
@@ -89,6 +90,7 @@ def ctx_factory():
             is_required=is_required,
             custom_formats=get_default_format_strategies(),
             validator_cls=jsonschema_rs.Draft4Validator,
+            update_pattern=update_quantifier,
             allow_extra_parameters=allow_extra_parameters,
         )
 

@@ -32,9 +32,11 @@ from schemathesis.cli.output import (
     print_lines,
 )
 from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisWarning
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok
+from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
@@ -42,7 +44,6 @@ from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.probes import ProbeOutcome
 from schemathesis.generation.meta import CoveragePhaseData, CoverageScenario
 from schemathesis.generation.modes import GenerationMode
-from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -880,8 +881,6 @@ class OutputHandler(BaseOutputHandler[BaseExecutionContext]):
             self._check_stateful_warnings(ctx, event)
 
     def _check_warnings(self, ctx: BaseExecutionContext, event: events.ScenarioFinished) -> None:
-        from schemathesis.core.compat import RefResolutionError
-
         statistic = aggregate_status_codes(event.recorder.interactions.values())
 
         if statistic.total == 0:

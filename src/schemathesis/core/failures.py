@@ -7,12 +7,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from json import JSONDecodeError
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import OutputConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transport import Response
+
+if TYPE_CHECKING:
+    from schemathesis.config import OutputConfig
 
 # Python 3.12 renamed several HTTP phrases per RFC 9110. Use the new names
 # consistently across all Python versions so snapshots don't vary by version.

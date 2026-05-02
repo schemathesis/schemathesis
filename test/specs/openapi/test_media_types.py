@@ -5,6 +5,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
@@ -75,7 +76,7 @@ def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi
 
 def test_malformed_registered_media_type_is_skipped(ctx):
     # Register a malformed media type (no slash, so it can't be parsed)
-    schemathesis.specs.openapi.media_types.MEDIA_TYPES["invalid"] = st.binary()
+    MEDIA_TYPE_STRATEGIES["invalid"] = st.binary()
 
     # Create schema with valid content type that would trigger wildcard search
     schema = ctx.openapi.build_schema(

@@ -20,7 +20,6 @@ from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events
 from schemathesis.engine._check_context import CheckContextCache
 from schemathesis.engine._validate import validate_response
-from schemathesis.engine.fuzz._link_chooser import collect_link_candidates
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis import examples
@@ -31,7 +30,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
     from schemathesis.generation.case import Case
-    from schemathesis.schemas import APIOperation, BaseSchema
+    from schemathesis.schemas import APIOperation
 
 FUZZ_TESTS_LABEL = "Fuzz tests"
 EVENT_QUEUE_TIMEOUT = 0.01
@@ -49,42 +48,6 @@ FUZZ_MAX_EXAMPLES = sys.maxsize
 MAX_SCENARIO_STEPS = 6
 # link-vs-random bias; Hypothesis prefers index 0 on shrinking, so True is the canonical step.
 _LINK_BIAS_CHOICES = [True] * 8 + [False] * 2
-
-
-def compute_operation_weights(schema: BaseSchema, operations: list[APIOperation]) -> dict[str, int]:
-    """Compute sampling weights from the dependency graph.
-
-    Layer-0 operations (producers with no dependencies) get boosted weight proportional
-    to their output count. All other operations get weight 1. Falls back to uniform
-    weights for non-OpenAPI schemas or schemas with no useful ordering.
-    """
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-    if not isinstance(schema, OpenApiSchema):
-        return {op.label: 1 for op in operations}
-
-    layers = schema.analysis.dependency_layers
-    if layers is None:
-        return {op.label: 1 for op in operations}
-
-    layer_0_labels = set(layers[0])
-    graph = schema.analysis.dependency_graph
-
-    weights = {}
-    for op in operations:
-        if op.label not in layer_0_labels:
-            weights[op.label] = 1
-        else:
-            node = graph.operations.get(op.label)
-            # Path-keyed and body-keyed outputs don't contribute response-body
-            # values to the resource pool, so they shouldn't bias fuzz scheduling weights.
-            out_degree = (
-                sum(1 for output in node.outputs if output.path_parameter is None and output.body_field is None)
-                if node is not None
-                else 0
-            )
-            weights[op.label] = 2 + out_degree
-    return weights
 
 
 def _build_strategy_kwargs(config: ProjectConfig, *, operation: APIOperation) -> dict[str, object]:
@@ -247,7 +210,6 @@ def _run_forever_thread(
     from hypothesis.errors import Flaky, Unsatisfiable, UnsatisfiedAssumption
 
     from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
 
     if not operations:
         return
@@ -272,11 +234,10 @@ def _run_forever_thread(
     }
     # Dependency-weighted sampling pool: each operation repeated by its weight.
     # Layer-0 producers appear more often; consumers and non-OpenAPI ops get weight 1.
-    weights_by_label = compute_operation_weights(ctx.schema, operations)
+    weights_by_label = ctx.schema.compute_fuzz_operation_weights(operations)
     weighted_operations = [op for op in operations for _ in range(weights_by_label[op.label])]
     operations_by_label: dict[str, APIOperation] = {operation.label: operation for operation in operations}
 
-    is_openapi_schema = isinstance(ctx.schema, OpenApiSchema)
     # Per-thread dedup: suppress repeated NonFatalError events for the same operation.
     seen_error_labels: set[str] = set()
 
@@ -298,19 +259,18 @@ def _run_forever_thread(
                 # Outer `except Flaky` swallows any data-tree fallout from this mid-draw break.
                 break  # type: ignore[unreachable]
             link_overrides: dict[str, Any] = {}
-            if last_step is not None and is_openapi_schema:
+            candidates: list[tuple[APIOperation, dict[str, Any]]] = []
+            if last_step is not None:
                 previous_operation, previous_case, previous_response = last_step
-                candidates = collect_link_candidates(
+                candidates = ctx.schema.iter_link_candidates(
                     operation=previous_operation,
                     case=previous_case,
                     response=previous_response,
                     operations_by_label=operations_by_label,
                     excluded_labels=excluded_operations,
                 )
-                if candidates and draw(st.sampled_from(_LINK_BIAS_CHOICES)):
-                    operation, link_overrides = draw(st.sampled_from(candidates))
-                else:
-                    operation = draw(st.sampled_from(weighted_operations))
+            if candidates and draw(st.sampled_from(_LINK_BIAS_CHOICES)):
+                operation, link_overrides = draw(st.sampled_from(candidates))
             else:
                 operation = draw(st.sampled_from(weighted_operations))
             merged_kwargs = {**strategy_kwargs_by_label[operation.label], **link_overrides}

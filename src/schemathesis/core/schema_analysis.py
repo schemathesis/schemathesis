@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from schemathesis.config import SchemathesisWarning
+from schemathesis.core.warnings import SchemathesisWarning
 
 
 class SchemaWarning(Protocol):

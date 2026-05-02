@@ -16,9 +16,8 @@ from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, StopReason, events, from_schema
-from schemathesis.engine.fuzz._executor import compute_operation_weights
-from schemathesis.engine.fuzz._link_chooser import collect_link_candidates
 from schemathesis.generation import GenerationMode
+from schemathesis.specs.openapi.stateful._link_chooser import collect_link_candidates
 
 
 def _make_flaky_repro_schema(ctx):
@@ -255,7 +254,7 @@ def test_fuzz_operation_weights_producer_higher_than_consumer(ctx):
     )
     loaded = schemathesis.openapi.from_dict(schema)
     operations = [op.ok() for op in loaded.get_all_operations() if isinstance(op, Ok)]
-    weights = compute_operation_weights(loaded, operations)
+    weights = loaded.compute_fuzz_operation_weights(operations)
 
     # Producer (POST /users, layer 0 with outputs) must outweigh consumer (GET, deeper layer)
     assert weights["POST /users"] > weights["GET /users/{user_id}"]

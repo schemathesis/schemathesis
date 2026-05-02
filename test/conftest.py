@@ -39,6 +39,7 @@ from schemathesis.cli.ext.groups import GROUPS, GroupedOption
 from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
 from schemathesis.core import deserialization
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
+from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.specs.openapi import media_types
@@ -87,14 +88,14 @@ def reset_hooks():
     hooks.unregister_all()
     auths.unregister()
     for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
-        transport.unregister_serializer(*media_types.MEDIA_TYPES.keys())
+        transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
     media_types.unregister_all()
     yield
     CUSTOM_HANDLERS.clear()
     hooks.unregister_all()
     auths.unregister()
     for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
-        transport.unregister_serializer(*media_types.MEDIA_TYPES.keys())
+        transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
     media_types.unregister_all()
     # Restore built-in deserializers
     current = list(deserialization.deserializers().keys())

@@ -39,6 +39,7 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.marks import Mark
+from schemathesis.core.media_types import FORM_MEDIA_TYPES, MEDIA_TYPE_STRATEGIES, find_media_type_strategy
 from schemathesis.core.parameters import LOCATION_TO_CONTAINER, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
@@ -46,6 +47,7 @@ from schemathesis.core.validation import has_invalid_characters, is_latin_1_enco
 from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples, setup
+from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput, format_given_and_schema_examples_error
 from schemathesis.generation.meta import (
@@ -64,6 +66,7 @@ from schemathesis.hooks import (
     _should_skip_hook,
 )
 from schemathesis.schemas import APIOperation, ParameterSet
+from schemathesis.transport.serialization import quote_all
 
 setup()
 
@@ -528,8 +531,6 @@ class Template:
         self._components[ParameterLocation.BODY] = ComponentInfo(mode=body.generation_mode)
 
     def _serialize(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        from schemathesis.specs.openapi._hypothesis import quote_all
-
         output = {}
         for container_name, value in kwargs.items():
             serializer = self._serializers.get(container_name)
@@ -677,9 +678,7 @@ def _generate_coverage_values_from_custom_strategy(
     media_type: str,
 ) -> Generator[coverage.GeneratedValue, None, None]:
     """Generate coverage values from a custom media type strategy."""
-    from schemathesis.specs.openapi._hypothesis import _find_media_type_strategy
-
-    strategy = _find_media_type_strategy(media_type)
+    strategy = find_media_type_strategy(media_type)
     if strategy is None:
         return
 
@@ -696,9 +695,6 @@ def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[s
 
     Returns None if the body doesn't have custom encoding strategies or isn't a form type.
     """
-    from schemathesis.specs.openapi._hypothesis import _find_media_type_strategy
-    from schemathesis.specs.openapi.adapter.parameters import FORM_MEDIA_TYPES
-
     if body.media_type not in FORM_MEDIA_TYPES:
         return None
 
@@ -716,7 +712,7 @@ def _generate_multipart_body_from_custom_strategies(body: OpenApiBody) -> dict[s
 
         content_types = content_type if isinstance(content_type, list) else content_type.split(",")
         for ct in content_types:
-            strategy = _find_media_type_strategy(ct.strip())
+            strategy = find_media_type_strategy(ct.strip())
             if strategy is not None:
                 result[prop_name] = examples.generate_one(strategy)
                 has_custom_strategy = True
@@ -740,24 +736,20 @@ def _iter_coverage_cases(
     extra_data_source: ExtraDataSource | None = None,
     unexpected_methods_seen: set[tuple[str, str]] | None = None,
 ) -> Generator[Case, None, None]:
-    from schemathesis.specs.openapi._hypothesis import _build_custom_formats
-    from schemathesis.specs.openapi.examples import find_matching_in_responses
-    from schemathesis.specs.openapi.media_types import MEDIA_TYPES
-    from schemathesis.specs.openapi.schemas import OpenApiSchema
-    from schemathesis.specs.openapi.serialization import get_serializers_for_operation
-
     generators: dict[tuple[ParameterLocation, str], Generator[coverage.GeneratedValue, None, None]] = {}
-    serializers = get_serializers_for_operation(operation)
+    serializers = operation.get_parameter_serializers()
     template = Template(serializers)
 
     instant = Instant()
     responses = list(operation.responses.iter_examples())
-    custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
+    custom_formats = operation.schema.get_custom_format_strategies(generation_config, GenerationMode.POSITIVE)
 
     seen_negative = coverage.HashSet()
     seen_positive = coverage.HashSet()
-    assert isinstance(operation.schema, OpenApiSchema)
-    validator_cls = operation.schema.adapter.jsonschema_validator_cls
+    capabilities = operation.schema.get_coverage_capabilities()
+    validator_cls = capabilities.validator_cls
+    update_pattern = capabilities.update_pattern
+    assert validator_cls is not None, "Coverage phase requires a JSON schema validator class"
 
     correlated: dict[tuple[ParameterLocation, str], Any]
     if extra_data_source is not None:
@@ -791,6 +783,7 @@ def _iter_coverage_cases(
                 is_required=parameter.is_required,
                 custom_formats=custom_formats,
                 validator_cls=validator_cls,
+                update_pattern=update_pattern,
                 allow_extra_parameters=generation_config.allow_extra_parameters,
             ),
             schema,
@@ -811,6 +804,7 @@ def _iter_coverage_cases(
                         is_required=parameter.is_required,
                         custom_formats=custom_formats,
                         validator_cls=validator_cls,
+                        update_pattern=update_pattern,
                         allow_extra_parameters=generation_config.allow_extra_parameters,
                     ),
                     schema,
@@ -885,7 +879,7 @@ def _iter_coverage_cases(
             if examples:
                 schema = dict(schema)
                 # User-registered media types should only handle text / binary data
-                if body.media_type in MEDIA_TYPES:
+                if body.media_type in MEDIA_TYPE_STRATEGIES:
                     schema["examples"] = [example for example in examples if isinstance(example, str | bytes)]
                 else:
                     schema["examples"] = examples
@@ -922,13 +916,14 @@ def _iter_coverage_cases(
                     is_required=body.is_required,
                     custom_formats=custom_formats,
                     validator_cls=validator_cls,
+                    update_pattern=update_pattern,
                     allow_extra_parameters=generation_config.allow_extra_parameters,
                 ),
                 schema,
             )
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet) or (
-                body.media_type in MEDIA_TYPES and not isinstance(value.value, str | bytes)
+                body.media_type in MEDIA_TYPE_STRATEGIES and not isinstance(value.value, str | bytes)
             ):
                 continue
             if body.is_required:
@@ -955,6 +950,7 @@ def _iter_coverage_cases(
                             is_required=body.is_required,
                             custom_formats=custom_formats,
                             validator_cls=validator_cls,
+                            update_pattern=update_pattern,
                             allow_extra_parameters=generation_config.allow_extra_parameters,
                         ),
                         schema,
@@ -989,7 +985,7 @@ def _iter_coverage_cases(
                 instant = Instant()
                 try:
                     next_value = next(iterator)
-                    if body.media_type in MEDIA_TYPES and not isinstance(next_value.value, str | bytes):
+                    if body.media_type in MEDIA_TYPE_STRATEGIES and not isinstance(next_value.value, str | bytes):
                         continue
 
                     data = template.with_body(value=next_value, media_type=body.media_type)
@@ -1219,6 +1215,7 @@ def _iter_coverage_cases(
                         is_required=is_required,
                         custom_formats=custom_formats,
                         validator_cls=validator_cls,
+                        update_pattern=update_pattern,
                         allow_extra_parameters=generation_config.allow_extra_parameters,
                     ),
                     subschema,

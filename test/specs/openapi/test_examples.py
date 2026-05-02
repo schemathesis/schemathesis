@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.hypothesis._response_matching import find_matching_in_responses
 from schemathesis.resources.descriptors import Cardinality, ResourceDescriptor
 from schemathesis.resources.repository import ResourceRepository
 from schemathesis.specs.openapi.adapter.parameters import parameters_to_json_schema
@@ -21,7 +22,6 @@ from schemathesis.specs.openapi.examples import (
     extract_from_schemas,
     extract_inner_examples,
     extract_top_level,
-    find_matching_in_responses,
     get_strategies_from_examples,
     produce_combinations,
 )
