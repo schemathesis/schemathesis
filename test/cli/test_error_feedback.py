@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import re
+import uuid
 
 import pytest
 from fastapi import FastAPI, HTTPException
 from flask import jsonify, request
 from pydantic import BaseModel, Field
 
+import schemathesis
 from schemathesis.core.error_feedback.pipeline import _reset_pipeline_for_tests
 from schemathesis.core.jsonschema import is_valid
+from schemathesis.engine import events, from_schema
+from schemathesis.engine.run import PhaseName
+from schemathesis.generation import GenerationMode
 
 REQUIRED_FIELDS = ("email", "username", "password")
 
@@ -792,3 +797,119 @@ def test_feedback_recovers_constraints_dropped_from_pydantic_schema(cli, pydanti
         )
         == snapshot_cli
     )
+
+
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}")
+
+
+def test_stale_example_evicted_after_format_inference(ctx, app_runner):
+    paths = {
+        "/events": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["commitDate"],
+                                "properties": {"commitDate": {"type": "string"}},
+                                "example": {"commitDate": "dd-MM-yyyy"},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/events", methods=["POST"])
+    def create_event():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"msg": "JSON parse error"}), 400
+        value = body.get("commitDate")
+        if not isinstance(value, str) or not _ISO_DATETIME.match(value):
+            return jsonify(
+                {
+                    "msg": (
+                        f"JSON parse error: Cannot deserialize value of type `java.time.LocalDateTime` "
+                        f'from String "{value}" through reference chain: Event["commitDate"]'
+                    )
+                }
+            ), 400
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage", "fuzzing"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=100)
+
+    fuzzing_commit_dates: list[str] = []
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
+            for case_node in event.recorder.cases.values():
+                body = case_node.value.body
+                if isinstance(body, dict) and isinstance(body.get("commitDate"), str):
+                    fuzzing_commit_dates.append(body["commitDate"])
+
+    assert fuzzing_commit_dates, "No fuzzing body draws collected"
+    stale = [v for v in fuzzing_commit_dates if v == "dd-MM-yyyy"]
+    assert not stale, f"Stale `commitDate`: {len(stale)}/{len(fuzzing_commit_dates)} fuzzing draws"
+
+
+def test_stale_example_evicted_after_format_inference_on_query_param(ctx, app_runner):
+    paths = {
+        "/items": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "string"},
+                        "example": "NOT_A_UUID",
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+    app, _ = ctx.openapi.make_flask_app(paths)
+
+    @app.route("/items", methods=["GET"])
+    def items():
+        value = request.args.get("token", "")
+        try:
+            uuid.UUID(value)
+        except (ValueError, AttributeError):
+            return jsonify(
+                {
+                    "detail": (
+                        "Method parameter 'token': Failed to convert value of type "
+                        "'java.lang.String' to required type 'java.util.UUID'"
+                    )
+                }
+            ), 400
+        return "", 200
+
+    port = app_runner.run_flask_app(app)
+    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["examples", "coverage", "fuzzing"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=100)
+
+    fuzzing_token_values: list[str] = []
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.phase == PhaseName.FUZZING:
+            for case_node in event.recorder.cases.values():
+                query = case_node.value.query
+                if isinstance(query, dict) and isinstance(query.get("token"), str):
+                    fuzzing_token_values.append(query["token"])
+
+    assert fuzzing_token_values, "No fuzzing query draws collected"
+    stale = [v for v in fuzzing_token_values if v == "NOT_A_UUID"]
+    assert not stale, f"Stale `token`: {len(stale)}/{len(fuzzing_token_values)} fuzzing draws"
