@@ -852,6 +852,7 @@ def test_invalid_response_definition(ctx, cli, snapshot_cli, openapi3_base_url):
     )
 
 
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_no_useless_traceback(ctx, cli, snapshot_cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {

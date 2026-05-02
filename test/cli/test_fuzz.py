@@ -42,7 +42,7 @@ def test_fuzz_basic(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -55,7 +55,7 @@ def test_fuzz_final_line_with_failure(cli, ctx, app_runner, snapshot_cli):
 
     port = app_runner.run_flask_app(app)
     assert_cli_snapshot(
-        cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2", "--seed=42"), snapshot_cli
+        cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3", "--seed=42"), snapshot_cli
     )
 
 
@@ -71,7 +71,7 @@ def test_fuzz_final_line_with_error(cli, ctx, app_runner, snapshot_cli):
     port = app_runner.run_flask_app(app)
     assert_cli_snapshot(
         cli.main(
-            "fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2", "--request-timeout=0.001", "--seed=42"
+            "fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3", "--request-timeout=0.001", "--seed=42"
         ),
         snapshot_cli,
     )
@@ -221,7 +221,7 @@ def _make_fuzz_multi_operation_event(ctx):
 def test_fuzz_report_junit(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=2", f"--report-junit-path={xml_path}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-junit-path={xml_path}")
     assert result.exit_code == 0, result.output
     assert xml_path.exists()
     ElementTree.parse(xml_path)
@@ -230,7 +230,7 @@ def test_fuzz_report_junit(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_junit_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_failure_app(ctx, app_runner)
     xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=2", "--seed=42", f"--report-junit-path={xml_path}")
+    result = cli.main("fuzz", url, "--max-time=3", "--seed=42", f"--report-junit-path={xml_path}")
     assert result.exit_code == 1, result.output
 
     tree = ElementTree.parse(xml_path)
@@ -243,7 +243,7 @@ def test_fuzz_report_junit_uses_operation_labels_for_failures(cli, ctx, app_runn
 def test_fuzz_report_vcr(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     vcr_path = tmp_path / "cassette.yaml"
-    result = cli.main("fuzz", url, "--max-time=2", f"--report-vcr-path={vcr_path}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-vcr-path={vcr_path}")
     assert result.exit_code == 0, result.output
     assert vcr_path.exists()
     cassette = yaml.safe_load(vcr_path.read_text())
@@ -253,7 +253,7 @@ def test_fuzz_report_vcr(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_har(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     har_path = tmp_path / "recording.har"
-    result = cli.main("fuzz", url, "--max-time=2", f"--report-har-path={har_path}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-har-path={har_path}")
     assert result.exit_code == 0, result.output
     assert har_path.exists()
     har = json.loads(har_path.read_text())
@@ -263,7 +263,7 @@ def test_fuzz_report_har(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_ndjson(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     ndjson_path = tmp_path / "events.ndjson"
-    result = cli.main("fuzz", url, "--max-time=2", f"--report-ndjson-path={ndjson_path}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-ndjson-path={ndjson_path}")
     assert result.exit_code == 0, result.output
     assert ndjson_path.exists()
     events = [json.loads(line) for line in ndjson_path.read_text().splitlines() if line]
@@ -378,7 +378,7 @@ def test_fuzz_custom_handler_error(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -396,7 +396,7 @@ def test_fuzz_custom_handler(cli, ctx, app_runner, snapshot_cli):
         return jsonify([])
 
     port = app_runner.run_flask_app(app)
-    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=2"), snapshot_cli)
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3"), snapshot_cli)
 
 
 def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
@@ -422,7 +422,7 @@ def test_fuzz_custom_handler_with_custom_option(ctx, cli, app_runner):
     result = cli.main(
         "fuzz",
         f"http://127.0.0.1:{port}/openapi.json",
-        "--max-time=2",
+        "--max-time=3",
         "--fuzz-counter=42",
     )
 

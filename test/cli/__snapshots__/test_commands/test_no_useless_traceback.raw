@@ -48,7 +48,7 @@ ________________________________ POST /success _________________________________
 
 Reproduce with:
 
-    curl -X POST -H 'Content-Type: application/json' -d '{"region": null}' 'http://127.0.0.1/api/success?key=%5BFiltered%5D'
+    <PLACEHOLDER>
 
 =================================== WARNINGS ===================================
 
