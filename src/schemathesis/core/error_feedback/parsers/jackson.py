@@ -4,7 +4,9 @@ import re
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
+    BoundDirection,
     EnumPayload,
+    NumericBoundPayload,
     Observation,
     ObservationKind,
     TypeMismatchPayload,
@@ -37,6 +39,21 @@ _CHAIN_STEP = re.compile(r'\["(?P<name>[^"]+)"\]|\[(?P<index>\d+)\]')
 # Jackson lists the enum's accepted values inline when a deserialization fails
 # on a non-matching string: "not one of the values accepted for Enum class: [USER, ADMIN]".
 _JACKSON_ENUM = re.compile(r"not one of the values accepted for Enum class:\s*\[(?P<values>[^\]]+)\]")
+
+# Jackson `Numeric value (X) out of range of <java-type>` — JsonParser emits
+# this when an incoming JSON number doesn't fit the destination Java integer
+# width. The width tells us the bounds to inject as `minimum`/`maximum`.
+_JACKSON_NUMERIC_OVERFLOW = re.compile(
+    r"Numeric value \([^)]+\) out of range of (?P<size>int|long|short|byte)\b",
+)
+
+# Inclusive bounds per Java primitive integer type.
+_JAVA_INT_BOUNDS: dict[str, tuple[int, int]] = {
+    "byte": (-128, 127),
+    "short": (-32_768, 32_767),
+    "int": (-2_147_483_648, 2_147_483_647),
+    "long": (-9_223_372_036_854_775_808, 9_223_372_036_854_775_807),
+}
 
 # Top-level keys we look for the Jackson message under. Spring wraps Jackson
 # errors in its own envelope (`{"detail": "..."}` / `{"message": "..."}`);
@@ -108,6 +125,7 @@ class JacksonParser:
             or "Cannot deserialize instance of" in s
             or "Can not deserialize instance of" in s
             or "Enum class:" in s
+            or "out of range of" in s
             for s in _carrier_strings(body)
         )
 
@@ -152,4 +170,21 @@ class JacksonParser:
                         payload=EnumPayload(values=enum_values),
                     )
                 )
+            overflow_match = _JACKSON_NUMERIC_OVERFLOW.search(message)
+            if overflow_match is not None:
+                minimum, maximum = _JAVA_INT_BOUNDS[overflow_match.group("size")]
+                for bound, direction in (
+                    (float(minimum), BoundDirection.MIN),
+                    (float(maximum), BoundDirection.MAX),
+                ):
+                    observations.append(
+                        Observation(
+                            operation_label=operation_label,
+                            location=ParameterLocation.BODY,
+                            parameter_path=path,
+                            kind=ObservationKind.NUMERIC_BOUND,
+                            raw_message=message,
+                            payload=NumericBoundPayload(bound=bound, direction=direction, exclusive=False),
+                        )
+                    )
         return tuple(observations)

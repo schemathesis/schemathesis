@@ -474,6 +474,79 @@ def test_feedback_unmasks_planted_bug_via_type_mismatch(cli, jackson_planted_bug
     )
 
 
+# Multiple int fields so overflow observations cross the calibration threshold during coverage.
+JACKSON_OVERFLOW_FIELDS: tuple[tuple[str, str], ...] = (
+    ("availableBeds", "msg"),
+    ("quantity", "message"),
+    ("score", "error"),
+)
+_INT32_MIN = -2_147_483_648
+_INT32_MAX = 2_147_483_647
+
+
+@pytest.fixture
+def jackson_overflow_planted_bug_app(ctx, app_runner):
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {field: {"type": "integer"} for field, _ in JACKSON_OVERFLOW_FIELDS},
+                        "required": [field for field, _ in JACKSON_OVERFLOW_FIELDS],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "400": {"description": "Bad"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/hospitals": {"post": dict(schema_body)}})
+
+    @app.route("/hospitals", methods=["POST"])
+    def create_hospital():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"msg": "JSON parse error"}), 400
+        envelope: dict[str, str] = {}
+        for field, carrier_key in JACKSON_OVERFLOW_FIELDS:
+            value = body.get(field)
+            if isinstance(value, int) and not isinstance(value, bool) and not _INT32_MIN <= value <= _INT32_MAX:
+                # Fixed placeholder for the actual value keeps the snapshot stable
+                # across runs; the parser regex accepts any non-paren content.
+                envelope[carrier_key] = (
+                    "JSON parse error: Numeric value (X) out of range of int; "
+                    "nested exception is com.fasterxml.jackson.databind.JsonMappingException: "
+                    "Numeric value (X) out of range of int "
+                    f'(through reference chain: HospitalDTO["{field}"])'
+                )
+        if envelope:
+            return jsonify(envelope), 400
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_jackson_numeric_overflow(cli, jackson_overflow_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            jackson_overflow_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+            "--seed=42",
+        )
+        == snapshot_cli
+    )
+
+
 # One enum-typed field per carrier key so observations cross the threshold during coverage.
 ENUM_TYPED_FIELDS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("user_type", "com.example.UserType", "msg", ("USER", "ADMIN")),
