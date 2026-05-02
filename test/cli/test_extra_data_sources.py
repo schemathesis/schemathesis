@@ -1120,7 +1120,6 @@ def test_stateful_reaches_every_list_producer_element(
         cli.run(
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
-            "--max-examples=30",
             "--mode=positive",
             "--seed=42",
         )
