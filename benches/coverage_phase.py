@@ -6,6 +6,7 @@ from jsonschema_rs import Draft202012Validator
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.coverage import CoverageContext, cover_schema_iter
 from schemathesis.generation.hypothesis import setup
+from schemathesis.specs.openapi.patterns import update_quantifier
 
 setup()
 
@@ -17,6 +18,7 @@ CONTEXTS = [
         is_required=True,
         custom_formats={},
         validator_cls=Draft202012Validator,
+        update_pattern=update_quantifier,
     ).with_positive(),
     CoverageContext(
         root_schema={},
@@ -25,6 +27,7 @@ CONTEXTS = [
         is_required=True,
         custom_formats={},
         validator_cls=Draft202012Validator,
+        update_pattern=update_quantifier,
     ).with_negative(),
 ]
 CONTEXT_NAMES = [",".join([m.value for m in ctx.generation_modes]) for ctx in CONTEXTS]

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis.core.deserialization import DeserializationContext, deserialize_response
 from schemathesis.core.transforms import UNRESOLVABLE, Unresolvable, resolve_pointer
 from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
@@ -169,8 +170,6 @@ class BodyResponse(Node):
         self.pointer = pointer
 
     def evaluate(self, output: StepOutput) -> Any:
-        from schemathesis.core.deserialization import DeserializationContext, deserialize_response
-
         response = output.response
         content_type = response.headers.get("content-type", ["application/json"])[0]
 

@@ -8,7 +8,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING
 
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.result import Result
+from schemathesis.core.result import Ok, Result
 from schemathesis.engine.run import PhaseName
 from schemathesis.schemas import APIOperation
 
@@ -29,6 +29,20 @@ class DefaultScheduler:
         """Get next API operation in a thread-safe manner."""
         with self.lock:
             return next(self.operations, None)
+
+
+def split_results(
+    operations: list[Result[APIOperation, InvalidSchema]],
+) -> tuple[list[APIOperation], list[InvalidSchema]]:
+    """Partition a result list into successful operations and schema errors."""
+    successes: list[APIOperation] = []
+    errors: list[InvalidSchema] = []
+    for result in operations:
+        if isinstance(result, Ok):
+            successes.append(result.ok())
+        else:
+            errors.append(result.err())
+    return successes, errors
 
 
 class WorkerPool:

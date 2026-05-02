@@ -41,16 +41,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     payload: Result[ProbePayload, Exception] | None = None
     for result in probes:
         if isinstance(result.probe, NullByteInHeader) and result.is_failure:
-            from schemathesis.specs.openapi import formats
-            from schemathesis.specs.openapi.formats import (
-                DEFAULT_HEADER_EXCLUDE_CHARACTERS,
-                HEADER_FORMAT,
-                header_values,
-            )
-
-            formats.register(
-                HEADER_FORMAT, header_values(exclude_characters=DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00")
-            )
+            ctx.schema.adapt_to_null_byte_in_header_failure()
         payload = Ok(ProbePayload(probes=probes))
     yield events.PhaseFinished(phase=phase, status=status, payload=payload)
 

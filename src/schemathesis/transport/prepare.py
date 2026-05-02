@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
@@ -65,31 +65,15 @@ def get_exclude_headers(case: Case) -> list[str]:
 
 
 def prepare_url(case: Case, base_url: str | None) -> str:
-    """Prepare URL based on case type."""
-    from schemathesis.specs.graphql.schemas import GraphQLSchema
-
+    """Prepare URL via the schema's spec-aware override."""
     base_url = base_url or case.operation.base_url
     assert base_url is not None
-    path = prepare_path(case.path, case.path_parameters)
-
-    if isinstance(case.operation.schema, GraphQLSchema):
-        parts = list(urlsplit(base_url))
-        parts[2] = path
-        return urlunsplit(parts)
-    else:
-        path = path.lstrip("/")
-        if not base_url.endswith("/"):
-            base_url += "/"
-        return unquote(urljoin(base_url, quote(path)))
+    return case.operation.schema.build_request_url(case, base_url)
 
 
 def prepare_body(case: Case) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
-    """Prepare body based on case type."""
-    from schemathesis.specs.graphql.schemas import GraphQLSchema
-
-    if isinstance(case.operation.schema, GraphQLSchema):
-        return case.body if isinstance(case.body, NotSet | bytes) else {"query": case.body}
-    return case.body
+    """Prepare body via the schema's spec-aware override."""
+    return case.operation.schema.prepare_request_body(case.body)
 
 
 def normalize_base_url(base_url: str | None) -> str | None:

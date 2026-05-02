@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from schemathesis.core.errors import MalformedMediaType
+
+if TYPE_CHECKING:
+    from hypothesis import strategies as st
 
 YAML_MEDIA_TYPES: tuple[str, ...] = (
     "text/yaml",
@@ -12,6 +16,36 @@ YAML_MEDIA_TYPES: tuple[str, ...] = (
     "text/vnd.yaml",
     "application/yaml",
 )
+
+FORM_MEDIA_TYPES: frozenset[str] = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
+
+# Registry of user-supplied strategies for content types. Populated via the public
+# `schemathesis.openapi.media_type(...)` API, but the storage is spec-agnostic.
+MEDIA_TYPE_STRATEGIES: dict[str, st.SearchStrategy[bytes]] = {}
+
+
+def find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | None:
+    """Find a registered strategy for a content type, supporting wildcard patterns."""
+    if content_type in MEDIA_TYPE_STRATEGIES:
+        return MEDIA_TYPE_STRATEGIES[content_type]
+
+    try:
+        main, sub = parse(content_type)
+    except MalformedMediaType:
+        return None
+
+    for registered_type, strategy in MEDIA_TYPE_STRATEGIES.items():
+        try:
+            target_main, target_sub = parse(registered_type)
+        except MalformedMediaType:
+            continue
+        # `*` on either side acts as a wildcard.
+        main_match = main == "*" or target_main == "*" or main == target_main
+        sub_match = sub == "*" or target_sub == "*" or sub == target_sub
+        if main_match and sub_match:
+            return strategy
+
+    return None
 
 
 def _parseparam(s: str) -> Generator[str]:

@@ -4,9 +4,33 @@ import re
 from io import StringIO
 from typing import TYPE_CHECKING, Any
 from unicodedata import normalize
+from urllib.parse import quote_plus, unquote
 
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.transforms import transform
+
+
+def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
+    """Apply URL quotation for all values in a dictionary."""
+    # Even though, "." is an unreserved character, it has a special meaning in "." and ".." strings.
+    # It will change the path:
+    #   - http://localhost/foo/./ -> http://localhost/foo/
+    #   - http://localhost/foo/../ -> http://localhost/
+    # Which is not desired as we need to test precisely the original path structure.
+
+    for key, value in parameters.items():
+        if isinstance(value, str):
+            # Unquote first to keep quoting idempotent for already-escaped inputs.
+            # E.g. "%2E" should stay escaped and not become a raw "."
+            decoded = unquote(value)
+            if decoded == ".":
+                parameters[key] = "%2E"
+            elif decoded == "..":
+                parameters[key] = "%2E%2E"
+            else:
+                parameters[key] = quote_plus(decoded)
+    return parameters
+
 
 if TYPE_CHECKING:
     from schemathesis.core.compat import RefResolver

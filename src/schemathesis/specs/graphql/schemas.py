@@ -12,16 +12,17 @@ from typing import (
     cast,
 )
 from unittest import SkipTest
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
-from schemathesis.core import NOT_SET, NotSet, Specification
+from schemathesis.core import NOT_SET, NotSet, SpecificationMetadata
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.statistic import ApiStatistic
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
@@ -37,10 +38,10 @@ from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatc
 from schemathesis.schemas import (
     APIOperation,
     APIOperationMap,
-    ApiStatistic,
     BaseSchema,
     OperationDefinition,
 )
+from schemathesis.transport.prepare import prepare_path
 
 from .extra_data_source import GraphQLResourcePool
 from .inference import RootType
@@ -53,6 +54,9 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.core.error_feedback import ErrorFeedbackStore
+    from schemathesis.engine.run import Phase
+    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.resources import ExtraDataSource
 
 
@@ -131,14 +135,46 @@ class GraphQLSchema(BaseSchema):
         return self.base_path
 
     @property
-    def specification(self) -> Specification:
-        return Specification.graphql(version="")
+    def specification(self) -> SpecificationMetadata:
+        return SpecificationMetadata.graphql(version="")
 
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         return False
 
     def create_extra_data_source(self) -> GraphQLResourcePool:
         return GraphQLResourcePool(client_schema=self.client_schema)
+
+    def build_request_url(self, case: Case, base_url: str) -> str:
+        parts = list(urlsplit(base_url))
+        parts[2] = prepare_path(case.path, case.path_parameters)
+        return urlunsplit(parts)
+
+    def prepare_request_body(
+        self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
+    ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
+        if isinstance(body, NotSet | bytes):
+            return body
+        return {"query": body}
+
+    def get_unit_scheduler(
+        self,
+        operations: list[Result[APIOperation, InvalidSchema]],
+        phase: Phase,
+    ) -> DefaultScheduler | LayeredScheduler:
+        from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+        from schemathesis.engine.run.unit._pool import DefaultScheduler, split_results
+        from schemathesis.specs.graphql.ordering import compute_graphql_layers
+
+        successes, errors = split_results(operations)
+        if not successes:
+            return DefaultScheduler(operations=operations)
+
+        layers = compute_graphql_layers(successes)
+        if len(layers) == 1:
+            # Single role: layering would add no information.
+            return DefaultScheduler(operations=operations)
+
+        return LayeredScheduler(layers, errors=errors)
 
     @property
     def client_schema(self) -> graphql.GraphQLSchema:

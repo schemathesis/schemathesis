@@ -18,7 +18,6 @@ from schemathesis.config import (
     CoveragePhaseConfig,
     ExamplesPhaseConfig,
     FuzzingPhaseConfig,
-    OperationOrdering,
 )
 from schemathesis.core.errors import (
     AuthenticationError,
@@ -27,20 +26,15 @@ from schemathesis.core.errors import (
     InvalidSchema,
     is_regex_validation_error,
 )
-from schemathesis.core.result import Err, Ok, Result
-from schemathesis.core.transport import restful_method_priority
+from schemathesis.core.result import Ok, Result
 from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-from schemathesis.engine.run.unit._ordering import compute_operation_layers
 from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.specs.graphql.ordering import compute_graphql_layers
-from schemathesis.specs.graphql.schemas import GraphQLSchema
-from schemathesis.specs.openapi.schemas import OpenApiSchema
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
@@ -51,73 +45,9 @@ WORKER_TIMEOUT = 0.1
 
 
 def _create_scheduler(engine: EngineContext, phase: Phase) -> DefaultScheduler | LayeredScheduler:
-    """Create the appropriate scheduler based on schema kind and ordering configuration."""
+    """Create the appropriate scheduler via the schema's specification-aware override."""
     operations: list[Result[APIOperation, InvalidSchema]] = list(engine.schema.get_all_operations())
-
-    if isinstance(engine.schema, OpenApiSchema):
-        return _create_openapi_scheduler(engine, phase, operations)
-    if isinstance(engine.schema, GraphQLSchema):
-        return _create_graphql_scheduler(operations)
-    return DefaultScheduler(operations=operations)
-
-
-def _split_results(
-    operations: list[Result[APIOperation, InvalidSchema]],
-) -> tuple[list[APIOperation], list[InvalidSchema]]:
-    successes: list[APIOperation] = []
-    errors: list[InvalidSchema] = []
-    for result in operations:
-        if isinstance(result, Ok):
-            successes.append(result.ok())
-        else:
-            errors.append(result.err())
-    return successes, errors
-
-
-def _create_openapi_scheduler(
-    engine: EngineContext,
-    phase: Phase,
-    operations: list[Result[APIOperation, InvalidSchema]],
-) -> DefaultScheduler | LayeredScheduler:
-    phase_config = engine.config.phases.get_by_name(name=phase.name.name)
-    assert isinstance(phase_config, FuzzingPhaseConfig | CoveragePhaseConfig | ExamplesPhaseConfig)
-    if phase_config.operation_ordering == OperationOrdering.NONE:
-        return DefaultScheduler(operations=operations)
-
-    successes, errors = _split_results(operations)
-    if not successes:
-        return DefaultScheduler(operations=operations)
-
-    assert isinstance(engine.schema, OpenApiSchema)
-    layers = compute_operation_layers(engine.schema, successes)
-
-    if not layers:
-        return DefaultScheduler(operations=operations)
-
-    if len(layers) == 1:
-        # Stable-sort by RESTful priority so producers dispatch before consumers
-        # without reordering same-priority operations against each other.
-        ordered_successes = sorted(successes, key=lambda op: restful_method_priority(op.method))
-        ordered: list[Result[APIOperation, InvalidSchema]] = [Ok(op) for op in ordered_successes]
-        ordered.extend(Err(err) for err in errors)
-        return DefaultScheduler(operations=ordered)
-
-    return LayeredScheduler(layers, errors=errors)
-
-
-def _create_graphql_scheduler(
-    operations: list[Result[APIOperation, InvalidSchema]],
-) -> DefaultScheduler | LayeredScheduler:
-    successes, errors = _split_results(operations)
-    if not successes:
-        return DefaultScheduler(operations=operations)
-
-    layers = compute_graphql_layers(successes)
-    if len(layers) == 1:
-        # Single role: layering would add no information.
-        return DefaultScheduler(operations=operations)
-
-    return LayeredScheduler(layers, errors=errors)
+    return engine.schema.get_unit_scheduler(operations, phase)
 
 
 def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:

@@ -5,22 +5,12 @@ from collections.abc import Callable, Generator, Mapping
 from typing import Any
 from urllib.parse import quote
 
-from schemathesis.core.parameters import LOCATION_TO_CONTAINER, RAW_QUERY_STRING_KEY, RawQueryString
-from schemathesis.schemas import APIOperation
+from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 
 Generated = dict[str, Any]
 Definition = dict[str, Any]
 DefinitionList = list[Definition]
 MapFunction = Callable[[Generated], Generated]
-
-
-def get_serializers_for_operation(operation: APIOperation) -> dict[str, Callable]:
-    serializers = {}
-    for location, container in LOCATION_TO_CONTAINER.items():
-        serializer = operation.get_parameter_serializer(location)
-        if serializer is not None:
-            serializers[container] = serializer
-    return serializers
 
 
 def make_serializer(

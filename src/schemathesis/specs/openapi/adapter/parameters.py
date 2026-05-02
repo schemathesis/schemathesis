@@ -17,6 +17,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, BundleError, Bundler, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
+from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import check_header_name
@@ -28,6 +29,7 @@ from schemathesis.specs.openapi.adapter.references import maybe_resolve
 from schemathesis.specs.openapi.converter import to_json_schema
 from schemathesis.specs.openapi.formats import HEADER_FORMAT, STRING_FORMATS
 from schemathesis.specs.openapi.headers import KNOWN_HEADER_FORMATS
+from schemathesis.transport.serialization import quote_all
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -45,8 +47,6 @@ MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
 INVALID_SCHEMA_MESSAGE = (
     "Can not generate data for {location} parameter `{name}`! Its schema should be an object or boolean, got {schema}"
 )
-
-FORM_MEDIA_TYPES = frozenset(["multipart/form-data", "application/x-www-form-urlencoded"])
 
 # Probability of using captured resource values vs generated values in hybrid strategy.
 CAPTURED_VALUES_PROBABILITY = 0.8
@@ -1136,7 +1136,6 @@ class OpenApiParameterSet(ParameterSet):
             _can_skip_header_filter,
             jsonify_python_specific_types,
             make_negative_strategy,
-            quote_all,
         )
         from schemathesis.specs.openapi.negative import GeneratedValue
         from schemathesis.specs.openapi.schemas import OpenApiSchema

@@ -46,10 +46,6 @@ from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 from schemathesis.transport.serialization import contains_binary
 
-from ..specs.openapi.converter import update_pattern_in_schema
-from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
-from ..specs.openapi.patterns import update_quantifier
-
 VALIDATED_FORMATS = frozenset(
     {
         "date",
@@ -145,8 +141,6 @@ def get_strategy_for_type(ty: str | list[str]) -> st.SearchStrategy:
     return st.one_of(STRATEGIES_FOR_TYPE[t] for t in ty if t in STRATEGIES_FOR_TYPE)
 
 
-FORMAT_STRATEGIES = {**BUILT_IN_STRING_FORMATS, **get_default_format_strategies(), **STRING_FORMATS}
-
 UNKNOWN_PROPERTY_KEY = "x-schemathesis-unknown-property"
 UNKNOWN_PROPERTY_VALUE = 42
 ADDITIONAL_PROPERTY_KEY_BASE = "x-schemathesis-additional"
@@ -220,6 +214,7 @@ class CoverageContext:
     path: list[str | int]
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema_rs.Validator]
+    update_pattern: Callable[[str, int | None, int | None], str] | None
     _resolver: RefResolver | None
     _schema_generation_cache: dict[tuple[Any, ...], Any]
     allow_extra_parameters: bool
@@ -233,6 +228,7 @@ class CoverageContext:
         "path",
         "custom_formats",
         "validator_cls",
+        "update_pattern",
         "_resolver",
         "_schema_generation_cache",
         "allow_extra_parameters",
@@ -249,6 +245,7 @@ class CoverageContext:
         path: list[str | int] | None = None,
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema_rs.Validator],
+        update_pattern: Callable[[str, int | None, int | None], str] | None = None,
         _resolver: RefResolver | None = None,
         _schema_generation_cache: dict[tuple[Any, ...], Any] | None = None,
         allow_extra_parameters: bool = True,
@@ -261,6 +258,7 @@ class CoverageContext:
         self.path = path or []
         self.custom_formats = custom_formats
         self.validator_cls = validator_cls
+        self.update_pattern = update_pattern
         self._resolver = _resolver
         self._schema_generation_cache = _schema_generation_cache if _schema_generation_cache is not None else {}
         self.allow_extra_parameters = allow_extra_parameters
@@ -299,6 +297,7 @@ class CoverageContext:
             path=self.path,
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
+            update_pattern=self.update_pattern,
             _resolver=self._resolver,
             _schema_generation_cache=self._schema_generation_cache,
             allow_extra_parameters=self.allow_extra_parameters,
@@ -314,6 +313,7 @@ class CoverageContext:
             path=self.path,
             custom_formats=self.custom_formats,
             validator_cls=self.validator_cls,
+            update_pattern=self.update_pattern,
             _resolver=self._resolver,
             _schema_generation_cache=self._schema_generation_cache,
             allow_extra_parameters=self.allow_extra_parameters,
@@ -374,8 +374,11 @@ class CoverageContext:
         if keys == ["format", "type"]:
             if schema["type"] != "string":
                 return cached_draw(get_strategy_for_type(schema["type"]))
-            elif schema["format"] in FORMAT_STRATEGIES:
-                return cached_draw(FORMAT_STRATEGIES[schema["format"]])
+            fmt = schema["format"]
+            if fmt in self.custom_formats:
+                return cached_draw(self.custom_formats[fmt])
+            if fmt in BUILT_IN_STRING_FORMATS:
+                return cached_draw(BUILT_IN_STRING_FORMATS[fmt])
         if (keys == ["maxLength", "minLength", "type"] or keys == ["maxLength", "type"]) and schema["type"] == "string":
             return cached_draw(st.text(min_size=schema.get("minLength", 0), max_size=schema["maxLength"]))
         if (
@@ -423,8 +426,8 @@ class CoverageContext:
                 raise Unsatisfiable from None
             min_length = schema.get("minLength")
             max_length = schema.get("maxLength")
-            if min_length is not None or max_length is not None:
-                pattern = update_quantifier(pattern, min_length, max_length)
+            if (min_length is not None or max_length is not None) and self.update_pattern is not None:
+                pattern = self.update_pattern(pattern, min_length, max_length)
             strategy = st.from_regex(pattern, fullmatch=True)
             if min_length is not None and max_length is not None:
                 strategy = strategy.filter(lambda s: min_length <= len(s) <= max_length)
@@ -498,7 +501,7 @@ class CoverageContext:
         # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
         cloned = deepclone(schema)
         if isinstance(cloned, dict) and BUNDLE_STORAGE_KEY in cloned:
-            _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY])
+            _apply_pattern_optimizations(cloned[BUNDLE_STORAGE_KEY], self.update_pattern)
         strategy = from_schema(cloned, custom_formats=self.custom_formats)
         # Keep generation consistent with the validator draft semantics used by this operation.
         # This avoids producing positive values that the validator for the same schema would reject.
@@ -516,14 +519,30 @@ class CoverageContext:
         return generated
 
 
-def _apply_pattern_optimizations(obj: Any) -> None:
+def _update_schema_pattern(
+    schema: dict[str, Any], update_pattern: Callable[[str, int | None, int | None], str]
+) -> None:
+    pattern = schema.get("pattern")
+    min_length = schema.get("minLength")
+    max_length = schema.get("maxLength")
+    if pattern and (min_length or max_length):
+        new_pattern = update_pattern(pattern, min_length, max_length)
+        if new_pattern != pattern:
+            schema.pop("minLength", None)
+            schema.pop("maxLength", None)
+            schema["pattern"] = new_pattern
+
+
+def _apply_pattern_optimizations(obj: Any, update_pattern: Callable[[str, int | None, int | None], str] | None) -> None:
+    if update_pattern is None:
+        return
     if isinstance(obj, dict):
-        update_pattern_in_schema(obj)
+        _update_schema_pattern(obj, update_pattern)
         for value in obj.values():
-            _apply_pattern_optimizations(value)
+            _apply_pattern_optimizations(value, update_pattern)
     elif isinstance(obj, list):
         for item in obj:
-            _apply_pattern_optimizations(item)
+            _apply_pattern_optimizations(item, update_pattern)
 
 
 def _schema_generation_cache_key(schema: JsonSchema) -> tuple[Any, ...]:
@@ -967,8 +986,10 @@ def cover_schema_iter(
                                 new_schema.pop("enum", None)
                                 new_schema.pop("const", None)
                                 new_schema["type"] = "string"
-                                if "pattern" in new_schema:
-                                    new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                                if "pattern" in new_schema and ctx.update_pattern is not None:
+                                    new_schema["pattern"] = ctx.update_pattern(
+                                        schema["pattern"], min_length, max_length
+                                    )
                                     if new_schema["pattern"] == schema["pattern"]:
                                         # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
                                         del new_schema["minLength"]
@@ -999,8 +1020,10 @@ def cover_schema_iter(
                                     # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
                                     del new_schema["pattern"]
                                     value = ctx.generate_from_schema(new_schema)
-                                else:
-                                    new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                                elif ctx.update_pattern is not None:
+                                    new_schema["pattern"] = ctx.update_pattern(
+                                        schema["pattern"], min_length, max_length
+                                    )
                                     if new_schema["pattern"] == schema["pattern"]:
                                         # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
                                         del new_schema["minLength"]
@@ -1008,6 +1031,8 @@ def cover_schema_iter(
                                         value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
                                     else:
                                         value = ctx.generate_from_schema(new_schema)
+                                else:
+                                    value = ctx.generate_from_schema(new_schema)
                             else:
                                 value = ctx.generate_from_schema(new_schema)
                             if seen.insert(value):
@@ -1309,7 +1334,8 @@ def _get_properties(schema: JsonSchema, ctx: CoverageContext) -> JsonSchema:
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object", ctx)
         _schema = deepclone(schema)
-        update_pattern_in_schema(_schema)
+        if ctx.update_pattern is not None:
+            _update_schema_pattern(_schema, ctx.update_pattern)
         # Strip format-invalid hints so hypothesis-jsonschema does not use them as generation seeds.
         if "default" in _schema and not _is_valid_with_formats(_schema["default"], _schema, ctx):
             del _schema["default"]
@@ -1395,7 +1421,9 @@ def _positive_string(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     max_length = schema.get("maxLength")
     if ctx.location == "path" and not ("format" in schema and schema["format"] in ctx.custom_formats):
         schema = _ensure_valid_path_parameter_schema(schema)
-    elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in FORMAT_STRATEGIES):
+    elif ctx.location in ("header", "cookie") and not (
+        "format" in schema and (schema["format"] in ctx.custom_formats or schema["format"] in BUILT_IN_STRING_FORMATS)
+    ):
         # Don't apply it for known formats - they will insure the correct format during generation
         schema = _ensure_valid_headers_schema(schema)
 

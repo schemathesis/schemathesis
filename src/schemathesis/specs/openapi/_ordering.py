@@ -1,4 +1,4 @@
-"""Operation ordering strategies for unit test phases."""
+"""OpenAPI-aware operation ordering for unit test phases."""
 
 from __future__ import annotations
 

@@ -8,7 +8,7 @@ from schemathesis.engine.context import EngineContext
 from schemathesis.engine.run import Phase, PhaseName
 from schemathesis.engine.run.unit import _create_scheduler
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
-from schemathesis.engine.run.unit._ordering import compute_operation_layers
+from schemathesis.specs.openapi._ordering import compute_operation_layers
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 
 

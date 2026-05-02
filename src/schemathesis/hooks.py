@@ -225,7 +225,14 @@ class HookDispatcher:
         return self._hooks
 
     def apply_to_container(
-        self, strategy: st.SearchStrategy, container: str, context: HookContext
+        self,
+        strategy: st.SearchStrategy,
+        container: str,
+        context: HookContext,
+        *,
+        filter_wrapper: Callable[[Callable], Callable] | None = None,
+        map_wrapper: Callable[[Callable], Callable] | None = None,
+        flatmap_wrapper: Callable[[Callable], Callable] | None = None,
     ) -> st.SearchStrategy:
         for hook in self.get_all_by_name(f"before_generate_{container}"):
             if _should_skip_hook(hook, context):
@@ -235,19 +242,22 @@ class HookDispatcher:
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
-            hook = _wrap_filter_hook_for_generated_value(hook)
+            if filter_wrapper is not None:
+                hook = filter_wrapper(hook)
             strategy = strategy.filter(hook)
         for hook in self.get_all_by_name(f"map_{container}"):
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
-            hook = _wrap_hook_for_generated_value(hook)
+            if map_wrapper is not None:
+                hook = map_wrapper(hook)
             strategy = strategy.map(hook)
         for hook in self.get_all_by_name(f"flatmap_{container}"):
             if _should_skip_hook(hook, context):
                 continue
             hook = partial(hook, context)
-            hook = _wrap_flatmap_hook_for_generated_value(hook)
+            if flatmap_wrapper is not None:
+                hook = flatmap_wrapper(hook)
             strategy = strategy.flatmap(hook)
         return strategy
 
@@ -292,72 +302,27 @@ def _should_skip_hook(hook: Callable, ctx: HookContext) -> bool:
     return filter_set is not None and ctx.operation is not None and not filter_set.match(ctx)
 
 
-def _wrap_hook_for_generated_value(hook: Callable) -> Callable:
-    """Wrap hook to handle GeneratedValue transparently.
-
-    In NEGATIVE mode, strategies yield GeneratedValue wrappers instead of raw dicts.
-    This wrapper ensures hooks always receive raw dict values and preserves the
-    GeneratedValue wrapper with its metadata after the hook processes the value.
-    """
-    from schemathesis.specs.openapi.negative import GeneratedValue
-
-    def wrapper(value: Any) -> Any:
-        if isinstance(value, GeneratedValue):
-            result = hook(value.value)
-            return GeneratedValue(value=result, meta=value.meta)
-        return hook(value)
-
-    return wrapper
-
-
-def _wrap_flatmap_hook_for_generated_value(hook: Callable) -> Callable:
-    """Wrap a flatmap hook to handle GeneratedValue transparently.
-
-    Unlike map hooks, flatmap hooks return a SearchStrategy — not a value.
-    In NEGATIVE mode the input is a GeneratedValue wrapper, so we unwrap it,
-    call the hook to get a SearchStrategy, then re-wrap each drawn result so
-    the GeneratedValue metadata is preserved through the flatmap.
-    """
-    from schemathesis.specs.openapi.negative import GeneratedValue
-
-    def wrapper(value: Any) -> st.SearchStrategy:
-        if isinstance(value, GeneratedValue):
-            meta = value.meta
-            return hook(value.value).map(lambda v: GeneratedValue(value=v, meta=meta))
-        return hook(value)
-
-    return wrapper
-
-
-def _wrap_filter_hook_for_generated_value(hook: Callable) -> Callable:
-    """Wrap a filter hook to handle GeneratedValue transparently.
-
-    Like _wrap_hook_for_generated_value but for filter hooks: the boolean result
-    must be returned directly so strategy.filter() can evaluate its truthiness.
-    Re-wrapping in GeneratedValue would make every result truthy and break filtering.
-    """
-    from schemathesis.specs.openapi.negative import GeneratedValue
-
-    def wrapper(value: Any) -> bool:
-        if isinstance(value, GeneratedValue):
-            return hook(value.value)
-        return hook(value)
-
-    return wrapper
-
-
 def apply_to_all_dispatchers(
     operation: APIOperation,
     context: HookContext,
     hooks: HookDispatcher | None,
     strategy: st.SearchStrategy,
     container: str,
+    *,
+    filter_wrapper: Callable[[Callable], Callable] | None = None,
+    map_wrapper: Callable[[Callable], Callable] | None = None,
+    flatmap_wrapper: Callable[[Callable], Callable] | None = None,
 ) -> st.SearchStrategy:
     """Apply all hooks related to the given location."""
-    strategy = GLOBAL_HOOK_DISPATCHER.apply_to_container(strategy, container, context)
-    strategy = operation.schema.hooks.apply_to_container(strategy, container, context)
+    wrappers = {
+        "filter_wrapper": filter_wrapper,
+        "map_wrapper": map_wrapper,
+        "flatmap_wrapper": flatmap_wrapper,
+    }
+    strategy = GLOBAL_HOOK_DISPATCHER.apply_to_container(strategy, container, context, **wrappers)
+    strategy = operation.schema.hooks.apply_to_container(strategy, container, context, **wrappers)
     if hooks is not None:
-        strategy = hooks.apply_to_container(strategy, container, context)
+        strategy = hooks.apply_to_container(strategy, container, context, **wrappers)
     return strategy
 
 
@@ -373,16 +338,94 @@ def validate_filterable_hook(hook: str | Callable) -> None:
 all_scopes = HookDispatcher.register_spec(list(HookScope))
 
 
-for action in ("filter", "map", "flatmap"):
-    for target in ("path_parameters", "query", "headers", "cookies", "body", "case"):
-        exec(
-            f"""
 @all_scopes
-def {action}_{target}(context: HookContext, {target}: Any) -> Any:
-    pass
-""",
-            globals(),
-        )
+def filter_path_parameters(context: HookContext, path_parameters: Any) -> Any:
+    """Drop generated `path_parameters` values that fail the predicate."""
+
+
+@all_scopes
+def filter_query(context: HookContext, query: Any) -> Any:
+    """Drop generated `query` values that fail the predicate."""
+
+
+@all_scopes
+def filter_headers(context: HookContext, headers: Any) -> Any:
+    """Drop generated `headers` values that fail the predicate."""
+
+
+@all_scopes
+def filter_cookies(context: HookContext, cookies: Any) -> Any:
+    """Drop generated `cookies` values that fail the predicate."""
+
+
+@all_scopes
+def filter_body(context: HookContext, body: Any) -> Any:
+    """Drop generated `body` values that fail the predicate."""
+
+
+@all_scopes
+def filter_case(context: HookContext, case: Any) -> Any:
+    """Drop generated `Case` instances that fail the predicate."""
+
+
+@all_scopes
+def map_path_parameters(context: HookContext, path_parameters: Any) -> Any:
+    """Transform each generated `path_parameters` value."""
+
+
+@all_scopes
+def map_query(context: HookContext, query: Any) -> Any:
+    """Transform each generated `query` value."""
+
+
+@all_scopes
+def map_headers(context: HookContext, headers: Any) -> Any:
+    """Transform each generated `headers` value."""
+
+
+@all_scopes
+def map_cookies(context: HookContext, cookies: Any) -> Any:
+    """Transform each generated `cookies` value."""
+
+
+@all_scopes
+def map_body(context: HookContext, body: Any) -> Any:
+    """Transform each generated `body` value."""
+
+
+@all_scopes
+def map_case(context: HookContext, case: Any) -> Any:
+    """Transform each generated `Case` instance."""
+
+
+@all_scopes
+def flatmap_path_parameters(context: HookContext, path_parameters: Any) -> Any:
+    """Replace the strategy for `path_parameters` with another strategy derived from each value."""
+
+
+@all_scopes
+def flatmap_query(context: HookContext, query: Any) -> Any:
+    """Replace the strategy for `query` with another strategy derived from each value."""
+
+
+@all_scopes
+def flatmap_headers(context: HookContext, headers: Any) -> Any:
+    """Replace the strategy for `headers` with another strategy derived from each value."""
+
+
+@all_scopes
+def flatmap_cookies(context: HookContext, cookies: Any) -> Any:
+    """Replace the strategy for `cookies` with another strategy derived from each value."""
+
+
+@all_scopes
+def flatmap_body(context: HookContext, body: Any) -> Any:
+    """Replace the strategy for `body` with another strategy derived from each value."""
+
+
+@all_scopes
+def flatmap_case(context: HookContext, case: Any) -> Any:
+    """Replace the strategy for `Case` with another strategy derived from each instance."""
 
 
 @all_scopes

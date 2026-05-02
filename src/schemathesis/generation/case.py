@@ -15,8 +15,8 @@ from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.parameters import CONTAINER_TO_LOCATION, ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status
-from schemathesis.generation import GenerationMode, generate_random_case_id
-from schemathesis.generation.meta import CaseMetadata, ComponentInfo
+from schemathesis.generation import generate_random_case_id
+from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
 from schemathesis.transport.prepare import prepare_path, prepare_request
@@ -226,40 +226,7 @@ class Case:
     def _revalidate_metadata(self) -> None:
         """Revalidate dirty components and update metadata."""
         assert self._meta and self._meta.is_dirty()
-
-        from schemathesis.specs.openapi.schemas import OpenApiSchema
-
-        # Only works for OpenAPI schemas
-        if not isinstance(self.operation.schema, OpenApiSchema):
-            # Can't validate, just clear dirty flags
-            for location in list(self._meta._dirty):
-                self._meta.clear_dirty(location)
-            return
-
-        validator_cls = self.operation.schema.adapter.jsonschema_validator_cls
-
-        for location in list(self._meta._dirty):
-            # Get current value
-            value = getattr(self, location.container_name)
-
-            # Validate against schema
-            is_valid = self._validate_component(location, value, validator_cls)
-
-            # Update component metadata
-            if location in self._meta.components:
-                new_mode = GenerationMode.POSITIVE if is_valid else GenerationMode.NEGATIVE
-                self._meta.components[location] = ComponentInfo(mode=new_mode)
-
-            # Update hash and clear dirty flag
-            self._meta.update_validated_hash(location, self._hash_container(value))
-            self._meta.clear_dirty(location)
-
-        # Recompute overall generation mode
-        if self._meta.components:
-            if all(info.mode.is_positive for info in self._meta.components.values()):
-                self._meta.generation.mode = GenerationMode.POSITIVE
-            else:
-                self._meta.generation.mode = GenerationMode.NEGATIVE
+        self.operation.schema.revalidate_case_metadata(self)
 
     def _validate_component(
         self,

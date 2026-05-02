@@ -15,12 +15,15 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
-from schemathesis.config import ProjectConfig
+from schemathesis.config import GenerationConfig, ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.parameters import LOCATION_TO_CONTAINER
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.spec import CoverageCapabilities
+from schemathesis.core.statistic import ApiStatistic
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -28,6 +31,7 @@ from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.hypothesis.reporting import FilterCaseTracker
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark, _should_skip_hook
+from schemathesis.transport.prepare import prepare_path
 
 from .auths import AuthStorage
 from .filters import (
@@ -47,7 +51,12 @@ if TYPE_CHECKING:
     from werkzeug.test import TestResponse
 
     from schemathesis.auths import AuthContext
-    from schemathesis.core import Specification
+    from schemathesis.core import SpecificationMetadata
+    from schemathesis.core.schema_analysis import SchemaWarning
+    from schemathesis.engine.context import EngineContext
+    from schemathesis.engine.run import Phase
+    from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
+    from schemathesis.engine.run.unit._pool import DefaultScheduler
     from schemathesis.generation.stateful.state_machine import APIStateMachine
     from schemathesis.resources import ExtraDataSource
 
@@ -55,48 +64,6 @@ if TYPE_CHECKING:
 @lru_cache
 def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path, quote(path.lstrip("/"))))
-
-
-@dataclass
-class FilteredCount:
-    """Count of total items and those passing filters."""
-
-    total: int
-    selected: int
-
-    __slots__ = ("total", "selected")
-
-    def __init__(self) -> None:
-        self.total = 0
-        self.selected = 0
-
-
-@dataclass
-class ApiStatistic:
-    """Statistics about API operations and links."""
-
-    operations: FilteredCount
-    links: FilteredCount
-
-    __slots__ = ("operations", "links")
-
-    def __init__(self) -> None:
-        self.operations = FilteredCount()
-        self.links = FilteredCount()
-
-
-@dataclass
-class ApiOperationsCount:
-    """Statistics about API operations."""
-
-    total: int
-    selected: int
-
-    __slots__ = ("total", "selected")
-
-    def __init__(self) -> None:
-        self.total = 0
-        self.selected = 0
 
 
 @dataclass(eq=False)
@@ -116,7 +83,7 @@ class BaseSchema(Mapping):
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
 
     @property
-    def specification(self) -> Specification:
+    def specification(self) -> SpecificationMetadata:
         raise NotImplementedError
 
     @property
@@ -482,6 +449,74 @@ class BaseSchema(Mapping):
     ) -> bool | None:
         raise NotImplementedError
 
+    def get_coverage_capabilities(self) -> CoverageCapabilities:
+        """Return spec-specific data the coverage phase asks of a schema."""
+        return CoverageCapabilities(format_strategies={}, update_pattern=None, validator_cls=None)
+
+    def revalidate_case_metadata(self, case: Case) -> None:
+        """Refresh case metadata after a container was modified; default just clears the dirty markers."""
+        meta = case._meta
+        if meta is None or not meta.is_dirty():
+            return
+        for location in list(meta._dirty):
+            meta.clear_dirty(location)
+
+    def get_unit_scheduler(
+        self,
+        operations: list[Result[APIOperation, InvalidSchema]],
+        phase: Phase,
+    ) -> DefaultScheduler | LayeredScheduler:
+        """Return the scheduler that decides operation execution order in the unit phase."""
+        from schemathesis.engine.run.unit._pool import DefaultScheduler
+
+        return DefaultScheduler(operations=operations)
+
+    def apply_stateful_links(self, ctx: EngineContext) -> int:
+        """Inject spec-specific stateful links from runtime observations; return the number injected."""
+        return 0
+
+    def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]:
+        """Return per-operation sampling weights for the fuzz phase; default is uniform."""
+        return {op.label: 1 for op in operations}
+
+    def iter_link_candidates(
+        self,
+        *,
+        operation: APIOperation,
+        case: Case,
+        response: Response,
+        operations_by_label: dict[str, APIOperation],
+        excluded_labels: set[str],
+    ) -> list[tuple[APIOperation, dict[str, Any]]]:
+        """Return resolvable (target, overrides) link candidates from a response; empty for specs without links."""
+        return []
+
+    def iter_schema_warnings(self) -> list[SchemaWarning]:
+        """Return spec-level static-analysis warnings collected from the schema."""
+        return []
+
+    def build_request_url(self, case: Case, base_url: str) -> str:
+        """Construct the request URL by templating the case path onto `base_url`."""
+        path = prepare_path(case.path, case.path_parameters).lstrip("/")
+        if not base_url.endswith("/"):
+            base_url += "/"
+        return unquote(urljoin(base_url, quote(path)))
+
+    def prepare_request_body(
+        self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
+    ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
+        """Apply spec-specific transformations to a generated body before sending."""
+        return body
+
+    def adapt_to_null_byte_in_header_failure(self) -> None:
+        """React to the engine probe finding that null bytes in headers crash the app under test."""
+
+    def get_custom_format_strategies(
+        self, generation_config: GenerationConfig, mode: GenerationMode
+    ) -> dict[str, SearchStrategy]:
+        """Return spec-specific format strategies (mode-aware) for hypothesis-jsonschema generation."""
+        return {}
+
     def as_strategy(
         self,
         generation_mode: GenerationMode = GenerationMode.POSITIVE,
@@ -769,6 +804,15 @@ class APIOperation(Generic[P, R, S]):
 
     def get_parameter_serializer(self, location: str) -> Callable | None:
         return self.schema.get_parameter_serializer(self, location)
+
+    def get_parameter_serializers(self) -> dict[str, Callable]:
+        """Return all per-container parameter serializers defined on this operation."""
+        serializers: dict[str, Callable] = {}
+        for location, container in LOCATION_TO_CONTAINER.items():
+            serializer = self.get_parameter_serializer(location)
+            if serializer is not None:
+                serializers[container] = serializer
+        return serializers
 
     def prepare_multipart(
         self, form_data: dict[str, Any], selected_content_types: dict[str, str] | None = None

@@ -4,7 +4,6 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, cast
-from urllib.parse import quote_plus, unquote
 
 import jsonschema_rs
 from hypothesis import event, note, reject
@@ -23,6 +22,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.jsonschema.types import JsonSchema
+from schemathesis.core.media_types import FORM_MEDIA_TYPES, find_media_type_strategy
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import (
@@ -38,9 +38,10 @@ from schemathesis.generation.meta import (
 from schemathesis.openapi.generation.filters import is_valid_urlencoded
 from schemathesis.resources import ExtraDataSource
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.adapter.parameters import FORM_MEDIA_TYPES, OpenApiBody, OpenApiParameterSet
+from schemathesis.specs.openapi.adapter.parameters import OpenApiBody, OpenApiParameterSet
 from schemathesis.specs.openapi.negative.mutations import MutationMetadata
 from schemathesis.specs.openapi.negative.utils import is_binary_format
+from schemathesis.transport.serialization import quote_all
 
 from ... import auths
 from ...generation import GenerationMode
@@ -54,8 +55,13 @@ from .formats import (
     header_values,
 )
 from .headers import KNOWN_HEADER_FORMATS, get_header_format_strategies
-from .media_types import MEDIA_TYPES
-from .negative import GeneratedValue, negative_schema
+from .negative import (
+    GeneratedValue,
+    negative_schema,
+    wrap_filter_hook_for_generated_value,
+    wrap_flatmap_hook_for_generated_value,
+    wrap_map_hook_for_generated_value,
+)
 from .negative.utils import can_negate
 
 SLASH = "/"
@@ -254,7 +260,7 @@ def openapi_cases(
     else:
         # This explicit body payload comes for a media type that has a custom strategy registered
         # Such strategies only support binary payloads, otherwise they can't be serialized
-        if not isinstance(body, bytes) and media_type and _find_media_type_strategy(media_type) is not None:
+        if not isinstance(body, bytes) and media_type and find_media_type_strategy(media_type) is not None:
             all_media_types = operation.get_request_payload_content_types()
             raise SerializationNotPossible.from_media_types(*all_media_types)
         body_ = ValueContainer(value=body, location="body", generator=None, meta=None)
@@ -427,33 +433,6 @@ def _maybe_set_optional_body(
     return strategy
 
 
-def _find_media_type_strategy(content_type: str) -> st.SearchStrategy[bytes] | None:
-    """Find a registered strategy for a content type, supporting wildcard patterns."""
-    # Try exact match first
-    if content_type in MEDIA_TYPES:
-        return MEDIA_TYPES[content_type]
-
-    try:
-        main, sub = media_types.parse(content_type)
-    except MalformedMediaType:
-        return None
-
-    # Check registered media types for wildcard matches
-    for registered_type, strategy in MEDIA_TYPES.items():
-        try:
-            target_main, target_sub = media_types.parse(registered_type)
-        except MalformedMediaType:
-            continue
-        # Match if both main and sub types are compatible
-        # "*" in either the requested or registered type acts as a wildcard
-        main_match = main == "*" or target_main == "*" or main == target_main
-        sub_match = sub == "*" or target_sub == "*" or sub == target_sub
-        if main_match and sub_match:
-            return strategy
-
-    return None
-
-
 def _build_form_strategy_with_encoding(
     parameter: OpenApiBody,
     operation: APIOperation,
@@ -492,7 +471,7 @@ def _build_form_strategy_with_encoding(
         if content_types:
             strategies_for_types = []
             for ct in content_types:
-                strategy = _find_media_type_strategy(ct)
+                strategy = find_media_type_strategy(ct)
                 if strategy is not None:
                     # Pair strategy with its content type so we know which was selected
                     strategies_for_types.append(st.tuples(st.just(ct), strategy))
@@ -601,7 +580,7 @@ def _get_body_strategy(
             return custom_strategy
 
     # Check for custom media type strategy
-    custom_strategy = _find_media_type_strategy(parameter.media_type)
+    custom_strategy = find_media_type_strategy(parameter.media_type)
     if custom_strategy is not None:
         # Always use custom strategies for raw bodies - they produce transmittable bytes.
         # In negative mode, bypassing them would generate non-bytes values (e.g., integers)
@@ -904,28 +883,6 @@ GENERATOR_MODE_TO_STRATEGY_FACTORY = {
 }
 
 
-def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
-    """Apply URL quotation for all values in a dictionary."""
-    # Even though, "." is an unreserved character, it has a special meaning in "." and ".." strings.
-    # It will change the path:
-    #   - http://localhost/foo/./ -> http://localhost/foo/
-    #   - http://localhost/foo/../ -> http://localhost/
-    # Which is not desired as we need to test precisely the original path structure.
-
-    for key, value in parameters.items():
-        if isinstance(value, str):
-            # Unquote first to keep quoting idempotent for already-escaped inputs.
-            # E.g. "%2E" should stay escaped and not become a raw "."
-            decoded = unquote(value)
-            if decoded == ".":
-                parameters[key] = "%2E"
-            elif decoded == "..":
-                parameters[key] = "%2E%2E"
-            else:
-                parameters[key] = quote_plus(decoded)
-    return parameters
-
-
 def apply_hooks(
     operation: APIOperation,
     ctx: HookContext,
@@ -933,5 +890,18 @@ def apply_hooks(
     strategy: st.SearchStrategy,
     location: ParameterLocation,
 ) -> st.SearchStrategy:
-    """Apply all hooks related to the given location."""
-    return apply_to_all_dispatchers(operation, ctx, hooks, strategy, location.container_name)
+    """Apply all hooks related to the given location.
+
+    Passes `GeneratedValue` (de)wrapping helpers so user hooks see plain values even
+    when negative-mode strategies wrap them.
+    """
+    return apply_to_all_dispatchers(
+        operation,
+        ctx,
+        hooks,
+        strategy,
+        location.container_name,
+        filter_wrapper=wrap_filter_hook_for_generated_value,
+        map_wrapper=wrap_map_hook_for_generated_value,
+        flatmap_wrapper=wrap_flatmap_hook_for_generated_value,
+    )
