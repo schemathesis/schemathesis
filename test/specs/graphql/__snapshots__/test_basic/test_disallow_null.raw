@@ -46,7 +46,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ❌ Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Failures:
   ❌ GraphQL client error: 1

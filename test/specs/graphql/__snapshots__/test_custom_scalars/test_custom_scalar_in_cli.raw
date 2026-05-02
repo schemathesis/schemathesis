@@ -41,7 +41,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   🚫 Fuzzing
-  ⏭  Stateful (not supported)
+  ⏭  Stateful (not applicable)
 
 Errors:
   🚫 Unknown GraphQL Scalar: 1

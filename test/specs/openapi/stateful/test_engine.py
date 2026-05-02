@@ -890,7 +890,7 @@ def test_multiple_incoming_link_without_override(ctx):
     state_machine = schema.as_state_machine()
     assert (
         sum(len(operation.outgoing) for operation in state_machine._transitions.operations.values())
-        == schema.statistic.links.total
+        == schema.statistic.transitions.total
     )
 
 

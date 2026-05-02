@@ -28,7 +28,7 @@ Operations chained together. Real IDs from real responses.
 
 ## How It Works
 
-Schemathesis analyzes your OpenAPI schema to understand how operations connect.
+Schemathesis analyzes your schema to understand how operations connect. The mechanism differs by spec but the model is the same: identify producers (operations that return resources), identify consumers (operations that need resources), and chain them.
 
 **Step 1: Find resources**
 
@@ -83,9 +83,12 @@ This works across non-stateful test phases and within them. The examples phase b
 
 Stateful testing needs to know how operations relate. For example, `POST /users` creates a user, and `GET /users/{userId}` needs that user's ID.
 
-Schemathesis discovers these connections in three ways:
+Schemathesis discovers these connections per spec:
 
-### 1. Automatic Schema Analysis
+- **OpenAPI**: schema analysis, `Location` headers, and explicit OpenAPI Links (see below).
+- **GraphQL**: the type graph itself encodes the connections — a mutation returning `Book!` is automatically connected to a query taking a `Book` id-typed argument.
+
+### 1. Automatic Schema Analysis (OpenAPI)
 
 Analyzes your OpenAPI schema to detect connections.
 
@@ -125,7 +128,30 @@ Schemathesis detects the following relationships:
 - Pagination: `{"data": [...]}`, `{"items": [...]}`
 - Schema composition: `allOf`, `oneOf`, `anyOf`
 
-### 2. Location Header Learning
+### 2. Automatic Schema Analysis (GraphQL)
+
+For GraphQL, Schemathesis reads the type graph directly. Object types with an `id` field become resources; mutations returning those types become producers; queries and mutations whose id-typed arguments resolve to those types become consumers.
+
+**Example:**
+
+```graphql
+type Book { id: ID! title: String! }
+
+type Mutation {
+    addBook(title: String!): Book!     # Producer of Book
+    deleteBook(id: ID!): Boolean       # Cleanup of Book
+}
+
+type Query {
+    book(id: ID!): Book                # Consumer of Book
+}
+```
+
+Schemathesis builds the chain `addBook -> book` (and `addBook -> deleteBook`) automatically.
+
+Argument-name conventions are recognized: `bookId`, `book_id`, `bookIds` all resolve to the `Book` type. Bespoke `<Type>ID` scalars (e.g. `BookID`) work the same way.
+
+### 3. Location Header Learning
 
 While running tests, Schemathesis can also learn new connections dynamically by observing `Location` headers in responses.
 
@@ -140,7 +166,7 @@ Location: /users/123
 
 This mechanism requires your API to return a valid `Location` header in `201 Created` responses.
 
-### 3. Manual OpenAPI Links
+### 4. Manual OpenAPI Links
 
 When you want full control or need to specify non-path relationships, you can define explicit connections using [OpenAPI Links](https://spec.openapis.org/oas/v3.1.0#link-object).
 

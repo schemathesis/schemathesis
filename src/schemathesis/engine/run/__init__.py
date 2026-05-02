@@ -52,7 +52,7 @@ class PhaseSkipReason(str, enum.Enum):
 
     DISABLED = "disabled"  # Explicitly disabled via config
     NOT_SUPPORTED = "not supported"  # Feature not supported by schema
-    NOT_APPLICABLE = "not applicable"  # No relevant data (e.g., no links for stateful)
+    NOT_APPLICABLE = "not applicable"  # No relevant data (e.g., no transitions for stateful)
     FAILURE_LIMIT_REACHED = "failure limit reached"
     NOTHING_TO_TEST = "nothing to test"
 

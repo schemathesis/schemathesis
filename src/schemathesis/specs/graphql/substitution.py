@@ -10,6 +10,8 @@ input-object arguments and to elements of list-typed arguments.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from random import Random
 from typing import TYPE_CHECKING, Final
 
 import graphql
@@ -18,13 +20,15 @@ from schemathesis.specs.graphql._helpers import _root_type_for, _unwrap
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
-    from random import Random
 
     from schemathesis.specs.graphql.extra_data_source import GraphQLResourcePool
 
 # Probability that captured values replace matching argument literals;
 # the remaining 0.3 leaves Hypothesis room to explore fresh values.
 SUBSTITUTION_PROBABILITY: Final = 0.7
+
+# Returns a substitution value for the given parent-type name, or None to keep the original.
+ValueProvider = Callable[[str, Random], str | None]
 
 
 def substitute_pool_values(
@@ -35,16 +39,52 @@ def substitute_pool_values(
     random: Random,
 ) -> None:
     """Replace matching argument literals with captured pool values."""
+
+    def provider(parent_type_name: str, random: Random) -> str | None:
+        return pool.draw(parent_type_name=parent_type_name, random=random)
+
+    _substitute(operation_node, client_schema, provider, random)
+
+
+def substitute_bundle_values(
+    *,
+    operation_node: graphql.OperationDefinitionNode,
+    client_schema: graphql.GraphQLSchema,
+    bundle_values: dict[str, str],
+    random: Random,
+    exploration_rate: float = 0.0,
+) -> None:
+    """Replace id-typed argument literals with values from the given type to id mapping.
+
+    `exploration_rate` is the per-argument probability of leaving the
+    strategy-generated value in place, forcing discovery of bugs reachable only
+    via unknown ids.
+    """
+
+    def provider(parent_type_name: str, random: Random) -> str | None:
+        if exploration_rate > 0.0 and random.random() < exploration_rate:
+            return None
+        return bundle_values.get(parent_type_name)
+
+    _substitute(operation_node, client_schema, provider, random)
+
+
+def _substitute(
+    operation_node: graphql.OperationDefinitionNode,
+    client_schema: graphql.GraphQLSchema,
+    provider: ValueProvider,
+    random: Random,
+) -> None:
     root = _root_type_for(client_schema, operation_node.operation)
     if root is None:
         return
-    _walk(operation_node.selection_set, root, pool, random)
+    _walk(operation_node.selection_set, root, provider, random)
 
 
 def _walk(
     selection_set: graphql.SelectionSetNode | None,
     parent_type: graphql.GraphQLObjectType,
-    pool: GraphQLResourcePool,
+    provider: ValueProvider,
     random: Random,
 ) -> None:
     if selection_set is None:
@@ -63,9 +103,63 @@ def _walk(
             arg_def = field_def.args.get(argument.name.value)
             if arg_def is None:
                 continue
-            _maybe_substitute(argument, arg_def.type, enclosing_field_type, pool, random)
+            new_value = _substitute_value(
+                argument.value, arg_def.type, argument.name.value, enclosing_field_type, provider, random
+            )
+            if new_value is not None:
+                argument.value = new_value
         if isinstance(unwrapped_return, graphql.GraphQLObjectType):
-            _walk(selection.selection_set, unwrapped_return, pool, random)
+            _walk(selection.selection_set, unwrapped_return, provider, random)
+
+
+def _substitute_value(
+    value: graphql.ValueNode,
+    value_type: graphql.GraphQLType,
+    name: str,
+    enclosing_field_type: str | None,
+    provider: ValueProvider,
+    random: Random,
+) -> graphql.ValueNode | None:
+    """Return a substituted value if the provider returns a candidate; otherwise None."""
+    inner = value_type
+    while isinstance(inner, graphql.GraphQLNonNull):
+        inner = inner.of_type
+    if isinstance(inner, graphql.GraphQLList) and isinstance(value, graphql.ListValueNode):
+        new_values = list(value.values)
+        replaced_any = False
+        for index, element in enumerate(new_values):
+            replaced = _substitute_value(element, inner.of_type, name, enclosing_field_type, provider, random)
+            if replaced is not None:
+                new_values[index] = replaced
+                replaced_any = True
+        return graphql.ListValueNode(values=tuple(new_values)) if replaced_any else None
+    if isinstance(inner, graphql.GraphQLScalarType):
+        parent_type_name = _candidate_parent_type(
+            scalar_name=inner.name,
+            argument_name=name,
+            enclosing_field_type=enclosing_field_type,
+        )
+        if parent_type_name is None:
+            return None
+        candidate = provider(parent_type_name, random)
+        if candidate is None:
+            return None
+        return graphql.StringValueNode(value=candidate)
+    if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
+        new_fields = list(value.fields)
+        replaced_any = False
+        for index, field_node in enumerate(new_fields):
+            field_def = inner.fields.get(field_node.name.value)
+            if field_def is None:
+                continue
+            replaced = _substitute_value(
+                field_node.value, field_def.type, field_node.name.value, None, provider, random
+            )
+            if replaced is not None:
+                new_fields[index] = graphql.ObjectFieldNode(name=field_node.name, value=replaced)
+                replaced_any = True
+        return graphql.ObjectValueNode(fields=tuple(new_fields)) if replaced_any else None
+    return None
 
 
 def _strip_id_suffix(name: str) -> str | None:
@@ -95,66 +189,6 @@ def _candidate_parent_type(
     # Bare `id`/`ids` falls back to the enclosing field's return type.
     if argument_name in ("id", "ids"):
         return enclosing_field_type
-    return None
-
-
-def _maybe_substitute(
-    argument: graphql.ArgumentNode | graphql.ObjectFieldNode,
-    arg_type: graphql.GraphQLType,
-    enclosing_field_type: str | None,
-    pool: GraphQLResourcePool,
-    random: Random,
-) -> None:
-    new_value = _substitute_value(argument.value, arg_type, argument.name.value, enclosing_field_type, pool, random)
-    if new_value is not None:
-        argument.value = new_value
-
-
-def _substitute_value(
-    value: graphql.ValueNode,
-    value_type: graphql.GraphQLType,
-    name: str,
-    enclosing_field_type: str | None,
-    pool: GraphQLResourcePool,
-    random: Random,
-) -> graphql.ValueNode | None:
-    """Return a substituted value if a captured pool match applies; otherwise None."""
-    inner = value_type
-    while isinstance(inner, graphql.GraphQLNonNull):
-        inner = inner.of_type
-    if isinstance(inner, graphql.GraphQLList) and isinstance(value, graphql.ListValueNode):
-        new_values = list(value.values)
-        replaced_any = False
-        for index, element in enumerate(new_values):
-            replaced = _substitute_value(element, inner.of_type, name, enclosing_field_type, pool, random)
-            if replaced is not None:
-                new_values[index] = replaced
-                replaced_any = True
-        return graphql.ListValueNode(values=tuple(new_values)) if replaced_any else None
-    if isinstance(inner, graphql.GraphQLScalarType):
-        parent_type_name = _candidate_parent_type(
-            scalar_name=inner.name,
-            argument_name=name,
-            enclosing_field_type=enclosing_field_type,
-        )
-        if parent_type_name is None:
-            return None
-        candidate = pool.draw(parent_type_name=parent_type_name, random=random)
-        if candidate is None:
-            return None
-        return graphql.StringValueNode(value=candidate)
-    if isinstance(inner, graphql.GraphQLInputObjectType) and isinstance(value, graphql.ObjectValueNode):
-        new_fields = list(value.fields)
-        replaced_any = False
-        for index, field_node in enumerate(new_fields):
-            field_def = inner.fields.get(field_node.name.value)
-            if field_def is None:
-                continue
-            replaced = _substitute_value(field_node.value, field_def.type, field_node.name.value, None, pool, random)
-            if replaced is not None:
-                new_fields[index] = graphql.ObjectFieldNode(name=field_node.name, value=replaced)
-                replaced_any = True
-        return graphql.ObjectValueNode(fields=tuple(new_fields)) if replaced_any else None
     return None
 
 

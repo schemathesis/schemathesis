@@ -154,10 +154,11 @@ def _normalize_name(name: str) -> str:
 
 
 class APIStateMachine(RuleBasedStateMachine):
-    """State machine for executing API operation sequences based on OpenAPI links.
+    """State machine for executing API operation sequences based on inferred transitions.
 
     Automatically generates test scenarios by chaining API operations according
-    to their defined relationships in the schema.
+    to spec-specific relationships (OpenAPI Links, GraphQL producer/consumer
+    inference, etc.).
     """
 
     # This is a convenience attribute, which happened to clash with `RuleBasedStateMachine` instance level attribute
@@ -171,7 +172,7 @@ class APIStateMachine(RuleBasedStateMachine):
             super().__init__()
         except InvalidDefinition as exc:
             if "defines no rules" in str(exc):
-                if not self.schema.statistic.links.total:
+                if not self.schema.statistic.transitions.total:
                     message = "Schema contains no link definitions required for stateful testing"
                 else:
                     message = "All link definitions required for stateful testing are excluded by filters"

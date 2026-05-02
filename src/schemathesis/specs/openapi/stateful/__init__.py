@@ -105,6 +105,12 @@ class ApiTransitions:
         self.operations.setdefault(source, OperationTransitions()).outgoing.append(link)
         self.operations.setdefault(link.target.label, OperationTransitions()).incoming.append(link)
 
+    def producer_labels_for_bundle(self, bundle_name: str) -> Iterator[str]:
+        # Bundles are named "<source label> -> <status code>" by `create_state_machine`.
+        source, separator, _ = bundle_name.partition(" -> ")
+        if separator:
+            yield source
+
 
 @dataclass
 class RootTransitions:

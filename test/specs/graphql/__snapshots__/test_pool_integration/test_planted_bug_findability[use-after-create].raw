@@ -21,6 +21,13 @@ Schemathesis dev
 
      ✅ 1 passed  ❌ 1 failed
 
+ ❌  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total (1 inferred)
+
+     ✅ N passed  ❌ 1 failed
+
 =================================== FAILURES ===================================
 __________________________________ Query.book __________________________________
 1. Test Case ID: <PLACEHOLDER>
@@ -47,7 +54,7 @@ Test Phases:
   ⏭  Examples (not supported)
   ⏭  Coverage (not supported)
   ❌ Fuzzing
-  ⏭  Stateful (not supported)
+  ❌ Stateful
 
 Failures:
   ❌ GraphQL server error: 1

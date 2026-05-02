@@ -212,7 +212,7 @@ class OpenApiSchema(BaseSchema):
 
         return LayeredScheduler(layers, errors=errors)
 
-    def apply_stateful_links(self, ctx: EngineContext) -> int:
+    def apply_stateful_inference(self, ctx: EngineContext) -> int:
         injected = 0
         if ctx.observations is not None and ctx.observations.location_headers:
             for operation, entries in ctx.observations.location_headers.items():
@@ -402,7 +402,7 @@ class OpenApiSchema(BaseSchema):
                                 _, response = resolve(response["$ref"])
                             defined_links = response.get(links_keyword)
                             if defined_links is not None:
-                                statistic.links.total += len(defined_links)
+                                statistic.transitions.total += len(defined_links)
                                 if is_selected:
                                     collected_links.extend(defined_links.values())
                 finally:
@@ -427,7 +427,7 @@ class OpenApiSchema(BaseSchema):
 
         for link in collected_links:
             if is_link_selected(link):
-                statistic.links.selected += 1
+                statistic.transitions.selected += 1
 
         return statistic
 

@@ -54,7 +54,7 @@ class SpecificationMetadata:
                 SpecificationFeature.COVERAGE,
                 SpecificationFeature.EXAMPLES,
             }
-        return False
+        return feature == SpecificationFeature.STATEFUL_TESTING
 
 
 class SpecificationKind(str, enum.Enum):

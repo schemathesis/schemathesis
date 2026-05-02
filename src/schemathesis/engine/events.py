@@ -53,9 +53,9 @@ class PhaseEvent(EngineEvent):
 
 @dataclass
 class StatefulPhasePayload:
-    inferred_links: int
+    inferred_transitions: int
 
-    __slots__ = ("inferred_links",)
+    __slots__ = ("inferred_transitions",)
 
 
 @dataclass

@@ -140,7 +140,7 @@ def _run_forever(
     operations: list[APIOperation],
     event_queue: queue.Queue[events.EngineEvent],
 ) -> EventGenerator:
-    ctx.inject_links()
+    ctx.apply_stateful_inference()
     strategy_kwargs_by_label: dict[str, dict[str, object]] = {
         op.label: _build_strategy_kwargs(ctx.config, operation=op) for op in operations
     }
