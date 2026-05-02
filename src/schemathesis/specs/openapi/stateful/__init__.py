@@ -19,10 +19,16 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import TestPhase
 from schemathesis.generation.stateful import STATEFUL_TESTS_LABEL
-from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
+from schemathesis.generation.stateful.control import TransitionController
+from schemathesis.generation.stateful.state_machine import (
+    BASE_EXPLORATION_RATE,
+    APIStateMachine,
+    StepInput,
+    StepOutput,
+    _normalize_name,
+)
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.expressions import MultiMatch
-from schemathesis.specs.openapi.stateful.control import TransitionController
 from schemathesis.specs.openapi.stateful.links import OpenApiLink
 from schemathesis.specs.openapi.utils import expand_status_code
 
@@ -71,8 +77,6 @@ class OpenAPIStateMachine(APIStateMachine):
 
 # The proportion of negative tests generated for "root" transitions
 NEGATIVE_TEST_CASES_THRESHOLD = 10
-# How often some transition is skipped
-BASE_EXPLORATION_RATE = 0.15
 
 
 @dataclass

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from schemathesis.generation.stateful.state_machine import StepInput
-    from schemathesis.specs.openapi.stateful import ApiTransitions
+    from schemathesis.generation.stateful.transitions import Transitions
 
 
 # It is enough to be able to catch double-click type of issues
@@ -20,7 +20,7 @@ MAX_OPERATIONS_PER_SOURCE_CAP = 2
 MAX_ROOT_SOURCES = 2
 
 
-def _get_max_operations_per_source(transitions: ApiTransitions) -> int:
+def _get_max_operations_per_source(transitions: Transitions) -> int:
     """Calculate global limit based on number of sources to maximize diversity of used API calls."""
     sources = len(transitions.operations)
 
@@ -37,7 +37,7 @@ class TransitionController:
 
     __slots__ = ("transitions", "max_operations_per_source", "statistic")
 
-    def __init__(self, transitions: ApiTransitions) -> None:
+    def __init__(self, transitions: Transitions) -> None:
         # Incoming & outgoing transitions available in the state machine
         self.transitions = transitions
         self.max_operations_per_source = _get_max_operations_per_source(transitions)
