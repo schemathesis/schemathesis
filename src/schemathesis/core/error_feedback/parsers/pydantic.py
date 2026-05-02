@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
@@ -17,6 +18,9 @@ from schemathesis.core.error_feedback.store import (
     SizeBoundPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 # HTTP frameworks (FastAPI, Litestar, Starlette) prepend a location segment to
 # `loc`. When the prefix is absent or unrecognised, treat the whole `loc` as a
@@ -148,7 +152,7 @@ class PydanticParser:
     def parse(
         self,
         *,
-        operation_label: str,
+        operation: APIOperation,
         body: object,
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
@@ -178,7 +182,7 @@ class PydanticParser:
             raw_message = entry.get("msg")
             observations.append(
                 Observation(
-                    operation_label=operation_label,
+                    operation_label=operation.label,
                     location=location,
                     parameter_path=path,
                     kind=kind,

@@ -450,12 +450,12 @@ def jackson_planted_bug_app(ctx, app_runner):
         if not isinstance(body, dict):
             return jsonify({"msg": "JSON parse error"}), 400
         envelope: dict[str, str] = {}
-        for field, java_type, carrier_key, format_name in JACKSON_TYPED_FIELDS:
+        for field, type_name, carrier_key, format_name in JACKSON_TYPED_FIELDS:
             value = body.get(field)
             if not is_valid(value, {"type": "string", "format": format_name}):
                 envelope[carrier_key] = (
                     f"JSON parse error: Cannot deserialize value of type "
-                    f'`{java_type}` from String "{value}" through reference chain: User["{field}"]'
+                    f'`{type_name}` from String "{value}" through reference chain: User["{field}"]'
                 )
         if envelope:
             return jsonify(envelope), 400
@@ -510,12 +510,12 @@ def jackson_planted_bug_app_ref_bundled(ctx, app_runner):
         if not isinstance(body, dict):
             return jsonify({"msg": "JSON parse error"}), 400
         envelope: dict[str, str] = {}
-        for field, java_type, carrier_key, format_name in JACKSON_TYPED_FIELDS:
+        for field, type_name, carrier_key, format_name in JACKSON_TYPED_FIELDS:
             value = body.get(field)
             if not is_valid(value, {"type": "string", "format": format_name}):
                 envelope[carrier_key] = (
                     f"JSON parse error: Cannot deserialize value of type "
-                    f'`{java_type}` from String "{value}" through reference chain: User["{field}"]'
+                    f'`{type_name}` from String "{value}" through reference chain: User["{field}"]'
                 )
         if envelope:
             return jsonify(envelope), 400
@@ -652,12 +652,12 @@ def jackson_enum_planted_bug_app(ctx, app_runner):
         if not isinstance(body, dict):
             return jsonify({"msg": "JSON parse error"}), 400
         envelope: dict[str, str] = {}
-        for field, java_type, carrier_key, accepted in ENUM_TYPED_FIELDS:
+        for field, type_name, carrier_key, accepted in ENUM_TYPED_FIELDS:
             value = body.get(field)
             if value not in accepted:
                 envelope[carrier_key] = (
                     f"JSON parse error: Cannot deserialize value of type "
-                    f'`{java_type}` from String "{value}": '
+                    f'`{type_name}` from String "{value}": '
                     f"not one of the values accepted for Enum class: [{', '.join(accepted)}] "
                     f'through reference chain: User["{field}"]'
                 )

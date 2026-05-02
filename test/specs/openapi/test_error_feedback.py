@@ -10,6 +10,7 @@ from uuid import UUID
 import pytest
 from pydantic import AnyUrl, BaseModel, Field, ValidationError
 
+import schemathesis
 from schemathesis.core.error_feedback import (
     MAX_ENTRIES_PER_BUCKET,
     BoundDirection,
@@ -19,12 +20,14 @@ from schemathesis.core.error_feedback import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ObservationPayload,
     PatternPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
 )
 from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.error_feedback.parsers import PARSERS
+from schemathesis.core.error_feedback.parsers.drf import DRFParser, _classify, _location_for_method, _walk
 from schemathesis.core.error_feedback.parsers.jackson import JacksonParser
 from schemathesis.core.error_feedback.parsers.pydantic import PydanticParser, _parse_expected
 from schemathesis.core.error_feedback.parsers.spring import SpringParser
@@ -50,6 +53,18 @@ from schemathesis.specs.openapi.error_feedback import (
     apply_adjustments,
 )
 from schemathesis.specs.openapi.patterns import normalize_regex
+
+
+@pytest.fixture
+def make_operation(ctx):
+    """Build a real `APIOperation` with the given method/path. Returns a callable."""
+
+    def factory(method: str = "post", path: str = "/api/users"):
+        schema_dict = ctx.openapi.build_schema({path: {method: {"responses": {"200": {"description": "OK"}}}}})
+        sthesis_schema = schemathesis.openapi.from_dict(schema_dict)
+        return sthesis_schema[path][method.upper()]
+
+    return factory
 
 
 def _obs(field: str, *, op: str = "POST /api/users") -> Observation:
@@ -253,9 +268,9 @@ SPRING_FIELDFIELD_PREFIX = b'{"subErrors":[{"message":"Name field cannot be empt
         "subErrors-with-fieldname-prefix",
     ],
 )
-def test_spring_parser_extracts_observations(body, expected_paths):
+def test_spring_parser_extracts_observations(body, expected_paths, make_operation):
     obs = SpringParser().parse(
-        operation_label="POST /api/users",
+        operation=make_operation(),
         body=json.loads(body),
     )
     assert [o.parameter_path for o in obs] == expected_paths
@@ -366,9 +381,9 @@ def test_spring_parser_can_parse_rejects_non_spring_bodies(body):
         "must-be-filled",
     ],
 )
-def test_spring_parser_recognizes_non_blank_message_variants(message):
+def test_spring_parser_recognizes_non_blank_message_variants(message, make_operation):
     body = {"subErrors": [{"field": "x", "message": message}]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind) for o in obs] == [(("x",), ObservationKind.MUST_NOT_BE_BLANK)]
 
 
@@ -382,9 +397,9 @@ def test_spring_parser_recognizes_non_blank_message_variants(message):
     ],
     ids=["random", "pattern", "range", "empty-string"],
 )
-def test_spring_parser_skips_unrecognized_messages(message):
+def test_spring_parser_skips_unrecognized_messages(message, make_operation):
     body = {"subErrors": [{"field": "x", "message": message}]}
-    assert SpringParser().parse(operation_label="POST /api/users", body=body) == ()
+    assert SpringParser().parse(operation=make_operation(), body=body) == ()
 
 
 @pytest.mark.parametrize(
@@ -397,9 +412,9 @@ def test_spring_parser_skips_unrecognized_messages(message):
     ],
     ids=["size-zero-min", "size-non-zero-min", "hibernate-length", "case-insensitive"],
 )
-def test_spring_parser_recognizes_size_bound_message_variants(message, expected_min, expected_max):
+def test_spring_parser_recognizes_size_bound_message_variants(message, expected_min, expected_max, make_operation):
     body = {"subErrors": [{"field": "username", "message": message}]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("username",), ObservationKind.SIZE_BOUND, SizeBoundPayload(min=expected_min, max=expected_max)),
     ]
@@ -434,20 +449,20 @@ def test_spring_parser_recognizes_size_bound_message_variants(message, expected_
         "uuid-well-formed",
     ],
 )
-def test_spring_parser_recognizes_format_message_variants(message, expected_name):
+def test_spring_parser_recognizes_format_message_variants(message, expected_name, make_operation):
     body = {"subErrors": [{"field": "contact", "message": message}]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("contact",), ObservationKind.FORMAT, FormatPayload(name=expected_name)),
     ]
 
 
-def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match():
+def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match(make_operation):
     # Defensive: a contrived "must be a valid URI UUID" string would match both
     # the URI and UUID regexes. The classifier checks UUID first so the more
     # specific format wins.
     body = {"subErrors": [{"field": "x", "message": "must be a valid UUID"}]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert obs[0].payload == FormatPayload(name="uuid")
 
 
@@ -480,10 +495,10 @@ def test_spring_parser_uuid_takes_precedence_over_uri_when_both_match():
     ],
 )
 def test_spring_parser_recognizes_numeric_bound_message_variants(
-    message, expected_bound, expected_direction, expected_exclusive
+    message, expected_bound, expected_direction, expected_exclusive, make_operation
 ):
     body = {"subErrors": [{"field": "score", "message": message}]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("score",),
@@ -503,9 +518,9 @@ def test_spring_parser_recognizes_numeric_bound_message_variants(
     ],
     ids=["simple-charclass", "anchored-quantifier", "username-style", "pcre-unicode-property"],
 )
-def test_spring_parser_recognizes_pattern_message_variants(message, expected_regex):
+def test_spring_parser_recognizes_pattern_message_variants(message, expected_regex, make_operation):
     body = {"subErrors": [{"field": "code", "message": message}]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (("code",), ObservationKind.PATTERN, PatternPayload(regex=expected_regex)),
     ]
@@ -532,8 +547,10 @@ _SPRING_TYPE_COERCION_PETCLINIC = {
 }
 
 
-def test_spring_parser_recognizes_missing_request_parameter():
-    obs = SpringParser().parse(operation_label="GET /v1/hospitais/maisProximo", body=_SPRING_MISSING_PARAMETER_BODY)
+def test_spring_parser_recognizes_missing_request_parameter(make_operation):
+    obs = SpringParser().parse(
+        operation=make_operation(method="get", path="/v1/hospitais/maisProximo"), body=_SPRING_MISSING_PARAMETER_BODY
+    )
     assert [(o.parameter_path, o.kind, o.location) for o in obs] == [
         (("lat",), ObservationKind.MUST_NOT_BE_BLANK, ParameterLocation.QUERY),
     ]
@@ -543,22 +560,24 @@ def test_spring_parser_can_parse_recognizes_missing_parameter_envelope():
     assert SpringParser().can_parse(body=_SPRING_MISSING_PARAMETER_BODY) is True
 
 
-def test_spring_parser_recognizes_method_argument_type_mismatch():
+def test_spring_parser_recognizes_method_argument_type_mismatch(make_operation):
     # Field captured from `Method parameter 'ownerId':` prefix; emitted on both
     # PATH and QUERY because the message doesn't pin the binding.
-    obs = SpringParser().parse(operation_label="GET /api/owners/{ownerId}/pets", body=_SPRING_TYPE_COERCION_PETCLINIC)
+    obs = SpringParser().parse(
+        operation=make_operation(method="get", path="/api/owners/{ownerId}/pets"), body=_SPRING_TYPE_COERCION_PETCLINIC
+    )
     assert [(o.parameter_path, o.kind, o.location, o.payload) for o in obs] == [
         (
             ("ownerId",),
             ObservationKind.TYPE_MISMATCH,
             ParameterLocation.PATH,
-            TypeMismatchPayload(java_type="java.lang.Integer"),
+            TypeMismatchPayload(type_name="java.lang.Integer"),
         ),
         (
             ("ownerId",),
             ObservationKind.TYPE_MISMATCH,
             ParameterLocation.QUERY,
-            TypeMismatchPayload(java_type="java.lang.Integer"),
+            TypeMismatchPayload(type_name="java.lang.Integer"),
         ),
     ]
 
@@ -567,7 +586,7 @@ def test_spring_parser_can_parse_recognizes_type_coercion_envelope():
     assert SpringParser().can_parse(body=_SPRING_TYPE_COERCION_PETCLINIC) is True
 
 
-def test_spring_parser_skips_type_coercion_without_method_parameter_prefix():
+def test_spring_parser_skips_type_coercion_without_method_parameter_prefix(make_operation):
     # Older Spring stdlib envelope omits the `Method parameter 'X':` prefix —
     # without a field name we can't attribute, so we don't emit.
     body = {
@@ -580,11 +599,498 @@ def test_spring_parser_skips_type_coercion_without_method_parameter_prefix():
         ),
         "path": "/v1/hospitais/maisProximo",
     }
-    assert SpringParser().parse(operation_label="GET /v1/hospitais/maisProximo", body=body) == ()
+    assert (
+        SpringParser().parse(operation=make_operation(method="get", path="/v1/hospitais/maisProximo"), body=body) == ()
+    )
 
 
 def test_parsers_registry_contains_jackson_parser():
     assert JacksonParser in PARSERS.get_all()
+
+
+def test_parsers_registry_contains_drf_parser():
+    assert DRFParser in PARSERS.get_all()
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"name": ["This field is required."]},
+        {"address": {"zipcode": ["This field is required."]}},
+        {"non_field_errors": ["Passwords do not match."]},
+        {"emails": [{}, {}, {"value": ["bad"]}]},
+        {"tags": {"0": ["bad"]}},
+    ],
+    ids=[
+        "flat-list-of-strings",
+        "nested-dict",
+        "non-field-errors-only",
+        "list-of-dicts",
+        "integer-keyed-dict",
+    ],
+)
+def test_drf_parser_can_parse_recognises_envelope(body):
+    assert DRFParser().can_parse(body=body) is True
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {},
+        None,
+        "",
+        [],
+        ["top-level-list"],
+        {"detail": "single-message"},
+        {"x": 5},
+        {"x": True},
+        123,
+    ],
+    ids=[
+        "empty-dict",
+        "none",
+        "empty-string",
+        "empty-list",
+        "top-level-list",
+        "detail-only",
+        "scalar-int-leaf",
+        "scalar-bool-leaf",
+        "non-dict-non-list",
+    ],
+)
+def test_drf_parser_can_parse_rejects_non_drf_bodies(body):
+    assert DRFParser().can_parse(body=body) is False
+
+
+@pytest.mark.parametrize(
+    "body, expected",
+    [
+        ({"name": ["msg"]}, [(("name",), "msg")]),
+        ({"a": ["m1", "m2"]}, [(("a",), "m1"), (("a",), "m2")]),
+        ({"address": {"zipcode": ["msg"]}}, [(("address", "zipcode"), "msg")]),
+        ({"a": {"b": {"c": ["msg"]}}}, [(("a", "b", "c"), "msg")]),
+        (
+            {"emails": [{}, {}, {"value": ["msg"]}]},
+            [(("emails", 2, "value"), "msg")],
+        ),
+        (
+            {"items": [None, {"x": ["m1"]}, None]},
+            [(("items", 1, "x"), "m1")],
+        ),
+    ],
+    ids=[
+        "flat-single",
+        "flat-multiple",
+        "nested-one-level",
+        "nested-three-levels",
+        "list-of-dicts-with-empty-placeholders",
+        "list-of-dicts-with-none-placeholders",
+    ],
+)
+def test_drf_parser_walks_basic_shapes(body, expected):
+    assert list(_walk(body)) == expected
+
+
+@pytest.mark.parametrize(
+    "body, expected",
+    [
+        ({"non_field_errors": ["x"]}, []),
+        ({"a": {"non_field_errors": ["x"]}}, []),
+        ({"a": ["m"], "non_field_errors": ["x"]}, [(("a",), "m")]),
+        ({"tags": {"0": ["m"]}}, [(("tags", 0), "m")]),
+        ({"tags": {"0": ["m0"], "2": ["m2"]}}, [(("tags", 0), "m0"), (("tags", 2), "m2")]),
+        ({"x": {"0": ["m"], "y": ["n"]}}, [(("x", 0), "m"), (("x", "y"), "n")]),
+        ({"x": []}, []),
+        ({"x": [""]}, []),
+        ({"x": [None]}, []),
+        ({"x": 42}, []),
+    ],
+    ids=[
+        "non-field-errors-top-level",
+        "non-field-errors-nested",
+        "non-field-errors-mixed-with-real-fields",
+        "integer-keyed-dict",
+        "integer-keyed-dict-multiple",
+        "mixed-key-dict",
+        "empty-list-leaf",
+        "empty-string-leaf",
+        "none-only-list",
+        "scalar-leaf",
+    ],
+)
+def test_drf_parser_walks_edge_cases(body, expected):
+    assert list(_walk(body)) == expected
+
+
+def test_drf_parser_walks_skips_non_string_dict_keys():
+    # JSON deserialisation usually gives all-string keys, but custom decoders
+    # could yield int keys; the walker treats them as garbage and continues.
+    assert list(_walk({1: ["msg"], "name": ["x"]})) == [(("name",), "x")]
+
+
+def test_drf_parser_can_parse_bails_on_pathological_depth():
+    body: dict = {"x": []}
+    nested: list = body["x"]
+    for _ in range(20):
+        wrapper: list = []
+        nested.append({"y": wrapper})
+        nested = wrapper
+    # The deepest leaf is well past the depth cap; can_parse must still return
+    # cleanly without scanning forever.
+    assert DRFParser().can_parse(body=body) is False
+
+
+@pytest.mark.parametrize(
+    "method, expected",
+    [
+        ("POST", ParameterLocation.BODY),
+        ("PUT", ParameterLocation.BODY),
+        ("PATCH", ParameterLocation.BODY),
+        ("GET", ParameterLocation.QUERY),
+        ("DELETE", ParameterLocation.QUERY),
+        ("HEAD", ParameterLocation.QUERY),
+        ("post", ParameterLocation.BODY),
+        ("OPTIONS", ParameterLocation.BODY),
+        ("WEIRDVERB", ParameterLocation.BODY),
+    ],
+    ids=[
+        "post",
+        "put",
+        "patch",
+        "get",
+        "delete",
+        "head",
+        "lowercase-method",
+        "options-defaults-to-body",
+        "unknown-method-defaults-to-body",
+    ],
+)
+def test_drf_parser_location_for_method(method, expected):
+    assert _location_for_method(method) is expected
+
+
+@pytest.mark.parametrize(
+    "message, kind, payload",
+    [
+        ("This field is required.", ObservationKind.MUST_NOT_BE_BLANK, None),
+        ("This field may not be blank.", ObservationKind.MUST_NOT_BE_BLANK, None),
+        ("This field may not be null.", ObservationKind.MUST_NOT_BE_BLANK, None),
+        ("Enter a valid email address.", ObservationKind.FORMAT, FormatPayload(name="email")),
+        ("Enter a valid URL.", ObservationKind.FORMAT, FormatPayload(name="uri")),
+        ("Must be a valid UUID.", ObservationKind.FORMAT, FormatPayload(name="uuid")),
+        (
+            "A valid integer is required.",
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(type_name="integer"),
+        ),
+        (
+            "A valid number is required.",
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(type_name="number"),
+        ),
+        (
+            "Must be a valid boolean.",
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(type_name="boolean"),
+        ),
+    ],
+    ids=[
+        "required",
+        "blank",
+        "null",
+        "email",
+        "url",
+        "uuid",
+        "type-integer",
+        "type-number",
+        "type-boolean",
+    ],
+)
+def test_drf_parser_classifier_literals(message, kind, payload):
+    assert _classify(message) == (kind, payload)
+
+
+def test_drf_parser_classifier_unrecognised_yields_none():
+    assert _classify("Some custom validate_<field> message we cannot map.") is None
+
+
+@pytest.mark.parametrize(
+    "message, kind, payload",
+    [
+        (
+            "Date has wrong format. Use one of these formats instead: YYYY-MM-DD.",
+            ObservationKind.FORMAT,
+            FormatPayload(name="date"),
+        ),
+        (
+            "Datetime has wrong format. Use one of these formats instead: YYYY-MM-DDThh:mm[:ss[.uuuuuu]][+HH:MM|-HH:MM|Z].",
+            ObservationKind.FORMAT,
+            FormatPayload(name="date-time"),
+        ),
+        (
+            "Time has wrong format. Use one of these formats instead: hh:mm[:ss[.uuuuuu]].",
+            ObservationKind.FORMAT,
+            FormatPayload(name="time"),
+        ),
+        (
+            'Expected a list of items but got type "str".',
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(type_name="array"),
+        ),
+        (
+            'Expected a dictionary of items but got type "list".',
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(type_name="object"),
+        ),
+    ],
+    ids=["date", "datetime", "time", "array", "object"],
+)
+def test_drf_parser_classifier_prefixes(message, kind, payload):
+    assert _classify(message) == (kind, payload)
+
+
+@pytest.mark.parametrize(
+    "message, expected_min, expected_max",
+    [
+        ("Ensure this field has at least 3 characters.", 3, None),
+        ("Ensure this value has at least 5 characters.", 5, None),
+        ("Ensure this value has at least 3 characters (it has 2).", 3, None),
+        ("Ensure this field has no more than 64 characters.", None, 64),
+        ("Ensure this field has at most 20 characters.", None, 20),
+        ("Ensure this value has at most 20 characters (it has 25).", None, 20),
+    ],
+    ids=[
+        "drf-min",
+        "django-bridge-min",
+        "django-bridge-min-with-suffix",
+        "drf-max-no-more-than",
+        "drf-max-at-most",
+        "django-bridge-max-with-suffix",
+    ],
+)
+def test_drf_parser_classifier_string_size(message, expected_min, expected_max):
+    assert _classify(message) == (
+        ObservationKind.SIZE_BOUND,
+        SizeBoundPayload(min=expected_min, max=expected_max),
+    )
+
+
+@pytest.mark.parametrize(
+    "message, expected_min, expected_max",
+    [
+        ("Ensure this field has at least 1 elements.", 1, None),
+        ("Ensure this field has at least 2 elements.", 2, None),
+        ("Ensure this field has no more than 5 elements.", None, 5),
+        ("Ensure this field has no more than 1 element.", None, 1),
+    ],
+    ids=["min-int", "min-int-2", "max-int", "max-int-singular-element"],
+)
+def test_drf_parser_classifier_array_size(message, expected_min, expected_max):
+    assert _classify(message) == (
+        ObservationKind.SIZE_BOUND,
+        SizeBoundPayload(min=expected_min, max=expected_max),
+    )
+
+
+@pytest.mark.parametrize(
+    "message, bound, direction, exclusive",
+    [
+        ("Ensure this value is greater than or equal to 0.", 0.0, BoundDirection.MIN, False),
+        ("Ensure this value is greater than 0.5.", 0.5, BoundDirection.MIN, True),
+        ("Ensure this value is greater than -50.", -50.0, BoundDirection.MIN, True),
+        ("Ensure this value is less than or equal to 100.", 100.0, BoundDirection.MAX, False),
+        ("Ensure this value is less than 99.99.", 99.99, BoundDirection.MAX, True),
+    ],
+    ids=[
+        "min-inclusive-int",
+        "min-exclusive-decimal",
+        "min-negative",
+        "max-inclusive-int",
+        "max-exclusive-decimal",
+    ],
+)
+def test_drf_parser_classifier_numeric_bound(message, bound, direction, exclusive):
+    assert _classify(message) == (
+        ObservationKind.NUMERIC_BOUND,
+        NumericBoundPayload(bound=bound, direction=direction, exclusive=exclusive),
+    )
+
+
+def _drf_obs(
+    *,
+    op: str,
+    location: ParameterLocation,
+    path: tuple[str | int, ...],
+    kind: ObservationKind,
+    raw_message: str,
+    payload: ObservationPayload = None,
+) -> Observation:
+    return Observation(
+        operation_label=op,
+        location=location,
+        parameter_path=path,
+        kind=kind,
+        raw_message=raw_message,
+        payload=payload,
+    )
+
+
+def test_drf_parser_parse_flat_field(make_operation):
+    body = {"name": ["This field is required."]}
+    assert DRFParser().parse(operation=make_operation(), body=body) == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("name",),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="This field is required.",
+        ),
+    )
+
+
+def test_drf_parser_parse_nested_with_size_bound(make_operation):
+    body = {"address": {"zipcode": ["Ensure this field has at least 5 characters."]}}
+    assert DRFParser().parse(operation=make_operation(), body=body) == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("address", "zipcode"),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message="Ensure this field has at least 5 characters.",
+            payload=SizeBoundPayload(min=5, max=None),
+        ),
+    )
+
+
+def test_drf_parser_parse_get_request_yields_query_location(make_operation):
+    body = {"limit": ["A valid integer is required."]}
+    assert DRFParser().parse(operation=make_operation(method="get", path="/api/users"), body=body) == (
+        _drf_obs(
+            op="GET /api/users",
+            location=ParameterLocation.QUERY,
+            path=("limit",),
+            kind=ObservationKind.TYPE_MISMATCH,
+            raw_message="A valid integer is required.",
+            payload=TypeMismatchPayload(type_name="integer"),
+        ),
+    )
+
+
+def test_drf_parser_parse_skips_unrecognised_messages(make_operation):
+    body = {"name": ["Custom validate_name message."]}
+    assert DRFParser().parse(operation=make_operation(), body=body) == ()
+
+
+def test_drf_parser_parse_non_field_errors_only_yields_empty(make_operation):
+    body = {"non_field_errors": ["Passwords do not match."]}
+    assert DRFParser().parse(operation=make_operation(), body=body) == ()
+
+
+def test_drf_parser_parse_list_with_failing_index(make_operation):
+    body = {"emails": [{}, {}, {"value": ["Enter a valid email address."]}]}
+    assert DRFParser().parse(operation=make_operation(), body=body) == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("emails", 2, "value"),
+            kind=ObservationKind.FORMAT,
+            raw_message="Enter a valid email address.",
+            payload=FormatPayload(name="email"),
+        ),
+    )
+
+
+# Verbatim from /tmp/drf-corpus capture — CharField required + min_length=3 (multi-error)
+_DRF_MULTI_ERROR_BODY = {"username": ["This field may not be blank.", "Ensure this field has at least 3 characters."]}
+
+# Verbatim from /tmp/drf-corpus capture — Django MaxLengthValidator bridge
+_DRF_DJANGO_BRIDGE_BODY = {"email": ["Ensure this value has at most 20 characters (it has 25)."]}
+
+# Verbatim from /tmp/drf-corpus capture — ListSerializer with bad item at index 2
+_DRF_LIST_INDEX_BODY = {"emails": [{}, {}, {"value": ["Enter a valid email address."]}]}
+
+# Verbatim from /tmp/drf-corpus capture — nested Serializer
+_DRF_NESTED_BODY = {"address": {"zipcode": ["This field is required."], "country": ["Enter a valid value."]}}
+
+# Verbatim from /tmp/drf-corpus capture — IntegerField with min_value=0
+_DRF_INTEGER_BODY = {"age": ["Ensure this value is greater than or equal to 0."]}
+
+
+def test_drf_parser_end_to_end_multi_error_per_field(make_operation):
+    obs = DRFParser().parse(operation=make_operation(), body=_DRF_MULTI_ERROR_BODY)
+    assert obs == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("username",),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="This field may not be blank.",
+        ),
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("username",),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message="Ensure this field has at least 3 characters.",
+            payload=SizeBoundPayload(min=3, max=None),
+        ),
+    )
+
+
+def test_drf_parser_end_to_end_django_bridge_max_length(make_operation):
+    obs = DRFParser().parse(operation=make_operation(), body=_DRF_DJANGO_BRIDGE_BODY)
+    assert obs == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("email",),
+            kind=ObservationKind.SIZE_BOUND,
+            raw_message="Ensure this value has at most 20 characters (it has 25).",
+            payload=SizeBoundPayload(min=None, max=20),
+        ),
+    )
+
+
+def test_drf_parser_end_to_end_list_index_attribution(make_operation):
+    obs = DRFParser().parse(operation=make_operation(), body=_DRF_LIST_INDEX_BODY)
+    assert obs == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("emails", 2, "value"),
+            kind=ObservationKind.FORMAT,
+            raw_message="Enter a valid email address.",
+            payload=FormatPayload(name="email"),
+        ),
+    )
+
+
+def test_drf_parser_end_to_end_nested_serializer(make_operation):
+    obs = DRFParser().parse(operation=make_operation(), body=_DRF_NESTED_BODY)
+    # Only the recognised "This field is required." emits — "Enter a valid value." is unmapped.
+    assert obs == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("address", "zipcode"),
+            kind=ObservationKind.MUST_NOT_BE_BLANK,
+            raw_message="This field is required.",
+        ),
+    )
+
+
+def test_drf_parser_end_to_end_integer_min_value(make_operation):
+    obs = DRFParser().parse(operation=make_operation(), body=_DRF_INTEGER_BODY)
+    assert obs == (
+        _drf_obs(
+            op="POST /api/users",
+            location=ParameterLocation.BODY,
+            path=("age",),
+            kind=ObservationKind.NUMERIC_BOUND,
+            raw_message="Ensure this value is greater than or equal to 0.",
+            payload=NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=False),
+        ),
+    )
 
 
 _JACKSON_LOCAL_DATE = (
@@ -682,30 +1188,30 @@ _JACKSON_ENUM_BARE = (
         "non-string-array-source",
     ],
 )
-def test_jackson_parser_extracts_observations(carrier_key, message, expected_path, expected_type):
+def test_jackson_parser_extracts_observations(carrier_key, message, expected_path, expected_type, make_operation):
     body = {carrier_key: message}
-    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    obs = JacksonParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
-        (expected_path, ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(java_type=expected_type)),
+        (expected_path, ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=expected_type)),
     ]
 
 
-def test_jackson_parser_emits_both_type_and_enum_for_enum_message():
+def test_jackson_parser_emits_both_type_and_enum_for_enum_message(make_operation):
     body = {"msg": _JACKSON_ENUM_USERTYPE}
-    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    obs = JacksonParser().parse(operation=make_operation(), body=body)
     assert [(o.kind, o.payload) for o in obs] == [
         (
             ObservationKind.TYPE_MISMATCH,
-            TypeMismatchPayload(java_type="com.example.demo.auth.model.enums.UserType"),
+            TypeMismatchPayload(type_name="com.example.demo.auth.model.enums.UserType"),
         ),
         (ObservationKind.ENUM, EnumPayload(values=("USER", "ADMIN"))),
     ]
     assert all(o.parameter_path == ("userType",) for o in obs)
 
 
-def test_jackson_parser_emits_enum_only_when_type_clause_is_absent():
+def test_jackson_parser_emits_enum_only_when_type_clause_is_absent(make_operation):
     body = {"msg": _JACKSON_ENUM_BARE}
-    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    obs = JacksonParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("status",),
@@ -726,13 +1232,13 @@ def test_jackson_parser_emits_enum_only_when_type_clause_is_absent():
     ],
     ids=["space-separated", "no-spaces", "single-value", "extra-whitespace", "many-values"],
 )
-def test_jackson_parser_enum_value_list_variants(values_blob, expected):
+def test_jackson_parser_enum_value_list_variants(values_blob, expected, make_operation):
     message = (
         f'Cannot deserialize value of type `Status` from String "x": '
         f"not one of the values accepted for Enum class: [{values_blob}] "
         f'through reference chain: Order["status"]'
     )
-    obs = JacksonParser().parse(operation_label="POST /api/users", body={"msg": message})
+    obs = JacksonParser().parse(operation=make_operation(), body={"msg": message})
     enum_payloads = [o.payload for o in obs if o.kind is ObservationKind.ENUM]
     assert enum_payloads == [EnumPayload(values=expected)]
 
@@ -760,11 +1266,11 @@ def test_jackson_parser_can_parse_rejects_non_jackson_bodies(body):
     assert JacksonParser().can_parse(body=body) is False
 
 
-def test_jackson_parser_skips_message_without_reference_chain():
+def test_jackson_parser_skips_message_without_reference_chain(make_operation):
     # Field attribution requires the chain — a bare type message can't be routed.
     body = {"msg": 'Cannot deserialize value of type `java.time.LocalDate` from String "x"'}
     assert JacksonParser().can_parse(body=body) is True
-    assert JacksonParser().parse(operation_label="POST /api/users", body=body) == ()
+    assert JacksonParser().parse(operation=make_operation(), body=body) == ()
 
 
 @pytest.mark.parametrize(
@@ -777,8 +1283,8 @@ def test_jackson_parser_skips_message_without_reference_chain():
     ],
     ids=["none", "string", "list", "no-jackson-text"],
 )
-def test_jackson_parser_parse_returns_empty_for_unparsable_bodies(body):
-    assert JacksonParser().parse(operation_label="POST /api/users", body=body) == ()
+def test_jackson_parser_parse_returns_empty_for_unparsable_bodies(body, make_operation):
+    assert JacksonParser().parse(operation=make_operation(), body=body) == ()
 
 
 @pytest.mark.parametrize(
@@ -796,31 +1302,31 @@ def test_jackson_parser_parse_returns_empty_for_unparsable_bodies(body):
         "fieldErrors-message",
     ],
 )
-def test_jackson_parser_walks_into_array_shape_envelopes(array_key, item_key):
+def test_jackson_parser_walks_into_array_shape_envelopes(array_key, item_key, make_operation):
     # Custom `@ControllerAdvice` handlers sometimes funnel Jackson parse errors
     # alongside Bean-validation results into a single `errors[]` array.
     body = {array_key: [{item_key: _JACKSON_LOCAL_DATE}]}
-    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
-    assert [o.payload for o in obs] == [TypeMismatchPayload(java_type="java.time.LocalDate")]
+    obs = JacksonParser().parse(operation=make_operation(), body=body)
+    assert [o.payload for o in obs] == [TypeMismatchPayload(type_name="java.time.LocalDate")]
 
 
-def test_jackson_parser_skips_non_dict_array_items():
+def test_jackson_parser_skips_non_dict_array_items(make_operation):
     body = {"errors": ["string-item", 123, None, {"message": _JACKSON_LOCAL_DATE}]}
-    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
-    assert [o.payload for o in obs] == [TypeMismatchPayload(java_type="java.time.LocalDate")]
+    obs = JacksonParser().parse(operation=make_operation(), body=body)
+    assert [o.payload for o in obs] == [TypeMismatchPayload(type_name="java.time.LocalDate")]
 
 
-def test_jackson_parser_extracts_one_observation_per_carrier_key():
+def test_jackson_parser_extracts_one_observation_per_carrier_key(make_operation):
     # Different carrier keys can each carry a Jackson error — `_carrier_strings`
     # walks them in order and emits one observation per match.
     body = {
         "msg": _JACKSON_LOCAL_DATE,
         "detail": _JACKSON_UUID,
     }
-    obs = JacksonParser().parse(operation_label="POST /api/users", body=body)
+    obs = JacksonParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.payload) for o in obs] == [
-        (("hire_date",), TypeMismatchPayload(java_type="java.time.LocalDate")),
-        (("id",), TypeMismatchPayload(java_type="java.util.UUID")),
+        (("hire_date",), TypeMismatchPayload(type_name="java.time.LocalDate")),
+        (("id",), TypeMismatchPayload(type_name="java.util.UUID")),
     ]
 
 
@@ -833,8 +1339,8 @@ _JACKSON_OVERFLOW_INT = (
 )
 
 
-def test_jackson_numeric_overflow_int():
-    obs = JacksonParser().parse(operation_label="POST /api/users", body={"msg": _JACKSON_OVERFLOW_INT})
+def test_jackson_numeric_overflow_int(make_operation):
+    obs = JacksonParser().parse(operation=make_operation(), body={"msg": _JACKSON_OVERFLOW_INT})
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("availableBeds",),
@@ -849,12 +1355,12 @@ def test_jackson_numeric_overflow_int():
     ]
 
 
-def test_jackson_numeric_overflow_long():
+def test_jackson_numeric_overflow_long(make_operation):
     message = (
         "JSON parse error: Numeric value (99999999999999999999) out of range of long "
         'through reference chain: Order["quantity"]'
     )
-    obs = JacksonParser().parse(operation_label="POST /api/users", body={"msg": message})
+    obs = JacksonParser().parse(operation=make_operation(), body={"msg": message})
     assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
         (
             ("quantity",),
@@ -905,8 +1411,8 @@ SPRING_FIELDERRORS_MULTI = (
     ],
     ids=["messages", "subErrors", "problemDetail", "errors", "fieldErrors"],
 )
-def test_spring_parser_extracts_multiple_entries_per_shape(body, expected_paths):
-    obs = SpringParser().parse(operation_label="POST /api/users", body=json.loads(body))
+def test_spring_parser_extracts_multiple_entries_per_shape(body, expected_paths, make_operation):
+    obs = SpringParser().parse(operation=make_operation(), body=json.loads(body))
     assert [o.parameter_path for o in obs] == expected_paths
 
 
@@ -932,8 +1438,8 @@ def test_spring_parser_extracts_multiple_entries_per_shape(body, expected_paths)
     ],
     ids=["subErrors-2-deep", "messages-3-deep", "errors-2-deep", "fieldErrors-3-deep"],
 )
-def test_spring_parser_splits_dotted_paths_into_tuples(body, expected_path):
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+def test_spring_parser_splits_dotted_paths_into_tuples(body, expected_path, make_operation):
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [o.parameter_path for o in obs] == [expected_path]
 
 
@@ -969,9 +1475,9 @@ def test_spring_parser_splits_dotted_paths_into_tuples(body, expected_path):
         "no-field-skipped",
     ],
 )
-def test_spring_parser_errors_field_and_message_priority(entry, expected):
+def test_spring_parser_errors_field_and_message_priority(entry, expected, make_operation):
     body = {"errors": [entry]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [o.parameter_path for o in obs] == expected
 
 
@@ -1012,9 +1518,9 @@ def test_spring_parser_errors_field_and_message_priority(entry, expected):
         "no-locator-skipped",
     ],
 )
-def test_spring_parser_field_errors_locator_and_message_priority(entry, expected):
+def test_spring_parser_field_errors_locator_and_message_priority(entry, expected, make_operation):
     body = {"fieldErrors": [entry]}
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [o.parameter_path for o in obs] == expected
 
 
@@ -1051,11 +1557,11 @@ def test_spring_parser_field_errors_locator_and_message_priority(entry, expected
         "fieldErrors-unknown-message",
     ],
 )
-def test_spring_parser_skips_invalid_or_unrecognized_entries(body):
-    assert SpringParser().parse(operation_label="POST /api/users", body=body) == ()
+def test_spring_parser_skips_invalid_or_unrecognized_entries(body, make_operation):
+    assert SpringParser().parse(operation=make_operation(), body=body) == ()
 
 
-def test_spring_parser_mixes_valid_and_invalid_messages():
+def test_spring_parser_mixes_valid_and_invalid_messages(make_operation):
     body = {
         "messages": [
             "valid - must not be blank",
@@ -1065,7 +1571,7 @@ def test_spring_parser_mixes_valid_and_invalid_messages():
             "x - just some prose",
         ]
     }
-    obs = SpringParser().parse(operation_label="POST /api/users", body=body)
+    obs = SpringParser().parse(operation=make_operation(), body=body)
     assert [o.parameter_path for o in obs] == [("valid",), ("another",)]
 
 
@@ -1074,8 +1580,8 @@ def test_spring_parser_mixes_valid_and_invalid_messages():
     [[1, 2, 3], "not a dict", None, 42, 1.5, True],
     ids=["list", "string", "none", "int", "float", "bool"],
 )
-def test_spring_parser_returns_empty_for_non_dict_body(body):
-    assert SpringParser().parse(operation_label="POST /api/users", body=body) == ()
+def test_spring_parser_returns_empty_for_non_dict_body(body, make_operation):
+    assert SpringParser().parse(operation=make_operation(), body=body) == ()
 
 
 def test_pipeline_dispatches_to_spring_parser_for_spring_shape(case_factory, response_factory):
@@ -2174,10 +2680,10 @@ def _build_type_mismatch_observations(
             location=ParameterLocation.BODY,
             parameter_path=path,
             kind=ObservationKind.TYPE_MISMATCH,
-            raw_message=f'Cannot deserialize value of type `{java_type}` from String "..."',
-            payload=TypeMismatchPayload(java_type=java_type),
+            raw_message=f'Cannot deserialize value of type `{type_name}` from String "..."',
+            payload=TypeMismatchPayload(type_name=type_name),
         )
-        for path, java_type in items
+        for path, type_name in items
     )
 
 
@@ -2353,6 +2859,125 @@ def _build_type_mismatch_observations(
     ],
 )
 def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expected, case_factory):
+    out = TypeMismatchAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_type_mismatch_observations(*items),
+    )
+    assert out == expected
+
+
+@pytest.mark.parametrize(
+    "input_schema, items, expected",
+    [
+        (
+            {"type": "object", "properties": {"age": {"type": "string"}}, "required": []},
+            [(("age",), "integer")],
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            [(("age",), "integer")],
+            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"age": {"anyOf": [{"type": "string"}, {"type": "integer"}]}},
+                "required": [],
+            },
+            [(("age",), "integer")],
+            {
+                "type": "object",
+                "properties": {"age": {"anyOf": [{"type": "string"}, {"type": "integer"}]}},
+                "required": [],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"age": {"oneOf": [{"type": "string"}, {"type": "integer"}]}},
+                "required": [],
+            },
+            [(("age",), "integer")],
+            {
+                "type": "object",
+                "properties": {"age": {"oneOf": [{"type": "string"}, {"type": "integer"}]}},
+                "required": [],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"age": {"type": ["string", "integer"]}},
+                "required": [],
+            },
+            [(("age",), "integer")],
+            {
+                "type": "object",
+                "properties": {"age": {"type": ["string", "integer"]}},
+                "required": [],
+            },
+        ),
+        (
+            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            [(("x",), "boolean")],
+            {"type": "object", "properties": {"x": {"type": "boolean"}}, "required": []},
+        ),
+        (
+            {"type": "object", "properties": {"hire_date": {"type": "string"}}, "required": []},
+            [(("hire_date",), "java.time.LocalDate")],
+            {
+                "type": "object",
+                "properties": {"hire_date": {"type": "string", "format": "date"}},
+                "required": [],
+            },
+        ),
+        (
+            # Schema declares a sub-object; rewriting `type` to a scalar would
+            # leave `properties` orphaned. Conservative: skip.
+            {
+                "type": "object",
+                "properties": {"profile": {"type": "object", "properties": {"name": {"type": "string"}}}},
+                "required": [],
+            },
+            [(("profile",), "integer")],
+            {
+                "type": "object",
+                "properties": {"profile": {"type": "object", "properties": {"name": {"type": "string"}}}},
+                "required": [],
+            },
+        ),
+        (
+            # Schema declares an array; rewriting `type` to a scalar would
+            # leave `items` orphaned. Conservative: skip.
+            {
+                "type": "object",
+                "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
+                "required": [],
+            },
+            [(("tags",), "integer")],
+            {
+                "type": "object",
+                "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
+                "required": [],
+            },
+        ),
+    ],
+    ids=[
+        "drf-token-rewrites-scalar-type",
+        "drf-token-noop-when-matching",
+        "composed-anyOf-skip",
+        "composed-oneOf-skip",
+        "type-list-skip",
+        "drf-token-boolean",
+        "java-fqn-regression",
+        "drf-token-skipped-when-existing-type-is-object",
+        "drf-token-skipped-when-existing-type-is-array",
+    ],
+)
+def test_type_mismatch_adjustment_handles_drf_and_java_payloads(input_schema, items, expected, case_factory):
     out = TypeMismatchAdjustment().apply(
         operation=case_factory().operation,
         location=ParameterLocation.BODY,
@@ -2812,12 +3437,12 @@ _PYDANTIC_FIXTURES: tuple[tuple[dict, Observation], ...] = (
     _PYDANTIC_FIXTURES,
     ids=[entry["type"] for entry, _ in _PYDANTIC_FIXTURES],
 )
-def test_pydantic_parser_extracts_observation(entry, expected):
-    obs = PydanticParser().parse(operation_label="POST /api/users", body={"detail": [entry]})
+def test_pydantic_parser_extracts_observation(entry, expected, make_operation):
+    obs = PydanticParser().parse(operation=make_operation(), body={"detail": [entry]})
     assert obs == (expected,)
 
 
-def test_pydantic_parser_coerces_decimal_numeric_bounds():
+def test_pydantic_parser_coerces_decimal_numeric_bounds(make_operation):
     # Decimal-typed Pydantic fields put a Decimal in `ctx`; the bound must
     # still produce a NumericBoundPayload (coerced to float).
     body = {
@@ -2830,7 +3455,7 @@ def test_pydantic_parser_coerces_decimal_numeric_bounds():
             }
         ]
     }
-    obs = PydanticParser().parse(operation_label="POST /api/users", body=body)
+    obs = PydanticParser().parse(operation=make_operation(), body=body)
     assert obs == (
         Observation(
             operation_label="POST /api/users",
@@ -2936,25 +3561,25 @@ def test_pydantic_fixture_matches_runtime(type_code, model, invalid_kwargs, cont
     ],
     ids=["body", "query", "path", "header", "cookie", "form-as-body"],
 )
-def test_pydantic_parser_maps_loc_prefix_to_location(loc_prefix, expected_location):
+def test_pydantic_parser_maps_loc_prefix_to_location(loc_prefix, expected_location, make_operation):
     body = {"detail": [{"type": "missing", "loc": [loc_prefix, "x"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation_label="POST /api/users", body=body)
+    obs = PydanticParser().parse(operation=make_operation(), body=body)
     assert len(obs) == 1
     assert obs[0].location == expected_location
     assert obs[0].parameter_path == ("x",)
 
 
-def test_pydantic_parser_defaults_to_body_when_loc_prefix_unrecognized():
+def test_pydantic_parser_defaults_to_body_when_loc_prefix_unrecognized(make_operation):
     body = {"detail": [{"type": "missing", "loc": ["unknown", "x"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation_label="POST /api/users", body=body)
+    obs = PydanticParser().parse(operation=make_operation(), body=body)
     assert obs[0].location == ParameterLocation.BODY
     assert obs[0].parameter_path == ("unknown", "x")
 
 
-def test_pydantic_parser_handles_int_path_segments():
+def test_pydantic_parser_handles_int_path_segments(make_operation):
     # FastAPI emits int segments for list-element validation failures.
     body = {"detail": [{"type": "missing", "loc": ["body", "items", 0, "qty"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation_label="POST /api/users", body=body)
+    obs = PydanticParser().parse(operation=make_operation(), body=body)
     assert obs[0].parameter_path == ("items", 0, "qty")
     assert obs[0].location == ParameterLocation.BODY
 
@@ -3015,8 +3640,8 @@ def test_pydantic_parse_expected_returns_none_for_non_string(value):
         "loc-prefix-only",
     ],
 )
-def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body):
-    assert PydanticParser().parse(operation_label="POST /api/users", body=body) == ()
+def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body, make_operation):
+    assert PydanticParser().parse(operation=make_operation(), body=body) == ()
 
 
 @pytest.mark.parametrize(
@@ -3042,26 +3667,26 @@ def test_pydantic_parser_parse_returns_empty_for_uninteresting_bodies(body):
         "literal-no-context",
     ],
 )
-def test_pydantic_parser_skips_handler_with_invalid_context(type_code, context):
+def test_pydantic_parser_skips_handler_with_invalid_context(type_code, context, make_operation):
     body = {"detail": [{"type": type_code, "loc": ["body", "x"], "msg": "...", "ctx": context}]}
-    assert PydanticParser().parse(operation_label="POST /api/users", body=body) == ()
+    assert PydanticParser().parse(operation=make_operation(), body=body) == ()
 
 
-def test_pydantic_parser_skips_non_dict_detail_entry():
+def test_pydantic_parser_skips_non_dict_detail_entry(make_operation):
     body = {"detail": [42, {"type": "missing", "loc": ["body", "x"], "msg": "Field required"}]}
-    obs = PydanticParser().parse(operation_label="POST /api/users", body=body)
+    obs = PydanticParser().parse(operation=make_operation(), body=body)
     assert obs[0].parameter_path == ("x",)
     assert len(obs) == 1
 
 
-def test_pydantic_parser_emits_one_observation_per_detail_entry():
+def test_pydantic_parser_emits_one_observation_per_detail_entry(make_operation):
     body = {
         "detail": [
             {"type": "missing", "loc": ["body", "name"], "msg": "Field required"},
             {"type": "string_too_short", "loc": ["body", "code"], "msg": "...", "ctx": {"min_length": 3}},
         ]
     }
-    obs = PydanticParser().parse(operation_label="POST /api/users", body=body)
+    obs = PydanticParser().parse(operation=make_operation(), body=body)
     assert [(o.parameter_path, o.kind) for o in obs] == [
         (("name",), ObservationKind.MUST_NOT_BE_BLANK),
         (("code",), ObservationKind.SIZE_BOUND),

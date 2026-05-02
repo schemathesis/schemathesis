@@ -15,7 +15,7 @@ from schemathesis.core.error_feedback.store import (
     TypeMismatchPayload,
 )
 from schemathesis.core.jsonschema import maybe_resolve_bundled
-from schemathesis.core.jsonschema.types import JsonSchema, get_type
+from schemathesis.core.jsonschema.types import ALL_TYPES, JsonSchema, get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.registries import Registry
 from schemathesis.core.transforms import deepclone
@@ -421,9 +421,35 @@ _JAVA_TYPE_TO_FORMAT: dict[str, str] = {
 }
 
 
+# Reuse the canonical seven-token JSON Schema type set from core.jsonschema.types
+# rather than inlining a parallel literal — duplication risks the two drifting.
+_JSON_SCHEMA_TYPES = frozenset(ALL_TYPES)
+
+
+def _apply_type_correction(prop: dict[str, Any], type_name: str) -> None:
+    """Rewrite scalar `type` when it disagrees with the server-reported one; skip composed and structural types."""
+    if "anyOf" in prop or "oneOf" in prop or "allOf" in prop:
+        return
+    declared = prop.get("type")
+    # `get_type(prop)` collapses "any-type" (no `type` key) and explicit composed
+    # `type: [...]` lists to the same shape — we need to distinguish them, so
+    # read the raw value here rather than going through `get_type`.
+    if isinstance(declared, list):
+        return  # explicitly composed
+    # Existing object/array declarations carry structural keys (`properties`,
+    # `items`) that would be orphaned by a scalar rewrite. The schema/server
+    # disagreement is real but resolving it here would silently corrupt the
+    # schema; leave it to surface as a regular validation gap.
+    if declared in ("object", "array"):
+        return
+    if declared == type_name:
+        return  # already matches
+    prop["type"] = type_name
+
+
 @ADJUSTMENTS.register
 class TypeMismatchAdjustment:
-    """Inject `format` from a Jackson type-error message via the Java-type-to-format map."""
+    """Apply type-mismatch observations: JSON-Schema type tokens correct schema `type`; Java FQNs map to `format`."""
 
     handles = frozenset({ObservationKind.TYPE_MISMATCH})
 
@@ -444,13 +470,17 @@ class TypeMismatchAdjustment:
 
         for observation in observations:
             assert isinstance(observation.payload, TypeMismatchPayload)
-            format_name = _JAVA_TYPE_TO_FORMAT.get(observation.payload.java_type)
-            if format_name is None:
-                continue
+            type_name = observation.payload.type_name
             for target in targets:
                 prop = _walk_to_property(target, observation.parameter_path)
-                if prop is not None:
-                    _apply_format_to_property(prop, format_name)
+                if prop is None:
+                    continue
+                if type_name in _JSON_SCHEMA_TYPES:
+                    _apply_type_correction(prop, type_name)
+                else:
+                    format_name = _JAVA_TYPE_TO_FORMAT.get(type_name)
+                    if format_name is not None:
+                        _apply_format_to_property(prop, format_name)
 
         return schema
 
