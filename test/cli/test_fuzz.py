@@ -273,7 +273,7 @@ def test_fuzz_report_ndjson(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_allure(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_app(ctx, app_runner)
     allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=2", f"--report-allure-path={allure_dir}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-allure-path={allure_dir}")
     assert result.exit_code == 0, result.output
     assert any(allure_dir.glob("*-result.json"))
 
@@ -281,7 +281,7 @@ def test_fuzz_report_allure(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_allure_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_failure_app(ctx, app_runner)
     allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=2", "--seed=42", f"--report-allure-path={allure_dir}")
+    result = cli.main("fuzz", url, "--max-time=3", "--seed=42", f"--report-allure-path={allure_dir}")
     assert result.exit_code == 1, result.output
 
     results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]

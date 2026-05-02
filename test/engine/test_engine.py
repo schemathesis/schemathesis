@@ -1191,7 +1191,7 @@ def test_stateful_override(real_app_schema):
         real_app_schema,
         phases=[PhaseName.STATEFUL_TESTING],
         parameters={"user_id": "42"},
-        max_examples=40,
+        max_examples=80,
         max_steps=2,
     ).execute()
     interactions = stream.find_all_interactions()

@@ -18,7 +18,6 @@ def test_default(cli, schema_url, snapshot_cli, workers):
     assert (
         cli.run(
             schema_url,
-            "--max-examples=80",
             "-c not_a_server_error",
             f"--workers={workers}",
             "--mode=positive",
@@ -36,7 +35,6 @@ def test_sanitization(cli, schema_url, tmp_path):
     result = cli.run_and_assert(
         schema_url,
         "--phases=stateful",
-        "--max-examples=80",
         "-c not_a_server_error",
         f"--header=Authorization: Bearer {token}",
         f"--report-vcr-path={cassette_path}",
@@ -135,7 +133,6 @@ def test_stateful_only(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--phases=stateful",
-            "-n 80",
             "-c not_a_server_error",
         )
         == snapshot_cli
