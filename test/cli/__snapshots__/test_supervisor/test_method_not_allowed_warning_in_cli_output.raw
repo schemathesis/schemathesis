@@ -5,31 +5,31 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Operations:       2 selected / 2 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
- ❌  Examples (in 0.00s)
+ ⏭   Examples (in 0.00s)
 
-     ❌ 1 failed
+     ⏭  2 skipped
 
  ❌  Coverage (in 0.00s)
 
-     ❌ 1 failed
+     ✅ 1 passed  ❌ 1 failed
 
- ⏭   Fuzzing (in 0.00s)
+ ✅  Fuzzing (in 0.00s)
 
-     ⏭  1 skipped
+     ✅ 1 passed  ⏭  1 skipped
 
 =================================== FAILURES ===================================
-________________________________ POST /success _________________________________
+________________________________ POST /missing _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - API rejected schema-compliant request
@@ -44,7 +44,7 @@ ________________________________ POST /success _________________________________
 
 [405] Method Not Allowed:
 
-    `405: Method Not Allowed`
+    `{"error":"Method Not Allowed"}`
 
 Reproduce with:
 
@@ -54,35 +54,27 @@ Reproduce with:
 
 Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` — skipped from later phases
 
-  - POST /success
+  - POST /missing
 
 💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported
-
-Unsupported regex patterns: 1 operation contain regex patterns not supported by Python and were removed
-
-  - POST /success
-    Unsupported regex `^[\p{Han}]+$` was removed
-
-💡 Use Python-compatible regex syntax: https://docs.python.org/3/library/re.html
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 2/2
+  Tested: 2
 
 Test Phases:
-  ❌ Examples
+  ⏭  Examples
   ❌ Coverage
-  ⏭  Fuzzing
-  ⏭  Stateful (not applicable)
+  ✅ Fuzzing
+  ⏭  Stateful (disabled)
 
 Failures:
   ❌ API rejected schema-compliant request: 1
   ❌ Undocumented HTTP status code: 1
 
 Warnings:
-  ⚠️ Unsupported regex: 1 operation had regex patterns removed
   ⚠️ Method Not Allowed: 1 operation skipped after consistent 405 responses
 
 Test cases:
@@ -90,4 +82,4 @@ Test cases:
 
 Seed: 42
 
-======================= 2 failures, 2 warnings in 1.00s ========================
+======================== 2 failures, 1 warning in 1.00s ========================

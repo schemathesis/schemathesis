@@ -771,7 +771,8 @@
               "missing_test_data",
               "validation_mismatch",
               "missing_deserializer",
-              "unused_openapi_auth"
+              "unused_openapi_auth",
+              "method_not_allowed"
             ]
           }
         },
@@ -791,7 +792,8 @@
                   "missing_test_data",
                   "validation_mismatch",
                   "missing_deserializer",
-                  "unused_openapi_auth"
+                  "unused_openapi_auth",
+                  "method_not_allowed"
                 ]
               }
             },
@@ -809,7 +811,8 @@
                       "missing_test_data",
                       "validation_mismatch",
                       "missing_deserializer",
-                      "unused_openapi_auth"
+                      "unused_openapi_auth",
+                      "method_not_allowed"
                     ]
                   }
                 }

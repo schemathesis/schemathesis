@@ -10,6 +10,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.observations import Observations
+from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation, BaseSchema
 
@@ -43,6 +44,8 @@ class EngineContext:
         "_extra_data_source_lock",
         "_error_feedback",
         "_error_feedback_lock",
+        "_supervisor",
+        "_supervisor_lock",
     )
 
     def __init__(
@@ -69,6 +72,8 @@ class EngineContext:
         self._extra_data_source_lock = threading.Lock()
         self._error_feedback: ErrorFeedbackStore | None = None
         self._error_feedback_lock = threading.Lock()
+        self._supervisor: Supervisor | None = None
+        self._supervisor_lock = threading.Lock()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -171,6 +176,15 @@ class EngineContext:
                 if self._error_feedback is None:
                     self._error_feedback = ErrorFeedbackStore()
         return self._error_feedback
+
+    @property
+    def supervisor(self) -> Supervisor:
+        """Per-operation runtime supervisor that issues scheduling directives based on observed signals."""
+        if self._supervisor is None:
+            with self._supervisor_lock:
+                if self._supervisor is None:
+                    self._supervisor = Supervisor()
+        return self._supervisor
 
 
 def make_session(config: ProjectConfig, *, operation: APIOperation | None = None) -> requests.Session:

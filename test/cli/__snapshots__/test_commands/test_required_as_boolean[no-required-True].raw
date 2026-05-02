@@ -24,17 +24,17 @@ Schemathesis dev
 
      ✅ 1 passed
 
- ✅  Fuzzing (in 0.00s)
+ ⏭   Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ⏭  1 skipped
 
 =================================== WARNINGS ===================================
 
-Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
+Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` — skipped from later phases
 
   - POST /success
 
-💡 Check your schema constraints - API validation may be stricter than documented
+💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported
 
 =================================== SUMMARY ====================================
 
@@ -45,11 +45,11 @@ API Operations:
 Test Phases:
   ⏭  Examples
   ✅ Coverage
-  ✅ Fuzzing
+  ⏭  Fuzzing
   ⏭  Stateful (not applicable)
 
 Warnings:
-  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
+  ⚠️ Method Not Allowed: 1 operation skipped after consistent 405 responses
 
 Test cases:
   N generated, N passed

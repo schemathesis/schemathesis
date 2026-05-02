@@ -32,6 +32,7 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
+from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -198,6 +199,25 @@ def worker_task(
                         or (phase == PhaseName.FUZZING and not phases.fuzzing.enabled)
                         or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
                     ):
+                        continue
+                    verdict = ctx.supervisor.verdict(operation.label)
+                    if verdict.directive is SchedulingDirective.SKIP:
+                        scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
+                        events_queue.put(scenario_started)
+                        events_queue.put(
+                            events.ScenarioFinished(
+                                id=scenario_started.id,
+                                suite_id=suite_id,
+                                phase=phase,
+                                label=operation.label,
+                                status=Status.SKIP,
+                                recorder=ScenarioRecorder(label=operation.label),
+                                elapsed_time=0.0,
+                                skip_reason=verdict.reason,
+                                skip_warning=verdict.warning,
+                                is_final=True,
+                            )
+                        )
                         continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation, phase=phase)
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)

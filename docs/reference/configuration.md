@@ -179,6 +179,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     - `validation_mismatch`: API rejects most generated data with 4xx errors, suggesting schema/validation mismatch
     - `missing_deserializer`: Response has structured schema but no registered deserializer for validation
     - `unused_openapi_auth`: Configured OpenAPI auth scheme is not defined in the schema
+    - `method_not_allowed`: Operation consistently returned `405 Method Not Allowed`; subsequent phases skip it
 
 !!! info "CLI Only"
     This option only applies when using the `schemathesis run` command. The pytest plugin uses pytest's own warning system.

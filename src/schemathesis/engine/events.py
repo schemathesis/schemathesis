@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.result import Result
 from schemathesis.core.schema_analysis import SchemaWarning
+from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import Phase, PhaseName
@@ -169,6 +170,7 @@ class ScenarioFinished(ScenarioEvent):
     recorder: ScenarioRecorder
     elapsed_time: float
     skip_reason: str | None
+    skip_warning: SchemathesisWarning | None
     # Whether this is a scenario that tries to reproduce a failure
     is_final: bool
 
@@ -182,6 +184,7 @@ class ScenarioFinished(ScenarioEvent):
         "recorder",
         "elapsed_time",
         "skip_reason",
+        "skip_warning",
         "is_final",
     )
 
@@ -197,6 +200,7 @@ class ScenarioFinished(ScenarioEvent):
         elapsed_time: float,
         skip_reason: str | None,
         is_final: bool,
+        skip_warning: SchemathesisWarning | None = None,
     ) -> None:
         self.id = id
         self.timestamp = time.time()
@@ -207,6 +211,7 @@ class ScenarioFinished(ScenarioEvent):
         self.recorder = recorder
         self.elapsed_time = elapsed_time
         self.skip_reason = skip_reason
+        self.skip_warning = skip_warning
         self.is_final = is_final
 
 

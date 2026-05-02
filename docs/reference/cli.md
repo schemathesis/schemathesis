@@ -107,7 +107,7 @@ $ st run [OPTIONS] SCHEMA
 
     **Type**: `String or comma-separated list`  
     **Default**: All warnings enabled  
-    **Possible values**: `off`, `missing_auth`, `missing_test_data`, `validation_mismatch`  
+    **Possible values**: `off`, `missing_auth`, `missing_test_data`, `validation_mismatch`, `missing_deserializer`, `unused_openapi_auth`, `method_not_allowed`  
 
     Control which warnings are displayed during test execution. Warnings help identify test configuration issues but don't stop execution.
 

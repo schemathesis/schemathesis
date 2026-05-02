@@ -861,6 +861,10 @@ def test_response_schema_conformance(ctx, app_runner, cli, snapshot_cli, app):
     def list_organizations():
         return [], 200
 
+    @app.route("/organizations/<slug>/", methods=["GET"])
+    def get_organization(slug):
+        return jsonify({"name": slug}), 200
+
     schema_file = ctx.openapi.write_schema(
         {
             "/organizations/": {

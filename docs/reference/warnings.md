@@ -14,6 +14,7 @@ Warnings appear in your CLI output and don't stop test execution but indicate ar
 | `validation_mismatch` | Schema constraints differ from real validation (lots of 4xx) | Tighten schema or extend generators to match runtime rules |
 | `missing_deserializer` | Structured responses lack a registered deserializer | Register one via `@schemathesis.deserializer` or align `content` types with actual formats |
 | `unused_openapi_auth` | Configured OpenAPI auth scheme doesn't exist in schema | Check scheme name matches `securitySchemes` (check for typos) |
+| `method_not_allowed` | Operation consistently returned `405 Method Not Allowed` | Verify the server accepts this method, or remove the operation from the schema |
 
 ## Available Warnings
 
@@ -108,6 +109,22 @@ Unused OpenAPI auth: 1 configured auth scheme not used in the schema
 This warning appears when `[auth.openapi.<scheme>]` references a scheme that doesn't exist in your OpenAPI spec. Verify the scheme name matches your schema's `securitySchemes` exactly - Schemathesis will suggest corrections for likely typos.
 
 See the [Authentication Guide](../guides/auth.md#openapi-aware-authentication) for details.
+
+### `method_not_allowed`
+
+```
+Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` — skipped from later phases
+
+  - POST /missing
+
+💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported
+```
+
+**Trigger**: An operation produced a streak of `405 Method Not Allowed` responses with no other status codes, and the schema does not declare `405` (or a `4XX`/`default` family covering it) as a documented response.
+
+Schemathesis stops scheduling the operation in subsequent phases to free budget for operations that can actually be tested. The streak length required is small — a single non-405 response anywhere cancels the streak, so this fires only when an operation never returns anything else.
+
+Common causes: a typo in the path, a method declared in the schema that the server doesn't implement, or an environment-specific routing layer that 405s for the configured base URL. If `405` is a legitimate documented response for the operation, list it under `responses:` in the schema and the warning will not fire.
 
 ## Configuring Warnings
 
