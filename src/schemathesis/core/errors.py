@@ -417,6 +417,15 @@ class NoLinksFound(IncorrectUsage):
     """Raised when no valid links are available for stateful testing."""
 
 
+class NoProducers(IncorrectUsage):
+    """Raised when GraphQL stateful testing has no producer mutations to seed bundles.
+
+    A producer is a mutation whose return type is an Object with an `id` field —
+    e.g. `Mutation.addBook(...): Book!`. Without at least one, every consumer
+    rule's bundle stays empty and no scenario can make progress.
+    """
+
+
 class InvalidRateLimit(IncorrectUsage):
     """Incorrect input for rate limiting."""
 
