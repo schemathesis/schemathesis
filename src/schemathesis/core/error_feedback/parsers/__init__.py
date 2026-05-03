@@ -32,4 +32,4 @@ PARSERS: Registry[type[ResponseParser]] = Registry()
 
 
 # Bundled parsers self-register on import.
-from schemathesis.core.error_feedback.parsers import drf, jackson, pydantic, spring  # noqa: F401, E402
+from schemathesis.core.error_feedback.parsers import drf, jackson, pydantic, rails, spring  # noqa: F401, E402

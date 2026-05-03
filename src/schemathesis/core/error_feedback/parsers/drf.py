@@ -1,36 +1,29 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterator
-from typing import TYPE_CHECKING, Literal
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
+from schemathesis.core.error_feedback.parsers.extractors import (
+    ClassificationResult,
+    RegexHandler,
+    location_for_method,
+    numeric_bound,
+    size_bound,
+)
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     FormatPayload,
-    NumericBoundPayload,
     Observation,
     ObservationKind,
-    ObservationPayload,
-    SizeBoundPayload,
     TypeMismatchPayload,
 )
-from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
-ClassificationResult = tuple[ObservationKind, ObservationPayload | None]
-
 WalkPair = tuple[tuple[str | int, ...], str]
-
-# DRF endpoints for these methods validate from query params, not from the
-# request body — surface their observations under the QUERY bucket.
-_QUERY_METHODS = frozenset({"GET", "DELETE", "HEAD"})
-
-
-def _location_for_method(method: str) -> ParameterLocation:
-    return ParameterLocation.QUERY if method.upper() in _QUERY_METHODS else ParameterLocation.BODY
 
 
 def _walk(body: object, path: tuple[str | int, ...] = ()) -> Iterator[WalkPair]:
@@ -104,64 +97,37 @@ _PREFIX_MESSAGES: tuple[tuple[str, ClassificationResult], ...] = (
 )
 
 
-RegexHandler = Callable[[re.Match[str]], ClassificationResult]
-
-
-def _size_bound(*, side: Literal["min", "max"]) -> RegexHandler:
-    """Build a handler that captures one side of a size bound from match group 1."""
-
-    def handler(match: re.Match[str]) -> ClassificationResult:
-        value = int(match.group(1))
-        payload = SizeBoundPayload(min=value, max=None) if side == "min" else SizeBoundPayload(min=None, max=value)
-        return ObservationKind.SIZE_BOUND, payload
-
-    return handler
-
-
-def _numeric_bound(*, direction: BoundDirection, exclusive: bool) -> RegexHandler:
-    """Mirrors Pydantic's `_numeric_bound` factory — direction + exclusive flag pick the bound shape."""
-
-    def handler(match: re.Match[str]) -> ClassificationResult:
-        return ObservationKind.NUMERIC_BOUND, NumericBoundPayload(
-            bound=float(match.group(1)),
-            direction=direction,
-            exclusive=exclusive,
-        )
-
-    return handler
-
-
 # Both DRF native ("field") and Django bridge ("value") wordings; Django's
 # `Min/MaxLengthValidator` appends `(it has N)` on either side, so make the
 # suffix optional on both min and max patterns.
 _REGEX_PATTERNS: tuple[tuple[re.Pattern[str], RegexHandler], ...] = (
     (
         re.compile(r"^Ensure this (?:field|value) has at least (\d+) characters?(?: \(it has \d+\))?\.$"),
-        _size_bound(side="min"),
+        size_bound(direction=BoundDirection.MIN),
     ),
     (
         re.compile(
             r"^Ensure this (?:field|value) has (?:no more than|at most) (\d+) characters?(?: \(it has \d+\))?\.$"
         ),
-        _size_bound(side="max"),
+        size_bound(direction=BoundDirection.MAX),
     ),
-    (re.compile(r"^Ensure this field has at least (\d+) elements?\.$"), _size_bound(side="min")),
-    (re.compile(r"^Ensure this field has no more than (\d+) elements?\.$"), _size_bound(side="max")),
+    (re.compile(r"^Ensure this field has at least (\d+) elements?\.$"), size_bound(direction=BoundDirection.MIN)),
+    (re.compile(r"^Ensure this field has no more than (\d+) elements?\.$"), size_bound(direction=BoundDirection.MAX)),
     (
         re.compile(r"^Ensure this value is greater than or equal to (-?\d+(?:\.\d+)?)\.$"),
-        _numeric_bound(direction=BoundDirection.MIN, exclusive=False),
+        numeric_bound(direction=BoundDirection.MIN, exclusive=False),
     ),
     (
         re.compile(r"^Ensure this value is greater than (-?\d+(?:\.\d+)?)\.$"),
-        _numeric_bound(direction=BoundDirection.MIN, exclusive=True),
+        numeric_bound(direction=BoundDirection.MIN, exclusive=True),
     ),
     (
         re.compile(r"^Ensure this value is less than or equal to (-?\d+(?:\.\d+)?)\.$"),
-        _numeric_bound(direction=BoundDirection.MAX, exclusive=False),
+        numeric_bound(direction=BoundDirection.MAX, exclusive=False),
     ),
     (
         re.compile(r"^Ensure this value is less than (-?\d+(?:\.\d+)?)\.$"),
-        _numeric_bound(direction=BoundDirection.MAX, exclusive=True),
+        numeric_bound(direction=BoundDirection.MAX, exclusive=True),
     ),
 )
 
@@ -209,7 +175,7 @@ class DRFParser:
         return _has_string_list_leaf(body)
 
     def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
-        location = _location_for_method(operation.method)
+        location = location_for_method(operation.method)
         observations: list[Observation] = []
         for path, message in _walk(body):
             classification = _classify(message)
