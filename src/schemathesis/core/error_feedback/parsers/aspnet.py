@@ -9,6 +9,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
     RegexHandler,
     location_for_method,
+    lowercase_first_letter,
     numeric_bound,
     size_bound,
 )
@@ -53,18 +54,11 @@ def _is_pseudo_field(name: str) -> bool:
     return name in _PSEUDO_FIELDS or name.startswith("$.")
 
 
-def _normalize_field(name: str) -> str:
-    """Lower-case the first letter to mirror the default JsonNamingPolicy.CamelCase wire format."""
-    if not name or not name[0].isupper():
-        return name
-    return name[0].lower() + name[1:]
-
-
 def _walk(errors: AspNetShape) -> Iterator[WalkPair]:
     for raw_key, messages in errors.items():
         if _is_pseudo_field(raw_key):
             continue
-        field = _normalize_field(raw_key)
+        field = lowercase_first_letter(raw_key)
         for message in messages:
             if isinstance(message, str) and message:
                 yield ((field,), message)

@@ -36,6 +36,7 @@ from schemathesis.core.error_feedback.parsers import (  # noqa: F401, E402
     ajv,
     aspnet,
     drf,
+    go_validator,
     jackson,
     laravel,
     pydantic,

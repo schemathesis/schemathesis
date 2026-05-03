@@ -1,4 +1,4 @@
-"""Shared regex helpers for prose-classifying parsers."""
+"""Shared helpers for parsers."""
 
 from __future__ import annotations
 
@@ -24,6 +24,13 @@ QUERY_METHODS = frozenset({"GET", "DELETE", "HEAD"})
 
 def location_for_method(method: str) -> ParameterLocation:
     return ParameterLocation.QUERY if method.upper() in QUERY_METHODS else ParameterLocation.BODY
+
+
+def lowercase_first_letter(name: str) -> str:
+    """Map a PascalCase identifier (C# property, Go struct field) to its camelCase JSON property name."""
+    if not name or not name[0].isupper():
+        return name
+    return name[0].lower() + name[1:]
 
 
 def size_bound(*, direction: BoundDirection) -> RegexHandler:
