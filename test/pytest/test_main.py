@@ -855,11 +855,11 @@ def extract_hypothesis_error(text):
     return "\n".join(result_lines)
 
 
-@pytest.mark.operations("success")
-def test_filter_case_rejects_all(testdir, openapi3_schema_url):
+def test_filter_case_rejects_all(ctx, testdir):
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{api.schema_url}')
 
 @schema.hook
 def filter_case(context, case):
@@ -1455,13 +1455,13 @@ def test_csv_validation(case):
     assert "res = hook_impl.function(*args)" not in result.stdout.str()
 
 
-@pytest.mark.operations("success")
-def test_graphql_lazy_loading(testdir, openapi3_schema_url):
+def test_graphql_lazy_loading(ctx, testdir):
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
 import sys
 
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{api.schema_url}')
 for k in list(sys.modules):
     if k.startswith("graphql"):
         del sys.modules[k]

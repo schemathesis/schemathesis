@@ -626,16 +626,16 @@ def test_graphql_query(ctx):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("success")
-def test_after_call_fires_for_schema_level_hook(openapi3_schema_url):
-    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_after_call_fires_for_schema_level_hook(ctx):
+    api = ctx.openapi.apps.success()
+    api_schema = schemathesis.openapi.from_url(api.schema_url)
     calls = []
 
     @api_schema.hooks.hook
     def after_call(context, case, response):
         calls.append(case.id)
 
-    @given(case=api_schema["/success"]["GET"].as_strategy())
+    @given(case=api_schema["/api/success"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
     def test(case):
         case.call()

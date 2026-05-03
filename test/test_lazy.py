@@ -593,13 +593,13 @@ def test_(case):
     assert expected in result.stdout.str()
 
 
-@pytest.mark.operations("success")
-def test_rate_limit(testdir, openapi3_schema_url):
+def test_rate_limit(ctx, testdir):
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
 @pytest.fixture
 def api_schema():
-    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema = schemathesis.openapi.from_url('{api.schema_url}')
     schema.config.update(rate_limit="1/s")
     return schema
 

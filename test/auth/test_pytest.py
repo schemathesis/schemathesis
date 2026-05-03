@@ -320,9 +320,8 @@ def test(case):
     result.assert_outcomes(passed=2)
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_basic_auth_from_fixture_with_toml_config(testdir, openapi3_base_url):
+def test_basic_auth_from_fixture_with_toml_config(ctx, testdir):
+    api = ctx.openapi.apps.success()
     # When a user:
     # 1. Has a schemathesis.toml with basic auth configured
     # 2. Uses the pytest schema loader `schemathesis.pytest.from_fixture`
@@ -330,7 +329,7 @@ def test_basic_auth_from_fixture_with_toml_config(testdir, openapi3_base_url):
     testdir.makefile(
         ".toml",
         schemathesis=f"""
-base-url = "{openapi3_base_url}"
+base-url = "{api.base_url}"
 [auth]
 basic = {{ username = "testuser", password = "testpass" }}
 """,
@@ -370,14 +369,13 @@ def test_api_with_auth(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_headers_from_fixture_with_toml_config(testdir, openapi3_base_url):
+def test_headers_from_fixture_with_toml_config(ctx, testdir):
+    api = ctx.openapi.apps.success()
     # When headers are configured in schemathesis.toml
     testdir.makefile(
         ".toml",
         schemathesis=f"""
-base-url = "{openapi3_base_url}"
+base-url = "{api.base_url}"
 [headers]
 X-API-Key = "secret-key"
 X-Client-ID = "test-client"
@@ -417,14 +415,13 @@ def test_api_with_headers(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_overrides_from_fixture_with_toml_config(testdir, openapi3_base_url):
+def test_overrides_from_fixture_with_toml_config(ctx, testdir):
+    api = ctx.openapi.apps.success()
     # When operation-specific overrides are configured in schemathesis.toml
     testdir.makefile(
         ".toml",
         schemathesis=f"""
-base-url = "{openapi3_base_url}"
+base-url = "{api.base_url}"
 
 [[operations]]
 include-path = "/success"

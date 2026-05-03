@@ -51,9 +51,9 @@ def test_allure_failure_has_reproduce_attachment(cli, schema_url, tmp_path):
     assert any("curl" in m.lower() for m in step_messages)
 
 
-@pytest.mark.operations("success")
-def test_allure_no_report_without_flag(cli, schema_url, tmp_path):
-    cli.run_and_assert(schema_url)
+def test_allure_no_report_without_flag(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    cli.run_and_assert(api.schema_url)
     assert not list(tmp_path.glob("**/*-result.json"))
 
 
@@ -67,9 +67,9 @@ def test_allure_broken_status_on_non_fatal_error(cli, schema_url, tmp_path):
     assert broken[0]["statusDetails"]["message"]
 
 
-@pytest.mark.operations("success")
-def test_allure_results_in_timestamped_dir_when_no_explicit_path(cli, schema_url, tmp_path):
-    cli.run_and_assert(schema_url, "--report=allure", f"--report-dir={tmp_path}")
+def test_allure_results_in_timestamped_dir_when_no_explicit_path(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
+    cli.run_and_assert(api.schema_url, "--report=allure", f"--report-dir={tmp_path}")
     allure_dirs = [d for d in tmp_path.iterdir() if d.is_dir() and d.name.startswith("allure-")]
     assert len(allure_dirs) == 1
     assert list(allure_dirs[0].glob("*-result.json"))
@@ -93,10 +93,10 @@ def test_allure_stateful_phase_produces_result(cli, schema_url, tmp_path):
         assert not any(lbl["name"] == "feature" for lbl in data["labels"])
 
 
-@pytest.mark.operations("success")
-def test_allure_layer_label(cli, schema_url, tmp_path):
+def test_allure_layer_label(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
-    cli.run_and_assert(schema_url, f"--report-allure-path={allure_dir}")
+    cli.run_and_assert(api.schema_url, f"--report-allure-path={allure_dir}")
     result_files = list(allure_dir.glob("*-result.json"))
     assert result_files
     data = json.loads(result_files[0].read_text())

@@ -328,12 +328,12 @@ def test_unknown_content_type(real_app_schema):
     assert check.failure_info.failure.defined_content_types == ["application/json"]
 
 
-@pytest.mark.operations("success")
-def test_known_content_type(real_app_schema):
+def test_known_content_type(ctx):
+    api = ctx.openapi.apps.success()
     # When API operation returns a response with a proper content type
     # And "content_type_conformance" is specified
     stream = execute(
-        real_app_schema,
+        schemathesis.openapi.from_url(api.schema_url),
         checks=(content_type_conformance,),
         max_examples=1,
     )
@@ -387,11 +387,13 @@ Value:
     assert check.failure_info.failure.validation_message == '"success" is a required property'
 
 
-@pytest.mark.operations("success")
-def test_response_conformance_valid(real_app_schema):
+def test_response_conformance_valid(ctx):
+    api = ctx.openapi.apps.success()
     # When API operation returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
-    stream = execute(real_app_schema, checks=(response_schema_conformance,), max_examples=1)
+    stream = execute(
+        schemathesis.openapi.from_url(api.schema_url), checks=(response_schema_conformance,), max_examples=1
+    )
     # Then there should be no failures or errors
     stream.assert_no_failures()
     stream.assert_no_errors()
@@ -953,9 +955,11 @@ def test_graphql(ctx):
             assert case.value.operation.label == expected
 
 
-@pytest.mark.operations("success")
 @pytest.mark.usefixtures("restore_checks")
-def test_interrupted_in_test(openapi3_schema):
+def test_interrupted_in_test(ctx):
+    api = ctx.openapi.apps.success()
+    openapi3_schema = schemathesis.openapi.from_url(api.schema_url)
+
     # When an interrupt happens within a test body (check is called within a test body)
     @schemathesis.check
     def interrupt_check(ctx, response, case):
@@ -971,8 +975,9 @@ def test_interrupted_in_test(openapi3_schema):
     assert scenario_finished.recorder.interactions
 
 
-@pytest.mark.operations("success")
-def test_interrupted_outside_test(mocker, openapi3_schema):
+def test_interrupted_outside_test(ctx, mocker):
+    api = ctx.openapi.apps.success()
+    openapi3_schema = schemathesis.openapi.from_url(api.schema_url)
     # See GH-1325
     # When an interrupt happens outside a test body
     mocker.patch("schemathesis.engine.events.ScenarioFinished.__init__", side_effect=KeyboardInterrupt)

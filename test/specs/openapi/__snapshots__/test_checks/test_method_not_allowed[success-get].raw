@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 1
 ---
 Stdout:
 Schemathesis dev
@@ -7,18 +7,40 @@ Schemathesis dev
 
  ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
- ✅  Coverage (in 0.00s)
+ ❌  Coverage (in 0.00s)
 
-     ✅ 1 passed
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+________________________________ TRACE /success ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Unsupported methods
+
+    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
+
+    Return 405 for methods not listed in the OpenAPI spec
+
+[404] Not Found:
+
+    `<!doctype html>
+    <html lang=en>
+    <title>404 Not Found</title>
+    <h1>Not Found</h1>
+    <p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>`
+
+Reproduce with:
+
+    curl -X TRACE http://127.0.0.1/success
 
 =================================== SUMMARY ====================================
 
@@ -28,13 +50,16 @@ API Operations:
 
 Test Phases:
   ⏭  Examples (disabled)
-  ✅ Coverage
+  ❌ Coverage
   ⏭  Fuzzing (disabled)
   ⏭  Stateful (disabled)
 
+Failures:
+  ❌ Unsupported methods: 1
+
 Test cases:
-  N generated, N passed
+  N generated, N found N unique failures
 
 Seed: 42
 
-=========================== No issues found in 1.00s ===========================
+============================== 1 failure in 1.00s ==============================

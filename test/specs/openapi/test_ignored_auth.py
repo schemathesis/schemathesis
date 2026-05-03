@@ -67,10 +67,10 @@ def test_auth_is_checked(schema_url):
     assert event.status == Status.SUCCESS
 
 
-@pytest.mark.operations("success")
-def test_no_failure(schema_url):
+def test_no_failure(ctx):
+    api = ctx.openapi.apps.success()
     # When there is no auth
-    event = run(schema_url)
+    event = run(api.schema_url)
     # Then there is no failure
     assert event.status == Status.SUCCESS
 
@@ -235,10 +235,10 @@ def test_contains_auth(ctx, request_kwargs, parameters, expected, response_facto
         ("cookies", [{"name": "A", "in": "cookie"}]),
     ],
 )
-@pytest.mark.operations("success")
-def test_remove_auth_from_case(schema_url, key, parameters):
-    schema = schemathesis.openapi.from_url(schema_url)
-    case = schema["/success"]["GET"].Case(**{key: {"A": "V"}})
+def test_remove_auth_from_case(ctx, key, parameters):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    case = schema["/api/success"]["GET"].Case(**{key: {"A": "V"}})
     case = remove_auth(case, parameters)
     assert not getattr(case, key)
 
