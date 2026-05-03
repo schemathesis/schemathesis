@@ -16,6 +16,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
+from typing_extensions import override
 
 from schemathesis import auths
 from schemathesis.core import NOT_SET, NotSet, SpecificationMetadata
@@ -94,6 +95,7 @@ class GraphQLResponses:
 
 @dataclass
 class GraphQLSchema(BaseSchema):
+    @override
     def __post_init__(self) -> None:
         super().__post_init__()
         from schemathesis.specs.graphql.analysis import GraphQLAnalysis
@@ -103,6 +105,7 @@ class GraphQLSchema(BaseSchema):
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
 
+    @override
     def __iter__(self) -> Iterator[str]:
         schema = self.client_schema
         for operation_type in (
@@ -112,6 +115,7 @@ class GraphQLSchema(BaseSchema):
             if operation_type is not None:
                 yield operation_type.name
 
+    @override
     def _get_operation_map(self, key: str) -> APIOperationMap:
         schema = self.client_schema
         for root_type, operation_type in (
@@ -124,6 +128,7 @@ class GraphQLSchema(BaseSchema):
                 return map
         raise KeyError(key)
 
+    @override
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         if label.startswith(("Query.", "Mutation.")):
             ty, field = label.split(".", maxsplit=1)
@@ -133,6 +138,7 @@ class GraphQLSchema(BaseSchema):
                 return None
         return None
 
+    @override
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raw_schema = self.raw_schema["__schema"]
         type_names = [type_def["name"] for type_def in raw_schema.get("types", [])]
@@ -142,35 +148,43 @@ class GraphQLSchema(BaseSchema):
             message += f". Did you mean `{matches[0]}`?"
         raise OperationNotFound(message=message, item=item) from exc
 
+    @override
     def get_full_path(self, path: str) -> str:
         return self.base_path
 
     @property
+    @override
     def specification(self) -> SpecificationMetadata:
         return SpecificationMetadata.graphql(version="")
 
+    @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         return False
 
+    @override
     def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
         # `error_feedback` is OpenAPI-specific; `hypothesis-graphql` strategies have no hook to consume it.
         from schemathesis.specs.graphql.stateful import create_state_machine
 
         return create_state_machine(self)
 
+    @override
     def apply_stateful_inference(self, ctx: EngineContext) -> int:
         # All GraphQL transitions are derived from schema structure (no `links` keyword equivalent),
         # so the entire selected count is reported through the engine's `inferred` channel.
         return self.analysis.transition_count
 
+    @override
     def create_extra_data_source(self) -> GraphQLResourcePool:
         return GraphQLResourcePool(client_schema=self.client_schema)
 
+    @override
     def build_request_url(self, case: Case, base_url: str) -> str:
         parts = list(urlsplit(base_url))
         parts[2] = prepare_path(case.path, case.path_parameters)
         return urlunsplit(parts)
 
+    @override
     def prepare_request_body(
         self, body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet
     ) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
@@ -178,6 +192,7 @@ class GraphQLSchema(BaseSchema):
             return body
         return {"query": body}
 
+    @override
     def get_unit_scheduler(
         self,
         operations: list[Result[APIOperation, InvalidSchema]],
@@ -207,14 +222,17 @@ class GraphQLSchema(BaseSchema):
         return self._client_schema
 
     @property
+    @override
     def base_path(self) -> str:
         if self.config.base_url:
             return urlsplit(self.config.base_url).path
         return self._get_base_path()
 
+    @override
     def _get_base_path(self) -> str:
         return cast(str, urlsplit(self.location).path)
 
+    @override
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
         raw_schema = self.raw_schema["__schema"]
@@ -242,6 +260,7 @@ class GraphQLSchema(BaseSchema):
                                 statistic.operations.selected += 1
         return statistic
 
+    @override
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
@@ -289,6 +308,7 @@ class GraphQLSchema(BaseSchema):
             ),
         )
 
+    @override
     def get_case_strategy(
         self,
         operation: APIOperation,
@@ -305,9 +325,11 @@ class GraphQLSchema(BaseSchema):
             **kwargs,
         )
 
+    @override
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         return []
 
+    @override
     def make_case(
         self,
         *,
@@ -337,9 +359,11 @@ class GraphQLSchema(BaseSchema):
             meta=meta,
         )
 
+    @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return None
 
+    @override
     def validate(self) -> None:
         return None
 

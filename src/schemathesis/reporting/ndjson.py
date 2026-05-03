@@ -22,6 +22,8 @@ from schemathesis.engine import events
 from schemathesis.engine.recorder import Request as RecorderRequest
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from schemathesis.config import SanitizationConfig
 
 TextOutput = IO[str] | StringIO | Path
@@ -186,7 +188,7 @@ class NdjsonWriter:
             self._owned_file = None
         self._stream = None
 
-    def __enter__(self) -> NdjsonWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

@@ -13,6 +13,8 @@ from schemathesis.engine.run import PhaseName
 from schemathesis.schemas import APIOperation
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
     from schemathesis.generation.hypothesis.builder import HypothesisTestMode
@@ -92,7 +94,7 @@ class WorkerPool:
         for worker in self.workers:
             worker.join()
 
-    def __enter__(self) -> WorkerPool:
+    def __enter__(self) -> Self:
         self.start()
         return self
 

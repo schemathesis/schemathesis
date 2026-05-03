@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.python import asgi
@@ -13,6 +15,7 @@ if TYPE_CHECKING:
 
 
 class ASGITransport(RequestsTransport):
+    @override
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         if kwargs.get("base_url") is None:
             kwargs["base_url"] = normalize_base_url(case.operation.base_url)

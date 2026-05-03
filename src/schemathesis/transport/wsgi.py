@@ -5,6 +5,8 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
+from typing_extensions import override
+
 from schemathesis.core import NotSet
 from schemathesis.core.parameters import RAW_QUERY_STRING_KEY, RawQueryString
 from schemathesis.core.rate_limit import ratelimit
@@ -29,6 +31,7 @@ if TYPE_CHECKING:
 
 
 class WSGITransport(BaseTransport["werkzeug.Client"]):
+    @override
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         headers = kwargs.get("headers")
         params_override = kwargs.get("params")
@@ -75,6 +78,7 @@ class WSGITransport(BaseTransport["werkzeug.Client"]):
 
         return data
 
+    @override
     def send(
         self,
         case: Case,

@@ -12,6 +12,8 @@ from junit_xml import TestCase, TestSuite, to_xml_report_file
 from schemathesis.core.failures import format_failures
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from schemathesis.config import OutputConfig
     from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.engine.statistic import GroupedFailures
@@ -100,7 +102,7 @@ class JunitXmlWriter:
     def _get_or_create(self, label: str) -> TestCase:
         return self._test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
 
-    def __enter__(self) -> JunitXmlWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

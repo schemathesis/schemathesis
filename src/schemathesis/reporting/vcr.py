@@ -5,7 +5,7 @@ import json
 from io import StringIO
 from pathlib import Path
 from types import TracebackType
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
 from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url
@@ -14,6 +14,9 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status
 from schemathesis.engine.recorder import CheckNode, Request, ScenarioRecorder
 from schemathesis.generation.meta import CoveragePhaseData
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 TextOutput = IO[str] | StringIO | Path
 
@@ -207,7 +210,7 @@ class VcrWriter:
             self._owned_file = None
         self._stream = None
 
-    def __enter__(self) -> VcrWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
