@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal, TypeAlias, TypeGuard
 
 from schemathesis.core.errors import InternalError
 
@@ -300,7 +300,7 @@ def normalize_regex(pattern: object) -> str | None:
 _POSIX_CLASS_RE = re.compile(r"\[\[:\^?[a-zA-Z]+:\]")
 
 
-def is_valid_python_regex(pattern: object) -> bool:
+def is_valid_python_regex(pattern: object) -> TypeGuard[str]:
     """Check if a pattern is valid Python regex."""
     if not isinstance(pattern, str):
         return False

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode, urlparse
 
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from typing_extensions import override
 
 from schemathesis.core import NotSet, media_types
 from schemathesis.core.errors import IncorrectUsage, SerializationNotPossible
@@ -51,6 +52,7 @@ def _merge_query_components(left: Any, right: Any) -> str:
 
 
 class RequestsTransport(BaseTransport["requests.Session"]):
+    @override
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         base_url = kwargs.get("base_url")
         headers = kwargs.get("headers")
@@ -125,6 +127,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
 
         return data
 
+    @override
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         import requests
 

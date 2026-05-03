@@ -14,6 +14,8 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transforms import resolve_pointer
 
 if TYPE_CHECKING:
+    from typing_extensions import Self
+
     from schemathesis.schemas import APIOperation
 
 
@@ -148,8 +150,8 @@ class FilterSet:
         self._includes = _includes or set()
         self._excludes = _excludes or set()
 
-    def clone(self) -> FilterSet:
-        return FilterSet(_includes=self._includes.copy(), _excludes=self._excludes.copy())
+    def clone(self) -> Self:
+        return self.__class__(_includes=self._includes.copy(), _excludes=self._excludes.copy())
 
     def applies_to(self, operation: APIOperation) -> bool:
         return self.match(SimpleNamespace(operation=operation))

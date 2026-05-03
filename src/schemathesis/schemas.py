@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     import requests
     from hypothesis.strategies import SearchStrategy
     from requests.structures import CaseInsensitiveDict
+    from typing_extensions import Self
     from werkzeug.test import TestResponse
 
     from schemathesis.auths import AuthContext
@@ -348,9 +349,7 @@ class BaseSchema(Mapping):
         """
         return given_proxy(*args, **kwargs)
 
-    def clone(
-        self, *, test_function: Callable | NotSet = NOT_SET, filter_set: FilterSet | NotSet = NOT_SET
-    ) -> BaseSchema:
+    def clone(self, *, test_function: Callable | NotSet = NOT_SET, filter_set: FilterSet | NotSet = NOT_SET) -> Self:
         if isinstance(test_function, NotSet):
             _test_function = self.test_function
         else:

@@ -1,4 +1,5 @@
 import re
+from typing import Any, TypeGuard
 from urllib.parse import urlparse
 
 from schemathesis.core.errors import InvalidSchema
@@ -22,7 +23,7 @@ def has_invalid_characters(name: str, value: object) -> bool:
         return True
 
 
-def is_latin_1_encodable(value: object) -> bool:
+def is_latin_1_encodable(value: object) -> TypeGuard[str]:
     """Check if a value is a Latin-1 encodable string."""
     if not isinstance(value, str):
         return False
@@ -54,7 +55,7 @@ SURROGATE_PAIR_RE = re.compile(r"[\ud800-\udfff]")
 _contains_surrogate_pair = SURROGATE_PAIR_RE.search
 
 
-def contains_unicode_surrogate_pair(item: object) -> bool:
+def contains_unicode_surrogate_pair(item: object) -> TypeGuard[list[Any] | str]:
     if isinstance(item, list):
         return any(isinstance(item_, str) and bool(_contains_surrogate_pair(item_)) for item_ in item)
     return isinstance(item, str) and bool(_contains_surrogate_pair(item))

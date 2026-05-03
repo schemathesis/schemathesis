@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, overload
+from typing import Any, TypeGuard, overload
 
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchema
@@ -97,7 +97,7 @@ def _to_json_schema(
                 schema["pattern"] = translated
             else:
                 del schema["pattern"]
-        elif isinstance(pattern, str) and (pattern.startswith(r"\A") or pattern.endswith(r"\Z")):
+        elif pattern.startswith(r"\A") or pattern.endswith(r"\Z"):
             # Pattern uses Python-specific anchors that need Rust translation for jsonschema-rs
             translated = normalize_regex(pattern)
             if translated is not None:
@@ -379,13 +379,13 @@ def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, An
         schema.pop("properties", None)
 
 
-def is_write_only(schema: Any) -> bool:
+def is_write_only(schema: Any) -> TypeGuard[dict[str, Any]]:
     if not isinstance(schema, dict):
         return False
     return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
 
 
-def is_read_only(schema: Any) -> bool:
+def is_read_only(schema: Any) -> TypeGuard[dict[str, Any]]:
     if not isinstance(schema, dict):
         return False
     return schema.get("readOnly", False)

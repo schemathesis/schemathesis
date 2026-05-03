@@ -6,7 +6,7 @@ from http.cookies import SimpleCookie
 from io import StringIO
 from pathlib import Path
 from types import TracebackType
-from typing import IO
+from typing import IO, TYPE_CHECKING
 from urllib.parse import parse_qsl, urlparse
 
 import harfile
@@ -15,6 +15,9 @@ from schemathesis.config import OutputConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine.recorder import ScenarioRecorder
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 TextOutput = IO[str] | StringIO | Path
 
@@ -131,7 +134,7 @@ class HarWriter:
             self._ctx.__exit__(None, None, None)
             self._har = None
 
-    def __enter__(self) -> HarWriter:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(

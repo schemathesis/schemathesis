@@ -14,6 +14,7 @@ import jsonschema
 import jsonschema_rs
 from packaging import version
 from requests.structures import CaseInsensitiveDict
+from typing_extensions import override
 
 from schemathesis.config import (
     CoveragePhaseConfig,
@@ -88,6 +89,7 @@ class OpenApiSchema(BaseSchema):
     adapter: SpecificationAdapter = None  # type: ignore[assignment]
     _spec_version: str = field(init=False)
 
+    @override
     def __post_init__(self) -> None:
         self._initialize_adapter()
         super().__post_init__()
@@ -118,6 +120,7 @@ class OpenApiSchema(BaseSchema):
         raise InvalidSchema("Unable to determine Open API version for this schema.")
 
     @cached_property
+    @override
     def specification(self) -> SpecificationMetadata:
         return SpecificationMetadata.openapi(version=self._spec_version)
 
@@ -125,6 +128,7 @@ class OpenApiSchema(BaseSchema):
     def security(self) -> OpenApiSecurity:
         return OpenApiSecurity(raw_schema=self.raw_schema, adapter=self.adapter, resolver=self.resolver)
 
+    @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
         """Apply OpenAPI-aware authentication to a test case.
 
@@ -135,6 +139,7 @@ class OpenApiSchema(BaseSchema):
             return False
         return self.security.apply_auth(case, context, all_schemes)
 
+    @override
     def create_extra_data_source(self) -> ExtraDataSource | None:
         """Create an extra data source for augmenting test generation with real data.
 
@@ -144,6 +149,7 @@ class OpenApiSchema(BaseSchema):
         """
         return self.analysis.extra_data_source
 
+    @override
     def get_coverage_capabilities(self) -> CoverageCapabilities:
         from schemathesis.specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
         from schemathesis.specs.openapi.patterns import update_quantifier
@@ -154,6 +160,7 @@ class OpenApiSchema(BaseSchema):
             validator_cls=self.adapter.jsonschema_validator_cls,
         )
 
+    @override
     def revalidate_case_metadata(self, case: Case) -> None:
         meta = case._meta
         if meta is None or not meta.is_dirty():
@@ -173,12 +180,14 @@ class OpenApiSchema(BaseSchema):
             else:
                 meta.generation.mode = GenerationMode.NEGATIVE
 
+    @override
     def as_state_machine(self, *, error_feedback: ErrorFeedbackStore | None = None) -> type[APIStateMachine]:
         # Apply dependency inference if configured and not already done
         if self.analysis.should_inject_links():
             self.analysis.inject_links()
         return create_state_machine(self, error_feedback=error_feedback)
 
+    @override
     def get_unit_scheduler(
         self,
         operations: list[Result[APIOperation, InvalidSchema]],
@@ -212,6 +221,7 @@ class OpenApiSchema(BaseSchema):
 
         return LayeredScheduler(layers, errors=errors)
 
+    @override
     def apply_stateful_inference(self, ctx: EngineContext) -> int:
         injected = 0
         if ctx.observations is not None and ctx.observations.location_headers:
@@ -221,6 +231,7 @@ class OpenApiSchema(BaseSchema):
             injected += self.analysis.inject_links()
         return injected
 
+    @override
     def compute_fuzz_operation_weights(self, operations: list[APIOperation]) -> dict[str, int]:
         layers = self.analysis.dependency_layers
         if layers is None:
@@ -245,6 +256,7 @@ class OpenApiSchema(BaseSchema):
                 weights[op.label] = 2 + out_degree
         return weights
 
+    @override
     def iter_link_candidates(
         self,
         *,
@@ -264,9 +276,11 @@ class OpenApiSchema(BaseSchema):
             excluded_labels=excluded_labels,
         )
 
+    @override
     def iter_schema_warnings(self) -> list[SchemaWarning]:
         return list(self.analysis.iter_warnings())
 
+    @override
     def adapt_to_null_byte_in_header_failure(self) -> None:
         from schemathesis.specs.openapi import formats
         from schemathesis.specs.openapi.formats import (
@@ -277,6 +291,7 @@ class OpenApiSchema(BaseSchema):
 
         formats.register(HEADER_FORMAT, header_values(exclude_characters=DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00"))
 
+    @override
     def get_custom_format_strategies(
         self, generation_config: GenerationConfig, mode: GenerationMode
     ) -> dict[str, SearchStrategy]:
@@ -288,6 +303,7 @@ class OpenApiSchema(BaseSchema):
         info = self.raw_schema["info"]
         return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
 
+    @override
     def __iter__(self) -> Iterator[str]:
         paths = self._get_paths()
         if paths is None:
@@ -298,6 +314,7 @@ class OpenApiSchema(BaseSchema):
     def default_media_types(self) -> list[str]:
         return self.adapter.get_default_media_types(self.raw_schema)
 
+    @override
     def _get_base_path(self) -> str:
         return self.adapter.get_base_path(self.raw_schema)
 
@@ -308,6 +325,7 @@ class OpenApiSchema(BaseSchema):
         assert isinstance(paths, Mapping)
         return cast(Mapping[str, Any], paths)
 
+    @override
     def _get_operation_map(self, path: str) -> APIOperationMap:
         paths = self._get_paths()
         if paths is None:
@@ -320,10 +338,12 @@ class OpenApiSchema(BaseSchema):
         map._data = MethodMap(map, scope, path, CaseInsensitiveDict(path_item))
         return map
 
+    @override
     def find_operation_by_label(self, label: str) -> APIOperation | None:
         method, path = label.split(" ", maxsplit=1)
         return self[path][method]
 
+    @override
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         matches = get_close_matches(item, list(self))
         self._on_missing_operation(item, exc, matches)
@@ -364,6 +384,7 @@ class OpenApiSchema(BaseSchema):
         operation.schema = self
         return not self.filter_set.match(_ctx_cache)
 
+    @override
     def _measure_statistic(self) -> ApiStatistic:
         statistic = ApiStatistic()
         paths = self._get_paths()
@@ -448,6 +469,7 @@ class OpenApiSchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 continue
 
+    @override
     def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
@@ -535,6 +557,7 @@ class OpenApiSchema(BaseSchema):
             ) from None
         raise InvalidSchema(SCHEMA_ERROR_SUGGESTION, path=path, method=method) from error
 
+    @override
     def validate(self) -> None:
         with suppress(TypeError):
             self._validate()
@@ -642,9 +665,11 @@ class OpenApiSchema(BaseSchema):
         """Content types available for this API operation."""
         return self.adapter.get_response_content_types(operation, response)
 
+    @override
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
         return self.adapter.get_request_payload_content_types(operation)
 
+    @override
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, **kwargs)
@@ -680,6 +705,7 @@ class OpenApiSchema(BaseSchema):
             return self.find_operation_by_id(operation_ref.value)
         return self.find_operation_by_reference(operation_ref.value)
 
+    @override
     def get_case_strategy(
         self,
         operation: APIOperation,
@@ -700,6 +726,7 @@ class OpenApiSchema(BaseSchema):
             **kwargs,
         )
 
+    @override
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
         config = self.config.generation_for(operation=operation)
@@ -714,14 +741,17 @@ class OpenApiSchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return self.adapter.get_parameter_serializer(definitions)
 
+    @override
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")
 
+    @override
     def prepare_multipart(
         self, form_data: dict[str, Any], operation: APIOperation, selected_content_types: dict[str, str] | None = None
     ) -> tuple[list | None, dict[str, Any] | None]:
         return self.adapter.prepare_multipart(operation, form_data, selected_content_types)
 
+    @override
     def make_case(
         self,
         *,
@@ -753,6 +783,7 @@ class OpenApiSchema(BaseSchema):
             meta=meta,
         )
 
+    @override
     def validate_response(
         self,
         operation: APIOperation,
