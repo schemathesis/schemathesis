@@ -7,7 +7,7 @@
 - Detect runtime auth requirements from 401/403 responses on operations the spec declares public.
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
 - Capture every element of list-shaped responses into the pool, not just the first.
-- Analyze server 4xx field errors to refine generation (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Zod).
+- Analyze 4xx field errors to refine generation (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Zod, AJV).
 - GraphQL fuzzing: dispatch producer mutations first and reuse captured identifiers across test cases.
 - GraphQL stateful phase: chained operation scenarios.
 - Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
