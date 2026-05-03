@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Literal
 
-from flask import Flask
+from flask import Flask, request
 
 from test.apps.catalog.openapi.stateful import UserStore
 
@@ -294,3 +295,28 @@ class RequireBearerAuth:
         store.config.enforce_auth = True
         spec = app.config["schema"]
         spec["components"]["securitySchemes"] = {"BearerAuth": {"type": "http", "scheme": "bearer"}}
+
+
+@dataclass(slots=True)
+class SlowOperations:
+    """Inject per-operation latency into a stateful_users app.
+
+    Keys of `latencies` are `(HTTP method, Werkzeug URL rule)` pairs, e.g.
+    `("DELETE", "/users/<int:user_id>")`. The matching handler sleeps for
+    the configured number of seconds before its body runs.
+    """
+
+    latencies: dict[tuple[str, str], float]
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        latencies = self.latencies
+
+        @app.before_request
+        def delay_request() -> None:
+            rule = request.url_rule
+            if rule is None:
+                return
+            seconds = latencies.get((request.method, rule.rule))
+            if seconds:
+                time.sleep(seconds)

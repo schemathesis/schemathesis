@@ -137,7 +137,7 @@ def test_feedback_unmasks_planted_bug_via_type_mismatch_ref_bundled(ctx, cli, sn
     assert (
         cli.run(
             api.schema_url,
-            "--max-examples=10",
+            "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
@@ -304,7 +304,7 @@ def test_feedback_unmasks_planted_bug_via_rails_envelope(ctx, cli, envelope, sna
     assert (
         cli.run(
             api.schema_url,
-            "--max-examples=10",
+            "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
@@ -319,7 +319,7 @@ def test_feedback_unmasks_planted_bug_via_laravel_envelope(ctx, cli, snapshot_cl
     assert (
         cli.run(
             api.schema_url,
-            "--max-examples=10",
+            "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
@@ -334,7 +334,7 @@ def test_feedback_unmasks_planted_bug_via_aspnet_envelope(ctx, cli, snapshot_cli
     assert (
         cli.run(
             api.schema_url,
-            "--max-examples=10",
+            "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
@@ -349,7 +349,7 @@ def test_feedback_unmasks_planted_bug_via_zod_envelope(ctx, cli, snapshot_cli):
     assert (
         cli.run(
             api.schema_url,
-            "--max-examples=10",
+            "--max-examples=30",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",

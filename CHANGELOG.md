@@ -22,6 +22,7 @@
 - Apply pool overlay to foreign-key fields nested inside request body objects.
 - Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
 - Drop spec examples invalidated by inferred constraints from the example mixer.
+- Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 
 ### :wrench: Changed
 

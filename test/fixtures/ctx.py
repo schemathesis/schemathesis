@@ -224,6 +224,9 @@ class GraphQLApps:
     def use_after_delete(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.use_after_delete())
 
+    def slow_mutation(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.slow_mutation())
+
     def double_delete(self) -> GraphQLServer:
         return _start(self.parent, graphql_bookstore.double_delete())
 

@@ -9,6 +9,7 @@ from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.error_feedback import ErrorFeedbackStore
 from schemathesis.engine.control import ExecutionControl
+from schemathesis.engine.health import HealthState
 from schemathesis.engine.observations import Observations
 from schemathesis.engine.supervisor import Supervisor
 from schemathesis.generation.case import Case
@@ -36,6 +37,7 @@ class EngineContext:
         "schema",
         "control",
         "outcome_cache",
+        "health",
         "start_time",
         "observations",
         "_thread_local",
@@ -65,6 +67,7 @@ class EngineContext:
             start_time=self.start_time,
         )
         self.outcome_cache = {}
+        self.health = HealthState()
         self.observations = observations
         self._thread_local = threading.local()
         self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
@@ -149,6 +152,13 @@ class EngineContext:
                 cached["proxies"] = {"all": proxy}
             self._transport_kwargs_cache[key] = cached
         kwargs = cached.copy()
+        # Apply the health timeout override only when it strictly tightens the configured timeout.
+        if operation is not None:
+            override = self.health.timeout_override(operation.label)
+            if override is not None:
+                base_timeout = kwargs.get("timeout")
+                if base_timeout is None or override < base_timeout:
+                    kwargs["timeout"] = override
         kwargs["session"] = self.get_session(operation=operation)
         return kwargs
 

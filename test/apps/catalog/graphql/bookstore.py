@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 from typing import Literal, NewType
 
@@ -224,6 +225,33 @@ def _make_use_after_delete() -> strawberry.Schema:
     return strawberry.Schema(Query, Mutation, config=_book_id_config())
 
 
+def _make_slow_mutation() -> strawberry.Schema:
+    books: dict[str, Book] = {}
+
+    @strawberry.type
+    class Query:
+        @strawberry.field
+        def book(self, id: BookID) -> Book | None:
+            return books.get(id)
+
+    @strawberry.type
+    class Mutation:
+        @strawberry.mutation
+        def addBook(self, title: str) -> Book:
+            new_id = BookID(str(uuid.uuid4()))
+            book = Book(id=new_id, title=title)
+            books[new_id] = book
+            return book
+
+        @strawberry.mutation
+        def deleteBook(self, id: BookID) -> bool:
+            time.sleep(2.0)
+            books.pop(id, None)
+            return True
+
+    return strawberry.Schema(Query, Mutation, config=_book_id_config())
+
+
 def _make_double_delete() -> strawberry.Schema:
     books: dict[str, Book] = {}
     deleted: set[str] = set()
@@ -395,6 +423,10 @@ def tombstone_pool(*, endpoint: str = "/graphql") -> GraphQLApp:
 
 def use_after_delete(*, endpoint: str = "/graphql") -> GraphQLApp:
     return _wrap(_make_use_after_delete(), endpoint, "flask")
+
+
+def slow_mutation(*, endpoint: str = "/graphql") -> GraphQLApp:
+    return _wrap(_make_slow_mutation(), endpoint, "flask")
 
 
 def double_delete(*, endpoint: str = "/graphql") -> GraphQLApp:
