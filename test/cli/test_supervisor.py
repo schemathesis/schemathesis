@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from flask import jsonify
 
 import schemathesis
 from schemathesis.core.warnings import SchemathesisWarning
@@ -10,43 +9,9 @@ from schemathesis.engine.run import PhaseName
 from schemathesis.generation import GenerationMode
 
 
-@pytest.fixture
-def unimplemented_method_app(ctx, app_runner):
-    paths = {
-        "/missing": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {"name": {"type": "string"}, "size": {"type": "integer"}},
-                            }
-                        }
-                    },
-                },
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-        "/items": {"get": {"responses": {"200": {"description": "OK"}}}},
-    }
-    app, _ = ctx.openapi.make_flask_app(paths)
-
-    @app.route("/missing", methods=["POST"])
-    def missing_post():
-        return jsonify({"error": "Method Not Allowed"}), 405
-
-    @app.route("/items", methods=["GET"])
-    def items_get():
-        return jsonify({"ok": True}), 200
-
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/openapi.json"
-
-
-def test_persistent_405_skips_op_in_later_phases(unimplemented_method_app):
-    schema = schemathesis.openapi.from_url(unimplemented_method_app)
+def test_persistent_405_skips_op_in_later_phases(ctx):
+    api = ctx.openapi.apps.unimplemented_method()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     schema.config.phases.update(phases=["examples", "coverage", "fuzzing"])
     schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=10)
@@ -82,11 +47,35 @@ def test_persistent_405_skips_op_in_later_phases(unimplemented_method_app):
     assert reason and "405" in reason, f"Expected skip_reason to mention 405, got {reason!r}"
 
 
+def test_baked_cases_short_circuit_after_supervisor_fires(ctx):
+    # After the window fills mid-Coverage, the remaining baked cases for the same
+    # operation must short-circuit before reaching the server — otherwise eager
+    # `@example` baking in Coverage / Examples burns the full mutation set on a
+    # known-dead operation.
+    api = ctx.openapi.apps.unimplemented_method()
+    store = api.wsgi_app.config["store"]
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage", "fuzzing"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=50)
+
+    list(from_schema(schema).execute())
+
+    assert store.hits["missing"] >= 10, f"window should have filled; got {store.hits['missing']} hits"
+    # 50 max_examples × Fuzzing + ~30+ Coverage mutations = >50 without the fix.
+    assert store.hits["missing"] <= 25, (
+        f"Expected server calls bounded after supervisor fires; got {store.hits['missing']} hits "
+        f"(remaining baked cases did not short-circuit)"
+    )
+    assert store.hits["items"] > 0, "GET /items should still be exercised"
+
+
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_method_not_allowed_warning_in_cli_output(cli, unimplemented_method_app, snapshot_cli):
+def test_method_not_allowed_warning_in_cli_output(cli, ctx, snapshot_cli):
+    api = ctx.openapi.apps.unimplemented_method()
     assert (
         cli.run(
-            unimplemented_method_app,
+            api.schema_url,
             "--max-examples=10",
             "--phases=examples,coverage,fuzzing",
             "--mode=positive",
@@ -96,9 +85,10 @@ def test_method_not_allowed_warning_in_cli_output(cli, unimplemented_method_app,
     )
 
 
-def test_method_not_allowed_warning_can_fail_the_run(cli, unimplemented_method_app):
+def test_method_not_allowed_warning_can_fail_the_run(cli, ctx):
+    api = ctx.openapi.apps.unimplemented_method()
     result = cli.run(
-        unimplemented_method_app,
+        api.schema_url,
         "--max-examples=10",
         "--phases=examples,coverage,fuzzing",
         "--mode=positive",
@@ -107,3 +97,33 @@ def test_method_not_allowed_warning_can_fail_the_run(cli, unimplemented_method_a
     )
     assert result.exit_code == 1, result.stdout
     assert "Method Not Allowed" in result.stdout
+
+
+def test_stateful_skips_supervisor_blocked_operations(ctx):
+    # Coverage fills the supervisor window on the 405-only POST. Stateful must honor
+    # the resulting SKIP verdict via the `TransitionController` precondition gate so
+    # the dead operation never gets selected as a state-machine transition.
+    api = ctx.openapi.apps.linked_with_unimplemented_method()
+    store = api.wsgi_app.config["store"]
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.checks.update(included_check_names=["not_a_server_error"])
+    schema.config.phases.update(phases=["coverage", "stateful"])
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE], max_examples=20)
+
+    missing_hits_pre_stateful = 0
+    saw_stateful_finish = False
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.PhaseStarted) and event.phase.name == PhaseName.STATEFUL_TESTING:
+            missing_hits_pre_stateful = store.hits["missing"]
+        if isinstance(event, events.PhaseFinished) and event.phase.name == PhaseName.STATEFUL_TESTING:
+            saw_stateful_finish = True
+
+    assert saw_stateful_finish, "Stateful phase did not run"
+    assert missing_hits_pre_stateful >= 10, (
+        f"window should have filled before Stateful started; got {missing_hits_pre_stateful} pre-Stateful hits"
+    )
+    stateful_missing_hits = store.hits["missing"] - missing_hits_pre_stateful
+    assert stateful_missing_hits == 0, (
+        f"Stateful sent {stateful_missing_hits} requests to POST /missing despite the SKIP verdict"
+    )
+    assert store.hits["items_id"] > 0, "Stateful did not chain GET /items/{itemId} from the link"

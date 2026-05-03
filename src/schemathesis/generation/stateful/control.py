@@ -7,10 +7,12 @@ from typing import TYPE_CHECKING, Protocol
 
 from schemathesis.core import DEFAULT_MAX_SCENARIO_STEPS
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.engine.supervisor import SchedulingDirective
 
 if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
+    from schemathesis.engine.supervisor import Supervisor
     from schemathesis.generation.stateful.state_machine import StepInput
 
 
@@ -67,7 +69,7 @@ def _get_max_operations_per_source(transitions: Transitions) -> int:
 class TransitionController:
     """Controls which transitions can be executed in a state machine."""
 
-    __slots__ = ("transitions", "max_operations_per_source", "statistic")
+    __slots__ = ("transitions", "max_operations_per_source", "statistic", "supervisor")
 
     def __init__(self, transitions: Transitions) -> None:
         # Incoming & outgoing transitions available in the state machine
@@ -75,6 +77,12 @@ class TransitionController:
         self.max_operations_per_source = _get_max_operations_per_source(transitions)
         # source -> derived API calls
         self.statistic: dict[str, dict[str, Counter[str]]] = {}
+        # Optional engine-side supervisor; the engine sets this on the per-scenario
+        # state machine so transitions targeting SKIP-verdict operations are filtered out.
+        self.supervisor: Supervisor | None = None
+
+    def _is_skipped(self, label: str) -> bool:
+        return self.supervisor is not None and self.supervisor.verdict(label).directive is SchedulingDirective.SKIP
 
     def record_step(self, input: StepInput, recorder: ScenarioRecorder) -> None:
         """Record API call input."""
@@ -99,6 +107,8 @@ class TransitionController:
 
     def allow_root_transition(self, source: str, bundles: dict[str, CaseInsensitiveDict]) -> bool:
         """Decide if this root transition should be allowed now."""
+        if self._is_skipped(source):
+            return False
         if len(self.statistic.get(source, {})) < MAX_ROOT_SOURCES:
             return True
 
@@ -117,6 +127,8 @@ class TransitionController:
 
     def allow_transition(self, source: str, target: str) -> bool:
         """Decide if this transition should be allowed now."""
+        if self._is_skipped(target):
+            return False
         existing = self.statistic.get(source, {})
         total = sum(metric.get(target, 0) for metric in existing.values())
         return total < self.max_operations_per_source

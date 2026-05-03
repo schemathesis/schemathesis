@@ -101,7 +101,7 @@ def test_jwt_sub_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cl
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_basic_auth_username_seeds_pool_for_username_path_param(cli, app_runner, snapshot_cli, ctx):
-    # Basic-auth username is the same identifier the SUT trusts; without seeding the runner
+    # Basic-auth username is the same identifier the API trusts; without seeding the runner
     # never generates "alice", so the bug at GET /users/alice stays hidden.
     user_schema = {
         "type": "object",

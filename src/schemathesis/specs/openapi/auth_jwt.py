@@ -39,7 +39,7 @@ _BASIC_AUTH_FIELDS: tuple[str, ...] = ("id", "user_id", "userId", "username")
 def decode_jwt_payload(token: str) -> dict | None:
     """Return the JWT payload dict, or None if the token isn't a parseable JWT.
 
-    No signature verification - the SUT already does that. Failure is silent
+    No signature verification - the server already does that. Failure is silent
     because Bearer tokens are commonly opaque/JWE/non-JWT.
     """
     parts = token.split(".")

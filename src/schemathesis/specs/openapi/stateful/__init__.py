@@ -328,7 +328,7 @@ def into_step_input(
                     # Wildcard expressions yield multiple candidates. Pick via the
                     # `use_true_random` instance so the per-step pick stays out of
                     # Hypothesis's data tree — the producer's response shape can vary
-                    # across runs of the same byte stream when the SUT has mutable
+                    # across runs of the same byte stream when the API has mutable
                     # state, and a tracked draw would be flagged as inconsistent.
                     if isinstance(value, MultiMatch):
                         value = random.choice(value.values)

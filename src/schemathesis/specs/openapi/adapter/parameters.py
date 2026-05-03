@@ -681,7 +681,7 @@ class OpenApiBody(OpenApiComponent):
         # Mix in schema examples for positive mode (20% example, 80% generated)
         # Skip during EXAMPLES phase since examples are handled separately there
         if mix_examples and generation_mode == GenerationMode.POSITIVE:
-            # Filter against the adjustment-applied schema so spec examples that the SUT
+            # Filter against the adjustment-applied schema so spec examples that the API
             # has demonstrated to be invalid (e.g. `"dd-MM-yyyy"` after format inference)
             # don't leak into the mixer.
             validation_schema = self.validation_schema
@@ -1239,7 +1239,7 @@ class OpenApiParameterSet(ParameterSet):
             if mix_examples and not is_negative:
                 validator_cls = operation.schema.adapter.jsonschema_validator_cls
                 # Splice inferred constraints (format / min / max etc.) onto each parameter's
-                # validation schema so examples the SUT has demonstrated to be invalid get evicted.
+                # validation schema so examples the API has demonstrated to be invalid get evicted.
                 adjusted_properties = schema_obj.get("properties") if isinstance(schema_obj, dict) else None
                 parameter_examples: dict[str, list[Any]] = {}
                 for param in self.items:

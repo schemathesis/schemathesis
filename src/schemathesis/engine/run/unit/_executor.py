@@ -47,6 +47,7 @@ from schemathesis.engine.errors import (
 )
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
+from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import metrics, overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
@@ -404,6 +405,16 @@ def cached_test_func(f: Callable) -> Callable:
         try:
             if ctx.has_to_stop:
                 raise KeyboardInterrupt
+            # Short-circuit baked cases for operations the supervisor flagged
+            # mid-scenario. Examples + Coverage materialize their cases as
+            # `@example`-decorators before any response exists, so a verdict that
+            # flips during the scenario would otherwise still let every remaining
+            # baked case hit the server.
+            if (
+                _targets_declared_method(case)
+                and ctx.supervisor.verdict(case.operation.label).directive is SchedulingDirective.SKIP
+            ):
+                return None
             if generation.unique_inputs:
                 cached = ctx.get_cached_outcome(case)
                 if isinstance(cached, BaseException):
