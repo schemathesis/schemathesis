@@ -111,12 +111,12 @@ def test_cli(ctx, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_ma
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-@pytest.mark.operations("failure")
-def test_cli_failure(unique_hook, cli, openapi3_schema_url, hypothesis_max_examples, snapshot_cli):
+def test_cli_failure(ctx, unique_hook, cli, hypothesis_max_examples, snapshot_cli):
+    api = ctx.openapi.apps.failure()
     assert (
         cli.main(
             "run",
-            openapi3_schema_url,
+            api.schema_url,
             "-cunique_test_cases",
             "-cnot_a_server_error",
             f"--max-examples={hypothesis_max_examples or 30}",

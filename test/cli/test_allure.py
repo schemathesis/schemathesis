@@ -34,11 +34,11 @@ def test_allure_report_via_config(cli, schema_url, tmp_path):
     assert any(allure_dir.glob("*-result.json"))
 
 
-@pytest.mark.operations("failure")
-def test_allure_failure_has_reproduce_attachment(cli, schema_url, tmp_path):
+def test_allure_failure_has_reproduce_attachment(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.failure()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-allure-path={allure_dir}",
         "--checks=not_a_server_error",
         exit_code=ExitCode.TESTS_FAILED,

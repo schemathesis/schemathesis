@@ -565,15 +565,15 @@ def test_(case):
     assert "def __flaky" not in stdout
 
 
-@pytest.mark.operations("failure")
 @pytest.mark.parametrize("value", [True, False])
-def test_output_sanitization(testdir, openapi3_schema_url, openapi3_base_url, value):
+def test_output_sanitization(ctx, testdir, value):
+    api = ctx.openapi.apps.failure()
     auth = "secret-auth"
     testdir.make_test(
         f"""
 @pytest.fixture
 def api_schema():
-    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema = schemathesis.openapi.from_url('{api.schema_url}')
     schema.config.output.sanitization.enabled = {value}
     return schema
 
@@ -584,12 +584,11 @@ def test_(case):
     case.call_and_validate(headers={{'Authorization': '{auth}'}})""",
     )
     result = testdir.runpytest()
-    # We should skip checking for a server error
     result.assert_outcomes(passed=1, failed=1)
     if value:
-        expected = rf"curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
+        expected = rf"curl -X GET -H 'Authorization: [Filtered]' {api.base_url}/api/failure"
     else:
-        expected = rf"curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+        expected = rf"curl -X GET -H 'Authorization: {auth}' {api.base_url}/api/failure"
     assert expected in result.stdout.str()
 
 

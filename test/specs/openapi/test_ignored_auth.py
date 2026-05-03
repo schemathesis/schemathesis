@@ -58,11 +58,11 @@ def test_auth_is_not_checked(with_generated, schema_url):
         assert response.json() == {"has_auth": False}
 
 
-@pytest.mark.operations("basic")
-def test_auth_is_checked(schema_url):
+def test_auth_is_checked(ctx):
+    api = ctx.openapi.apps.basic()
     # When auth is present (generated)
     # And endpoint declares auth as a requirement and checks it
-    event = run(schema_url, headers={"Authorization": "Basic dGVzdDp0ZXN0"})
+    event = run(api.schema_url, headers={"Authorization": "Basic dGVzdDp0ZXN0"})
     # Then there is no failure
     assert event.status == Status.SUCCESS
 
@@ -305,11 +305,10 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth, expected):
     assert str(exc.value.exceptions[0]).startswith(expected)
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("basic")
-def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
+def test_explicit_auth_cli(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.basic()
     assert (
-        cli.run(schema_url, "-c", "ignored_auth", "--auth=test:test", "--max-examples=1", "--mode=positive")
+        cli.run(api.schema_url, "-c", "ignored_auth", "--auth=test:test", "--max-examples=1", "--mode=positive")
         == snapshot_cli
     )
 

@@ -302,11 +302,13 @@ def test_unknown_response_code(real_app_schema):
     assert check.failure_info.failure.defined_status_codes == ["200"]
 
 
-@pytest.mark.operations("failure")
-def test_unknown_response_code_with_default(real_app_schema):
+def test_unknown_response_code_with_default(ctx):
+    api = ctx.openapi.apps.failure()
     # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    stream = EventStream(real_app_schema, checks=(status_code_conformance,), max_examples=1).execute()
+    stream = EventStream(
+        schemathesis.openapi.from_url(api.schema_url), checks=(status_code_conformance,), max_examples=1
+    ).execute()
     # Then there should be no failure
     stream.assert_no_failures()
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]

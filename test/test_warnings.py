@@ -1,13 +1,13 @@
 import pytest
 
 
-@pytest.mark.operations("basic")
-def test_warning_on_unauthorized(cli, openapi3_schema_url, snapshot_cli):
+def test_warning_on_unauthorized(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.basic()
     # When endpoint returns only 401
     # Then the output should contain a warning about it
     assert (
         cli.run(
-            openapi3_schema_url,
+            api.schema_url,
             "-c not_a_server_error",
             "--mode=positive",
             "--phases=fuzzing",
