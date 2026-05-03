@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # Spring's stdlib `must not be blank/null/empty`, plus common custom variants
 # (apostrophe-contracted "can't be blank", "must be filled", etc.).
 _NON_BLANK = re.compile(
-    r"\b(?:must not be (?:blank|null|empty)"
+    r"\b(?:(?:must|shall) not be (?:blank|null|empty)"
     r"|can(?:not|'?t) be (?:blank|empty|null)"
     r"|must be filled"
     r"|is required)\b",

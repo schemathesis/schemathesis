@@ -247,6 +247,11 @@ SPRING_PROBLEMDETAIL = (
 SPRING_ERRORS = b'{"errors":[{"field":"email","defaultMessage":"must not be blank"}]}'
 SPRING_FIELDERRORS = b'{"fieldErrors":[{"property":"name","message":"must not be blank","code":"REQUIRED_NOT_BLANK"}]}'
 SPRING_FIELDFIELD_PREFIX = b'{"subErrors":[{"message":"Name field cannot be empty","field":"name"}]}'
+SPRING_FIELDERRORS_SHALL_NOT_BE_EMPTY = (
+    b'{"message":"Argument validation error","description":"uri=/customer/contacts",'
+    b'"entityName":"contactsDTO",'
+    b'"fieldErrors":[{"field":"address","message":"The value shall not be empty"}]}'
+)
 
 
 @pytest.mark.parametrize(
@@ -258,6 +263,7 @@ SPRING_FIELDFIELD_PREFIX = b'{"subErrors":[{"message":"Name field cannot be empt
         (SPRING_ERRORS, [("email",)]),
         (SPRING_FIELDERRORS, [("name",)]),
         (SPRING_FIELDFIELD_PREFIX, [("name",)]),
+        (SPRING_FIELDERRORS_SHALL_NOT_BE_EMPTY, [("address",)]),
     ],
     ids=[
         "messages",
@@ -266,6 +272,7 @@ SPRING_FIELDFIELD_PREFIX = b'{"subErrors":[{"message":"Name field cannot be empt
         "errors",
         "fieldErrors",
         "subErrors-with-fieldname-prefix",
+        "fieldErrors-shall-not-be-empty",
     ],
 )
 def test_spring_parser_extracts_observations(body, expected_paths, make_operation):
