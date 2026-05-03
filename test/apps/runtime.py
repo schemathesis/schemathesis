@@ -38,6 +38,7 @@ class OpenAPIServer:
     base_url: str
     port: int
     spec: Schema
+    wsgi_app: Flask | FastAPI
 
 
 @dataclass(slots=True)

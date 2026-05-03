@@ -26,6 +26,26 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     use_after_free,
 )
+from test.apps.catalog.openapi.modifiers.stateful import (
+    BearerAuth,
+    CircularLinks,
+    CustomHeadersCheck,
+    DuplicateOperationLinks,
+    EnsureResourceAvailability,
+    FailureBehindFailure,
+    IgnoredAuth,
+    IndependentInternalError,
+    ListUsersAsRoot,
+    MultipleConformanceIssues,
+    MultipleIncomingLinksWithSameStatus,
+    MultipleSourceLinks,
+    NoReliableTransitions,
+    ReuseDeletedIds,
+    SingleLink,
+    Slowdown,
+    Unsatisfiable,
+    UseAfterFree,
+)
 from test.utils import flaky
 
 
@@ -64,9 +84,7 @@ def collect_result(events) -> EngineResult:
 @pytest.mark.parametrize("max_failures", [1, 2])
 def test_find_independent_5xx(engine_factory, max_failures):
     # When the app contains multiple endpoints with 5xx responses
-    engine = engine_factory(
-        app_kwargs={"independent_500": True}, checks=[not_a_server_error], max_failures=max_failures
-    )
+    engine = engine_factory(IndependentInternalError(), checks=[not_a_server_error], max_failures=max_failures)
     result = collect_result(engine)
     assert result.events[-1].status == Status.FAILURE, result.errors
     if max_failures == 1:
@@ -78,7 +96,7 @@ def test_find_independent_5xx(engine_factory, max_failures):
 
 
 def test_works_on_single_link(engine_factory):
-    engine = engine_factory(app_kwargs={"single_link": True, "independent_500": True})
+    engine = engine_factory(SingleLink(), IndependentInternalError())
     result = collect_result(engine)
     assert result.events[-1].status == Status.FAILURE, result.errors
 
@@ -122,7 +140,7 @@ def test_explicit_stop(engine_factory, event_cls, stop_event):
 def test_stop_outside_of_state_machine_execution(engine_factory, mocker, stop_event):
     # When stop signal is received outside of state machine execution
     engine = engine_factory(
-        app_kwargs={"independent_500": True},
+        IndependentInternalError(),
     )
     mocker.patch(
         "schemathesis.engine.run.stateful._executor.StatefulContext.mark_as_seen_in_run",
@@ -262,7 +280,7 @@ def test_failure_hidden_behind_another_failure(engine_factory):
             response_schema_conformance(*args, **kwargs)
 
     engine = engine_factory(
-        app_kwargs={"failure_behind_failure": True},
+        FailureBehindFailure(),
         checks=[dynamic_check],
         max_examples=60,
     )
@@ -284,7 +302,7 @@ def test_failure_hidden_behind_another_failure(engine_factory):
 
 
 def test_multiple_conformance_issues(engine_factory):
-    engine = engine_factory(app_kwargs={"multiple_conformance_issues": True})
+    engine = engine_factory(MultipleConformanceIssues())
     result = collect_result(engine)
     assert len(result.failures) == 2
     assert {check.failure_info.failure.title for check in result.failures} == {
@@ -296,7 +314,7 @@ def test_multiple_conformance_issues(engine_factory):
 @flaky(max_runs=10, min_passes=1)
 def test_find_use_after_free(engine_factory):
     engine = engine_factory(
-        app_kwargs={"use_after_free": True},
+        UseAfterFree(),
         checks=[use_after_free],
         max_examples=60,
     )
@@ -314,17 +332,16 @@ _STATE_MACHINE_SETTINGS = hypothesis.settings(
 )
 
 
-def _use_after_free_schema(app_factory, app_runner):
-    app = app_factory(use_after_free=True)
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+def _use_after_free_schema(ctx):
+    api = ctx.openapi.apps.stateful_users(UseAfterFree())
+    schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["use_after_free"])
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     return schema
 
 
-def test_find_use_after_free_via_state_machine(app_factory, app_runner):
-    schema = _use_after_free_schema(app_factory, app_runner)
+def test_find_use_after_free_via_state_machine(ctx):
+    schema = _use_after_free_schema(ctx)
     StateMachine = schema.as_state_machine()
 
     with pytest.raises(FailureGroup) as exc_info:
@@ -332,8 +349,8 @@ def test_find_use_after_free_via_state_machine(app_factory, app_runner):
     assert any("Use after free" in str(e) for e in exc_info.value.exceptions)
 
 
-def test_find_use_after_free_via_state_machine_with_overridden_validate_response(app_factory, app_runner):
-    schema = _use_after_free_schema(app_factory, app_runner)
+def test_find_use_after_free_via_state_machine_with_overridden_validate_response(ctx):
+    schema = _use_after_free_schema(ctx)
 
     class CustomStateMachine(schema.as_state_machine()):
         def validate_response(self, response, case, additional_checks=None, **kwargs):
@@ -354,7 +371,8 @@ def test_no_false_positive_use_after_free_when_id_reused(engine_factory):
     #
     # The resource was re-created with the same id between the DELETE and the GET; this is NOT a use-after-free.
     engine = engine_factory(
-        app_kwargs={"circular_links": True, "reuse_deleted_ids": True},
+        CircularLinks(),
+        ReuseDeletedIds(),
         checks=[use_after_free],
         max_examples=60,
     )
@@ -374,7 +392,8 @@ def test_no_false_positive_ensure_resource_availability_when_id_reused(engine_fa
     #
     # The resource was re-created and then re-deleted; this is NOT a resource-not-available issue.
     engine = engine_factory(
-        app_kwargs={"circular_links": True, "reuse_deleted_ids": True},
+        CircularLinks(),
+        ReuseDeletedIds(),
         checks=[ensure_resource_availability],
         max_examples=60,
     )
@@ -423,7 +442,7 @@ def test_flaky(engine_factory, kwargs):
 
 
 def test_unsatisfiable(engine_factory):
-    engine = engine_factory(app_kwargs={"unsatisfiable": True}, max_examples=1)
+    engine = engine_factory(Unsatisfiable(), max_examples=1)
     result = collect_result(engine)
     assert result.errors
     assert isinstance(result.errors[0].value, hypothesis.errors.InvalidArgument)
@@ -432,7 +451,7 @@ def test_unsatisfiable(engine_factory):
 
 def test_custom_headers(engine_factory):
     headers = {"X-Foo": "Bar"}
-    engine = engine_factory(app_kwargs={"custom_headers": headers}, max_examples=1, headers=headers)
+    engine = engine_factory(CustomHeadersCheck(expected=headers), max_examples=1, headers=headers)
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS
 
@@ -440,7 +459,7 @@ def test_custom_headers(engine_factory):
 def test_multiple_source_links(engine_factory):
     # When there are multiple links coming to the same operation from different operations
     # Then there should be no error during getting the previous step results
-    engine = engine_factory(app_kwargs={"multiple_source_links": True}, max_examples=10)
+    engine = engine_factory(MultipleSourceLinks(), max_examples=10)
     result = collect_result(engine)
     assert not result.errors, result.errors
 
@@ -458,7 +477,7 @@ def test_max_response_time_valid(engine_factory):
 
 def test_max_response_time_invalid(engine_factory):
     engine = engine_factory(
-        app_kwargs={"slowdown": 0.010},
+        Slowdown(seconds=0.010),
         max_steps=2,
         max_examples=1,
         checks=[],
@@ -489,10 +508,9 @@ def test_targeted(engine_factory):
     assert calls > 0
 
 
-def test_external_link(ctx, app_factory, app_runner):
-    remote_app = app_factory(independent_500=True)
-    remote_app_port = app_runner.run_flask_app(remote_app)
-    base_ref = f"http://127.0.0.1:{remote_app_port}/openapi.json#/paths/~1users~1{{userId}}"
+def test_external_link(ctx):
+    remote_api = ctx.openapi.apps.stateful_users(IndependentInternalError())
+    base_ref = f"{remote_api.schema_url}#/paths/~1users~1{{userId}}"
     post_links = {
         "GetUser": {
             "operationRef": f"{base_ref}/get",
@@ -607,10 +625,9 @@ def test_external_link(ctx, app_factory, app_runner):
             }
         },
     )
-    root_app = app_factory(independent_500=True)
-    root_app_port = app_runner.run_flask_app(root_app)
+    root_api = ctx.openapi.apps.stateful_users(IndependentInternalError())
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=f"http://127.0.0.1:{root_app_port}/")
+    schema.config.update(base_url=f"{root_api.base_url}/")
     schema.config.generation.update(max_examples=75, database="none", modes=[GenerationMode.POSITIVE])
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),
@@ -623,7 +640,7 @@ def test_external_link(ctx, app_factory, app_runner):
 def test_new_resource_is_not_available(engine_factory):
     # When a resource is not available after creation
     engine = engine_factory(
-        app_kwargs={"ensure_resource_availability": True},
+        EnsureResourceAvailability(),
         max_examples=50,
     )
     result = collect_result(engine)
@@ -644,7 +661,7 @@ def test_resource_availability(engine_factory):
 
 def test_negative_tests(engine_factory):
     engine = engine_factory(
-        app_kwargs={"independent_500": True},
+        IndependentInternalError(),
         max_examples=50,
         generation_modes=list(GenerationMode),
     )
@@ -825,7 +842,7 @@ def test_explicit_auth_header_does_not_trigger_negative_data_rejection(app_runne
 
 def test_unique_inputs(engine_factory):
     engine = engine_factory(
-        app_kwargs={"independent_500": True},
+        IndependentInternalError(),
         unique_inputs=True,
         max_steps=50,
         max_examples=25,
@@ -842,7 +859,7 @@ def test_ignored_auth_valid(engine_factory):
     # When auth works properly
     token = "Test"
     engine = engine_factory(
-        app_kwargs={"auth_token": token},
+        BearerAuth(token=token),
         checks=[ignored_auth],
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -857,7 +874,7 @@ def test_ignored_auth_invalid(engine_factory):
     # When auth is ignored
     token = "Test"
     engine = engine_factory(
-        app_kwargs={"auth_token": token, "ignored_auth": True},
+        IgnoredAuth(token=token),
         checks=[ignored_auth],
         headers={"Authorization": "Bearer UNKNOWN"},
     )
@@ -867,9 +884,9 @@ def test_ignored_auth_invalid(engine_factory):
     assert result.failures[0].failure_info.failure.title == "API accepts requests without authentication"
 
 
-def test_multiple_incoming_link_without_override(app_factory):
-    app = app_factory(multiple_incoming_links_with_same_status=True)
-    schema = schemathesis.openapi.from_dict(app.config["schema"])
+def test_multiple_incoming_link_without_override(ctx):
+    api = ctx.openapi.apps.stateful_users(MultipleIncomingLinksWithSameStatus())
+    schema = schemathesis.openapi.from_dict(api.spec)
     state_machine = schema.as_state_machine()
     assert (
         sum(len(operation.outgoing) for operation in state_machine._transitions.operations.values())
@@ -878,7 +895,7 @@ def test_multiple_incoming_link_without_override(app_factory):
 
 
 def test_circular_links(engine_factory):
-    engine = engine_factory(app_kwargs={"circular_links": True}, max_examples=5)
+    engine = engine_factory(CircularLinks(), max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
@@ -890,19 +907,19 @@ def test_link_subset(engine_factory):
 
 
 def test_duplicate_operation_links(engine_factory):
-    engine = engine_factory(app_kwargs={"duplicate_operation_links": True}, max_examples=5)
+    engine = engine_factory(DuplicateOperationLinks(), max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_list_users_as_root(engine_factory):
-    engine = engine_factory(app_kwargs={"list_users_as_root": True}, max_examples=5)
+    engine = engine_factory(ListUsersAsRoot(), max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_no_reliable_transitions(engine_factory):
-    engine = engine_factory(app_kwargs={"no_reliable_transitions": True}, max_examples=5)
+    engine = engine_factory(NoReliableTransitions(), max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 

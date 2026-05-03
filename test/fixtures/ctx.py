@@ -14,7 +14,8 @@ from schemathesis.checks import CHECKS
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
 from test.apps.catalog.openapi import basic as openapi_basic
-from test.apps.runtime import OpenAPIApp, OpenAPIServer
+from test.apps.catalog.openapi import stateful as openapi_stateful
+from test.apps.runtime import Modifier, OpenAPIApp, OpenAPIServer
 
 
 @dataclass(slots=True)
@@ -23,6 +24,9 @@ class OpenAPIApps:
 
     def success(self) -> OpenAPIServer:
         return self._start(openapi_basic.success())
+
+    def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
+        return self._start(openapi_stateful.stateful_users(*modifiers))
 
     def _start(self, app: OpenAPIApp) -> OpenAPIServer:
         app_runner = self.parent.request.getfixturevalue("app_runner")
@@ -35,6 +39,7 @@ class OpenAPIApps:
             base_url=f"http://127.0.0.1:{port}",
             port=port,
             spec=app.spec,
+            wsgi_app=app.server,
         )
 
 

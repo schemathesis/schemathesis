@@ -6,6 +6,11 @@ import pytest
 from _pytest.main import ExitCode
 from flask import jsonify, request
 
+from test.apps.catalog.openapi.modifiers.stateful import (
+    InvalidParameter,
+    OmitRequiredField,
+    ReturnPlainText,
+)
 from test.utils import flaky, load_yaml_or_fail
 
 
@@ -232,19 +237,17 @@ def test_not_enough_links(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli
 
 
-def test_invalid_parameter_reference(app_factory, app_runner, cli, snapshot_cli):
+def test_invalid_parameter_reference(ctx, cli, snapshot_cli):
     # When a link references a non-existent parameter
-    app = app_factory(invalid_parameter=True)
-    port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 1") == snapshot_cli
+    api = ctx.openapi.apps.stateful_users(InvalidParameter())
+    assert cli.run(api.schema_url, "--phases=stateful", "-n 1") == snapshot_cli
 
 
-def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
-    app = app_factory(omit_required_field=True)
-    port = app_runner.run_flask_app(app)
+def test_missing_body_parameter(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.stateful_users(OmitRequiredField())
     assert (
         cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+            api.schema_url,
             "--phases=stateful",
             "-n 30",
             "-c not_a_server_error",
@@ -408,12 +411,11 @@ def test_link_requestbody_extraction_fails_when_producer_missing_id(ctx, cli, ap
 
 @flaky(max_runs=3, min_passes=1)
 @pytest.mark.parametrize("content", ["", "User data as plain text"])
-def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
-    app = app_factory(return_plain_text=content)
-    port = app_runner.run_flask_app(app)
+def test_non_json_response(ctx, cli, snapshot_cli, content):
+    api = ctx.openapi.apps.stateful_users(ReturnPlainText(body=content))
     assert (
         cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+            api.schema_url,
             "--phases=stateful",
             "-n 80",
             "--generation-database=none",
