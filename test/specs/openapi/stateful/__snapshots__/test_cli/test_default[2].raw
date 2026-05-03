@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       3 selected / 3 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ✅  Examples (in 0.00s)
 
@@ -43,9 +43,11 @@ ________________________________ Stateful tests ________________________________
 
 [500] Internal Server Error:
 
-    `500 Internal Server Error
-
-    Server got itself in trouble`
+    `<!doctype html>
+    <html lang=en>
+    <title>500 Internal Server Error</title>
+    <h1>Internal Server Error</h1>
+    <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>`
 
 Reproduce with:
 

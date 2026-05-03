@@ -1,0 +1,63 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ 🚫  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 0 selected / 2 total
+
+     No tests were run
+
+==================================== ERRORS ====================================
+________________________________ Stateful tests ________________________________
+Invalid OpenAPI Links Definition
+
+The following API operations contain invalid link definitions:
+
+  POST /users/ -> [201] GetUserByUserId -> getUser
+
+     - Operation 'getUser' not found
+
+  POST /users/ -> [201] UpdateUserById -> updateUser
+
+     - Operation 'updateUser' not found
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Skipped: 1
+
+Test Phases:
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  🚫 Stateful
+
+Errors:
+  🚫 Invalid OpenAPI Links Definition: 1
+
+Test cases:
+  No test cases were generated
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

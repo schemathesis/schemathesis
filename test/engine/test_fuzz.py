@@ -140,16 +140,18 @@ def test_fuzz_preflight_excludes_non_generatable_operation_before_hypothesis(ctx
     assert any(event.status == Status.FAILURE for event in finished)
 
 
-@pytest.mark.operations("success", "failure")
-def test_fuzz_preflight_all_operations_excluded(real_app_schema):
-    @real_app_schema.hook
+def test_fuzz_preflight_all_operations_excluded(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+
+    @schema.hook
     def before_generate_case(context, strategy):
         def reject(case):
             assume(False)
 
         return strategy.map(reject)
 
-    collected = list(from_schema(real_app_schema).fuzz(FuzzConfig()))
+    collected = list(from_schema(schema).fuzz(FuzzConfig()))
 
     assert isinstance(collected[0], events.EngineStarted)
     assert isinstance(collected[-1], events.EngineFinished)
@@ -431,19 +433,21 @@ def test_fuzz_generation_exception_excludes_operation(ctx):
     ]
 
 
-@pytest.mark.operations("success", "failure")
-def test_fuzz_preflight_excludes_hook_broken_operation_but_keeps_survivors(real_app_schema):
-    @real_app_schema.hook
+def test_fuzz_preflight_excludes_hook_broken_operation_but_keeps_survivors(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+
+    @schema.hook
     def before_generate_case(context, strategy):
         def fail_generation(case):
-            if case.operation.label == "GET /failure":
+            if case.operation.label == "GET /api/failure":
                 raise RuntimeError("generation error")
             return case
 
         return strategy.map(fail_generation)
 
     collected: list[events.EngineEvent] = []
-    stream = from_schema(real_app_schema).fuzz(FuzzConfig())
+    stream = from_schema(schema).fuzz(FuzzConfig())
     for event in stream:
         collected.append(event)
         if isinstance(event, events.FuzzScenarioFinished):
@@ -456,7 +460,7 @@ def test_fuzz_preflight_excludes_hook_broken_operation_but_keeps_survivors(real_
         == events.NonFatalError(
             error=RuntimeError("generation error"),
             phase=None,
-            label="GET /failure",
+            label="GET /api/failure",
             related_to_operation=True,
         )
         for event in errors

@@ -1147,11 +1147,11 @@ STATEFUL_KWARGS = {
 }
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("get_user", "create_user", "update_user")
-def test_stateful_auth(real_app_schema):
+def test_stateful_auth(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(
-        real_app_schema,
+        schema,
         phases=[PhaseName.STATEFUL_TESTING],
         auth=("admin", "password"),
         **STATEFUL_KWARGS,
@@ -1162,25 +1162,25 @@ def test_stateful_auth(real_app_schema):
         assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("get_user", "create_user", "update_user")
-def test_stateful_all_generation_modes(real_app_schema):
+def test_stateful_all_generation_modes(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     mode = GenerationMode.NEGATIVE
-    real_app_schema.config.generation.update(modes=[mode])
-    stream = EventStream(real_app_schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
+    schema.config.generation.update(modes=[mode])
+    stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
     cases = list(stream.find(events.ScenarioFinished).recorder.cases.values())
     assert len(cases) > 0
     for case in cases:
         assert case.value.meta.generation.mode == mode
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("get_user", "create_user", "update_user")
-def test_stateful_seed(real_app_schema):
+def test_stateful_seed(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     requests = []
     for _ in range(3):
         stream = EventStream(
-            real_app_schema,
+            schema,
             phases=[PhaseName.STATEFUL_TESTING],
             seed=42,
             modes=[GenerationMode.POSITIVE],
@@ -1196,11 +1196,11 @@ def test_stateful_seed(real_app_schema):
     assert requests[0][0] == requests[1][0] == requests[2][0]
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("get_user", "create_user", "update_user")
-def test_stateful_override(real_app_schema):
+def test_stateful_override(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     stream = EventStream(
-        real_app_schema,
+        schema,
         phases=[PhaseName.STATEFUL_TESTING],
         parameters={"user_id": "42"},
         max_examples=80,
@@ -1210,11 +1210,11 @@ def test_stateful_override(real_app_schema):
     assert len(interactions) > 0
     # Check any request that uses user_id (GET or PATCH)
     user_requests = [
-        i.request for i in interactions if "/api/users/" in i.request.uri and i.request.method in ("GET", "PATCH")
+        i.request for i in interactions if "/users/" in i.request.uri and i.request.method in ("GET", "PATCH")
     ]
     assert len(user_requests) > 0
     for request in user_requests:
-        assert "/api/users/42" in request.uri
+        assert "/users/42" in request.uri
 
 
 def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):

@@ -5,11 +5,11 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1:1/api
      Specification:    Open API 3.0.2
-     Operations:       4 selected / 4 total
+     Operations:       3 selected / 3 total
 
 
  ✅  API capabilities:
@@ -29,16 +29,16 @@ Network Error
 
 Connection failed
 
-    Unable to connect to proxy
+    Failed to establish a new connection: [Error NUM] Connection refused
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 4/4
+  Selected: 3/3
   Tested: 0
-  Skipped: 4
+  Skipped: 3
 
 Test Phases:
   ⏭  Examples (disabled)

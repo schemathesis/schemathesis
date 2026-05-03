@@ -14,15 +14,14 @@ from test.apps.catalog.openapi.modifiers.stateful import (
 from test.utils import flaky, load_yaml_or_fail
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
-def test_default(cli, schema_url, snapshot_cli, workers):
+def test_default(ctx, cli, snapshot_cli, workers):
+    api = ctx.openapi.apps.users_crud()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "-c not_a_server_error",
             f"--workers={workers}",
             "--mode=positive",
@@ -31,14 +30,13 @@ def test_default(cli, schema_url, snapshot_cli, workers):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_sanitization(cli, schema_url, tmp_path):
+def test_sanitization(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.users_crud()
     cassette_path = tmp_path / "output.yaml"
     token = "secret"
     result = cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         "--phases=stateful",
         "-c not_a_server_error",
         f"--header=Authorization: Bearer {token}",
@@ -49,14 +47,13 @@ def test_sanitization(cli, schema_url, tmp_path):
     assert token not in result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("failure", "create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 @flaky(max_runs=5, min_passes=1)
-def test_max_failures(cli, schema_url, snapshot_cli):
+def test_max_failures(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud_with_failure()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--max-examples=80",
             "--max-failures=2",
             "--generation-database=none",
@@ -68,12 +65,11 @@ def test_max_failures(cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_with_cassette(tmp_path, cli, schema_url):
+def test_with_cassette(ctx, tmp_path, cli):
+    api = ctx.openapi.apps.users_crud()
     cassette_path = tmp_path / "output.yaml"
     cli.run(
-        schema_url,
+        api.schema_url,
         "--max-examples=40",
         "--max-failures=1",
         "-c not_a_server_error",
@@ -85,12 +81,11 @@ def test_with_cassette(tmp_path, cli, schema_url):
     assert cassette["seed"] not in (None, "None")
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_with_cassette_stateful_only(tmp_path, cli, schema_url):
+def test_with_cassette_stateful_only(ctx, tmp_path, cli):
+    api = ctx.openapi.apps.users_crud()
     cassette_path = tmp_path / "output.yaml"
     cli.run(
-        schema_url,
+        api.schema_url,
         "--max-examples=5",
         "--max-failures=1",
         "--phases=stateful",
@@ -103,12 +98,11 @@ def test_with_cassette_stateful_only(tmp_path, cli, schema_url):
         assert interaction["phase"]["name"] == "stateful"
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_junit(tmp_path, cli, schema_url):
+def test_junit(ctx, tmp_path, cli):
+    api = ctx.openapi.apps.users_crud()
     junit_path = tmp_path / "junit.xml"
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         "--phases=stateful",
         "--max-examples=80",
         "--max-failures=1",
@@ -130,13 +124,12 @@ def test_junit(tmp_path, cli, schema_url):
     assert structure == expected, xml_content
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_only(cli, schema_url, snapshot_cli):
+def test_stateful_only(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--phases=stateful",
             "-c not_a_server_error",
         )
@@ -144,13 +137,12 @@ def test_stateful_only(cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
-def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
+def test_stateful_only_with_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--url=http://127.0.0.1:1/api",
             "--phases=stateful",
         )
@@ -158,29 +150,27 @@ def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user", "success")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_filtered_out(cli, schema_url, snapshot_cli):
+def test_filtered_out(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud_with_success()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--max-examples=40",
-            "--include-path=/success",
+            "--include-path=/api/success",
             "--max-failures=1",
         )
         == snapshot_cli
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user", "success")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
-def test_proxy_error(cli, schema_url, snapshot_cli):
+def test_proxy_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud_with_success()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--proxy=http://127.0.0.1",
             "--phases=stateful",
         )
@@ -188,16 +178,15 @@ def test_proxy_error(cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("get_user", "create_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_generation_config(cli, mocker, schema_url, snapshot_cli):
+def test_generation_config(ctx, cli, mocker, snapshot_cli):
     from schemathesis.specs.openapi import _hypothesis
 
+    api = ctx.openapi.apps.users_crud()
     mocked = mocker.spy(_hypothesis, "from_schema")
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--phases=stateful",
             "--max-examples=100",
             "--generation-allow-x00=false",
@@ -212,29 +201,26 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
     assert from_schema_kwargs["codec"] == "ascii"
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user", "success")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_keyboard_interrupt(cli, mocker, schema_url, snapshot_cli):
+def test_keyboard_interrupt(ctx, cli, mocker, snapshot_cli):
     def mocked(*args, **kwargs):
         raise KeyboardInterrupt
 
+    api = ctx.openapi.apps.users_crud_with_success()
     mocker.patch("schemathesis.Case.call", wraps=mocked)
-    assert cli.run(schema_url, "--phases=stateful") == snapshot_cli
+    assert cli.run(api.schema_url, "--phases=stateful") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_missing_link(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--phases=stateful") == snapshot_cli
+def test_missing_link(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_create_only()
+    assert cli.run(api.schema_url, "--phases=stateful") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_not_enough_links(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli
+def test_not_enough_links(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.users_crud()
+    assert cli.run(api.schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli
 
 
 def test_invalid_parameter_reference(ctx, cli, snapshot_cli):

@@ -5,9 +5,9 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
      Configuration:    /tmp/config.toml
@@ -15,29 +15,25 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
-
- ⏭   Examples (in 0.00s)
-
-     ⏭  2 skipped
-
- ✅  Coverage (in 0.00s)
-
-     ✅ 1 passed
+     Supports NULL byte in headers:    ✓
 
  ❌  Fuzzing (in 0.00s)
 
-     ❌ 1 failed
+     ✅ 1 passed  ❌ 1 failed
 
 =================================== FAILURES ===================================
-_________________________________ GET /failure _________________________________
+_______________________________ GET /api/failure _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Server error
 
 [500] Internal Server Error:
 
-    `500: Internal Server Error`
+    `<!doctype html>
+    <html lang=en>
+    <title>500 Internal Server Error</title>
+    <h1>Internal Server Error</h1>
+    <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>`
 
 Reproduce with:
 
@@ -50,10 +46,10 @@ API Operations:
   Tested: 2
 
 Test Phases:
-  ⏭  Examples
-  ✅ Coverage
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
   ❌ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Stateful (disabled)
 
 Failures:
   ❌ Server error: 1

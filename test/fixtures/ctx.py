@@ -21,6 +21,7 @@ from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
+from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi import zod as openapi_zod
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
 
@@ -88,6 +89,12 @@ class OpenAPIApps:
     def failure_multiple_failures_unsatisfiable(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.failure_multiple_failures_unsatisfiable())
 
+    def success_and_failure(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_and_failure())
+
+    def success_failure_multiple_failures_custom_format(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_failure_multiple_failures_custom_format())
+
     def path_variable_and_custom_format(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.path_variable_and_custom_format())
 
@@ -106,6 +113,18 @@ class OpenAPIApps:
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
 
+    def users_crud(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_users.crud())
+
+    def users_create_only(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_users.create_user_only())
+
+    def users_crud_with_success(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_users.crud_with_success())
+
+    def users_crud_with_failure(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_users.crud_with_failure())
+
     def aspnet_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.aspnet_planted_bug())
 
@@ -122,6 +141,57 @@ class OpenAPIApps:
 
     def linked_with_unimplemented_method(self) -> OpenAPIServer:
         return _start(self.parent, openapi_supervisor.linked_with_unimplemented_method())
+
+    def planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.planted_bug())
+
+    def nested_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.nested_planted_bug())
+
+    def size_bound_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.size_bound_planted_bug())
+
+    def format_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.format_planted_bug())
+
+    def numeric_bound_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.numeric_bound_planted_bug())
+
+    def pattern_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.pattern_planted_bug())
+
+    def jackson_typed_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.jackson_typed_planted_bug())
+
+    def jackson_typed_planted_bug_ref_bundled(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.jackson_typed_planted_bug_ref_bundled())
+
+    def jackson_overflow_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.jackson_overflow_planted_bug())
+
+    def jackson_enum_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.jackson_enum_planted_bug())
+
+    def missing_query_param_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.missing_query_param_planted_bug())
+
+    def pydantic_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.pydantic_planted_bug())
+
+    def commit_date_with_example(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.commit_date_with_example())
+
+    def commit_date_with_examples(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.commit_date_with_examples())
+
+    def commit_date_with_link(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.commit_date_with_link())
+
+    def token_with_example(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.token_with_example())
+
+    def token_with_examples(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.token_with_examples())
 
 
 @dataclass(slots=True)

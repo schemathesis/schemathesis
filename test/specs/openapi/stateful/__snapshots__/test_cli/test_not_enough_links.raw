@@ -5,44 +5,40 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+     Operations:       1 selected / 3 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  🚫  Stateful (in 0.00s)
 
      Scenarios:    N
-     API Links:    N covered / 0 selected / 2 total
+     API Links:    N covered / 0 selected / 4 total
 
      No tests were run
 
 ==================================== ERRORS ====================================
 ________________________________ Stateful tests ________________________________
-Invalid OpenAPI Links Definition
+Missing Open API links
 
-The following API operations contain invalid link definitions:
+All link definitions required for stateful testing are excluded by filters
 
-  POST /users/ -> [201] GetUserByUserId -> getUser
+Learn how to define links: https://schemathesis.readthedocs.io/en/stable/guides/stateful-testing/
 
-     - Operation 'getUser' not found
-
-  POST /users/ -> [201] UpdateUserById -> updateUser
-
-     - Operation 'updateUser' not found
+Tip: Review your endpoint filters to include linked operations
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
+  Selected: 1/3
   Tested: 0
   Skipped: 1
 
@@ -53,7 +49,7 @@ Test Phases:
   🚫 Stateful
 
 Errors:
-  🚫 Invalid OpenAPI Links Definition: 1
+  🚫 Missing Open API links: 1
 
 Test cases:
   No test cases were generated

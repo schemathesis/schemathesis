@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api/v4
+     Base URL:         http://127.0.0.1/v4
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ✅  Fuzzing (in 0.00s)
 
@@ -24,8 +24,8 @@ Schemathesis dev
 
 Missing test data: 2 operations repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
 
-  - GET /failure
-  - GET /success
+  - GET /api/failure
+  - GET /api/success
 
 💡 Provide realistic parameter values in your config file so tests can access existing resources
 

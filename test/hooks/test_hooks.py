@@ -72,8 +72,9 @@ def test_global_query_hook(ctx):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("create_user")
-def test_case_hook(wsgi_app_schema, ctx):
+def test_case_hook(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
     with ctx.restore_hooks():
         dispatcher = HookDispatcher(scope=HookScope.TEST)
 
@@ -87,7 +88,7 @@ def test_case_hook(wsgi_app_schema, ctx):
             case.body["first_name"] = case.body["last_name"]
             return case
 
-        strategy = wsgi_app_schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
+        strategy = schema["/users/"]["POST"].as_strategy(hooks=dispatcher)
 
         @given(case=strategy)
         @settings(max_examples=10, suppress_health_check=list(HealthCheck), deadline=None)
@@ -526,9 +527,9 @@ def test_(case):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("success", "failure")
-def test_after_validate_hook(openapi3_schema_url, ctx):
-    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_after_validate_hook(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    api_schema = schemathesis.openapi.from_url(api.schema_url)
     results = []
 
     with ctx.restore_hooks():
@@ -537,14 +538,14 @@ def test_after_validate_hook(openapi3_schema_url, ctx):
         def after_validate(context, case, response, check_results):
             results.extend(check_results)
 
-        @given(case=api_schema["/success"]["GET"].as_strategy())
+        @given(case=api_schema["/api/success"]["GET"].as_strategy())
         @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
         def test_success(case):
             case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
 
         test_success()
 
-        @given(case=api_schema["/failure"]["GET"].as_strategy())
+        @given(case=api_schema["/api/failure"]["GET"].as_strategy())
         @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
         def test_failure(case):
             with pytest.raises(FailureGroup):
@@ -659,23 +660,23 @@ def test_after_call_fires_for_schema_level_hook(ctx):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("success", "failure")
-def test_after_validate_fires_for_schema_level_hook(openapi3_schema_url):
-    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_after_validate_fires_for_schema_level_hook(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    api_schema = schemathesis.openapi.from_url(api.schema_url)
     results = []
 
     @api_schema.hooks.hook
     def after_validate(context, case, response, check_results):
         results.extend(check_results)
 
-    @given(case=api_schema["/success"]["GET"].as_strategy())
+    @given(case=api_schema["/api/success"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
     def test_success(case):
         case.call_and_validate(checks=[schemathesis.checks.not_a_server_error])
 
     test_success()
 
-    @given(case=api_schema["/failure"]["GET"].as_strategy())
+    @given(case=api_schema["/api/failure"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
     def test_failure(case):
         with pytest.raises(FailureGroup):

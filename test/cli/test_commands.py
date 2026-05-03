@@ -1284,13 +1284,14 @@ def test_max_response_time_valid(ctx, cli):
     cli.run_and_assert(api.schema_url, "--max-response-time=200")
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("failure", "success")
 @pytest.mark.snapshot(remove_last_line=True)
-def test_exit_first(cli, schema_url, snapshot_cli):
+def test_exit_first(ctx, cli, snapshot_cli):
     # When the `--max-failures=1` CLI option is passed
     # And a failure occurs
-    assert cli.run(schema_url, "--max-failures=1", "--phases=fuzzing", "--checks=not_a_server_error") == snapshot_cli
+    api = ctx.openapi.apps.success_and_failure()
+    assert (
+        cli.run(api.schema_url, "--max-failures=1", "--phases=fuzzing", "--checks=not_a_server_error") == snapshot_cli
+    )
 
 
 def test_long_operation_output(ctx, cli, openapi3_base_url, snapshot_cli):
@@ -2475,11 +2476,10 @@ class OperationOrderTracker(cli.EventHandler):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires a more complex test setup")
-def test_rediscover_the_same_failure_in_different_phases_and_store_junit(ctx, cli, schema_url, tmp_path, snapshot_cli):
+def test_rediscover_the_same_failure_in_different_phases_and_store_junit(ctx, cli, tmp_path, snapshot_cli):
     # See GH-2814
+    api = ctx.openapi.apps.users_crud()
     report_dir = tmp_path / "reports"
     with ctx.check(
         r"""
@@ -2492,7 +2492,7 @@ def always_fails(ctx, response, case):
         assert (
             cli.main(
                 "run",
-                schema_url,
+                api.schema_url,
                 "-c",
                 "always_fails",
                 "--max-examples=1",
