@@ -32,12 +32,17 @@ from schemathesis.openapi.checks import (
     UnsupportedMethodResponse,
     UseAfterFree,
 )
+from schemathesis.specs.openapi._auth_retry import (
+    build_retry_transport_kwargs,
+    get_security_parameters,
+    remove_auth,
+    set_auth_for_case,
+)
 from schemathesis.specs.openapi.utils import expand_status_code, expand_status_codes
 from schemathesis.transport.prepare import prepare_path
 
 if TYPE_CHECKING:
     from schemathesis.engine.recorder import ScenarioRecorder
-    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.parameters import OpenApiParameterSet
     from schemathesis.specs.openapi.schemas import OpenApiSchema
 
@@ -965,12 +970,12 @@ class AuthKind(str, enum.Enum):
 @skips_on_unexpected_http_status
 def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
-    from schemathesis.specs.openapi.adapter.security import has_optional_auth
+    from schemathesis.specs.openapi.adapter.security import has_effective_optional_auth
 
     operation = case.operation
-    if has_optional_auth(operation.schema.raw_schema, operation.definition.raw):
+    if has_effective_optional_auth(operation, operation.schema.raw_schema):
         return True
-    security_parameters = _get_security_parameters(case.operation)
+    security_parameters = get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
     if security_parameters and 200 <= response.status_code < 300:
         auth = _contains_auth(ctx, case, response, security_parameters)
@@ -978,22 +983,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             no_auth_case = remove_auth(case, security_parameters)
-            kwargs = (ctx._transport_kwargs or {}).copy()
-            for location, container_name in (
-                ("header", "headers"),
-                ("cookie", "cookies"),
-                ("query", "query"),
-                # `params` is the requests-style kwarg for query parameters passed directly via call_and_validate
-                ("query", "params"),
-            ):
-                if container_name in kwargs:
-                    container = kwargs[container_name]
-                    if isinstance(container, dict):
-                        container = container.copy()
-                        _remove_auth_from_container(container, security_parameters, location=location)
-                        kwargs[container_name] = container
-            kwargs.pop("session", None)
-            kwargs.pop("auth", None)
+            kwargs = build_retry_transport_kwargs(ctx._transport_kwargs, security_parameters)
             if case.operation.app is not None:
                 kwargs.setdefault("app", case.operation.app)
             ctx._record_case(parent_id=case.id, case=no_auth_case)
@@ -1004,7 +994,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 invalid_auth_case = remove_auth(case, security_parameters)
-                _set_auth_for_case(invalid_auth_case, parameter)
+                set_auth_for_case(invalid_auth_case, parameter)
                 ctx._record_case(parent_id=case.id, case=invalid_auth_case)
                 invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
                 ctx._record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
@@ -1043,17 +1033,6 @@ def _raise_no_auth_error(response: Response, case: Case, auth: AuthScenario) -> 
         title=title,
         case_id=case.id,
     )
-
-
-def _get_security_parameters(operation: APIOperation) -> list[Mapping[str, Any]]:
-    """Extract security definitions that are active for the given operation and convert them into parameters."""
-    from schemathesis.specs.openapi.adapter.security import ORIGINAL_SECURITY_TYPE_KEY
-
-    return [
-        param
-        for param in operation.security.iter_parameters()
-        if param[ORIGINAL_SECURITY_TYPE_KEY] in ["apiKey", "basic", "http"]
-    ]
 
 
 def _contains_auth(
@@ -1123,60 +1102,6 @@ def _contains_auth(
             return AuthKind.GENERATED
 
     return None
-
-
-def remove_auth(case: Case, security_parameters: list[Mapping[str, Any]]) -> Case:
-    """Remove security parameters from a generated case.
-
-    It mutates `case` in place.
-    """
-    headers = case.headers.copy()
-    query = case.query.copy()
-    cookies = case.cookies.copy()
-    for parameter in security_parameters:
-        name = parameter["name"]
-        if parameter["in"] == "header" and headers:
-            headers.pop(name, None)
-        if parameter["in"] == "query" and query:
-            query.pop(name, None)
-        if parameter["in"] == "cookie" and cookies:
-            cookies.pop(name, None)
-    return Case(
-        operation=case.operation,
-        method=case.method,
-        path=case.path,
-        path_parameters=case.path_parameters.copy(),
-        headers=headers,
-        cookies=cookies,
-        query=query,
-        body=case.body.copy() if isinstance(case.body, (list | dict)) else case.body,
-        media_type=case.media_type,
-        multipart_content_types=case.multipart_content_types,
-        meta=case.meta,
-    )
-
-
-def _remove_auth_from_container(container: dict, security_parameters: list[Mapping[str, Any]], location: str) -> None:
-    for parameter in security_parameters:
-        name = parameter["name"]
-        if parameter["in"] == location:
-            container.pop(name, None)
-
-
-def _set_auth_for_case(case: Case, parameter: Mapping[str, Any]) -> None:
-    name = parameter["name"]
-    for location, attr_name in (
-        ("header", "headers"),
-        ("query", "query"),
-        ("cookie", "cookies"),
-    ):
-        if parameter["in"] == location:
-            container = getattr(case, attr_name, {})
-            # Could happen in the negative testing mode
-            if not isinstance(container, dict):
-                container = {}
-            container[name] = "SCHEMATHESIS-INVALID-VALUE"
-            setattr(case, attr_name, container)
 
 
 @dataclass

@@ -269,7 +269,7 @@ def test_passing_transport_kwargs(app_schema, openapi3_base_url, mocker):
     schema.config.update(base_url=openapi3_base_url)
 
     mocker.patch(
-        "schemathesis.specs.openapi.checks._get_security_parameters",
+        "schemathesis.specs.openapi.checks.get_security_parameters",
         return_value=[{"name": "token", "required": True, "in": "query"}],
     )
     mocked = mocker.patch("schemathesis.specs.openapi.checks._contains_auth")

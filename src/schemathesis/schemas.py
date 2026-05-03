@@ -83,6 +83,10 @@ class BaseSchema(Mapping):
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
         # Path-level dedup of undeclared-method coverage probes; cleared per coverage phase.
         self.coverage_unexpected_methods_seen: set[tuple[str, str]] = set()
+        # Runtime auth-inference overlays keyed by operation label. Populated when the server enforces
+        # auth on an operation the spec declares public; subsequent generations consult it instead of
+        # mutating the parsed spec. Empty for schemas whose adapter doesn't run inference.
+        self._inferred_security: dict[str, list[Mapping[str, list[str]]]] = {}
 
     @property
     def specification(self) -> SpecificationMetadata:

@@ -22,6 +22,7 @@ class ObservationKind(str, Enum):
     PATTERN = "pattern"
     TYPE_MISMATCH = "type_mismatch"
     ENUM = "enum"
+    REQUIRES_AUTHENTICATION = "requires_authentication"
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,8 +100,27 @@ class EnumPayload:
     values: tuple[str, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class RequiresAuthPayload:
+    """Operation-level signal: the named scheme is required to reach the operation.
+
+    Recorded after an auth-failure response is followed by a confirmation retry that
+    attached the scheme's configured credentials and succeeded. Consumers attach the
+    scheme to the operation's effective security requirements.
+    """
+
+    scheme_name: str
+
+
 ObservationPayload = (
-    SizeBoundPayload | FormatPayload | NumericBoundPayload | PatternPayload | TypeMismatchPayload | EnumPayload | None
+    SizeBoundPayload
+    | FormatPayload
+    | NumericBoundPayload
+    | PatternPayload
+    | TypeMismatchPayload
+    | EnumPayload
+    | RequiresAuthPayload
+    | None
 )
 
 

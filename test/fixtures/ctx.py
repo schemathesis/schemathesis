@@ -19,13 +19,18 @@ from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
+from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
 
 
 @overload
 def _start(parent: Context, app: OpenAPIApp) -> OpenAPIServer: ...
+
+
 @overload
 def _start(parent: Context, app: GraphQLApp) -> GraphQLServer: ...
+
+
 def _start(parent: Context, app: OpenAPIApp | GraphQLApp) -> OpenAPIServer | GraphQLServer:
     app_runner = parent.request.getfixturevalue("app_runner")
     runner = app_runner.run_flask_app if app.kind == "flask" else app_runner.run_asgi_app
@@ -59,6 +64,11 @@ class OpenAPIApps:
 
     def aspnet_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.aspnet_planted_bug())
+
+    def under_declared_security(
+        self, *modifiers: Modifier[openapi_under_declared_security.UnderDeclaredSecurityStore]
+    ) -> OpenAPIServer:
+        return _start(self.parent, openapi_under_declared_security.under_declared_security(*modifiers))
 
 
 @dataclass(slots=True)

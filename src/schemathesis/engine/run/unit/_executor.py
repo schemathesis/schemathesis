@@ -63,6 +63,7 @@ from schemathesis.generation.hypothesis.reporting import (
     build_unsatisfiable_error,
     ignore_hypothesis_output,
 )
+from schemathesis.specs.openapi.auth_inference import record_auth_inference
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -494,6 +495,14 @@ def test_func(
             operation=case.operation,
             case=case,
             response=response,
+        )
+        record_auth_inference(
+            store=ctx.error_feedback,
+            recorder=recorder,
+            operation=case.operation,
+            case=case,
+            response=response,
+            transport_kwargs=transport_kwargs,
         )
     if _targets_declared_method(case):
         is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None
