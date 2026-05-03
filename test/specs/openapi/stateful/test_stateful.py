@@ -8,6 +8,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, StepOutput
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
+from test.apps.catalog.openapi.modifiers.stateful import NoMergeBody
 
 
 @pytest.mark.parametrize(
@@ -236,9 +237,10 @@ def test_settings_error(app_schema):
 
 
 @pytest.mark.parametrize("merge_body", [True, False])
-def test_dynamic_body(merge_body, app_factory):
-    app = app_factory(merge_body=merge_body)
-    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
+def test_dynamic_body(merge_body, ctx):
+    modifiers = () if merge_body else (NoMergeBody(),)
+    api = ctx.openapi.apps.stateful_users(*modifiers)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=api.wsgi_app)
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     state_machine = schema.as_state_machine()
 
@@ -253,9 +255,9 @@ def test_dynamic_body(merge_body, app_factory):
     )
 
 
-def test_custom_config_in_test_case(app_factory):
-    app = app_factory()
-    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
+def test_custom_config_in_test_case(ctx):
+    api = ctx.openapi.apps.stateful_users()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=api.wsgi_app)
     settings = schema.as_state_machine().TestCase.settings
     for key, value in DEFAULT_STATE_MACHINE_SETTINGS.__dict__.items():
         assert getattr(settings, key) == value
