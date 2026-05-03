@@ -8,32 +8,48 @@ from typing import Any
 
 import pytest
 import yaml
-from flask import Flask, jsonify
+from flask import Flask
 
 from schemathesis.checks import CHECKS
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
+from test.apps import builders
+from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.runtime import OpenAPIApp, OpenAPIServer
+
+
+@dataclass(slots=True)
+class OpenAPIApps:
+    parent: Context
+
+    def success(self) -> OpenAPIServer:
+        return self._start(openapi_basic.success())
+
+    def _start(self, app: OpenAPIApp) -> OpenAPIServer:
+        app_runner = self.parent.request.getfixturevalue("app_runner")
+        if app.kind == "flask":
+            port = app_runner.run_flask_app(app.server)
+        else:
+            port = app_runner.run_asgi_app(app.server)
+        return OpenAPIServer(
+            schema_url=f"http://127.0.0.1:{port}/openapi.json",
+            base_url=f"http://127.0.0.1:{port}",
+            port=port,
+            spec=app.spec,
+        )
 
 
 @dataclass
 class OpenApiContext:
     parent: Context
 
+    @property
+    def apps(self) -> OpenAPIApps:
+        return OpenAPIApps(parent=self.parent)
+
     def build_schema(
         self, paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: dict[str, Any]
     ) -> dict[str, Any]:
-        """Create a new schema as a dict."""
-        template: dict[str, Any] = {
-            "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-            "paths": paths,
-        }
-        if version.startswith("3"):
-            template["openapi"] = version
-        elif version.startswith("2"):
-            template["swagger"] = version
-            template["basePath"] = "/api"
-        else:
-            raise ValueError("Unknown version")
-        return {**template, **kwargs}
+        return builders.build_schema(paths, version=version, **kwargs)
 
     def write_schema(
         self,
@@ -50,19 +66,10 @@ class OpenApiContext:
     def make_flask_app(
         self, paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: dict[str, Any]
     ) -> tuple[Flask, dict[str, Any]]:
-        """Create a Flask app with /openapi.json pre-registered. Returns (app, schema)."""
-        schema = self.build_schema(paths, version=version, **kwargs)
-        return self.make_flask_app_from_schema(schema), schema
+        return builders.make_flask_app(paths, version=version, **kwargs)
 
     def make_flask_app_from_schema(self, schema: dict[str, Any]) -> Flask:
-        """Create a Flask app with /openapi.json pre-registered from an already-built schema dict."""
-        app = Flask(__name__)
-
-        @app.route("/openapi.json")
-        def openapi_spec() -> Any:
-            return jsonify(schema)
-
-        return app
+        return builders.make_flask_app_from_schema(schema)
 
 
 @dataclass
