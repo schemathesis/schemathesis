@@ -98,11 +98,10 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
 
 
 @pytest.mark.parametrize("format", ["vcr", "har", "ndjson"])
-@pytest.mark.operations("slow")
-@pytest.mark.openapi_version("3.0")
-def test_store_timeout(cli, schema_url, cassette_path, format):
+def test_store_timeout(ctx, cli, cassette_path, format):
+    api = ctx.openapi.apps.slow()
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-{format}-path={cassette_path}",
         "--max-examples=1",
         "--request-timeout=0.001",
@@ -129,12 +128,12 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
         assert events[0]["Initialize"]["seed"] == 1
 
 
-@pytest.mark.operations("flaky")
-def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
+def test_interaction_status(ctx, cli, hypothesis_max_examples, cassette_path):
     # See GH-695
     # When an API operation has responses with SUCCESS and FAILURE statuses
+    api = ctx.openapi.apps.flaky()
     cli.run_and_assert(
-        openapi3_schema_url,
+        api.schema_url,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 5}",
         "--seed=1",
@@ -145,7 +144,7 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     # Then their statuses should be reflected in the "status" field
     # And it should not be overridden by the overall test status
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
-    assert load_response_body(cassette, 0) == "500: Internal Server Error"
+    assert "500 Internal Server Error" in load_response_body(cassette, 0)
 
 
 def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):

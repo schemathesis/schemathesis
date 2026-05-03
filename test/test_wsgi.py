@@ -51,9 +51,10 @@ def test_cookies(flask_app):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("multipart")
-def test_form_data(schema):
-    strategy = schema["/multipart"]["POST"].as_strategy()
+def test_form_data(ctx):
+    api = ctx.openapi.apps.multipart()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    strategy = schema["/api/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)

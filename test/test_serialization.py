@@ -50,23 +50,15 @@ def csv_serializer():
         transport.unregister_serializer("text/csv", "text/tsv")
 
 
-@pytest.fixture(params=["aiohttp", "flask"])
-def api_schema(request, openapi_version):
-    if request.param == "aiohttp":
-        schema_url = request.getfixturevalue("schema_url")
-        return schemathesis.openapi.from_url(schema_url)
-    app = request.getfixturevalue("flask_app")
-    return schemathesis.openapi.from_wsgi("/schema.yaml", app=app)
-
-
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("csv_payload")
 @pytest.mark.usefixtures("csv_serializer")
-def test_text_csv(api_schema):
+def test_text_csv(ctx):
+    api = ctx.openapi.apps.csv_payload()
     # When API expects `text/csv`
     # And the user registers a custom serializer for it
+    schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=api_schema["/csv"]["POST"].as_strategy())
+    @given(case=schema["/api/csv"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)
     def test(case):
         # Then this serializer should be used
@@ -78,23 +70,21 @@ def test_text_csv(api_schema):
 
 
 @pytest.fixture
-def tsv_schema(schema_url):
-    schema = schemathesis.openapi.from_url(schema_url)
-    definition = schema.raw_schema["paths"]["/csv"]["post"]
-    if "consumes" in definition:
-        definition["consumes"] = ["text/tsv"]
-    else:
-        definition["requestBody"]["content"]["text/tsv"] = definition["requestBody"]["content"].pop("text/csv")
-    return schema
+def tsv_setup(ctx):
+    api = ctx.openapi.apps.csv_payload()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    definition = schema.raw_schema["paths"]["/api/csv"]["post"]
+    definition["requestBody"]["content"]["text/tsv"] = definition["requestBody"]["content"].pop("text/csv")
+    return api, schema
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("csv_payload")
-def test_no_serialization_possible(tsv_schema):
+def test_no_serialization_possible(tsv_setup):
+    _, tsv_schema = tsv_setup
     # When API expects `text/tsv`
     # And there is no registered serializer for this media type
 
-    @given(case=tsv_schema["/csv"]["POST"].as_strategy())
+    @given(case=tsv_schema["/api/csv"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
         pass
@@ -107,11 +97,10 @@ def test_no_serialization_possible(tsv_schema):
         test()
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("csv_payload")
-def test_in_cli(ctx, cli, tsv_schema, snapshot_cli, openapi3_base_url):
+def test_in_cli(ctx, cli, tsv_setup, snapshot_cli):
+    api, tsv_schema = tsv_setup
     schema_path = ctx.openapi.write_schema(tsv_schema.raw_schema["paths"])
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={api.base_url}") == snapshot_cli
 
 
 @pytest.mark.parametrize("transport", [RequestsTransport, WSGITransport])

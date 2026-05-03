@@ -517,63 +517,33 @@ def test_nullable_body_behind_a_reference(ctx):
     }
 
 
-@pytest.fixture(params=["aiohttp", "flask"])
-def api_schema(ctx, request, openapi_version):
-    if openapi_version.is_openapi_2:
-        schema = ctx.openapi.build_schema(
-            {
-                "/payload": {
-                    "post": {
-                        "parameters": [
-                            {
-                                "in": "body",
-                                "required": True,
-                                "name": "payload",
-                                "schema": {"type": "boolean", "x-nullable": True},
-                            }
-                        ],
-                        "responses": {"200": {"description": "OK"}},
-                    }
-                }
-            },
-            version="2.0",
-        )
-    else:
-        schema = ctx.openapi.build_schema(
-            {
-                "/payload": {
-                    "post": {
-                        "requestBody": {
-                            "required": True,
-                            "content": {"application/json": {"schema": {"type": "boolean", "nullable": True}}},
-                        },
-                        "responses": {"200": {"description": "OK"}},
-                    }
+@pytest.mark.hypothesis_nested
+def test_null_body(ctx):
+    api = ctx.openapi.apps.payload()
+    # When API operation expects `null` as payload
+    schema_dict = ctx.openapi.build_schema(
+        {
+            "/api/payload": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"type": "boolean", "nullable": True}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 }
             }
-        )
-    schema = schemathesis.openapi.from_dict(schema)
-    if request.param == "aiohttp":
-        base_url = request.getfixturevalue("base_url")
-        schema.config.update(base_url=base_url)
-        return schema
-    schema.app = request.getfixturevalue("flask_app")
-    schema.config.update(base_url="http://127.0.0.1/api")
-    return schema
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema_dict)
+    schema.config.update(base_url=api.base_url)
 
-
-@pytest.mark.hypothesis_nested
-@pytest.mark.operations("payload")
-def test_null_body(api_schema):
-    # When API operation expects `null` as payload
-
-    @given(case=api_schema["/payload"]["POST"].as_strategy())
+    @given(case=schema["/api/payload"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)
     def test(case):
         assume(case.body is None)
         # Then it should be possible to send `null`
         response = case.call_and_validate()
-        # And the application should return what was sent (`/payload` behaves this way)
+        # And the application should return what was sent (`/api/payload` behaves this way)
         assert response.content.strip() == b"null"
 
     test()
@@ -636,12 +606,12 @@ def test_missing_content_and_schema(ctx, location):
         test()
 
 
-@pytest.mark.operations("headers")
-def test_ascii_codec_for_headers(openapi3_schema_url):
-    schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_ascii_codec_for_headers(ctx):
+    api = ctx.openapi.apps.headers()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.generation.codec = "ascii"
 
-    @given(case=schema["/headers"]["GET"].as_strategy())
+    @given(case=schema["/api/headers"]["GET"].as_strategy())
     @settings(max_examples=50)
     def test(case):
         assert case.headers["X-Token"].isascii()
@@ -649,13 +619,13 @@ def test_ascii_codec_for_headers(openapi3_schema_url):
     test()
 
 
-@pytest.mark.operations("headers")
-def test_exclude_chars_and_no_x00_for_headers(openapi3_schema_url):
-    schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_exclude_chars_and_no_x00_for_headers(ctx):
+    api = ctx.openapi.apps.headers()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.generation.exclude_header_characters = "abc"
     schema.config.generation.allow_x00 = False
 
-    @given(case=schema["/headers"]["GET"].as_strategy())
+    @given(case=schema["/api/headers"]["GET"].as_strategy())
     @settings(max_examples=50)
     def test(case):
         assert "\x00" not in case.headers["X-Token"]

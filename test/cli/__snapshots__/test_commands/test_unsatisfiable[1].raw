@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
-     Specification:    Open API 2.0
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
@@ -29,7 +29,7 @@ Schemathesis dev
      🚫 1 error
 
 ==================================== ERRORS ====================================
-_____________________________ POST /unsatisfiable ______________________________
+___________________________ POST /api/unsatisfiable ____________________________
 Schema Error
 
 Cannot generate test data for request body (application/json)

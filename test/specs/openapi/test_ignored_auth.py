@@ -34,14 +34,14 @@ def run(schema_url, **config):
 
 
 @pytest.mark.parametrize("with_generated", [True, False])
-@pytest.mark.operations("ignored_auth")
-def test_auth_is_not_checked(with_generated, schema_url):
+def test_auth_is_not_checked(ctx, with_generated):
+    api = ctx.openapi.apps.ignored_auth()
     kwargs = {}
     if not with_generated:
         kwargs["with_security_parameters"] = False
     # When auth is present
     # And endpoint declares auth as a requirement but doesn't actually require it
-    event = run(schema_url, **kwargs)
+    event = run(api.schema_url, **kwargs)
     # Then it is a failure
     recorder = event.recorder
     case = list(recorder.cases.values())[-1].value
@@ -75,14 +75,13 @@ def test_no_failure(ctx):
     assert event.status == Status.SUCCESS
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("ignored_auth")
-def test_keep_tls_verification(schema_url, mocker):
+def test_keep_tls_verification(ctx, mocker):
     # See GH-2613
     # `verify` and other options should not be ignored in `ignored_auth`
+    api = ctx.openapi.apps.ignored_auth()
     send = mocker.spy(RequestsTransport, "send")
     run(
-        schema_url,
+        api.schema_url,
         request_timeout=5,
         tls_verify=False,
         headers={"Authorization": "Basic dGVzdDp0ZXN0"},
@@ -92,9 +91,9 @@ def test_keep_tls_verification(schema_url, mocker):
         assert not call.kwargs["verify"]
     send.reset_mock()
 
-    schema = schemathesis.openapi.from_url(schema_url)
+    schema = schemathesis.openapi.from_url(api.schema_url)
 
-    operation = schema["/ignored_auth"]["get"]
+    operation = schema["/api/ignored_auth"]["get"]
 
     @given(operation.as_strategy())
     def test(case):
@@ -110,16 +109,15 @@ def test_keep_tls_verification(schema_url, mocker):
         assert not call.kwargs["verify"]
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("ignored_auth")
-def test_file_loaded_schema_requires_explicit_base_url(openapi3_schema, openapi3_base_url, tmp_path):
+def test_file_loaded_schema_requires_explicit_base_url(ctx, tmp_path):
     # See GH-3318
+    api = ctx.openapi.apps.ignored_auth()
     schema_path = tmp_path / "schema.json"
-    schema_path.write_text(json.dumps(openapi3_schema.raw_schema))
+    schema_path.write_text(json.dumps(api.spec))
     schema = schemathesis.openapi.from_path(schema_path)
-    case = schema["/ignored_auth"]["get"].Case(headers={"Authorization": "Basic dGVzdDp0ZXN0"})
+    case = schema["/api/ignored_auth"]["get"].Case(headers={"Authorization": "Basic dGVzdDp0ZXN0"})
     with pytest.raises(FailureGroup) as exc_info:
-        case.call_and_validate(base_url=openapi3_base_url, checks=[ignored_auth])
+        case.call_and_validate(base_url=api.base_url, checks=[ignored_auth])
     assert any(isinstance(failure, IgnoredAuth) for failure in exc_info.value.exceptions)
 
 

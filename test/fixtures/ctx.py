@@ -42,6 +42,48 @@ class OpenAPIApps:
     def failure(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.failure())
 
+    def multiple_failures(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.multiple_failures())
+
+    def custom_format(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.custom_format())
+
+    def flaky(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.flaky())
+
+    def multipart(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.multipart())
+
+    def csv_payload(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.csv_payload())
+
+    def ignored_auth(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.ignored_auth())
+
+    def slow(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.slow())
+
+    def success_and_slow(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_and_slow())
+
+    def headers(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.headers())
+
+    def path_variable(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.path_variable())
+
+    def payload(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.payload())
+
+    def unsatisfiable(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.unsatisfiable())
+
+    def failure_multiple_failures_unsatisfiable(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.failure_multiple_failures_unsatisfiable())
+
+    def path_variable_and_custom_format(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.path_variable_and_custom_format())
+
     def basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.basic())
 

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, Literal, Protocol, TypeVar
+
+from flask import Flask
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
-    from flask import Flask
 
 Schema = dict[str, Any]
 
@@ -18,12 +20,25 @@ class AppRunner(Protocol):
 
 
 @dataclass(slots=True)
+class CapturedRequest:
+    method: str
+    path: str
+    query: dict[str, str]
+    headers: dict[str, str]
+    body: bytes
+
+    def json(self) -> Any:
+        return json.loads(self.body)
+
+
+@dataclass(slots=True)
 class OpenAPIServer:
     schema_url: str
     base_url: str
     port: int
     spec: Schema
     wsgi_app: Flask | FastAPI
+    requests: list[CapturedRequest] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -42,12 +57,16 @@ class OpenAPIApp:
 
     def make_server(self, port: int) -> OpenAPIServer:
         base_url = f"http://127.0.0.1:{port}"
+        captured: list[CapturedRequest] = []
+        if isinstance(self.server, Flask):
+            captured = self.server.config.setdefault("captured_requests", captured)
         return OpenAPIServer(
             schema_url=f"{base_url}/openapi.json",
             base_url=base_url,
             port=port,
             spec=self.spec,
             wsgi_app=self.server,
+            requests=captured,
         )
 
 

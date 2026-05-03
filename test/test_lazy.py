@@ -511,14 +511,14 @@ def test_(case):
     assert "def run_subtest" not in stdout
 
 
-@pytest.mark.operations("multiple_failures")
-def test_multiple_failures(testdir, openapi3_schema_url):
+def test_multiple_failures(ctx, testdir):
+    api = ctx.openapi.apps.multiple_failures()
     # When multiple failures are discovered within the same test
     testdir.make_test(
         f"""
 @pytest.fixture
 def api_schema():
-    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema = schemathesis.openapi.from_url('{api.schema_url}')
     schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     return schema
 
@@ -539,14 +539,14 @@ def test_(case):
     assert "def run_subtest" not in stdout
 
 
-@pytest.mark.operations("flaky")
-def test_flaky(testdir, openapi3_schema_url):
+def test_flaky(ctx, testdir):
+    api = ctx.openapi.apps.flaky()
     # When failure is flaky
     testdir.make_test(
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.openapi.from_url('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{api.schema_url}')
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
@@ -615,13 +615,13 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.operations("path_variable", "custom_format")
-def test_override(testdir, openapi3_schema_url):
+def test_override(ctx, testdir):
+    api = ctx.openapi.apps.path_variable_and_custom_format()
     testdir.make_test(
         f"""
 @pytest.fixture
 def api_schema():
-    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema = schemathesis.openapi.from_url('{api.schema_url}')
     schema.config.update(parameters={{"key": "foo", "id": "bar"}})
     return schema
 

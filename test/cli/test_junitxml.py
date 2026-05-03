@@ -169,12 +169,11 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
     )
 
 
-@pytest.mark.operations("slow")
-@pytest.mark.openapi_version("3.0")
-def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
+def test_timeout(ctx, cli, tmp_path, hypothesis_max_examples):
+    api = ctx.openapi.apps.slow()
     xml_path = tmp_path / "junit.xml"
     cli.run(
-        schema_url,
+        api.schema_url,
         f"--report-junit-path={xml_path}",
         f"--max-examples={hypothesis_max_examples or 1}",
         "--seed=1",
@@ -185,7 +184,7 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     testsuite = tree.getroot()[0]
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
-    assert testcases[0].attrib["name"] == "GET /slow"
+    assert testcases[0].attrib["name"] == "GET /api/slow"
     assert testcases[0][0].tag == "error"
     assert testcases[0][0].attrib["type"] == "error"
     assert "Read timed out after 0.01 seconds" in testcases[0][0].text

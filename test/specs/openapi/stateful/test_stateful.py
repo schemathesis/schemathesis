@@ -196,17 +196,16 @@ TestStateful.settings = settings(
     result.stdout.re_match_lines([r".+ValueError: ERROR FOUND!"])
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("multiple_failures")
-def test_trimmed_output(testdir, app_schema, base_url):
+def test_trimmed_output(ctx, testdir):
+    api = ctx.openapi.apps.multiple_failures()
     # When an issue is found
     testdir.make_test(
         f"""
-schema.config.update(base_url="{base_url}")
+schema.config.update(base_url="{api.base_url}")
 
 TestStateful = schema.as_state_machine().TestCase
 """,
-        schema=app_schema,
+        schema=api.spec,
     )
     result = testdir.runpytest("--tb=short")
     result.assert_outcomes(failed=1)
