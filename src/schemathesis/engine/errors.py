@@ -81,6 +81,9 @@ class EngineErrorInfo:
         if isinstance(self._error, InvalidTransition):
             return "Invalid Link Definition"
 
+        if isinstance(self._error, UnhealthyAPIError):
+            return "Unhealthy API"
+
         if isinstance(self._error, requests.RequestException):
             return "Network Error"
 
@@ -449,18 +452,27 @@ def is_unrecoverable_network_error(exc: Exception) -> bool:
     return has_connection_reset(exc)
 
 
+class UnhealthyAPIError(Exception):
+    """The API is unhealthy enough that the stateful phase cannot continue."""
+
+
 @dataclass
 class UnrecoverableNetworkError:
     error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout
     code_sample: str
+    reason: str | None
 
-    __slots__ = ("error", "code_sample")
+    __slots__ = ("error", "code_sample", "reason")
 
     def __init__(
-        self, error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout, code_sample: str
+        self,
+        error: requests.ConnectionError | ChunkedEncodingError | requests.Timeout,
+        code_sample: str,
+        reason: str | None = None,
     ) -> None:
         self.error = error
         self.code_sample = code_sample
+        self.reason = reason
 
 
 @dataclass
