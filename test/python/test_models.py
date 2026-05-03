@@ -292,11 +292,11 @@ def test_call_and_validate(ctx, kwargs):
     test()
 
 
-@pytest.mark.operations("custom_format")
-def test_metadata_has_only_relevant_components(openapi3_schema_url):
-    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_metadata_has_only_relevant_components(ctx):
+    api = ctx.openapi.apps.custom_format()
+    api_schema = schemathesis.openapi.from_url(api.schema_url)
 
-    operation = api_schema["/custom_format"]["GET"]
+    operation = api_schema["/api/custom_format"]["GET"]
 
     @given(
         case=operation.as_strategy(generation_mode=GenerationMode.POSITIVE)

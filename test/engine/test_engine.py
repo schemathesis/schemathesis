@@ -250,8 +250,10 @@ def test_execute_filter_method(app, schema_url):
     assert_incoming_requests_num(app, 0)
 
 
-@pytest.mark.operations("multipart")
-def test_form_data(app, real_app_schema):
+def test_form_data(ctx):
+    api = ctx.openapi.apps.multipart()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+
     def is_ok(ctx, response, case):
         assert response.status_code == 200
 
@@ -262,26 +264,26 @@ def test_form_data(app, real_app_schema):
 
     # When API operation specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
-    stream = execute(real_app_schema, checks=(is_ok, check_content), max_examples=3)
+    stream = execute(schema, checks=(is_ok, check_content), max_examples=3)
     # And there should be no errors or failures
     stream.assert_no_errors()
     stream.assert_no_failures()
+    multipart_requests = [r for r in api.requests if r.method == "POST" and r.path == "/api/multipart"]
     # And the application should receive 3 requests as specified in `max_examples`
-    assert_incoming_requests_num(app, 3)
+    assert len(multipart_requests) == 3
     # And the Content-Type of incoming requests should be `multipart/form-data`
-    incoming_requests = app["incoming_requests"]
-    assert incoming_requests[0].headers["Content-Type"].startswith("multipart/form-data")
+    assert multipart_requests[0].headers["Content-Type"].startswith("multipart/form-data")
 
 
-@pytest.mark.operations("headers")
-def test_headers_override(real_app_schema):
+def test_headers_override(ctx):
+    api = ctx.openapi.apps.headers()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+
     def check_headers(ctx, response, case):
         data = response.json()
         assert data["X-Token"] == "test"
 
-    stream = EventStream(
-        real_app_schema, checks=(check_headers,), headers={"X-Token": "test"}, max_examples=1
-    ).execute()
+    stream = EventStream(schema, checks=(check_headers,), headers={"X-Token": "test"}, max_examples=1).execute()
     stream.assert_no_failures()
     stream.assert_no_errors()
 
@@ -465,13 +467,14 @@ def filter_path_parameters():
     schemathesis.hook(before_generate_path_parameters)
 
 
-@pytest.mark.operations("path_variable")
 @pytest.mark.usefixtures("filter_path_parameters")
-def test_path_parameters_encoding(real_app_schema):
+def test_path_parameters_encoding(ctx):
+    api = ctx.openapi.apps.path_variable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # NOTE. WSGI and ASGI applications decode %2F as / and returns 404
     # When API operation has a path parameter
     stream = execute(
-        real_app_schema,
+        schema,
         checks=(status_code_conformance,),
         deterministic=True,
     )
@@ -481,21 +484,22 @@ def test_path_parameters_encoding(real_app_schema):
     stream.assert_no_failures()
 
 
-@pytest.mark.operations("slow")
-def test_exceptions(schema_url):
-    schema = schemathesis.openapi.from_url(schema_url)
+def test_exceptions(ctx):
+    api = ctx.openapi.apps.slow()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.update(base_url="http://127.0.0.1:1/")
     stream = execute(schema)
     assert any(event.status == Status.ERROR for event in stream.find_all(events.ScenarioFinished))
 
 
-@pytest.mark.operations("multipart")
-def test_internal_exceptions(real_app_schema, mocker):
+def test_internal_exceptions(ctx, mocker):
     # GH: #236
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
+    api = ctx.openapi.apps.multipart()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
-    stream = execute(real_app_schema, max_examples=3)
+    stream = execute(schema, max_examples=3)
     # Then the execution result should indicate errors
     stream.assert_errors()
     # And an error from the buggy code should be collected
@@ -504,18 +508,18 @@ def test_internal_exceptions(real_app_schema, mocker):
     assert len(exceptions) == 1
 
 
-@pytest.mark.operations("payload")
-async def test_payload_explicit_example(app, real_app_schema):
+def test_payload_explicit_example(ctx):
+    api = ctx.openapi.apps.payload()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation has an example specified
-    stream = execute(real_app_schema)
+    stream = execute(schema)
     # Then run should be successful
     stream.assert_no_errors()
     stream.assert_no_failures()
-    incoming_requests = app["incoming_requests"]
 
-    body = await incoming_requests[0].json()
+    payload_requests = [r for r in api.requests if r.method == "POST" and r.path == "/api/payload"]
     # And this example should be sent to the app
-    assert body == {"name": "John"}
+    assert payload_requests[0].json() == {"name": "John"}
 
 
 def test_explicit_examples_from_response(ctx, openapi3_base_url):
@@ -552,25 +556,25 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
     ]
 
 
-@pytest.mark.operations("payload")
-async def test_explicit_example_disable(app, real_app_schema, mocker):
+def test_explicit_example_disable(ctx, mocker):
+    api = ctx.openapi.apps.payload()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation has an example specified
     # And the `explicit` phase is excluded
     spy = mocker.patch("schemathesis.generation.hypothesis.builder.add_examples", wraps=add_examples)
     stream = execute(
-        real_app_schema,
+        schema,
         max_examples=1,
         phases=[PhaseName.FUZZING],
     )
     # Then run should be successful
     stream.assert_no_errors()
     stream.assert_no_failures()
-    incoming_requests = app["incoming_requests"]
-    assert len(incoming_requests) == 1
+    payload_requests = [r for r in api.requests if r.method == "POST" and r.path == "/api/payload"]
+    assert len(payload_requests) == 1
 
-    body = await incoming_requests[0].json()
     # And this example should NOT be used
-    assert body != {"name": "John"}
+    assert payload_requests[0].json() != {"name": "John"}
     # And examples are not evaluated at all
     assert not spy.called
 
@@ -611,10 +615,11 @@ def test_missing_path_parameter(real_app_schema):
     assert len(event.recorder.cases) > 0
 
 
-@pytest.mark.operations("failure", "multiple_failures", "unsatisfiable")
-def test_max_failures(real_app_schema):
+def test_max_failures(ctx):
+    api = ctx.openapi.apps.failure_multiple_failures_unsatisfiable()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When `max_failures` is specified
-    stream = execute(real_app_schema, max_failures=2, phases=[PhaseName.FUZZING])
+    stream = execute(schema, max_failures=2, phases=[PhaseName.FUZZING])
     # Then the total numbers of failures and errors should not exceed this number
     assert stream.failures_count <= 2
     errors = stream.find_all(events.NonFatalError)

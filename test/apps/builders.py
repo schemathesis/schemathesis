@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+
+from test.apps.runtime import CapturedRequest
 
 
 def build_schema(paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: Any) -> dict[str, Any]:
@@ -22,6 +24,22 @@ def build_schema(paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: Any
 
 def make_flask_app_from_schema(schema: dict[str, Any]) -> Flask:
     app = Flask(__name__)
+    captured: list[CapturedRequest] = []
+    app.config["captured_requests"] = captured
+
+    @app.before_request
+    def _capture_request() -> None:
+        if request.path == "/openapi.json":
+            return
+        captured.append(
+            CapturedRequest(
+                method=request.method,
+                path=request.path,
+                query=dict(request.args),
+                headers=dict(request.headers),
+                body=request.get_data(),
+            )
+        )
 
     @app.route("/openapi.json")
     def openapi_spec() -> Any:

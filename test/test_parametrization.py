@@ -692,11 +692,11 @@ def test_multipart_behind_a_reference():
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("multipart")
-def test_optional_form_parameters(schema_url):
+def test_optional_form_parameters(ctx):
     # When form parameters are optional
-    schema = schemathesis.openapi.from_url(schema_url)
-    strategy = schema["/multipart"]["POST"].as_strategy()
+    api = ctx.openapi.apps.multipart()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    strategy = schema["/api/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
@@ -770,19 +770,18 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET /users\]"])
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("slow")
-def test_long_response(testdir, app_schema, openapi3_base_url):
+def test_long_response(ctx, testdir):
+    api = ctx.openapi.apps.slow()
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}")
 
 @schema.parametrize()
 @settings(max_examples=1)
 def test_(case):
     case.call_and_validate(timeout=0.001)
 """,
-        schema=app_schema,
+        schema=api.spec,
     )
     result = testdir.runpytest()
     assert "timed out" in result.stdout.str()

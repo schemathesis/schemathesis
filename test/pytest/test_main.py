@@ -878,11 +878,11 @@ def test(case):
     assert "hook rejected all generated test cases" in output
 
 
-@pytest.mark.operations("unsatisfiable")
-def test_unsatisfiable_schema(testdir, openapi3_schema_url, snapshot):
+def test_unsatisfiable_schema(ctx, testdir, snapshot):
+    api = ctx.openapi.apps.unsatisfiable()
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{api.schema_url}')
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @schema.parametrize()
@@ -896,8 +896,8 @@ def test(case):
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires a more complex test setup")
-@pytest.mark.operations("unsatisfiable")
-def test_health_check_failure(ctx, testdir, openapi3_base_url, snapshot):
+def test_health_check_failure(ctx, testdir, snapshot):
+    api = ctx.openapi.apps.unsatisfiable()
     schema_path = ctx.openapi.write_schema(
         {
             "/items/{item_id}/": {
@@ -924,7 +924,7 @@ def test_health_check_failure(ctx, testdir, openapi3_base_url, snapshot):
         f"""
 schema = schemathesis.openapi.from_path('{schema_path}')
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
-schema.config.base_url = '{openapi3_base_url}'
+schema.config.base_url = '{api.base_url}/api'
 
 @schema.parametrize()
 def test(case):
@@ -1144,11 +1144,11 @@ def test(case):
     )
 
 
-@pytest.mark.operations("path_variable", "custom_format")
-def test_override(testdir, openapi3_schema_url):
+def test_override(ctx, testdir):
+    api = ctx.openapi.apps.path_variable_and_custom_format()
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{api.schema_url}')
 schema.config.update(parameters={{"key": "foo", "id": "bar"}})
 
 @schema.include(path_regex="path_variable|custom_format").parametrize()
@@ -1166,11 +1166,11 @@ def test(case):
     result.assert_outcomes(passed=2)
 
 
-@pytest.mark.operations("csv_payload")
-def test_error_reporting(testdir, openapi3_schema_url):
+def test_error_reporting(ctx, testdir):
+    api = ctx.openapi.apps.csv_payload()
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{api.schema_url}')
 
 @schema.include(path_regex="csv").parametrize()
 def test(case):

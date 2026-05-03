@@ -57,10 +57,11 @@ def dispatcher():
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("custom_format")
 @pytest.mark.usefixtures("global_hook")
-def test_global_query_hook(wsgi_app_schema):
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+def test_global_query_hook(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
@@ -98,13 +99,15 @@ def test_case_hook(wsgi_app_schema, ctx):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("custom_format")
-def test_schema_query_hook(wsgi_app_schema):
-    @wsgi_app_schema.hook
+def test_schema_query_hook(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+
+    @schema.hook
     def filter_query(context, query):
         return query["id"].isdigit() and query["id"].isascii()
 
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
@@ -116,14 +119,16 @@ def test_schema_query_hook(wsgi_app_schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.usefixtures("global_hook")
-@pytest.mark.operations("custom_format")
-def test_hooks_combination(wsgi_app_schema):
-    @wsgi_app_schema.hook("filter_query")
+def test_hooks_combination(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+
+    @schema.hook("filter_query")
     def extra(context, query):
-        assert context.operation == wsgi_app_schema["/custom_format"]["GET"]
+        assert context.operation == schema["/api/custom_format"]["GET"]
         return int(query["id"]) % 2 == 0
 
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
@@ -325,19 +330,21 @@ def test_local_dispatcher(wsgi_app_schema, apply_first):
 
 @flaky(max_runs=3, min_passes=1)
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("custom_format")
-def test_multiple_hooks_per_spec(wsgi_app_schema):
-    @wsgi_app_schema.hook("filter_query")
+def test_multiple_hooks_per_spec(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+
+    @schema.hook("filter_query")
     def first_hook(context, query):
         return query["id"].isdigit() and query["id"].isascii()
 
-    @wsgi_app_schema.hook("filter_query")
+    @schema.hook("filter_query")
     def second_hook(context, query):
         return int(query["id"]) % 2 == 0
 
-    assert wsgi_app_schema.hooks.get_all_by_name("filter_query") == [first_hook, second_hook]
+    assert schema.hooks.get_all_by_name("filter_query") == [first_hook, second_hook]
 
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
@@ -349,18 +356,20 @@ def test_multiple_hooks_per_spec(wsgi_app_schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("custom_format")
-def test_flatmap(wsgi_app_schema):
-    @wsgi_app_schema.hook
+def test_flatmap(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+
+    @schema.hook
     def filter_query(context, query):
         return query["id"].isdigit() and query["id"].isascii()
 
-    @wsgi_app_schema.hook
+    @schema.hook
     def flatmap_query(context, query):
         value = query["id"]
         return st.fixed_dictionaries({"id": st.just(value), "square": st.just(int(value) ** 2)})
 
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
@@ -373,23 +382,25 @@ def test_flatmap(wsgi_app_schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("custom_format")
-def test_case_hooks(wsgi_app_schema):
-    @wsgi_app_schema.hook
+def test_case_hooks(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+
+    @schema.hook
     def filter_case(context, case):
         return case.query["id"].isdigit() and case.query["id"].isascii()
 
-    @wsgi_app_schema.hook
+    @schema.hook
     def map_case(context, case):
         case.query["id"] += "42"
         case.query["square"] = int(case.query["id"]) ** 2
         return case
 
-    @wsgi_app_schema.hook
+    @schema.hook
     def flatmap_case(context, case):
         return st.just(case)
 
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
@@ -402,14 +413,16 @@ def test_case_hooks(wsgi_app_schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("custom_format")
-def test_before_process_path_hook(wsgi_app_schema):
-    @wsgi_app_schema.hook
+def test_before_process_path_hook(ctx):
+    api = ctx.openapi.apps.custom_format()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+
+    @schema.hook
     def before_process_path(context, path, methods):
         methods["get"]["parameters"][0]["name"] = "foo"
-        methods["get"]["parameters"][0]["enum"] = ["bar"]
+        methods["get"]["parameters"][0]["schema"] = {"type": "string", "enum": ["bar"]}
 
-    strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
+    strategy = schema["/api/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)

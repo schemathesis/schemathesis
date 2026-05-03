@@ -191,8 +191,8 @@ def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
     assert " HYPOTHESIS OUTPUT " not in result.stdout
 
 
-@pytest.mark.operations("ignored_auth")
-def test_openapi_auth_skips_malformed_security_requirements(cli, ctx, openapi3_base_url):
+def test_openapi_auth_skips_malformed_security_requirements(cli, ctx):
+    api = ctx.openapi.apps.ignored_auth()
     schema_path = ctx.openapi.write_schema(
         {
             "/ignored_auth": {
@@ -218,7 +218,7 @@ def test_openapi_auth_skips_malformed_security_requirements(cli, ctx, openapi3_b
 
     result = cli.run(
         str(schema_path),
-        f"--url={openapi3_base_url}",
+        f"--url={api.base_url}/api",
         "--max-examples=1",
         "--checks=not_a_server_error",
         config={"auth": {"openapi": {"ApiKeyAuth": {"api_key": "secret"}}}},
@@ -287,12 +287,12 @@ def test_timeout_reclassified_as_error_on_flaky_replay(ctx, cli, app_runner):
     assert "Network Error" in result.stdout, result.stdout
 
 
-@pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_connection_timeout(ctx, cli, schema_url, workers, snapshot_cli):
+def test_connection_timeout(ctx, cli, workers, snapshot_cli):
     # When connection timeout is specified in the CLI and the request fails because of it
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
+    api = ctx.openapi.apps.success_and_slow()
     with ctx.restore_checks():
 
         @schemathesis.check
@@ -302,7 +302,7 @@ def test_connection_timeout(ctx, cli, schema_url, workers, snapshot_cli):
         # Timeout is well under /slow's 500ms sleep but high enough to absorb CI jitter on /success.
         assert (
             cli.run(
-                schema_url,
+                api.schema_url,
                 "--request-timeout=0.25",
                 f"--workers={workers}",
                 "--phases=fuzzing",
@@ -329,14 +329,14 @@ def test_read_content_timeout(ctx, cli, mocker, snapshot_cli):
     assert cli.run(api.schema_url) == snapshot_cli
 
 
-@pytest.mark.operations("unsatisfiable")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_unsatisfiable(cli, schema_url, workers, snapshot_cli):
+def test_unsatisfiable(ctx, cli, workers, snapshot_cli):
     # When the app's schema contains parameters that can't be generated
     # For example if it contains contradiction in the parameters' definition - requires to be integer AND string at the
     # same time
     # And more clear error message is displayed instead of Hypothesis one
-    assert cli.run(schema_url, "--mode=positive", f"--workers={workers}") == snapshot_cli
+    api = ctx.openapi.apps.unsatisfiable()
+    assert cli.run(api.schema_url, "--mode=positive", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("invalid")
@@ -485,11 +485,11 @@ def test_headers_conformance_valid(cli, schema_url):
     assert "1. Received a response with missing headers: X-Custom-Header" not in lines
 
 
-@pytest.mark.operations("multiple_failures")
-def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
+def test_multiple_failures_single_check(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.multiple_failures()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--generation-deterministic",
             "-c not_a_server_error,positive_data_acceptance",
             "--mode=positive",
@@ -498,18 +498,17 @@ def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.operations("multiple_failures")
-@pytest.mark.openapi_version("3.0")
-def test_continue_on_failure(cli, schema_url):
-    result = cli.run_and_assert(schema_url, "--continue-on-failure", exit_code=ExitCode.TESTS_FAILED)
+def test_continue_on_failure(ctx, cli):
+    api = ctx.openapi.apps.multiple_failures()
+    result = cli.run_and_assert(api.schema_url, "--continue-on-failure", exit_code=ExitCode.TESTS_FAILED)
     assert "114 generated" in result.stdout
 
 
-@pytest.mark.operations("multiple_failures")
-def test_multiple_failures_different_check(cli, schema_url, snapshot_cli):
+def test_multiple_failures_different_check(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.multiple_failures()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "-c",
             "status_code_conformance",
             "-c",
@@ -604,21 +603,23 @@ def digits_format(ctx):
     unregister_string_format("digits")
 
 
-@pytest.mark.operations("custom_format")
-def test_hooks_valid(cli, schema_url, app, digits_format):
+def test_hooks_valid(ctx, cli, digits_format):
+    api = ctx.openapi.apps.custom_format()
     # When a hook is passed to the CLI call
     result = cli.main(
         "run",
         "--suppress-health-check=filter_too_much",
         "--phases=fuzzing",
         "--mode=positive",
-        schema_url,
+        api.schema_url,
         hooks=digits_format,
     )
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
+    test_cases = [req for req in api.requests if req.path == "/api/custom_format" and "id" in req.query]
+    assert test_cases
     # And all registered new string format should produce digits as expected
-    assert all(request.query["id"].isdigit() for request in app["incoming_requests"])
+    assert all(req.query["id"].isdigit() for req in test_cases)
 
 
 @pytest.fixture
@@ -1266,21 +1267,21 @@ paths:
     )
 
 
-@pytest.mark.operations("slow")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_max_response_time_invalid(cli, schema_url, workers, snapshot_cli):
+def test_max_response_time_invalid(ctx, cli, workers, snapshot_cli):
     # When maximum response time check is specified in the CLI and the request takes more time
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
     # And the proper error message should be displayed
-    assert cli.run(schema_url, "--max-response-time=0.05", f"--workers={workers}") == snapshot_cli
+    api = ctx.openapi.apps.slow()
+    assert cli.run(api.schema_url, "--max-response-time=0.05", f"--workers={workers}") == snapshot_cli
 
 
-@pytest.mark.operations("slow")
-def test_max_response_time_valid(cli, schema_url):
+def test_max_response_time_valid(ctx, cli):
+    api = ctx.openapi.apps.slow()
     # When maximum response time check is specified in the CLI and the request takes less time
     # Then no errors should occur
-    cli.run_and_assert(schema_url, "--max-response-time=200")
+    cli.run_and_assert(api.schema_url, "--max-response-time=200")
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1386,15 +1387,15 @@ def test_auth_override_on_protected_operation(ctx, cli, extra, snapshot_cli):
     assert cli.run(api.schema_url, "--output-sanitize=false", "--phases=fuzzing", extra) == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("flaky")
-def test_explicit_headers_in_output_on_errors(cli, schema_url, snapshot_cli):
+def test_explicit_headers_in_output_on_errors(ctx, cli, snapshot_cli):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly
+    api = ctx.openapi.apps.flaky()
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
     # Then the code sample should have the overridden value
     assert (
-        cli.run(schema_url, "--output-sanitize=false", f"-H Authorization: {auth}", "--mode=positive") == snapshot_cli
+        cli.run(api.schema_url, "--output-sanitize=false", f"-H Authorization: {auth}", "--mode=positive")
+        == snapshot_cli
     )
 
 
@@ -1623,8 +1624,8 @@ def data_generation_check(ctx, response, case):
 
 
 @flaky(max_runs=5, min_passes=1)
-@pytest.mark.operations("payload")
-def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_check):
+def test_multiple_generation_modes(ctx, cli, data_generation_check):
+    api = ctx.openapi.apps.payload()
     # When multiple data generation methods are supplied in CLI
     result = cli.main(
         "run",
@@ -1632,7 +1633,7 @@ def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_che
         "data_generation_check",
         "-c",
         "not_a_server_error",
-        openapi3_schema_url,
+        api.schema_url,
         "--max-examples=25",
         "--suppress-health-check=all",
         "--mode",
@@ -2073,15 +2074,14 @@ def verify_overrides(ctx, response, case):
         yield module
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("path_variable", "custom_format")
-def test_parameter_overrides(cli, schema_url, verify_overrides):
+def test_parameter_overrides(ctx, cli, verify_overrides):
+    api = ctx.openapi.apps.path_variable_and_custom_format()
     result = cli.main(
         "run",
         "-c",
         "verify_overrides",
         "--phases=fuzzing",
-        schema_url,
+        api.schema_url,
         hooks=verify_overrides,
         config={"parameters": {"key": "foo", "id": "bar"}},
     )
@@ -2286,10 +2286,9 @@ def test_reference_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("payload")
 @pytest.mark.skipif(sys.version_info >= (3, 13), reason="Traceback is different")
-def test_unknown_schema_error(ctx, schema_url, cli, snapshot_cli):
+def test_unknown_schema_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.payload()
     module = ctx.write_pymodule(
         r"""
 import schemathesis
@@ -2302,7 +2301,7 @@ def buggy(ctx):
     assert (
         cli.main(
             "run",
-            schema_url,
+            api.schema_url,
             "--generation-maximize=buggy",
             "-c not_a_server_error",
             hooks=module,

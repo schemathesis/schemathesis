@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
@@ -29,21 +29,22 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-__________________________________ GET /slow ___________________________________
+__________________________ GET /api/multiple_failures __________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response time limit exceeded
+- Server error
 
-    Actual: 105.00ms
-    Limit: 50.00ms
+[500] Internal Server Error:
 
-[200] OK:
-
-    `{"success": true}`
+    `<!doctype html>
+    <html lang=en>
+    <title>500 Internal Server Error</title>
+    <h1>Internal Server Error</h1>
+    <p>The server encountered an internal error and was unable to complete your request. Either the server is overloaded or there is an error in the application.</p>`
 
 Reproduce with:
 
-    curl -X GET http://127.0.0.1/api/slow
+    curl -X GET 'http://127.0.0.1/api/multiple_failures?id=0'
 
 =================================== SUMMARY ====================================
 
@@ -58,11 +59,11 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Response time limit exceeded: 1
+  ❌ Server error: 1
 
 Test cases:
   N generated, N found N unique failures
 
-Seed: 42
+Seed: not used in the deterministic mode
 
 ============================== 1 failure in 1.00s ==============================

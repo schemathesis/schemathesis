@@ -124,11 +124,10 @@ def test_store_ndjson(ctx, cli, ndjson_path, hypothesis_max_examples):
     assert "running_time" in get_event_data(events[-1])
 
 
-@pytest.mark.operations("slow")
-@pytest.mark.openapi_version("3.0")
-def test_store_timeout(cli, schema_url, ndjson_path):
+def test_store_timeout(ctx, cli, ndjson_path):
+    api = ctx.openapi.apps.slow()
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=1",
         "--request-timeout=0.001",
@@ -141,10 +140,10 @@ def test_store_timeout(cli, schema_url, ndjson_path):
     assert get_event_data(events[0])["seed"] == 1
 
 
-@pytest.mark.operations("flaky")
-def test_interaction_with_failure(cli, openapi3_schema_url, hypothesis_max_examples, ndjson_path):
+def test_interaction_with_failure(ctx, cli, hypothesis_max_examples, ndjson_path):
+    api = ctx.openapi.apps.flaky()
     cli.run_and_assert(
-        openapi3_schema_url,
+        api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         f"--max-examples={hypothesis_max_examples or 5}",
         "--seed=1",
