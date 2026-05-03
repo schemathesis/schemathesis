@@ -3,59 +3,30 @@ from __future__ import annotations
 import datetime
 import io
 import logging
-import os
-import platform
-import re
 import shlex
-import warnings
-from contextlib import contextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-import click
 import httpx
 import pytest
 import requests
-import tomli_w
 import yaml
-from _pytest.main import ExitCode
-from click.testing import CliRunner, Result
 from hypothesis import settings
-from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from urllib3 import HTTPResponse
 from werkzeug import Request
 from werkzeug.datastructures import Headers
 from werkzeug.test import TestResponse
 
 import schemathesis.cli
-from schemathesis import auths, hooks
-from schemathesis.cli.commands import fuzz as fuzz_command
-from schemathesis.cli.commands import run as run_command
 from schemathesis.cli.commands.run.handlers import output
-from schemathesis.cli.ext.groups import GROUPS, GroupedOption
-from schemathesis.cli.ext.handlers import CUSTOM_HANDLERS
-from schemathesis.core import deserialization
-from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
-from schemathesis.core.media_types import MEDIA_TYPE_STRATEGIES
 from schemathesis.core.transport import Response
-from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.specs.openapi import media_types
-from schemathesis.specs.openapi.formats import STRING_FORMATS
-from schemathesis.transport.asgi import ASGI_TRANSPORT
-from schemathesis.transport.requests import REQUESTS_TRANSPORT
-from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
 from .apps import _graphql as graphql
 from .apps import openapi
 from .apps.openapi.schema import OpenAPIVersion, Operation
 from .utils import make_schema
-
-if TYPE_CHECKING:
-    from _pytest.fixtures import FixtureRequest
-    from syrupy.types import PropertyFilter, PropertyMatcher
 
 pytest_plugins = [
     "pytester",
@@ -63,6 +34,10 @@ pytest_plugins = [
     "pytest_mock",
     "test.fixtures.ctx",
     "test.fixtures.app_runner",
+    "test.fixtures.snapshots",
+    "test.fixtures.reset",
+    "test.fixtures.markers",
+    "test.fixtures.cli",
 ]
 
 logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
@@ -77,45 +52,6 @@ settings.register_profile("CI", max_examples=2000)
 output.SCHEMATHESIS_VERSION = "dev"
 
 
-@pytest.fixture(autouse=True)
-def reset_hooks():
-    # Store built-in deserializers to restore after test
-    builtin_deserializers = deserialization.deserializers().copy()
-    builtin_string_formats = set(STRING_FORMATS.keys())
-    builtin_groups = set(GROUPS.keys())
-
-    CUSTOM_HANDLERS.clear()
-    hooks.unregister_all()
-    auths.unregister()
-    for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
-        transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
-    media_types.unregister_all()
-    yield
-    CUSTOM_HANDLERS.clear()
-    hooks.unregister_all()
-    auths.unregister()
-    for transport in (ASGI_TRANSPORT, WSGI_TRANSPORT, REQUESTS_TRANSPORT):
-        transport.unregister_serializer(*MEDIA_TYPE_STRATEGIES.keys())
-    media_types.unregister_all()
-    # Restore built-in deserializers
-    current = list(deserialization.deserializers().keys())
-    deserialization.unregister_deserializer(*current)
-    for media_type, func in builtin_deserializers.items():
-        deserialization.register_deserializer(func, media_type)
-    # Remove any string formats registered during the test
-    for name in list(STRING_FORMATS.keys()):
-        if name not in builtin_string_formats:
-            del STRING_FORMATS[name]
-    # Remove any CLI option groups registered during the test
-    for name in list(GROUPS.keys()):
-        if name not in builtin_groups:
-            del GROUPS[name]
-    for command in (run_command, fuzz_command):
-        command.params[:] = [
-            p for p in command.params if not (isinstance(p, GroupedOption) and p.group not in builtin_groups)
-        ]
-
-
 @pytest.fixture(scope="session")
 def hypothesis_max_examples():
     """Take `max_examples` value if it is not default.
@@ -124,45 +60,6 @@ def hypothesis_max_examples():
     """
     value = settings().max_examples
     return None if value == 100 else value  # Hypothesis uses 100 examples by default
-
-
-def pytest_collection_modifyitems(session, config, items):
-    """Add the `hypothesis_nested` marker to tests, that depend on the `hypothesis_max_examples` fixture.
-
-    During scheduled test runs on CI, we select such tests and run them with a higher number of examples.
-    """
-    for item in items:
-        if isinstance(item, pytest.Function) and "hypothesis_max_examples" in item.fixturenames:
-            item.add_marker("hypothesis_nested")
-
-
-def pytest_generate_tests(metafunc):
-    # A more ergonomic way to limit test parametrization to the specific Open API versions:
-    #
-    #     @pytest.mark.openapi_version("2.0")
-    #
-    #  or:
-    #
-    #     @pytest.mark.openapi_version("2.0", "3.0")
-    if "openapi_version" in metafunc.fixturenames:
-        marker = metafunc.definition.get_closest_marker("openapi_version")
-        if marker is not None:
-            variants = [OpenAPIVersion(variant) if isinstance(variant, str) else variant for variant in marker.args]
-        else:
-            variants = [OpenAPIVersion("2.0"), OpenAPIVersion("3.0")]
-        metafunc.parametrize("openapi_version", variants)
-
-
-def pytest_configure(config):
-    config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
-    config.addinivalue_line("markers", "snapshot(**kwargs): Configure snapshot tests.")
-    config.addinivalue_line("markers", "snapshot_suffix(suffix): Append a suffix to the snapshot file name.")
-    config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
-    config.addinivalue_line(
-        "markers",
-        "openapi_version(*versions): Restrict test parametrization only to the specified Open API version(s).",
-    )
-    warnings.filterwarnings("ignore", category=pytest.PytestDeprecationWarning)
 
 
 @pytest.fixture(scope="session")
@@ -360,388 +257,6 @@ def graphql_schema(graphql_url):
 @pytest.fixture
 def graphql_strategy(graphql_schema):
     return graphql_schema["Query"]["getBooks"].as_strategy()
-
-
-@contextmanager
-def keep_cwd():
-    cwd = os.getcwd()
-    try:
-        yield
-    finally:
-        os.chdir(cwd)
-
-
-FLASK_MARKERS = ("* Serving Flask app", "* Debug mode")
-PACKAGE_ROOT = Path(schemathesis.__file__).parent
-TEST_ROOT = Path(__file__).parent
-SITE_PACKAGES = requests.__file__.split("requests")[0]
-IS_WINDOWS = platform.system() == "Windows"
-
-
-@dataclass
-class CliSnapshotConfig:
-    request: FixtureRequest
-    replace_server_host: bool = True
-    replace_tmp_dir: bool = True
-    replace_duration: bool = True
-    replace_error_codes: bool = True
-    replace_test_case_id: bool = True
-    replace_uuid: bool = True
-    replace_response_time: bool = True
-    replace_seed: bool = True
-    replace_reproduce_with: bool = False
-    replace_test_cases: bool = True
-    replace_phase_statistic: bool = False
-    replace_stateful_statistic: bool = True
-    remove_last_line: bool = False
-    replace: bool = True
-
-    @classmethod
-    def from_request(cls, request: FixtureRequest) -> CliSnapshotConfig:
-        marker = request.node.get_closest_marker("snapshot")
-        if marker is not None:
-            return cls(request, **marker.kwargs)
-        return cls(request)
-
-    @property
-    def testdir(self):
-        return self.request.getfixturevalue("testdir")
-
-    def serialize(self, data: str) -> str:
-        if not self.replace:
-            return data
-        if self.replace_test_cases:
-            # All-skipped case
-            data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated", data)
-            # Cases with failures (skip count optional — non-deterministic, so not snapshot-tested)
-            data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures(?:, \d+ skipped)?",
-                "Test cases:\n  N generated, N found N unique failures",
-                data,
-            )
-            # Cases with passed (skip count optional)
-            data = re.sub(
-                r"Test cases:\n  (\d+) generated, (\d+) passed(?:, \d+ skipped)?",
-                "Test cases:\n  N generated, N passed",
-                data,
-            )
-        if self.replace_server_host:
-            used_fixtures = self.request.fixturenames
-            for fixture in ("graphql_server_host", "server_host"):
-                if fixture in used_fixtures:
-                    try:
-                        host = self.request.getfixturevalue(fixture)
-                        data = data.replace(host, "127.0.0.1")
-                    except LookupError:
-                        pass
-            with keep_cwd():
-                data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
-        data = re.sub(r"http://127\.0\.0\.1:[0-9]{3,}", "http://127.0.0.1", data)
-        if self.replace_tmp_dir:
-            with keep_cwd():
-                data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
-                data = data.replace(str(Path(self.testdir.tmpdir).parent) + os.path.sep, "/tmp/")
-        if "Configuration:" in data:
-            lines = []
-            for line in data.splitlines():
-                normalized = click.unstyle(line)
-                stripped = normalized.lstrip()
-                if stripped.startswith("Configuration:"):
-                    indent = " " * (len(normalized) - len(stripped))
-                    lines.append(f"{indent}Configuration:    /tmp/config.toml")
-                else:
-                    lines.append(line)
-            data = "\n".join(lines)
-        package_root = "/package-root"
-        site_packages = "/site-packages/"
-        data = data.replace(str(PACKAGE_ROOT), package_root)
-        data = data.replace(str(TEST_ROOT), "/test-root")
-        data = re.sub(
-            "❌  Failed to load configuration file from .*toml$",
-            "❌  Failed to load configuration file from config.toml",
-            data,
-            flags=re.MULTILINE,
-        )
-        version_line = "Schemathesis dev"
-        data = data.replace(f"Schemathesis v{SCHEMATHESIS_VERSION}", version_line)
-        data = re.sub("━+", "━" * len(version_line), data)
-        data = data.replace(str(SITE_PACKAGES), site_packages)
-        data = re.sub(", line [0-9]+,", ", line XXX,", data)
-        data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
-        if "Stop reason:" in data:
-            # Fuzz-specific output: scenario count and counters vary with time and machine speed
-            data = re.sub(r"✅ \d+ scenarios", "✅ N scenarios", data)
-            data = re.sub(r"❌ \d+ unique failures", "❌ N unique failures", data)
-            data = re.sub(r"🚫 \d+ errors?", "🚫 N errors", data)
-            data = re.sub(r"Tested: \d+", "Tested: N", data)
-        if self.replace_phase_statistic:
-            data = re.sub("🚫 [0-9]+ errors", "🚫 1 error", data)
-        if "Stateful" in data:
-            if self.replace_stateful_statistic:
-                data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
-            before, after = data.split("Stateful", 1)
-            after = re.sub(r"\d+ passed", "N passed", after)
-            data = before + "Stateful" + after
-
-        if "Traceback (most recent call last):" in data:
-            lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
-            comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
-            # Drop frames that are related to comprehensions
-            for idx in comprehension_ids[::-1]:
-                lines.pop(idx)
-                lines.pop(idx)
-            if platform.system() == "Windows":
-                for idx, line in enumerate(lines):
-                    if line.strip().startswith("File") and "line" in line:
-                        lines[idx] = line.replace("\\", "/")
-            data = "\n".join(lines)
-        if self.replace_error_codes:
-            data = (
-                data.replace("Errno 111", "Error NUM")
-                .replace("Errno 61", "Error NUM")
-                .replace("WinError 10061", "Error NUM")
-                .replace("Cannot connect to proxy.", "Unable to connect to proxy")
-            )
-            data = data.replace(
-                "No connection could be made because the target machine actively refused it", "Connection refused"
-            )
-        if self.replace_duration:
-            data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
-            data = re.sub(r"\(in [0-9]+\.[0-9]{2}s\)", "(in 0.00s)", data)
-            data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
-            lines = data.splitlines()
-            lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
-            if "in 1.00s" in lines[-1]:
-                lines[-1] = lines[-1].strip("=").center(80, "=")
-            data = "\n".join(lines) + "\n"
-        if self.remove_last_line:
-            lines = data.splitlines()
-            data = "\n".join(lines[:-1])
-        if self.replace_test_case_id:
-            lines = data.splitlines()
-            for idx, line in enumerate(lines):
-                if re.match(r".*\d+\. Test Case ID", line):
-                    sequential_id = line.split(".")[0]
-                    lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
-            data = "\n".join(lines) + "\n"
-        if self.replace_uuid:
-            data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
-        if self.replace_response_time:
-            data = re.sub(r"Actual: \d+\.\d+ms", "Actual: 105.00ms", data)
-        if self.replace_seed:
-            data = re.sub(r"--seed=\d+", "--seed=42", data)
-            data = re.sub(r"Seed: \d+", "Seed: 42", data)
-        if self.replace_reproduce_with:
-            lines = []
-            seen = False
-            for line in data.splitlines():
-                if "curl" in line:
-                    if not seen:
-                        lines.append("    <PLACEHOLDER>")
-                        seen = True
-                else:
-                    seen = False
-                    lines.append(line)
-            data = "\n".join(lines) + "\n"
-        lines = []
-        for line in data.splitlines():
-            line = click.unstyle(line)
-            if line.endswith("Schema Loading Error"):
-                # It is written at the end of the current line and does not properly rewrite the current line
-                # on all terminals
-                lines.append("Schema Loading Error")
-                continue
-            if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
-                line = line.replace("\\", "/")
-            if (
-                any(marker in line for marker in FLASK_MARKERS)
-                or line.lstrip().startswith(
-                    (
-                        "🕛 ",
-                        "🕐 ",
-                        "🕑 ",
-                        "🕒 ",
-                        "🕓 ",
-                        "🕔 ",
-                        "🕕 ",
-                        "🕖 ",
-                        "🕗 ",
-                        "🕘 ",
-                        "🕙 ",
-                        "🕚 ",
-                        "⠋",
-                        "⠙",
-                        "⠹",
-                        "⠸",
-                        "⠼",
-                        "⠴",
-                        "⠦",
-                        "⠧",
-                        "⠇",
-                        "⠏",
-                        "0:0",
-                        # Fuzz live-display lines (transient, not cleared on non-TTY)
-                        "No issues found yet",
-                        "Last new failure:",
-                    )
-                )
-                or re.match(r"    [❌🚫]", line)
-            ):
-                continue
-            lines.append(line.rstrip())
-        if "Stop reason:" in data or "Empty test suite" in data:
-            # Rich Live progress widgets leave extra blank lines on non-TTY consoles;
-            # collapse runs of consecutive blanks to one. Triggers on st fuzz output
-            # (after "Stop reason:") and on the st run "no tests ran" path
-            # ("Empty test suite") where the probing progress doesn't clean up
-            # identically across platforms.
-            collapsed = []
-            for line in lines:
-                if line == "" and collapsed and collapsed[-1] == "":
-                    continue
-                collapsed.append(line)
-            lines = collapsed
-        lines = clean_unit_tests(lines)
-        lines = clean_stateful_tests(lines)
-        return "\n".join(lines).strip() + "\n"
-
-
-def clean_unit_tests(lines):
-    for idx, line in enumerate(lines):
-        if "API capabilities" in line:
-            probing_idx = idx + 4
-            break
-        if "API probing" in line:
-            probing_idx = idx + 2
-            break
-    else:
-        return lines
-
-    indices = []
-    for idx, line in enumerate(lines[probing_idx:], start=probing_idx):
-        if any(f"{phase} (in" in line for phase in ("Examples", "Coverage", "Fuzzing")):
-            indices.append(idx)
-
-    if not indices:
-        return lines
-
-    output = lines[:probing_idx]
-    for idx in indices[:-1]:
-        output += lines[idx : idx + 4]
-    output += lines[indices[-1] :]
-    return output
-
-
-def clean_stateful_tests(lines):
-    start_idx = None
-    for i, line in enumerate(lines):
-        if "Fuzzing (in" in line:
-            start_idx = i + 3
-            break
-    if start_idx is None:
-        for i, line in enumerate(lines):
-            if "API probing failed" in line:
-                start_idx = i + 1
-                break
-            if "API capabilities" in line:
-                start_idx = i + 3
-                break
-
-    end_idx = None
-    for i, line in enumerate(lines):
-        if "Stateful (in" in line:
-            end_idx = i
-            break
-
-    if start_idx is not None and end_idx is not None:
-        return lines[: start_idx + 1] + lines[end_idx:]
-    return lines
-
-
-EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
-
-
-@pytest.fixture
-def snapshot_cli(request, snapshot):
-    config = CliSnapshotConfig.from_request(request)
-    snapshot_suffix = request.node.get_closest_marker("snapshot_suffix")
-
-    class CliSnapshotExtension(SingleFileSnapshotExtension):
-        _write_mode = WriteMode.TEXT
-
-        def serialize(
-            self,
-            data: Result | pytest.RunResult,
-            *,
-            exclude: PropertyFilter | None = None,
-            include: PropertyFilter | None = None,
-            matcher: PropertyMatcher | None = None,
-        ) -> str:
-            stdout = ""
-            if isinstance(data, Result):
-                exit_code = data.exit_code
-                if data.stdout_bytes:
-                    stdout = data.stdout
-                if data.stderr_bytes:
-                    stdout += data.stderr
-            else:
-                exit_code = data.ret
-                stdout = data.stdout.str() + data.stderr.str()
-            serialized = f"Exit code: {exit_code}"
-            if stdout:
-                serialized += f"\n---\nStdout:\n{stdout}"
-            return config.serialize(serialized).replace("\r\n", "\n").replace("\r", "\n")
-
-        @classmethod
-        def get_snapshot_name(cls, *, test_location, index=0) -> str:
-            base_name = super().get_snapshot_name(test_location=test_location, index=index)
-            if snapshot_suffix is not None:
-                suffix = str(snapshot_suffix.args[0])
-                return f"{base_name}.{suffix}"
-            return base_name
-
-    class SnapshotAssertion(snapshot.__class__):
-        def rebuild(self):
-            return self.use_extension(extension_class=CliSnapshotExtension)
-
-    snapshot.__class__ = SnapshotAssertion
-    return snapshot.rebuild()
-
-
-@pytest.fixture
-def cli(tmp_path):
-    """CLI runner helper.
-
-    Provides in-process execution via `click.CliRunner`.
-    """
-    cli_runner = CliRunner()
-
-    class Runner:
-        @staticmethod
-        def run(*args, **kwargs):
-            return Runner.main("run", *args, **kwargs)
-
-        @staticmethod
-        def main(*args, config=None, hooks=None, **kwargs):
-            if config is not None:
-                path = tmp_path / "config.toml"
-                path.write_text(tomli_w.dumps(config), encoding="utf-8")
-                args = ["--config-file", str(path), *args]
-            if hooks is not None:
-                env = kwargs.setdefault("env", {})
-                env[HOOKS_MODULE_ENV_VAR] = hooks
-            result = cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
-            if result.exception and not isinstance(result.exception, SystemExit):
-                raise result.exception
-            return result
-
-        @staticmethod
-        def run_and_assert(*args, exit_code: ExitCode = ExitCode.OK, **kwargs):
-            result = Runner.run(*args, **kwargs)
-            assert result.exit_code == exit_code, result.stdout
-            return result
-
-    return Runner()
 
 
 @pytest.fixture
