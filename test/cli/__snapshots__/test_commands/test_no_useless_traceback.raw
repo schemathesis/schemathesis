@@ -24,9 +24,9 @@ Schemathesis dev
 
      ❌ 1 failed
 
- ⏭   Fuzzing (in 0.00s)
+ ❌  Fuzzing (in 0.00s)
 
-     ⏭  1 skipped
+     ❌ 1 failed
 
 =================================== FAILURES ===================================
 ________________________________ POST /success _________________________________
@@ -52,12 +52,6 @@ Reproduce with:
 
 =================================== WARNINGS ===================================
 
-Method Not Allowed: 1 operation consistently returned `405 Method Not Allowed` — skipped from later phases
-
-  - POST /success
-
-💡 Verify the server actually accepts these methods, or remove them from the schema if unsupported
-
 Unsupported regex patterns: 1 operation contain regex patterns not supported by Python and were removed
 
   - POST /success
@@ -74,7 +68,7 @@ API Operations:
 Test Phases:
   ❌ Examples
   ❌ Coverage
-  ⏭  Fuzzing
+  ❌ Fuzzing
   ⏭  Stateful (not applicable)
 
 Failures:
@@ -83,11 +77,10 @@ Failures:
 
 Warnings:
   ⚠️ Unsupported regex: 1 operation had regex patterns removed
-  ⚠️ Method Not Allowed: 1 operation skipped after consistent 405 responses
 
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-======================= 2 failures, 2 warnings in 1.00s ========================
+======================== 2 failures, 1 warning in 1.00s ========================

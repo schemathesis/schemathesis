@@ -19,6 +19,7 @@ from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
+from test.apps.catalog.openapi import supervisor as openapi_supervisor
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.catalog.openapi import zod as openapi_zod
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
@@ -115,6 +116,12 @@ class OpenAPIApps:
 
     def zod_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_zod.planted_bug())
+
+    def unimplemented_method(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_supervisor.unimplemented_method())
+
+    def linked_with_unimplemented_method(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_supervisor.linked_with_unimplemented_method())
 
 
 @dataclass(slots=True)

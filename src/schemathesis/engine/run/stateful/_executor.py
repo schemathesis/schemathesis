@@ -79,6 +79,15 @@ def execute_state_machine_loop(
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
 
+        def __init__(self) -> None:
+            super().__init__()
+            # The state machine creates a fresh `TransitionController` per scenario.
+            # Inject the engine's supervisor so transitions targeting operations with
+            # a SKIP verdict (consistently-405 operations detected during the unit
+            # phases) are filtered out of rule preconditions before Hypothesis selects
+            # them.
+            self.control.supervisor = engine.supervisor
+
         def setup(self) -> None:
             scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
             self._start_time = time.monotonic()
