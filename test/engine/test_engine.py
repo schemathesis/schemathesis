@@ -144,7 +144,6 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     assert success.response.headers["content-type"] == ["application/json; charset=utf-8"]
 
 
-@pytest.mark.operations("root")
 def test_asgi_interactions(fastapi_app):
     schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
     stream = EventStream(schema).execute()
@@ -152,10 +151,11 @@ def test_asgi_interactions(fastapi_app):
     assert interactions[0].request.uri == "http://localhost/users"
 
 
-@pytest.mark.operations("empty")
-def test_empty_response_interaction(real_app_schema):
+def test_empty_response_interaction(ctx):
+    api = ctx.openapi.apps.empty()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When there is a GET request and a response that doesn't return content (e.g. 204)
-    stream = EventStream(real_app_schema).execute()
+    stream = EventStream(schema).execute()
     interactions = list(stream.find(events.ScenarioFinished).recorder.interactions.values())
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
@@ -164,11 +164,11 @@ def test_empty_response_interaction(real_app_schema):
         assert interaction.response.encoding is None
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("empty_string")
-def test_empty_string_response_interaction(real_app_schema):
+def test_empty_string_response_interaction(ctx):
+    api = ctx.openapi.apps.empty_string()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When there is a response that returns payload of length 0
-    stream = EventStream(real_app_schema).execute()
+    stream = EventStream(schema).execute()
     interactions = stream.find(events.ScenarioFinished).recorder.interactions.values()
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
@@ -288,11 +288,12 @@ def test_headers_override(ctx):
     stream.assert_no_errors()
 
 
-@pytest.mark.operations("teapot")
-def test_unknown_response_code(real_app_schema):
+def test_unknown_response_code(ctx):
+    api = ctx.openapi.apps.teapot()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    stream = EventStream(real_app_schema, checks=(status_code_conformance,), max_examples=1).execute()
+    stream = EventStream(schema, checks=(status_code_conformance,), max_examples=1).execute()
 
     # Then there should be a failure
     assert stream.failures_count == 1
@@ -318,11 +319,12 @@ def test_unknown_response_code_with_default(ctx):
     assert check.status == Status.SUCCESS
 
 
-@pytest.mark.operations("text")
-def test_unknown_content_type(real_app_schema):
+def test_unknown_content_type(ctx):
+    api = ctx.openapi.apps.text()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    stream = EventStream(real_app_schema, checks=(content_type_conformance,), max_examples=1).execute()
+    stream = EventStream(schema, checks=(content_type_conformance,), max_examples=1).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
@@ -345,12 +347,13 @@ def test_known_content_type(ctx):
     stream.assert_no_failures()
 
 
-@pytest.mark.operations("invalid_response")
-def test_response_conformance_invalid(real_app_schema):
+def test_response_conformance_invalid(ctx):
+    api = ctx.openapi.apps.invalid_response()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
     stream = EventStream(
-        real_app_schema, checks=(response_schema_conformance,), max_examples=1, phases=[PhaseName.FUZZING]
+        schema, checks=(response_schema_conformance,), max_examples=1, phases=[PhaseName.FUZZING]
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
@@ -403,12 +406,13 @@ def test_response_conformance_valid(ctx):
     stream.assert_no_errors()
 
 
-@pytest.mark.operations("recursive")
-def test_response_conformance_recursive_valid(real_app_schema):
+def test_response_conformance_recursive_valid(ctx):
+    api = ctx.openapi.apps.recursive()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation contains a response that have recursive references
     # And "response_schema_conformance" is specified
     stream = execute(
-        real_app_schema,
+        schema,
         checks=(response_schema_conformance,),
         max_examples=1,
     )
@@ -417,12 +421,13 @@ def test_response_conformance_recursive_valid(real_app_schema):
     stream.assert_no_errors()
 
 
-@pytest.mark.operations("text")
-def test_response_conformance_text(real_app_schema):
+def test_response_conformance_text(ctx):
+    api = ctx.openapi.apps.text()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation returns a response that is not JSON
     # And "response_schema_conformance" is specified
     stream = execute(
-        real_app_schema,
+        schema,
         checks=(response_schema_conformance,),
         max_examples=1,
     )
@@ -431,12 +436,13 @@ def test_response_conformance_text(real_app_schema):
     stream.assert_no_errors()
 
 
-@pytest.mark.operations("malformed_json")
-def test_response_conformance_malformed_json(real_app_schema):
+def test_response_conformance_malformed_json(ctx):
+    api = ctx.openapi.apps.malformed_json()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When API operation returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
     stream = EventStream(
-        real_app_schema,
+        schema,
         checks=(response_schema_conformance,),
         max_examples=1,
     ).execute()
@@ -579,34 +585,37 @@ def test_explicit_example_disable(ctx, mocker):
     assert not spy.called
 
 
-@pytest.mark.operations("plain_text_body")
-def test_plain_text_body(app, real_app_schema):
+def test_plain_text_body(ctx):
+    api = ctx.openapi.apps.plain_text_body()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+
     # When the expected payload is text/plain
     # Then the payload is not encoded as JSON
     def check_content(ctx, response, case):
         data = response.content
         assert case.body.encode("utf8") == data
 
-    stream = execute(real_app_schema, checks=(check_content,), max_examples=3)
+    stream = execute(schema, checks=(check_content,), max_examples=3)
     stream.assert_no_errors()
     stream.assert_no_failures()
 
 
-@pytest.mark.operations("invalid_path_parameter")
-def test_invalid_path_parameter(schema_url):
+def test_invalid_path_parameter(ctx):
+    api = ctx.openapi.apps.invalid_path_parameter()
     # When a path parameter is marked as not required
     # And schema validation is disabled
-    schema = schemathesis.openapi.from_url(schema_url)
+    schema = schemathesis.openapi.from_url(api.schema_url)
     stream = execute(schema, max_examples=3)
     # Then Schemathesis enforces all path parameters to be required
     # And there should be no errors
     stream.assert_no_errors()
 
 
-@pytest.mark.operations("missing_path_parameter")
-def test_missing_path_parameter(real_app_schema):
+def test_missing_path_parameter(ctx):
+    api = ctx.openapi.apps.missing_path_parameter()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When a path parameter is missing
-    stream = EventStream(real_app_schema, max_examples=3).execute()
+    stream = EventStream(schema, max_examples=3).execute()
     # Then it leads to an error
     stream.assert_errors()
     assert "Path parameter 'id' is not defined" in str(stream.find(events.NonFatalError).info)
@@ -849,15 +858,16 @@ def test_connection_error(ctx):
     assert expected in str(errors[0].info)
 
 
-@pytest.mark.operations("reserved")
-def test_reserved_characters_in_operation_name(real_app_schema):
+def test_reserved_characters_in_operation_name(ctx):
     # See GH-992
+    api = ctx.openapi.apps.reserved()
+    schema = schemathesis.openapi.from_url(api.schema_url)
 
     def check(ctx, response, case):
         assert response.status_code == 200
 
     # When there is `:` in the API operation path
-    stream = execute(real_app_schema, checks=(check,))
+    stream = execute(schema, checks=(check,))
     # Then it should be reachable
     stream.assert_no_errors()
     stream.assert_no_failures()

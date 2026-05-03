@@ -144,15 +144,19 @@ def execute_state_machine_loop(
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                # Absorb transport failures locally; only escalate to phase-fatal when too many distinct ops fail in the window.
+                # A timeout is per-request: a slow operation shouldn't abort the phase. Connection-level
+                # failures (reset, chunked-encoding break) usually mean the server crashed; surface
+                # those immediately on the first occurrence.
                 if isinstance(
                     exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
                 ) and is_unrecoverable_network_error(exc):
                     now = time.monotonic()
                     engine.health.record_transport_failure(operation_label=operation_label, now=now)
-                    reason = engine.health.abort_reason(now=now)
-                    if reason is None:
-                        raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
+                    reason: str | None = None
+                    if isinstance(exc, requests.Timeout):
+                        reason = engine.health.abort_reason(now=now)
+                        if reason is None:
+                            raise UnsatisfiedAssumption("transport failure absorbed by health monitor") from exc
                     transport_kwargs = engine.get_transport_kwargs(operation=input.case.operation)
                     if exc.request is not None:
                         headers = dict(exc.request.headers)

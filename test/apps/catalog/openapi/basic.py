@@ -110,6 +110,188 @@ def ignored_auth() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+_NODE_DEFINITION = {
+    "type": "object",
+    "properties": {"children": {"type": "array", "items": {"$ref": "#/x-definitions/Node"}}},
+    "required": ["children"],
+}
+
+
+def form() -> OpenAPIApp:
+    spec = build_schema(schemas.form())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_form(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def upload_file() -> OpenAPIApp:
+    spec = build_schema(schemas.upload_file())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_upload_file(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def always_incorrect() -> OpenAPIApp:
+    spec = build_schema(schemas.always_incorrect())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_always_incorrect(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def success_and_upload_file() -> OpenAPIApp:
+    spec = build_schema({**schemas.success(), **schemas.upload_file()})
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_upload_file(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def upload_file_and_custom_format() -> OpenAPIApp:
+    spec = build_schema({**schemas.upload_file(), **schemas.custom_format()})
+    app = make_flask_app_from_schema(spec)
+    handlers.register_upload_file(app)
+    handlers.register_custom_format(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def success_and_custom_format() -> OpenAPIApp:
+    spec = build_schema({**schemas.success(), **schemas.custom_format()})
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_custom_format(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def success_failure_unsatisfiable_empty_string() -> OpenAPIApp:
+    spec = build_schema({**schemas.success(), **schemas.failure(), **schemas.unsatisfiable(), **schemas.empty_string()})
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_failure(app)
+    handlers.register_unsatisfiable(app)
+    handlers.register_empty_string(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def empty() -> OpenAPIApp:
+    spec = build_schema(schemas.empty())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_empty(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def empty_string() -> OpenAPIApp:
+    spec = build_schema(schemas.empty_string())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_empty_string(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def recursive() -> OpenAPIApp:
+    spec = {**build_schema(schemas.recursive()), "x-definitions": {"Node": _NODE_DEFINITION}}
+    app = make_flask_app_from_schema(spec)
+    handlers.register_recursive(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def invalid_response() -> OpenAPIApp:
+    spec = build_schema(schemas.invalid_response())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_invalid_response(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def invalid_path_parameter() -> OpenAPIApp:
+    spec = build_schema(schemas.invalid_path_parameter())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_invalid_path_parameter(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def missing_path_parameter() -> OpenAPIApp:
+    # Path declares `{id}` but no `parameters` section — surfaces as a schema error.
+    spec = build_schema(schemas.missing_path_parameter())
+    app = make_flask_app_from_schema(spec)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def reserved() -> OpenAPIApp:
+    spec = build_schema(schemas.reserved())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_reserved(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def conformance() -> OpenAPIApp:
+    spec = build_schema(schemas.conformance())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_conformance(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def cp866() -> OpenAPIApp:
+    spec = build_schema(schemas.cp866())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_cp866(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def read_only() -> OpenAPIApp:
+    spec = build_schema(schemas.read_only(), components=schemas.READ_WRITE_COMPONENTS)
+    app = make_flask_app_from_schema(spec)
+    handlers.register_read_only(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def write_only() -> OpenAPIApp:
+    spec = build_schema(schemas.write_only(), components=schemas.READ_WRITE_COMPONENTS)
+    app = make_flask_app_from_schema(spec)
+    handlers.register_write_only(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def text() -> OpenAPIApp:
+    spec = build_schema(schemas.text())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_text(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def plain_text_body() -> OpenAPIApp:
+    spec = build_schema(schemas.plain_text_body())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_plain_text_body(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def teapot() -> OpenAPIApp:
+    spec = build_schema(schemas.teapot())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_teapot(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def malformed_json() -> OpenAPIApp:
+    spec = build_schema(schemas.malformed_json())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_malformed_json(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def invalid() -> OpenAPIApp:
+    spec = build_schema(schemas.invalid())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_invalid(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def success_and_text() -> OpenAPIApp:
+    spec = build_schema({**schemas.success(), **schemas.text()})
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_text(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def slow() -> OpenAPIApp:
     spec = build_schema(schemas.slow())
     app = make_flask_app_from_schema(spec)

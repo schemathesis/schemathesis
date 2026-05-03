@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       2 selected / 2 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
@@ -32,7 +32,7 @@ Schemathesis dev
 
 Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
 
-  - GET /custom_format
+  - GET /api/custom_format
 
 💡 Check your schema constraints - API validation may be stricter than documented
 

@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
-     Specification:    Open API 2.0
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
@@ -29,21 +29,32 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-_________________________________ POST /teapot _________________________________
+_____________________________ GET /api/conformance _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented HTTP status code
+- Response violates schema
 
-    Received: 418
-    Documented: 200
+    "e32ab85ed4634c38a320eb0b22460da9" is not one of "foo"
 
-[418] I'm a Teapot:
+    Schema at /properties/value:
 
-    `{"success": true}`
+        {
+            "enum": [
+                "foo"
+            ]
+        }
+
+    Value:
+
+        "e32ab85ed4634c38a320eb0b22460da9"
+
+[200] OK:
+
+    `{"value":"e32ab85ed4634c38a320eb0b22460da9"}`
 
 Reproduce with:
 
-    curl -X POST http://127.0.0.1/api/teapot
+    curl -X GET http://127.0.0.1/api/conformance
 
 =================================== SUMMARY ====================================
 
@@ -58,10 +69,10 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
+  ❌ Response violates schema: 1
 
 Test cases:
-  N generated, N found N unique failures
+  9 generated, 1 found 1 unique failures, 7 skipped
 
 Seed: 42
 

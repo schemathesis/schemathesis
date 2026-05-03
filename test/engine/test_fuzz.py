@@ -95,10 +95,10 @@ def test_fuzz_scenario_events_are_paired(ctx):
     assert finished_ids
 
 
-@pytest.mark.operations()
-def test_fuzz_no_operations_emits_no_scenarios(real_app_schema):
+def test_fuzz_no_operations_emits_no_scenarios(ctx):
     # When the schema has no operations, the fuzz thread returns immediately
-    collected = list(from_schema(real_app_schema).fuzz())
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema({}))
+    collected = list(from_schema(schema).fuzz())
     assert isinstance(collected[0], events.EngineStarted)
     assert isinstance(collected[-1], events.EngineFinished)
     assert not any(isinstance(e, events.FuzzScenarioStarted) for e in collected)

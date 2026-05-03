@@ -69,6 +69,78 @@ class OpenAPIApps:
     def ignored_auth(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.ignored_auth())
 
+    def form(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.form())
+
+    def upload_file(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.upload_file())
+
+    def always_incorrect(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.always_incorrect())
+
+    def success_and_upload_file(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_and_upload_file())
+
+    def upload_file_and_custom_format(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.upload_file_and_custom_format())
+
+    def success_and_custom_format(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_and_custom_format())
+
+    def success_failure_unsatisfiable_empty_string(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_failure_unsatisfiable_empty_string())
+
+    def empty(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.empty())
+
+    def empty_string(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.empty_string())
+
+    def recursive(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.recursive())
+
+    def invalid_response(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.invalid_response())
+
+    def invalid_path_parameter(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.invalid_path_parameter())
+
+    def missing_path_parameter(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.missing_path_parameter())
+
+    def reserved(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.reserved())
+
+    def conformance(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.conformance())
+
+    def cp866(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.cp866())
+
+    def read_only(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.read_only())
+
+    def write_only(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.write_only())
+
+    def text(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.text())
+
+    def plain_text_body(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.plain_text_body())
+
+    def teapot(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.teapot())
+
+    def malformed_json(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.malformed_json())
+
+    def invalid(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.invalid())
+
+    def success_and_text(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_and_text())
+
     def slow(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.slow())
 

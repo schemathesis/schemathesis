@@ -163,6 +163,382 @@ def csv_payload() -> dict[str, Any]:
     }
 
 
+def form() -> dict[str, Any]:
+    return {
+        "/api/form": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "additionalProperties": False,
+                                "type": "object",
+                                "properties": {
+                                    "first_name": {"type": "string"},
+                                    "last_name": {"type": "string"},
+                                },
+                                "required": ["first_name", "last_name"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+def upload_file() -> dict[str, Any]:
+    return {
+        "/api/upload_file": {
+            "post": {
+                "x-property": 42,
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "data": {"type": "string", "format": "binary"},
+                                    "note": {"type": "string"},
+                                },
+                                "required": ["data", "note"],
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "default": {"description": "Everything else"}},
+            }
+        }
+    }
+
+
+def always_incorrect() -> dict[str, Any]:
+    # Server always returns non-2xx; used by the missing-test-data warning checks.
+    return {
+        "/api/always_incorrect": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def empty() -> dict[str, Any]:
+    return {
+        "/api/empty": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def empty_string() -> dict[str, Any]:
+    return {
+        "/api/empty_string": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"type": "string"}}},
+                    }
+                }
+            }
+        }
+    }
+
+
+def recursive() -> dict[str, Any]:
+    return {
+        "/api/recursive": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"$ref": "#/x-definitions/Node"}}},
+                    }
+                }
+            }
+        }
+    }
+
+
+def invalid_response() -> dict[str, Any]:
+    return {
+        "/api/invalid_response": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def invalid_path_parameter() -> dict[str, Any]:
+    return {
+        "/api/invalid_path_parameter/{id}": {
+            "get": {
+                "parameters": [{"name": "id", "in": "path", "required": False, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+def missing_path_parameter() -> dict[str, Any]:
+    # Path declares `{id}` but no `parameters` section — surfaces as a schema error.
+    return {
+        "/api/missing_path_parameter/{id}": {
+            "get": {"responses": {"200": {"description": "OK"}}},
+        }
+    }
+
+
+def reserved() -> dict[str, Any]:
+    return {
+        "/api/foo:bar": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def conformance() -> dict[str, Any]:
+    # Schema requires `value` to be the literal "foo"; handler returns a fresh UUID — fails
+    # response_schema_conformance every time.
+    return {
+        "/api/conformance": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"value": {"enum": ["foo"]}},
+                                    "required": ["value"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def cp866() -> dict[str, Any]:
+    return {
+        "/api/cp866": {
+            "get": {
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "string"}}}}
+                }
+            }
+        }
+    }
+
+
+_READ_WRITE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "read": {"type": "string", "readOnly": True},
+        "write": {"type": "integer", "writeOnly": True},
+    },
+    "required": ["read", "write"],
+    "additionalProperties": False,
+}
+
+
+def read_only() -> dict[str, Any]:
+    return {
+        "/api/read_only": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadWrite"}}},
+                    }
+                }
+            }
+        }
+    }
+
+
+def write_only() -> dict[str, Any]:
+    return {
+        "/api/write_only": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadWrite"}}},
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ReadWrite"}}},
+                    }
+                },
+            }
+        }
+    }
+
+
+READ_WRITE_COMPONENTS: dict[str, Any] = {"schemas": {"ReadWrite": _READ_WRITE_SCHEMA}}
+
+
+def text() -> dict[str, Any]:
+    # Schema declares JSON; handler returns text/plain — used to test content-type checks.
+    return {
+        "/api/text": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def plain_text_body() -> dict[str, Any]:
+    return {
+        "/api/text": {
+            "post": {
+                "requestBody": {"content": {"text/plain": {"schema": {"type": "string"}}}, "required": True},
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
+def teapot() -> dict[str, Any]:
+    # Handler returns 418 (an undocumented status); used to verify status_code_conformance.
+    return {
+        "/api/teapot": {
+            "post": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def malformed_json() -> dict[str, Any]:
+    return {
+        "/api/malformed_json": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"success": {"type": "boolean"}},
+                                    "required": ["success"],
+                                }
+                            }
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+
+def invalid() -> dict[str, Any]:
+    # The `type: int` is an intentional typo — should be "integer". Used to test schema validation errors.
+    return {
+        "/api/invalid": {
+            "post": {
+                "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "int"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+
+
 def slow() -> dict[str, Any]:
     return {
         "/api/slow": {

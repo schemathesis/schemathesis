@@ -5,34 +5,34 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       1 selected / 2 total
+     Operations:       2 selected / 2 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
-     ⏭  1 skipped
+     ⏭  2 skipped
 
  ✅  Coverage (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 2 passed
 
  ✅  Fuzzing (in 0.00s)
 
-     ✅ 1 passed
+     ✅ 2 passed
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/2
-  Tested: 1
+  Selected: 2/2
+  Tested: 2
 
 Test Phases:
   ⏭  Examples
