@@ -37,22 +37,25 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.transport.prepare import get_default_headers
 from schemathesis.transport.wsgi import WSGI_TRANSPORT
-from test.apps import _graphql as graphql
-from test.apps._graphql.schema import Author
 from test.utils import assert_requests_call
 
 
-def test_raw_schema(graphql_schema):
-    assert graphql_schema.specification.name == "GraphQL"
+def test_raw_schema(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    assert schema.specification.name == "GraphQL"
 
 
-def test_tags(graphql_schema):
-    assert graphql_schema["Query"]["getBooks"].tags is None
+def test_tags(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    assert schema["Query"]["getBooks"].tags is None
 
 
 @pytest.mark.hypothesis_nested
-def test_operation_strategy(graphql_strategy):
-    @given(case=graphql_strategy)
+def test_operation_strategy(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    strategy = schema["Query"]["getBooks"].as_strategy()
+
+    @given(case=strategy)
     @settings(max_examples=10, deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much])
     def test(case):
         response = case.call()
@@ -62,8 +65,10 @@ def test_operation_strategy(graphql_strategy):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_as_wsgi_kwargs(graphql_strategy):
-    case = graphql_strategy.example()
+def test_as_wsgi_kwargs(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    strategy = schema["Query"]["getBooks"].as_strategy()
+    case = strategy.example()
     expected = {
         "method": "POST",
         "path": "/graphql",
@@ -80,8 +85,8 @@ def test_as_wsgi_kwargs(graphql_strategy):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_custom_base_url(graphql_url):
-    schema = schemathesis.graphql.from_url(graphql_url)
+def test_custom_base_url(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     schema.config.update(base_url="http://0.0.0.0:1234/something")
 
     # Then the base path is changed, in this case it is the only available path
@@ -93,8 +98,9 @@ def test_custom_base_url(graphql_url):
 
 
 @pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])
-def test_make_case(graphql_schema, kwargs):
-    case = graphql_schema["Query"]["getBooks"].Case(**kwargs)
+def test_make_case(ctx, kwargs):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = schema["Query"]["getBooks"].Case(**kwargs)
     assert_requests_call(case)
 
 
@@ -105,9 +111,10 @@ def test_make_case(graphql_schema, kwargs):
         ({"content": b"[]"}, "Unexpected GraphQL Response"),
     ],
 )
-def test_response_validation(graphql_schema, response_factory, kwargs, expected):
+def test_response_validation(ctx, response_factory, kwargs, expected):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     response = response_factory.requests(status_code=200, **kwargs)
-    case = graphql_schema["Query"]["getBooks"].Case(body="Q")
+    case = schema["Query"]["getBooks"].Case(body="Q")
     with pytest.raises(Failure, match=expected):
         not_a_server_error(
             CheckContext(
@@ -122,8 +129,9 @@ def test_response_validation(graphql_schema, response_factory, kwargs, expected)
         )
 
 
-def test_client_error(graphql_schema):
-    case = graphql_schema["Query"]["getBooks"].Case(body="invalid query")
+def test_client_error(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = schema["Query"]["getBooks"].Case(body="invalid query")
     with pytest.raises(FailureGroup) as exc:
         case.call_and_validate()
     assert "Syntax Error: Unexpected Name 'invalid'." in str(exc.value.exceptions[0])
@@ -158,7 +166,11 @@ def test_is_client_error(payload, expected):
     assert is_client_error(payload) == expected
 
 
-def test_server_error(graphql_path, app_runner):
+def test_server_error(ctx):
+    @strawberry.type
+    class Author:
+        name: str
+
     @strawberry.type
     class Query:
         @strawberry.field
@@ -169,14 +181,10 @@ def test_server_error(graphql_path, app_runner):
         def showBug2(self, name: str) -> Author:
             raise AssertionError("Another bug")
 
-    gql_schema = strawberry.Schema(Query)
+    api = ctx.graphql.apps.from_schema(strawberry.Schema(Query))
+    schema = schemathesis.graphql.from_url(api.schema_url)
 
-    app = graphql._flask.create_app(graphql_path, schema=gql_schema)
-    port = app_runner.run_flask_app(app)
-    graphql_url = f"http://127.0.0.1:{port}{graphql_path}"
-    graphql_schema = schemathesis.graphql.from_url(graphql_url)
-
-    @given(case=graphql_schema["Query"]["showBug1"].as_strategy())
+    @given(case=schema["Query"]["showBug1"].as_strategy())
     @settings(max_examples=1, deadline=None, phases=[Phase.generate])
     def test(case):
         case.call_and_validate()
@@ -201,9 +209,10 @@ def test_multiple_server_error():
     assert exc.value.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
 
 
-def test_no_query(graphql_url):
+def test_no_query(ctx):
     # When GraphQL schema does not contain the `Query` type
-    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
+    api = ctx.graphql.apps.books()
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     raw_schema = decoded["data"]
     raw_schema["__schema"]["queryType"] = None
@@ -215,8 +224,9 @@ def test_no_query(graphql_url):
 
 
 @pytest.mark.parametrize("with_data_key", [True, False])
-def test_data_key(graphql_url, with_data_key):
-    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
+def test_data_key(ctx, with_data_key):
+    api = ctx.graphql.apps.books()
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     if not with_data_key:
         decoded = decoded["data"]
@@ -224,15 +234,17 @@ def test_data_key(graphql_url, with_data_key):
     assert schema.statistic.operations.total == 4
 
 
-def test_malformed_response(graphql_url):
-    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
+def test_malformed_response(ctx):
+    api = ctx.graphql.apps.books()
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
     response._content += b"42"
     with pytest.raises(LoaderError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
         extract_schema_from_response(response, lambda r: r.json())
 
 
-def test_operations_count(graphql_url):
-    response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
+def test_operations_count(ctx):
+    api = ctx.graphql.apps.books()
+    response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     raw_schema = decoded["data"]
     schema = schemathesis.graphql.from_dict(raw_schema)
@@ -290,9 +302,10 @@ type Query {
         ),
     ],
 )
-def test_schema_error(testdir, cli, snapshot_cli, schema, extension, graphql_url):
+def test_schema_error(ctx, testdir, cli, snapshot_cli, schema, extension):
     schema_file = testdir.make_graphql_schema_file(schema, extension=extension)
-    assert cli.run(str(schema_file), f"--url={graphql_url}") == snapshot_cli
+    api = ctx.graphql.apps.books()
+    assert cli.run(str(schema_file), f"--url={api.schema_url}") == snapshot_cli
 
 
 @pytest.mark.parametrize(
@@ -303,11 +316,12 @@ def test_schema_error(testdir, cli, snapshot_cli, schema, extension, graphql_url
         "--include-name=DoesNotExist",
     ],
 )
-def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
-    assert cli.run(graphql_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
+def test_filter_operations(ctx, cli, snapshot_cli, arg):
+    api = ctx.graphql.apps.books()
+    assert cli.run(api.schema_url, "--max-examples=1", "--mode=positive", arg) == snapshot_cli
 
 
-def test_disallow_null(ctx, cli, testdir, snapshot_cli, graphql_url):
+def test_disallow_null(ctx, cli, testdir, snapshot_cli):
     schema = """type Query {
     getValue(value: Int): Int
 }
@@ -324,11 +338,12 @@ def filter_body(context, body):
     return True
 """
     )
+    api = ctx.graphql.apps.books()
     assert (
         cli.main(
             "run",
             str(schema_file),
-            f"--url={graphql_url}",
+            f"--url={api.schema_url}",
             "--generation-graphql-allow-null=false",
             hooks=module,
         )
@@ -336,9 +351,10 @@ def filter_body(context, body):
     )
 
 
-def test_unknown_type_name(graphql_schema):
+def test_unknown_type_name(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     with pytest.raises(LookupError, match="`Qwery` type not found. Did you mean `Query`?"):
-        graphql_schema["Qwery"]["getBooks"]
+        schema["Qwery"]["getBooks"]
 
 
 @pytest.mark.parametrize(
@@ -348,26 +364,30 @@ def test_unknown_type_name(graphql_schema):
         ("abcdef", "`abcdef` field not found"),
     ],
 )
-def test_unknown_field_name(graphql_schema, name, expected):
+def test_unknown_field_name(ctx, name, expected):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     with pytest.raises(LookupError, match=expected):
-        graphql_schema["Query"][name]
+        schema["Query"][name]
 
 
-def test_field_map_operations(graphql_schema):
-    assert len(graphql_schema["Query"]) == 2
-    assert list(iter(graphql_schema["Query"])) == ["getBooks", "getAuthors"]
-    assert graphql_schema.find_operation_by_label("Query.getBooks") is not None
-    assert graphql_schema.find_operation_by_label("Query.getBookz") is None
-    assert graphql_schema.find_operation_by_label("getBookz") is None
+def test_field_map_operations(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    assert len(schema["Query"]) == 2
+    assert list(iter(schema["Query"])) == ["getBooks", "getAuthors"]
+    assert schema.find_operation_by_label("Query.getBooks") is not None
+    assert schema.find_operation_by_label("Query.getBookz") is None
+    assert schema.find_operation_by_label("getBookz") is None
 
 
-def test_repr(graphql_schema):
-    assert repr(graphql_schema) == "<GraphQLSchema>"
+def test_repr(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    assert repr(schema) == "<GraphQLSchema>"
 
 
 @pytest.mark.parametrize("type_name", ["Query", "Mutation"])
-def test_type_as_strategy(graphql_schema, type_name):
-    operations = graphql_schema[type_name]
+def test_type_as_strategy(ctx, type_name):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    operations = schema[type_name]
     strategy = operations.as_strategy()
     for operation in operations.values():
         # All fields should be possible to generate
@@ -379,9 +399,10 @@ def test_type_as_strategy(graphql_schema, type_name):
         )
 
 
-def test_schema_as_strategy(graphql_schema):
-    strategy = graphql_schema.as_strategy()
-    for operations in graphql_schema.values():
+def test_schema_as_strategy(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    strategy = schema.as_strategy()
+    for operations in schema.values():
         for operation in operations.values():
             # All fields should be possible to generate
             # Note: Phase.explain excluded due to Hypothesis 6.149.0 bug with variable-length strategies
@@ -396,21 +417,24 @@ def test_schema_as_strategy(graphql_schema):
     "check",
     [use_after_free, ensure_resource_availability, ignored_auth, positive_data_acceptance, negative_data_rejection],
 )
-def test_ignored_checks(graphql_schema, check):
+def test_ignored_checks(ctx, check):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     # Just in case
-    case = graphql_schema["Query"]["getBooks"].Case()
+    case = schema["Query"]["getBooks"].Case()
     assert check(None, None, case)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_negative_mode_cli(cli, graphql_url, snapshot_cli):
+def test_negative_mode_cli(ctx, cli, snapshot_cli):
     # Test that negative mode generates invalid queries for mutations with required arguments
-    assert cli.run(graphql_url, "--max-examples=1", "--mode=negative") == snapshot_cli
+    api = ctx.graphql.apps.books()
+    assert cli.run(api.schema_url, "--max-examples=1", "--mode=negative") == snapshot_cli
 
 
-def test_negative_mode_skip_when_impossible(graphql_schema):
-    operation = graphql_schema["Query"]["getBooks"]
-    graphql_schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
+def test_negative_mode_skip_when_impossible(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    operation = schema["Query"]["getBooks"]
+    schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     with pytest.raises(SkipTest, match="Impossible to generate negative test cases"):
@@ -423,9 +447,10 @@ def test_negative_mode_skip_when_impossible(graphql_schema):
         test_()
 
 
-def test_negative_mode_fallback_to_positive(graphql_schema):
-    operation = graphql_schema["Query"]["getBooks"]
-    graphql_schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
+def test_negative_mode_fallback_to_positive(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    operation = schema["Query"]["getBooks"]
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE, GenerationMode.NEGATIVE])
     strategy = operation.as_strategy(generation_mode=GenerationMode.NEGATIVE)
 
     @given(strategy)
@@ -437,8 +462,8 @@ def test_negative_mode_fallback_to_positive(graphql_schema):
     test_()
 
 
-def _make_graphql_case_with_mode(graphql_schema, mode):
-    operation = graphql_schema["Mutation"]["addBook"]
+def _make_graphql_case_with_mode(schema, mode):
+    operation = schema["Mutation"]["addBook"]
     meta = CaseMetadata(
         generation=GenerationInfo(time=0.0, mode=mode),
         components={ParameterLocation.BODY: ComponentInfo(mode=mode)},
@@ -472,66 +497,72 @@ def _make_mock_response(content, status_code=200):
     return Response.from_requests(response, True)
 
 
-def test_not_a_server_error_graphql_negative_mode_accepted_invalid_data(graphql_schema):
-    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+def test_not_a_server_error_graphql_negative_mode_accepted_invalid_data(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
-    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
     with pytest.raises(AcceptedNegativeData, match="Invalid data should have been rejected"):
-        not_a_server_error(ctx, response, case)
+        not_a_server_error(check_ctx, response, case)
 
 
-def test_not_a_server_error_graphql_negative_mode_client_error_passes(graphql_schema):
-    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+def test_not_a_server_error_graphql_negative_mode_client_error_passes(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
-    result = not_a_server_error(ctx, response, case)
+    result = not_a_server_error(check_ctx, response, case)
     assert result is None
 
 
-def test_not_a_server_error_graphql_positive_mode_client_error_raises(graphql_schema):
-    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.POSITIVE)
+def test_not_a_server_error_graphql_positive_mode_client_error_raises(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.POSITIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
     with pytest.raises(GraphQLClientError, match="Field 'addBook' argument 'title' is required"):
-        not_a_server_error(ctx, response, case)
+        not_a_server_error(check_ctx, response, case)
 
 
-def test_not_a_server_error_graphql_negative_mode_server_error_raises(graphql_schema):
-    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+def test_not_a_server_error_graphql_negative_mode_server_error_raises(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Internal error in resolver", "path": ["addBook"]}]}
     )
-    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
     with pytest.raises(GraphQLServerError, match="Internal error in resolver"):
-        not_a_server_error(ctx, response, case)
+        not_a_server_error(check_ctx, response, case)
 
 
-def test_not_a_server_error_graphql_negative_mode_includes_description(graphql_schema):
-    case = _make_graphql_case_with_mode(graphql_schema, GenerationMode.NEGATIVE)
+def test_not_a_server_error_graphql_negative_mode_includes_description(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = _make_graphql_case_with_mode(schema, GenerationMode.NEGATIVE)
     response = _make_mock_response({"data": {"addBook": {"id": "1"}}})
-    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
     with pytest.raises(AcceptedNegativeData) as exc_info:
-        not_a_server_error(ctx, response, case)
+        not_a_server_error(check_ctx, response, case)
 
     assert "Negative test case" in exc_info.value.message
 
 
-def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(graphql_schema):
-    case = graphql_schema["Mutation"]["addBook"].Case()
+def test_not_a_server_error_graphql_no_meta_falls_through_to_validation(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+    case = schema["Mutation"]["addBook"].Case()
     response = _make_mock_response(
         {"data": None, "errors": [{"message": "Field 'addBook' argument 'title' is required"}]}
     )
-    ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
+    check_ctx = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
     # Without meta, should fall through to normal validation and raise GraphQLClientError
     with pytest.raises(GraphQLClientError):
-        not_a_server_error(ctx, response, case)
+        not_a_server_error(check_ctx, response, case)

@@ -7,18 +7,25 @@ import schemathesis.graphql
 from schemathesis.core.rate_limit import parse_units
 
 
+def _graphql_url(ctx):
+    return ctx.graphql.apps.books().schema_url
+
+
+def _openapi_url(ctx):
+    return ctx.request.getfixturevalue("openapi3_schema_url")
+
+
 @pytest.mark.parametrize(
-    ("loader", "fixture"),
+    ("loader", "make_url", "kind"),
     [
-        (schemathesis.graphql.from_url, "graphql_url"),
-        (schemathesis.openapi.from_url, "openapi3_schema_url"),
+        (schemathesis.graphql.from_url, _graphql_url, "graphql"),
+        (schemathesis.openapi.from_url, _openapi_url, "openapi"),
     ],
 )
 @pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_maximum_requests(request, loader, fixture):
-    url = request.getfixturevalue(fixture)
-    schema = loader(url)
+def test_maximum_requests(ctx, loader, make_url, kind):
+    schema = loader(make_url(ctx))
     schema.config.update(rate_limit="5/h")
     counter = 0
 
@@ -27,7 +34,7 @@ def test_maximum_requests(request, loader, fixture):
         for _ in range(5):
             for operation in schema.get_all_operations():
                 operation = operation.ok()
-                if fixture == "graphql_url":
+                if kind == "graphql":
                     case = operation.Case(body={})
                 else:
                     case = operation.Case()

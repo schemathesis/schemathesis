@@ -545,8 +545,10 @@ def test_after_validate_hook(openapi3_schema_url, ctx):
     ]
 
 
-def test_graphql_body(graphql_schema):
-    @graphql_schema.hook
+def test_graphql_body(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
+
+    @schema.hook
     def map_body(context, body):
         node = body.definitions[0].selection_set.selections[0]
         node.name.value = "addedViaHook"
@@ -554,7 +556,7 @@ def test_graphql_body(graphql_schema):
         node.selection_set = ()
         return body
 
-    strategy = graphql_schema["Mutation"]["addBook"].as_strategy()
+    strategy = schema["Mutation"]["addBook"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
@@ -565,37 +567,39 @@ def test_graphql_body(graphql_schema):
     test()
 
 
-def test_graphql_query(graphql_schema, graphql_server_host):
+def test_graphql_query(ctx):
+    api = ctx.graphql.apps.books()
+    schema = schemathesis.graphql.from_url(api.schema_url)
     query = {"q": 1}
     path_parameters = {"p": 2}
     headers = {"h": "3"}
     cookies = {"c": "4"}
 
-    @graphql_schema.hook
+    @schema.hook
     def map_query(_, __):
         nonlocal query
 
         return query
 
-    @graphql_schema.hook
+    @schema.hook
     def map_path_parameters(_, __):
         nonlocal path_parameters
 
         return path_parameters
 
-    @graphql_schema.hook
+    @schema.hook
     def map_headers(_, __):
         nonlocal headers
 
         return headers
 
-    @graphql_schema.hook
+    @schema.hook
     def map_cookies(_, __):
         nonlocal cookies
 
         return cookies
 
-    strategy = graphql_schema["Query"]["getBooks"].as_strategy()
+    strategy = schema["Query"]["getBooks"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=3, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
@@ -616,7 +620,7 @@ def test_graphql_query(graphql_schema, graphql_server_host):
             "json": {"query": ANY},
             "method": "POST",
             "params": {"q": 1},
-            "url": f"http://{graphql_server_host}/graphql",
+            "url": f"http://127.0.0.1:{api.port}/graphql",
         }
         assert_requests_call(case)
 

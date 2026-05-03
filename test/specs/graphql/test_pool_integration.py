@@ -30,11 +30,12 @@ _POOL_DISABLED_CONFIG = {"phases": {"fuzzing": {"extra-data-sources": {"response
     ids=["use-after-create", "update-on-existing", "no-producer", "pool-disabled-via-config"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_planted_bug_findability(cli, buggy_graphql_url, snapshot_cli, filter_arg, config):
+def test_planted_bug_findability(ctx, cli, snapshot_cli, filter_arg, config):
     # Positive-only: negative queries fail server validation before capture, so they never exercise the pool.
+    api = ctx.graphql.apps.use_after_create()
     assert (
         cli.run(
-            buggy_graphql_url,
+            api.schema_url,
             "--max-examples=10",
             "-m",
             "positive",
@@ -57,10 +58,11 @@ def test_planted_bug_findability(cli, buggy_graphql_url, snapshot_cli, filter_ar
     ids=["bare-id-via-return-type", "arg-name-token", "pool-disabled-via-config"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_generic_id_planted_bug_findability(cli, buggy_generic_id_graphql_url, snapshot_cli, filter_args, config):
+def test_generic_id_planted_bug_findability(ctx, cli, snapshot_cli, filter_args, config):
+    api = ctx.graphql.apps.generic_id_pool()
     assert (
         cli.run(
-            buggy_generic_id_graphql_url,
+            api.schema_url,
             "--max-examples=10",
             "-m",
             "positive",
@@ -79,10 +81,11 @@ def test_generic_id_planted_bug_findability(cli, buggy_generic_id_graphql_url, s
     ids=["pool-enabled", "pool-disabled-via-config"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_input_object_planted_bug_findability(cli, buggy_input_object_graphql_url, snapshot_cli, config):
+def test_input_object_planted_bug_findability(ctx, cli, snapshot_cli, config):
+    api = ctx.graphql.apps.input_object_pool()
     assert (
         cli.run(
-            buggy_input_object_graphql_url,
+            api.schema_url,
             "--max-examples=10",
             "-m",
             "positive",
@@ -100,10 +103,11 @@ def test_input_object_planted_bug_findability(cli, buggy_input_object_graphql_ur
     ids=["pool-enabled", "pool-disabled-via-config"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_list_argument_planted_bug_findability(cli, buggy_list_graphql_url, snapshot_cli, config):
+def test_list_argument_planted_bug_findability(ctx, cli, snapshot_cli, config):
+    api = ctx.graphql.apps.list_argument_pool()
     assert (
         cli.run(
-            buggy_list_graphql_url,
+            api.schema_url,
             "--max-examples=10",
             "-m",
             "positive",
@@ -121,11 +125,12 @@ def test_list_argument_planted_bug_findability(cli, buggy_list_graphql_url, snap
     ids=["pool-enabled", "pool-disabled-via-config"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_tombstone_planted_bug_findability(cli, buggy_tombstone_graphql_url, snapshot_cli, config):
+def test_tombstone_planted_bug_findability(ctx, cli, snapshot_cli, config):
     # Tombstones evict deleted ids so updateBook draws from still-existing books and finds the planted bug.
+    api = ctx.graphql.apps.tombstone_pool()
     assert (
         cli.run(
-            buggy_tombstone_graphql_url,
+            api.schema_url,
             "--max-examples=10",
             "-m",
             "positive",

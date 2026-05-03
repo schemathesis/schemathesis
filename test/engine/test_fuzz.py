@@ -337,11 +337,12 @@ def test_fuzz_scenario_error_status(real_app_schema):
     assert any(isinstance(e, events.FuzzScenarioFinished) and e.status == Status.ERROR for e in collected)
 
 
-def test_fuzz_graphql_schema(graphql_schema):
+def test_fuzz_graphql_schema(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     collected: list[events.EngineEvent] = []
     started_ids: set[uuid.UUID] = set()
     finished_ids: list[uuid.UUID] = []
-    stream = from_schema(graphql_schema).fuzz(FuzzConfig())
+    stream = from_schema(schema).fuzz(FuzzConfig())
     for event in stream:
         collected.append(event)
         if isinstance(event, events.FuzzScenarioStarted):

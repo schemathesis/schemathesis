@@ -28,25 +28,28 @@ type Query {
 }"""
 
 
-def test_graphql_asgi_loader(graphql_path, fastapi_graphql_app, run_test):
+def test_graphql_asgi_loader(ctx, run_test):
+    api = ctx.graphql.apps.books(framework="fastapi")
     # When an ASGI app is loaded via `from_asgi`
-    schema = loaders.from_asgi(graphql_path, fastapi_graphql_app)
+    schema = loaders.from_asgi("/graphql", api.wsgi_app)
     strategy = schema["Query"]["getBooks"].as_strategy()
     # Then it should successfully make calls
     run_test(strategy)
 
 
-def test_graphql_wsgi_loader(graphql_path, graphql_app, run_test):
+def test_graphql_wsgi_loader(ctx, run_test):
+    api = ctx.graphql.apps.books()
     # When a WSGI app is loaded via `from_wsgi`
-    schema = loaders.from_wsgi(graphql_path, graphql_app)
+    schema = loaders.from_wsgi("/graphql", api.wsgi_app)
     strategy = schema["Query"]["getBooks"].as_strategy()
     # Then it should successfully make calls
     run_test(strategy)
 
 
-def test_graphql_url(graphql_path, fastapi_graphql_app):
+def test_graphql_url(ctx):
+    api = ctx.graphql.apps.books(framework="fastapi")
     # See GH-1987
-    schema = loaders.from_asgi(graphql_path, fastapi_graphql_app)
+    schema = loaders.from_asgi("/graphql", api.wsgi_app)
     schema.location = "/graphql/"
     strategy = schema["Query"]["getBooks"].as_strategy()
 
