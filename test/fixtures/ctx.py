@@ -17,6 +17,7 @@ from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import ajv as openapi_ajv
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
+from test.apps.catalog.openapi import go_validator as openapi_go_validator
 from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
@@ -196,6 +197,9 @@ class OpenAPIApps:
 
     def ajv_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_ajv.planted_bug())
+
+    def go_validator_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_go_validator.planted_bug())
 
 
 @dataclass(slots=True)
