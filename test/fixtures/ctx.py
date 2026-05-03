@@ -142,6 +142,12 @@ class OpenAPIApps:
     def success_and_text(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_text())
 
+    def chunked_success(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.chunked_success())
+
+    def success_text_and_write_only(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_text_and_write_only())
+
     def slow(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.slow())
 

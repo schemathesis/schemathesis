@@ -1223,23 +1223,27 @@ def test(case):
 @pytest.mark.parametrize(
     ["filter", "expected"],
     (
+        # Only POST /api/write_only is enabled by the config; it fails on random input.
         ("", {"failed": 1}),
-        # Adds two additional operations
-        (".include(name_regex='GET /(success|text)')", {"failed": 2, "passed": 1}),
-        # Also excludes the one defined in the config file
-        (".include(name_regex='GET /(success|text)').exclude(name='POST /write_only')", {"failed": 1, "passed": 1}),
+        # Adds /api/success (passes) and /api/text (content-type failure) on top of write_only.
+        (".include(name_regex='GET /api/(success|text)')", {"failed": 2, "passed": 1}),
+        # Also drops write_only via name exclusion, leaving success + text.
+        (
+            ".include(name_regex='GET /api/(success|text)').exclude(name='POST /api/write_only')",
+            {"failed": 1, "passed": 1},
+        ),
     ),
 )
-@pytest.mark.operations("__all__")
-def test_filter_combination(testdir, openapi3_schema_url, filter, expected):
+def test_filter_combination(ctx, testdir, filter, expected):
+    api = ctx.openapi.apps.success_text_and_write_only()
     testdir.make_test(f"""
 config = schemathesis.Config.from_dict({{
     "operations": [{{
-        "exclude-name": "POST /write_only",
+        "exclude-name": "POST /api/write_only",
         "enabled": False,
     }}]
 }})
-schema = schemathesis.openapi.from_url("{openapi3_schema_url}", config=config)
+schema = schemathesis.openapi.from_url("{api.schema_url}", config=config)
 
 @schema{filter}.parametrize()
 def test_api(case):

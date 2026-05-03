@@ -5,23 +5,23 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  🚫  Fuzzing (in 0.00s)
 
      🚫 1 error
 
 ==================================== ERRORS ====================================
-_________________________________ GET /success _________________________________
+_______________________________ GET /api/success _______________________________
 Network Error
 
 Connection broken. The server declared chunked encoding but sent an invalid chunk

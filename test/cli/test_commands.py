@@ -476,10 +476,9 @@ def test_status_code_conformance(ctx, cli, workers, snapshot_cli):
     assert cli.run(api.schema_url, "-c", "status_code_conformance", f"--workers={workers}") == snapshot_cli
 
 
-@pytest.mark.operations("headers")
-@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="aiohttp crashes on PyPy")
-def test_headers_conformance_valid(cli, schema_url):
-    result = cli.run_and_assert(schema_url, "-c", "response_headers_conformance", "-H", "X-Custom-Header: 42")
+def test_headers_conformance_valid(ctx, cli):
+    api = ctx.openapi.apps.headers()
+    result = cli.run_and_assert(api.schema_url, "-c", "response_headers_conformance", "-H", "X-Custom-Header: 42")
 
     lines = result.stdout.split("\n")
     assert "1. Received a response with missing headers: X-Custom-Header" not in lines
@@ -530,10 +529,8 @@ def test_connection_error(cli, schema_url, workers, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
-    app["config"]["chunked"] = True
+def test_chunked_encoding_error(ctx, mocker, cli, snapshot_cli):
+    api = ctx.openapi.apps.chunked_success()
 
     def _update_chunk_length(response):
         value = b""
@@ -543,7 +540,7 @@ def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
             raise urllib3.exceptions.InvalidChunkLength(response, value) from e
 
     mocker.patch("urllib3.response.HTTPResponse._update_chunk_length", _update_chunk_length)
-    assert cli.run(schema_url, "--phases=fuzzing") == snapshot_cli
+    assert cli.run(api.schema_url, "--phases=fuzzing") == snapshot_cli
 
 
 def test_remote_disconnected_error(ctx, mocker, cli, snapshot_cli):

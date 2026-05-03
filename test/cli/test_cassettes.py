@@ -208,14 +208,14 @@ def test_run_subprocess(ctx, testdir, cassette_path, hypothesis_max_examples, sn
     assert cassette["command"] == command
 
 
-@pytest.mark.operations("__all__")
 @pytest.mark.parametrize("value", ["true", "false"])
 @pytest.mark.parametrize("args", [(), ("--report-preserve-bytes",)], ids=("plain", "base64"))
-def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args, value):
+def test_har_format(ctx, cli, cassette_path, hypothesis_max_examples, args, value):
+    api = ctx.openapi.apps.success_and_failure()
     cassette_path = cassette_path.with_suffix(".har")
     auth = "secret"
     result = cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-har-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 1}",
         "--seed=1",
@@ -290,11 +290,11 @@ def request_args(request, tmp_path):
 
 
 @pytest.mark.parametrize("value", ["true", "false"])
-@pytest.mark.operations("headers")
-def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
+def test_output_sanitization(ctx, cli, hypothesis_max_examples, cassette_path, value):
+    api = ctx.openapi.apps.headers()
     auth = "secret-auth"
     cli.run_and_assert(
-        openapi2_schema_url,
+        api.schema_url,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 5}",
         "--seed=1",
