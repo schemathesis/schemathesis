@@ -88,13 +88,12 @@ class CliSnapshotConfig:
             )
         if self.replace_server_host:
             used_fixtures = self.request.fixturenames
-            for fixture in ("graphql_server_host", "server_host"):
-                if fixture in used_fixtures:
-                    try:
-                        host = self.request.getfixturevalue(fixture)
-                        data = data.replace(host, "127.0.0.1")
-                    except LookupError:
-                        pass
+            if "server_host" in used_fixtures:
+                try:
+                    host = self.request.getfixturevalue("server_host")
+                    data = data.replace(host, "127.0.0.1")
+                except LookupError:
+                    pass
             with keep_cwd():
                 data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
         data = re.sub(r"http://127\.0\.0\.1:[0-9]{3,}", "http://127.0.0.1", data)

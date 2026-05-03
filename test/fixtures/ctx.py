@@ -4,7 +4,7 @@ import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any
+from typing import Any, Literal, overload
 
 import pytest
 import yaml
@@ -13,9 +13,20 @@ from flask import Flask
 from schemathesis.checks import CHECKS
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
+from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
 from test.apps.catalog.openapi import stateful as openapi_stateful
-from test.apps.runtime import Modifier, OpenAPIApp, OpenAPIServer
+from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
+
+
+@overload
+def _start(parent: Context, app: OpenAPIApp) -> OpenAPIServer: ...
+@overload
+def _start(parent: Context, app: GraphQLApp) -> GraphQLServer: ...
+def _start(parent: Context, app: OpenAPIApp | GraphQLApp) -> OpenAPIServer | GraphQLServer:
+    app_runner = parent.request.getfixturevalue("app_runner")
+    runner = app_runner.run_flask_app if app.kind == "flask" else app_runner.run_asgi_app
+    return app.make_server(port=runner(app.server))
 
 
 @dataclass(slots=True)
@@ -23,24 +34,53 @@ class OpenAPIApps:
     parent: Context
 
     def success(self) -> OpenAPIServer:
-        return self._start(openapi_basic.success())
+        return _start(self.parent, openapi_basic.success())
 
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
-        return self._start(openapi_stateful.stateful_users(*modifiers))
+        return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
 
-    def _start(self, app: OpenAPIApp) -> OpenAPIServer:
-        app_runner = self.parent.request.getfixturevalue("app_runner")
-        if app.kind == "flask":
-            port = app_runner.run_flask_app(app.server)
-        else:
-            port = app_runner.run_asgi_app(app.server)
-        return OpenAPIServer(
-            schema_url=f"http://127.0.0.1:{port}/openapi.json",
-            base_url=f"http://127.0.0.1:{port}",
-            port=port,
-            spec=app.spec,
-            wsgi_app=app.server,
-        )
+
+@dataclass(slots=True)
+class GraphQLApps:
+    parent: Context
+
+    def books(self, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask") -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.books(endpoint=endpoint, framework=framework))
+
+    def from_schema(
+        self, schema, *, endpoint: str = "/graphql", framework: Literal["flask", "fastapi"] = "flask"
+    ) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.from_schema(schema, endpoint=endpoint, framework=framework))
+
+    def use_after_create(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.use_after_create())
+
+    def generic_id_pool(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.generic_id_pool())
+
+    def input_object_pool(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.input_object_pool())
+
+    def list_argument_pool(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.list_argument_pool())
+
+    def tombstone_pool(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.tombstone_pool())
+
+    def use_after_delete(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.use_after_delete())
+
+    def double_delete(self) -> GraphQLServer:
+        return _start(self.parent, graphql_bookstore.double_delete())
+
+
+@dataclass
+class GraphQLContext:
+    parent: Context
+
+    @property
+    def apps(self) -> GraphQLApps:
+        return GraphQLApps(parent=self.parent)
 
 
 @dataclass
@@ -86,6 +126,10 @@ class Context:
     @property
     def openapi(self) -> OpenApiContext:
         return OpenApiContext(parent=self)
+
+    @property
+    def graphql(self) -> GraphQLContext:
+        return GraphQLContext(parent=self)
 
     @property
     def _testdir(self):

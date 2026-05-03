@@ -24,16 +24,24 @@ def test_absolute_urls_for_apps(loader):
         loader("http://127.0.0.1:1/schema.json", app=None)  # actual app doesn't matter here
 
 
+def _openapi_url(ctx):
+    return ctx.request.getfixturevalue("openapi3_schema_url")
+
+
+def _graphql_url(ctx):
+    return ctx.graphql.apps.books().schema_url
+
+
 @pytest.mark.parametrize(
-    ("loader", "url_fixture"),
+    ("loader", "make_url"),
     [
-        (schemathesis.openapi.from_url, "openapi3_schema_url"),
-        (schemathesis.graphql.from_url, "graphql_url"),
+        (schemathesis.openapi.from_url, _openapi_url),
+        (schemathesis.graphql.from_url, _graphql_url),
     ],
 )
 @pytest.mark.parametrize("base_url", ["http://example.com/", "http://example.com"])
-def test_base_url_override(request, loader, url_fixture, base_url):
-    url = request.getfixturevalue(url_fixture)
+def test_base_url_override(ctx, loader, make_url, base_url):
+    url = make_url(ctx)
     # When the user overrides base_url
     schema = loader(url)
     schema.config.update(base_url=base_url)

@@ -24,11 +24,12 @@ def _register_book_id_scalar():
     ids=["use-after-create", "update-on-existing"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_chained_planted_bug(cli, buggy_graphql_url, snapshot_cli, filter_arg):
+def test_stateful_finds_chained_planted_bug(ctx, cli, snapshot_cli, filter_arg):
     # Producer chains to a dependent consumer and exposes a planted error.
+    api = ctx.graphql.apps.use_after_create()
     assert (
         cli.run(
-            buggy_graphql_url,
+            api.schema_url,
             "--max-examples=20",
             "--phases=stateful",
             "-m",
@@ -41,19 +42,27 @@ def test_stateful_finds_chained_planted_bug(cli, buggy_graphql_url, snapshot_cli
     )
 
 
+def _use_after_delete(apps):
+    return apps.use_after_delete()
+
+
+def _double_delete(apps):
+    return apps.double_delete()
+
+
 @pytest.mark.parametrize(
-    "url_fixture",
-    ["buggy_stateful_use_after_delete_url", "buggy_stateful_double_delete_url"],
+    "make_api",
+    [_use_after_delete, _double_delete],
     ids=["use-after-delete", "double-delete"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_stateful_finds_tombstone_bugs(cli, request, snapshot_cli, url_fixture):
+def test_stateful_finds_tombstone_bugs(ctx, cli, snapshot_cli, make_api):
     # Tombstones expose use-after-delete and double-delete on a known-deleted resource.
     # Tombstone probes need many iterations to traverse the deleted-id bundle reliably.
-    url = request.getfixturevalue(url_fixture)
+    api = make_api(ctx.graphql.apps)
     assert (
         cli.run(
-            url,
+            api.schema_url,
             "--max-examples=75",
             "--phases=stateful",
             "-m",

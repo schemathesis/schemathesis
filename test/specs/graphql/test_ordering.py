@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import pytest
 
+import schemathesis
 from schemathesis.specs.graphql.ordering import compute_graphql_layers
 
 
 @pytest.fixture
-def operations(graphql_schema):
+def operations(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     return [
-        graphql_schema["Query"]["getAuthors"],
-        graphql_schema["Mutation"]["addAuthor"],
-        graphql_schema["Query"]["getBooks"],
-        graphql_schema["Mutation"]["addBook"],
+        schema["Query"]["getAuthors"],
+        schema["Mutation"]["addAuthor"],
+        schema["Query"]["getBooks"],
+        schema["Mutation"]["addBook"],
     ]
 
 

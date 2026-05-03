@@ -130,11 +130,12 @@ def test_cli_failure(unique_hook, cli, openapi3_schema_url, hypothesis_max_examp
     )
 
 
-def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
+def test_graphql_url(ctx, cli, unique_hook, snapshot_cli):
+    api = ctx.graphql.apps.books()
     assert (
         cli.main(
             "run",
-            graphql_url,
+            api.schema_url,
             "-cunique_test_cases",
             "--max-examples=5",
             "--generation-unique-inputs",

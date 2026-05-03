@@ -24,7 +24,7 @@ import schemathesis
 from schemathesis.core.shell import ShellType
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
-from test.apps._graphql._flask import create_app as create_graphql_app
+from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky
 
@@ -1466,10 +1466,11 @@ def test_force_color(cli, schema_url):
         ("--checks", "all"),
     ],
 )
-@pytest.mark.parametrize("graphql_path", ["/graphql", "/foo"])
-def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
+@pytest.mark.parametrize("endpoint", ["/graphql", "/foo"])
+def test_graphql_url(ctx, cli, endpoint, args, snapshot_cli):
     # When the target API is GraphQL
-    assert cli.run(graphql_url, "--max-examples=5", "--mode=positive", *args) == snapshot_cli
+    api = ctx.graphql.apps.books(endpoint=endpoint)
+    assert cli.run(api.schema_url, "--max-examples=5", "--mode=positive", *args) == snapshot_cli
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
@@ -1661,7 +1662,7 @@ def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_che
 
 
 @pytest.mark.parametrize(
-    ("schema_path", "app_factory"),
+    ("schema_path", "make_app"),
     (
         [
             (
@@ -1670,14 +1671,14 @@ def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_che
             ),
             (
                 "graphql",
-                create_graphql_app,
+                lambda: graphql_bookstore.books().server,
             ),
         ]
     ),
 )
-def test_wait_for_schema(cli, schema_path, app_factory, app_runner):
+def test_wait_for_schema(cli, schema_path, make_app, app_runner):
     # When Schemathesis is asked to wait for API schema to become available
-    app = app_factory()
+    app = make_app()
     original_run = app.run
 
     def run_with_delay(*args, **kwargs):

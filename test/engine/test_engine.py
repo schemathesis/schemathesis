@@ -938,8 +938,8 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
     stream.assert_no_errors()
 
 
-def test_graphql(graphql_url):
-    schema = schemathesis.graphql.from_url(graphql_url)
+def test_graphql(ctx):
+    schema = schemathesis.graphql.from_url(ctx.graphql.apps.books().schema_url)
     stream = EventStream(schema, max_examples=5).execute()
     expected_order = [
         "Mutation.addAuthor",

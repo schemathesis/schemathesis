@@ -36,7 +36,7 @@ type Query {
     test()
 
 
-def test_custom_scalar_in_cli(testdir, cli, snapshot_cli, graphql_url):
+def test_custom_scalar_in_cli(ctx, testdir, cli, snapshot_cli):
     schema_file = testdir.make_graphql_schema_file(
         """
 scalar FooBar
@@ -46,10 +46,11 @@ type Query {
 }
     """,
     )
-    assert cli.run(str(schema_file), f"--url={graphql_url}") == snapshot_cli
+    api = ctx.graphql.apps.books()
+    assert cli.run(str(schema_file), f"--url={api.schema_url}") == snapshot_cli
 
 
-def test_built_in_scalars_in_cli(testdir, cli, graphql_url):
+def test_built_in_scalars_in_cli(ctx, testdir, cli):
     schema_file = testdir.make_graphql_schema_file(
         """
 scalar Date
@@ -74,10 +75,11 @@ type Query {
   getByUUID(value: UUID!): Int!
 }""",
     )
+    api = ctx.graphql.apps.books()
     result = cli.run_and_assert(
         str(schema_file),
         "--max-examples=5",
-        f"--url={graphql_url}",
+        f"--url={api.schema_url}",
         exit_code=ExitCode.TESTS_FAILED,
     )
     # Queries can be constructed, but the backend does not implement the fields

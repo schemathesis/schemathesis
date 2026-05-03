@@ -147,10 +147,11 @@ def test_state_machine_has_real_transition_controller():
     assert "Query.book" in add_outgoing
 
 
-def test_state_machine_finds_planted_bug_via_python_api(_register_book_id_scalar, buggy_graphql_url):
+def test_state_machine_finds_planted_bug_via_python_api(_register_book_id_scalar, ctx):
     # The CLI path wraps validate_response with its own version; `.run()` is the only path
     # that exercises the state-machine override.
-    schema = schemathesis.graphql.from_url(buggy_graphql_url)
+    api = ctx.graphql.apps.use_after_create()
+    schema = schemathesis.graphql.from_url(api.schema_url)
     schema.config.checks.update(included_check_names=["not_a_server_error"])
     StateMachine = schema.as_state_machine()
 

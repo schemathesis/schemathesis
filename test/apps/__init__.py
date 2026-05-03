@@ -6,14 +6,15 @@ from aiohttp import web
 from schemathesis.cli.ext.options import CsvEnumChoice
 
 try:
-    from . import _graphql, openapi
+    from . import openapi
+    from .catalog.graphql import bookstore as graphql_bookstore
 except ImportError as exc:
     # try/except for cases when there is a different ImportError in the block before, that
     # doesn't imply another running environment (test_server.sh vs usual pytest run)
     # Ref: https://github.com/schemathesis/schemathesis/issues/658
     try:
-        import _graphql
         import openapi
+        from catalog.graphql import bookstore as graphql_bookstore
     except ImportError:
         raise exc from None
 
@@ -29,7 +30,7 @@ AvailableOperations = CsvEnumChoice(openapi.schema.Operation)
 @click.option("--framework", type=click.Choice(["aiohttp", "flask"]), default="aiohttp")
 def run_app(port: int, operations: list[openapi.schema.Operation], spec: str, framework: str) -> None:
     if spec == "graphql":
-        app = _graphql._flask.create_app()
+        app = graphql_bookstore.books().server
         app.run(port=port)
     else:
         if operations is not None:

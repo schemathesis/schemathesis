@@ -23,18 +23,7 @@ import schemathesis.cli
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core.transport import Response
 
-from .apps import _graphql as graphql
 from .apps import openapi
-from .apps._graphql import (
-    _flask,
-    buggy_schema,
-    buggy_schema_double_delete,
-    buggy_schema_generic_id,
-    buggy_schema_input_object,
-    buggy_schema_list,
-    buggy_schema_tombstone,
-    buggy_schema_use_after_delete,
-)
 from .apps.openapi.schema import OpenAPIVersion, Operation
 from .utils import make_schema
 
@@ -180,99 +169,6 @@ def openapi3_schema_url(server_address, openapi_3_app):
 @pytest.fixture
 def openapi3_schema(openapi3_schema_url):
     return schemathesis.openapi.from_url(openapi3_schema_url)
-
-
-@pytest.fixture
-def graphql_path():
-    return "/graphql"
-
-
-@pytest.fixture
-def graphql_app(graphql_path):
-    return graphql._flask.create_app(graphql_path)
-
-
-@pytest.fixture
-def graphql_server(graphql_app, app_runner):
-    port = app_runner.run_flask_app(graphql_app)
-    return {"port": port}
-
-
-@pytest.fixture
-def graphql_server_host(graphql_server):
-    return f"127.0.0.1:{graphql_server['port']}"
-
-
-@pytest.fixture
-def graphql_url(graphql_server_host, graphql_path):
-    return f"http://{graphql_server_host}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_graphql_url(graphql_path, app_runner):
-    buggy_schema.BUGGY_BOOKS.clear()
-    app = _flask.create_app(graphql_path, schema=buggy_schema.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_generic_id_graphql_url(graphql_path, app_runner):
-    buggy_schema_generic_id.BUGGY_USERS.clear()
-    buggy_schema_generic_id.BUGGY_AUTHORS.clear()
-    app = _flask.create_app(graphql_path, schema=buggy_schema_generic_id.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_input_object_graphql_url(graphql_path, app_runner):
-    buggy_schema_input_object.BUGGY_AUTHORS.clear()
-    app = _flask.create_app(graphql_path, schema=buggy_schema_input_object.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_list_graphql_url(graphql_path, app_runner):
-    buggy_schema_list.BUGGY_BOOKS.clear()
-    app = _flask.create_app(graphql_path, schema=buggy_schema_list.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_stateful_use_after_delete_url(graphql_path, app_runner):
-    buggy_schema_use_after_delete.reset_state()
-    app = _flask.create_app(graphql_path, schema=buggy_schema_use_after_delete.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_stateful_double_delete_url(graphql_path, app_runner):
-    buggy_schema_double_delete.reset_state()
-    app = _flask.create_app(graphql_path, schema=buggy_schema_double_delete.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def buggy_tombstone_graphql_url(graphql_path, app_runner):
-    buggy_schema_tombstone.BUGGY_BOOKS.clear()
-    app = _flask.create_app(graphql_path, schema=buggy_schema_tombstone.schema)
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}{graphql_path}"
-
-
-@pytest.fixture
-def graphql_schema(graphql_url):
-    return schemathesis.graphql.from_url(graphql_url)
-
-
-@pytest.fixture
-def graphql_strategy(graphql_schema):
-    return graphql_schema["Query"]["getBooks"].as_strategy()
 
 
 @pytest.fixture
@@ -757,11 +653,6 @@ def asgi_app_factory():
 @pytest.fixture
 def fastapi_app(asgi_app_factory):
     return asgi_app_factory()
-
-
-@pytest.fixture
-def fastapi_graphql_app(graphql_path):
-    return graphql._fastapi.create_app(graphql_path)
 
 
 @pytest.fixture
