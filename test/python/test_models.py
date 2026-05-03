@@ -151,13 +151,14 @@ def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
     assert response.json() == {"success": True}
 
 
-@pytest.mark.operations("create_user")
-def test_mutate_body(openapi3_schema):
-    operation = openapi3_schema["/users/"]["post"]
+def test_mutate_body(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    operation = schema["/users/"]["post"]
     case = operation.Case(body={"foo": "bar"})
     response = case.call()
     assert response.request.body == json.dumps(case.body).encode()
-    openapi3_schema.app = 42
+    schema.app = 42
     assert case.as_transport_kwargs()["json"] == case.body
 
 

@@ -5,24 +5,21 @@ from schemathesis.core.errors import OperationNotFound
 from schemathesis.schemas import APIOperation
 
 
-@pytest.mark.operations("get_user", "update_user")
-def test_get_operation_via_remote_reference(openapi_version, schema_url):
-    schema = schemathesis.openapi.from_url(schema_url)
-    resolved = schema.find_operation_by_reference(f"{schema_url}#/paths/~1users~1{{user_id}}/patch")
+def test_get_operation_via_remote_reference(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    resolved = schema.find_operation_by_reference(f"{api.schema_url}#/paths/~1users~1{{user_id}}/patch")
     assert isinstance(resolved, APIOperation)
     assert resolved.path == "/users/{user_id}"
     assert resolved.method.upper() == "PATCH"
     assert len(resolved.query) == 1
     # Via common parameters for all methods
-    if openapi_version.is_openapi_2:
-        assert resolved.query[0].definition == {"in": "query", "name": "common", "required": True, "type": "integer"}
-    if openapi_version.is_openapi_3:
-        assert resolved.query[0].definition == {
-            "in": "query",
-            "name": "common",
-            "required": True,
-            "schema": {"type": "integer"},
-        }
+    assert resolved.query[0].definition == {
+        "in": "query",
+        "name": "common",
+        "required": True,
+        "schema": {"type": "integer"},
+    }
 
 
 @pytest.mark.parametrize(

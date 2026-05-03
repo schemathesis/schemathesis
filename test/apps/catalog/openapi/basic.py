@@ -51,6 +51,26 @@ def unsatisfiable() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def success_and_failure() -> OpenAPIApp:
+    spec = build_schema({**schemas.success(), **schemas.failure()})
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_failure(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def success_failure_multiple_failures_custom_format() -> OpenAPIApp:
+    spec = build_schema(
+        {**schemas.success(), **schemas.failure(), **schemas.multiple_failures(), **schemas.custom_format()}
+    )
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_failure(app)
+    handlers.register_multiple_failures(app)
+    handlers.register_custom_format(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def failure_multiple_failures_unsatisfiable() -> OpenAPIApp:
     spec = build_schema({**schemas.failure(), **schemas.multiple_failures(), **schemas.unsatisfiable()})
     app = make_flask_app_from_schema(spec)

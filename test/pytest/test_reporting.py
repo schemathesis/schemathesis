@@ -1,8 +1,6 @@
 import pathlib
 from xml.etree import ElementTree
 
-import pytest
-
 from test.utils import load_json_or_fail, load_yaml_or_fail
 
 
@@ -507,13 +505,13 @@ def test_api(case):
     assert "recorded_with" in content
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_vcr_report_written_for_stateful_test(testdir, openapi3_base_url, openapi3_schema_url):
+def test_vcr_report_written_for_stateful_test(ctx, testdir):
+    api = ctx.openapi.apps.users_crud()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
-schema.config.update(base_url="{openapi3_base_url}")
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
 schema.config.reports.update(vcr_path=r"{cassette_path}")
 TestCase = schema.as_state_machine().TestCase
 """,
@@ -528,13 +526,13 @@ TestCase = schema.as_state_machine().TestCase
     assert "response" in interactions[0]
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_har_report_written_for_stateful_test(testdir, openapi3_base_url, openapi3_schema_url):
+def test_har_report_written_for_stateful_test(ctx, testdir):
+    api = ctx.openapi.apps.users_crud()
     har_path = str(testdir.tmpdir.join("cassette.har"))
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
-schema.config.update(base_url="{openapi3_base_url}")
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
 schema.config.reports.update(har_path=r"{har_path}")
 TestCase = schema.as_state_machine().TestCase
 """,
@@ -549,13 +547,13 @@ TestCase = schema.as_state_machine().TestCase
     assert "response" in entries[0]
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_junit_report_written_for_stateful_test(testdir, openapi3_base_url, openapi3_schema_url):
+def test_junit_report_written_for_stateful_test(ctx, testdir):
+    api = ctx.openapi.apps.users_crud()
     report_path = str(testdir.tmpdir.join("report.xml"))
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
-schema.config.update(base_url="{openapi3_base_url}")
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
 schema.config.reports.update(junit_path=r"{report_path}")
 TestCase = schema.as_state_machine().TestCase
 """,
@@ -571,15 +569,15 @@ TestCase = schema.as_state_machine().TestCase
     assert len(failures) >= 1
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_vcr_report_written_for_stateful_test_via_xdist(testdir, openapi3_base_url, openapi3_schema_url):
+def test_vcr_report_written_for_stateful_test_via_xdist(ctx, testdir):
+    api = ctx.openapi.apps.users_crud()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     testdir.makepyfile(
         f"""
 import schemathesis
 
-schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
-schema.config.update(base_url="{openapi3_base_url}")
+schema = schemathesis.openapi.from_url("{api.schema_url}")
+schema.config.update(base_url="{api.base_url}")
 schema.config.reports.update(vcr_path=r"{cassette_path}")
 
 TestCase = schema.as_state_machine().TestCase

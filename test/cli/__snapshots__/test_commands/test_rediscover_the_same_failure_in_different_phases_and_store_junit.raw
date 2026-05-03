@@ -5,16 +5,28 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       3 selected / 3 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
+
+ ❌  Examples (in 0.00s)
+
+     ✅ 1 passed  ❌ 1 failed  ⏭  1 skipped
+
+ ❌  Coverage (in 0.00s)
+
+     ✅ 2 passed  ❌ 1 failed
+
+ ❌  Fuzzing (in 0.00s)
+
+     ✅ 2 passed  ❌ 1 failed
 
  ❌  Stateful (in 0.00s)
 
@@ -24,20 +36,20 @@ Schemathesis dev
      ✅ N passed  ❌ 1 failed
 
 =================================== FAILURES ===================================
-________________________________ Stateful tests ________________________________
+_____________________________ GET /users/{user_id} _____________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- Custom check failed: `always_fails`
 
-[500] Internal Server Error:
+    Failed!
 
-    `500 Internal Server Error
+[404] Not Found:
 
-    Server got itself in trouble`
+    `{"message":"Not found"}`
 
 Reproduce with:
 
-    <PLACEHOLDER>
+    curl -X GET 'http://127.0.0.1/users/0?user_id=test-id&code=0&common=0'
 
 =================================== SUMMARY ====================================
 
@@ -46,16 +58,19 @@ API Operations:
   Tested: 3
 
 Test Phases:
-  ⏭  Examples (disabled)
-  ⏭  Coverage (disabled)
-  ⏭  Fuzzing (disabled)
+  ❌ Examples
+  ❌ Coverage
+  ❌ Fuzzing
   ❌ Stateful
 
 Failures:
-  ❌ Server error: 1
+  ❌ Custom check failed: `always_fails`: 1
 
 Test cases:
   N generated, N found N unique failures
+
+Reports:
+  - JUNIT: /tmp/test_rediscover_the_same_failu0/reports/junit.xml
 
 Seed: 42
 

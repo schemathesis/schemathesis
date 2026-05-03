@@ -82,12 +82,12 @@ TestStateful = APIWorkflow.TestCase
 #   3. Get info about this user
 
 
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_hidden_failure(testdir, app_schema, openapi3_base_url):
+def test_hidden_failure(ctx, testdir):
+    api = ctx.openapi.apps.users_crud()
     # When we run test as a state machine
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}")
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
@@ -98,13 +98,13 @@ TestStateful.settings = settings(
     stateful_step_count=3  # There is no need for longer sequences to uncover the bug
 )
 """,
-        schema=app_schema,
+        schema=api.spec,
     )
     result = testdir.runpytest()
     # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
     # And there should be cURL command to reproduce the error in the GET call
-    result.stdout.re_match_lines([rf".+curl -X GET '{openapi3_base_url}/users/\w+.+"])
+    result.stdout.re_match_lines([rf".+curl -X GET '{api.base_url}/users/\w+.+"])
 
 
 def removeprefix(value: str, prefix: str) -> str:
@@ -165,14 +165,13 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
     assert "Server error" in failures[0] or "Server error" in failures[1] or "Server error" in failures[2]
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_step_override(testdir, app_schema, base_url):
+def test_step_override(ctx, testdir):
     # See GH-970
+    api = ctx.openapi.apps.users_crud()
     # When the user overrides the `step` method
     testdir.make_test(
         f"""
-schema.config.update(base_url="{base_url}")
+schema.config.update(base_url="{api.base_url}")
 
 class APIWorkflow(schema.as_state_machine()):
 
@@ -187,7 +186,7 @@ TestStateful.settings = settings(
     suppress_health_check=list(HealthCheck),
 )
 """,
-        schema=app_schema,
+        schema=api.spec,
     )
     result = testdir.runpytest()
     # Then it should be overridden
@@ -222,10 +221,9 @@ def test_no_transitions_error(ctx):
         state_machine_cls()
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_settings_error(app_schema):
-    schema = schemathesis.openapi.from_dict(app_schema)
+def test_settings_error(ctx):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_dict(api.spec)
 
     class Workflow(schema.as_state_machine()):
         settings = settings(max_examples=5)
@@ -261,11 +259,10 @@ def test_custom_config_in_test_case(ctx):
         assert getattr(settings, key) == value
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_passing_transport_kwargs(app_schema, openapi3_base_url, mocker):
-    schema = schemathesis.openapi.from_dict(app_schema)
-    schema.config.update(base_url=openapi3_base_url)
+def test_passing_transport_kwargs(ctx, mocker):
+    api = ctx.openapi.apps.users_crud()
+    schema = schemathesis.openapi.from_dict(api.spec)
+    schema.config.update(base_url=api.base_url)
 
     mocker.patch(
         "schemathesis.specs.openapi.checks.get_security_parameters",

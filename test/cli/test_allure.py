@@ -4,11 +4,11 @@ import pytest
 from _pytest.main import ExitCode
 
 
-@pytest.mark.operations("success", "failure")
-def test_allure_result_files_written(cli, schema_url, tmp_path):
+def test_allure_result_files_written(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success_and_failure()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-allure-path={allure_dir}",
         "--checks=not_a_server_error",
         exit_code=ExitCode.TESTS_FAILED,
@@ -23,11 +23,11 @@ def test_allure_result_files_written(cli, schema_url, tmp_path):
         assert any(lbl["name"] == "framework" and lbl["value"] == "schemathesis" for lbl in data["labels"])
 
 
-@pytest.mark.operations("success", "failure")
-def test_allure_report_via_config(cli, schema_url, tmp_path):
+def test_allure_report_via_config(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success_and_failure()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         exit_code=ExitCode.TESTS_FAILED,
         config={"reports": {"allure": {"path": str(allure_dir)}}},
     )
@@ -75,12 +75,11 @@ def test_allure_results_in_timestamped_dir_when_no_explicit_path(ctx, cli, tmp_p
     assert list(allure_dirs[0].glob("*-result.json"))
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_allure_stateful_phase_produces_result(cli, schema_url, tmp_path):
+def test_allure_stateful_phase_produces_result(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.users_crud()
     allure_dir = tmp_path / "allure-results"
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-allure-path={allure_dir}",
         # This one won't fail
         "--checks=use_after_free",

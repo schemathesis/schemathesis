@@ -1,20 +1,16 @@
-import pytest
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success", "failure")
-def test_disable_phases(cli, schema_url, snapshot_cli):
+def test_disable_phases(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success_and_failure()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--checks=not_a_server_error",
             config={
                 "project": [
                     {
-                        "title": "Example API",
+                        "title": "Test",
                         "operations": [
                             {
-                                "include-name": "GET /success",
+                                "include-name": "GET /api/success",
                                 "phases": {
                                     "fuzzing": {"enabled": False},
                                 },
@@ -24,7 +20,7 @@ def test_disable_phases(cli, schema_url, snapshot_cli):
                 ],
                 "operations": [
                     {
-                        "include-name": "GET /failure",
+                        "include-name": "GET /api/failure",
                         "phases": {
                             "coverage": {"enabled": False},
                         },
@@ -36,19 +32,18 @@ def test_disable_phases(cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success", "failure")
-def test_disable_operations(cli, schema_url, snapshot_cli):
+def test_disable_operations(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success_and_failure()
     assert (
         cli.run(
-            schema_url,
+            api.schema_url,
             "--checks=not_a_server_error",
             config={
                 "project": [
                     {
-                        "title": "Example API",
+                        "title": "Test",
                         "operations": [
-                            {"include-name": "GET /success", "enabled": False},
+                            {"include-name": "GET /api/success", "enabled": False},
                         ],
                     }
                 ],
