@@ -15,6 +15,7 @@ from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
@@ -55,6 +56,9 @@ class OpenAPIApps:
 
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))
+
+    def aspnet_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.aspnet_planted_bug())
 
 
 @dataclass(slots=True)
