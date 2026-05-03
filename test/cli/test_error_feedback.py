@@ -1233,3 +1233,75 @@ def test_feedback_unmasks_planted_bug_via_rails_envelope(cli, rails_planted_bug_
         )
         == snapshot_cli
     )
+
+
+LARAVEL_BOUNDED_FIELDS: tuple[tuple[str, int, int], ...] = (
+    ("username", 3, 30),
+    ("title", 5, 80),
+    ("description", 10, 200),
+)
+
+
+@pytest.fixture
+def laravel_planted_bug_app(ctx, app_runner):
+    # 422 gate uses Laravel's `field must be at least N characters.` phrasing
+    # so the parser can infer a size bound and reach the planted 500.
+    schema_body = {
+        "requestBody": {
+            "required": True,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "username": {"type": "string"},
+                            "title": {"type": "string"},
+                            "description": {"type": "string"},
+                            "tags": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": [field for field, _, _ in LARAVEL_BOUNDED_FIELDS],
+                    }
+                }
+            },
+        },
+        "responses": {
+            "422": {"description": "Unprocessable Entity"},
+            "500": {"description": "Server Error"},
+        },
+    }
+    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"message": "The given data was invalid.", "errors": {}}), 422
+        errors: dict[str, list[str]] = {}
+        for field, lo, hi in LARAVEL_BOUNDED_FIELDS:
+            value = body.get(field, "")
+            if not isinstance(value, str):
+                value = ""
+            if len(value) < lo:
+                errors.setdefault(field, []).append(f"The {field} field must be at least {lo} characters.")
+            elif len(value) > hi:
+                errors.setdefault(field, []).append(f"The {field} field must not be greater than {hi} characters.")
+        if errors:
+            return jsonify({"message": "The given data was invalid.", "errors": errors}), 422
+        return "", 500
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/openapi.json"
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_laravel_envelope(cli, laravel_planted_bug_app, snapshot_cli):
+    assert (
+        cli.run(
+            laravel_planted_bug_app,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )

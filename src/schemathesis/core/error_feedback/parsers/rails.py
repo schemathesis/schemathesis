@@ -210,6 +210,9 @@ def _is_legacy_shape(messages: object) -> TypeGuard[LegacyShape]:
 def _unwrap_ar_envelope(body: object) -> object:
     """Strip the `{"errors": <inner>, ...}` wrapper if present, return inner; otherwise return body unchanged."""
     if isinstance(body, dict) and "errors" in body and len(body) <= 2:
+        # Laravel pairs `errors` with a top-level string `message` — let LaravelParser claim it.
+        if isinstance(body.get("message"), str):
+            return body
         return body["errors"]
     return body
 
