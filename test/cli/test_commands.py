@@ -139,10 +139,9 @@ def test_empty_schema_file(testdir, cli, snapshot_cli):
     assert cli.run(str(filename), "--url=http://127.0.0.1:1") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_force_color_nocolor(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--force-color", "--no-color") == snapshot_cli
+def test_force_color_nocolor(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--force-color", "--no-color") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
