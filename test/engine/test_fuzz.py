@@ -114,10 +114,11 @@ def test_fuzz_single_unsatisfiable_operation_emits_non_fatal_error(real_app_sche
     assert any(isinstance(e, events.NonFatalError) for e in collected)
 
 
-@pytest.mark.operations("failure")
-def test_fuzz_finds_failure_without_continue_on_failure(real_app_schema):
+def test_fuzz_finds_failure_without_continue_on_failure(ctx):
+    api = ctx.openapi.apps.failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # Without continue_on_failure, the first failure stops the campaign
-    collected = list(from_schema(real_app_schema).fuzz(FuzzConfig()))
+    collected = list(from_schema(schema).fuzz(FuzzConfig()))
     finished = [e for e in collected if isinstance(e, events.FuzzScenarioFinished)]
     assert any(e.status == Status.FAILURE for e in finished)
     assert isinstance(collected[-1], events.EngineFinished)
@@ -187,10 +188,11 @@ def test_fuzz_max_time_stop_reason(real_app_schema):
     assert collected[-1].stop_reason == StopReason.MAX_TIME
 
 
-@pytest.mark.operations("failure")
-def test_fuzz_max_failures_stop_reason(real_app_schema):
-    real_app_schema.config.max_failures = 1
-    collected = list(from_schema(real_app_schema).fuzz(FuzzConfig()))
+def test_fuzz_max_failures_stop_reason(ctx):
+    api = ctx.openapi.apps.failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.max_failures = 1
+    collected = list(from_schema(schema).fuzz(FuzzConfig()))
     assert collected[-1].stop_reason == StopReason.FAILURE_LIMIT
 
 

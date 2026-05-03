@@ -15,6 +15,8 @@ from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.catalog.openapi import laravel as openapi_laravel
+from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
 
@@ -35,6 +37,21 @@ class OpenAPIApps:
 
     def success(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success())
+
+    def failure(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.failure())
+
+    def basic(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.basic())
+
+    def success_and_basic(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.success_and_basic())
+
+    def rails_planted_bug(self, *, envelope: openapi_rails.Envelope) -> OpenAPIServer:
+        return _start(self.parent, openapi_rails.planted_bug(envelope))
+
+    def laravel_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_laravel.planted_bug())
 
     def stateful_users(self, *modifiers: Modifier[openapi_stateful.UserStore]) -> OpenAPIServer:
         return _start(self.parent, openapi_stateful.stateful_users(*modifiers))

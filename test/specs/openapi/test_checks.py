@@ -420,8 +420,8 @@ def test_positive_data_acceptance(
         ("/success", "Authorization", "200"),  # Fails because response is not 401
     ],
 )
-@pytest.mark.operations("success", "basic")
-def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path, header_name, expected_status):
+def test_missing_required_header(ctx, cli, snapshot_cli, path, header_name, expected_status):
+    api = ctx.openapi.apps.success_and_basic()
     schema_path = ctx.openapi.write_schema(
         {
             path: {
@@ -438,7 +438,7 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--phases=coverage",
             "--mode=negative",
             "--checks=missing_required_header",
@@ -480,9 +480,9 @@ def verify_missing_required_header(cassette_path, header, expected_status):
     assert missing_header_check["status"] == expected_status
 
 
-@pytest.mark.operations("basic")
-def test_missing_required_header_default_accepts_401(ctx, cli, openapi3_base_url, tmp_path):
+def test_missing_required_header_default_accepts_401(ctx, cli, tmp_path):
     # Non-Authorization required headers may be rejected with 401 by auth-first middleware.
+    api = ctx.openapi.apps.basic()
     cassette_path = tmp_path / "missing_token_header.yaml"
 
     schema_path = ctx.openapi.write_schema(
@@ -500,7 +500,7 @@ def test_missing_required_header_default_accepts_401(ctx, cli, openapi3_base_url
 
     cli.run(
         str(schema_path),
-        f"--url={openapi3_base_url}",
+        f"--url={api.base_url}/api",
         f"--report-vcr-path={cassette_path}",
         "--phases=coverage",
         "--mode=negative",
@@ -553,12 +553,12 @@ def test_missing_required_accept_header(ctx, cli, tmp_path):
         "--auth=test:test",
     ],
 )
-@pytest.mark.operations("basic")
-def test_missing_required_authorization_if_provided_explicitly(cli, openapi3_schema_url, tmp_path, arg):
+def test_missing_required_authorization_if_provided_explicitly(ctx, cli, tmp_path, arg):
+    api = ctx.openapi.apps.basic()
     cassette_path = tmp_path / "missing_authorization_header.yaml"
 
     cli.run(
-        openapi3_schema_url,
+        api.schema_url,
         f"--report-vcr-path={cassette_path}",
         "--phases=coverage",
         "--mode=negative",

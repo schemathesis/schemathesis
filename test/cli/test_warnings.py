@@ -13,9 +13,8 @@ def _serve_schema(ctx, app_runner, schema: dict, routes):
     return f"http://127.0.0.1:{port}/openapi.json"
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("basic")
-def test_missing_auth_warning_with_fail_on_true(cli, schema_url, tmp_path, monkeypatch):
+def test_missing_auth_warning_with_fail_on_true(ctx, cli, tmp_path, monkeypatch):
+    api = ctx.openapi.apps.basic()
     # Given a config file that fails on all warnings
     config_file = tmp_path / "schemathesis.toml"
     config_file.write_text("""
@@ -25,15 +24,14 @@ fail-on = true
     monkeypatch.chdir(tmp_path)
 
     # When running tests without proper auth (will trigger missing_auth warning)
-    result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
+    result = cli.run_and_assert(api.schema_url, exit_code=ExitCode.TESTS_FAILED)
     # And warnings should be displayed
     assert "WARNINGS" in result.stdout
     assert "Authentication failed" in result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("basic")
-def test_missing_auth_warning_with_fail_on_specific(cli, schema_url, tmp_path, monkeypatch):
+def test_missing_auth_warning_with_fail_on_specific(ctx, cli, tmp_path, monkeypatch):
+    api = ctx.openapi.apps.basic()
     # Given a config file that fails only on missing_auth warnings
     config_file = tmp_path / "schemathesis.toml"
     config_file.write_text("""
@@ -43,7 +41,7 @@ fail-on = ["missing_auth"]
     monkeypatch.chdir(tmp_path)
 
     # When running tests without proper auth (will trigger missing_auth warning)
-    result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
+    result = cli.run_and_assert(api.schema_url, exit_code=ExitCode.TESTS_FAILED)
     # And warnings should be displayed
     assert "WARNINGS" in result.stdout
     assert "Authentication failed" in result.stdout
@@ -178,11 +176,10 @@ def test_warnings_specific_type_via_cli(cli, ctx, openapi3_base_url):
     assert "Schema validation skipped" in result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("basic")
-def test_warnings_multiple_types_via_cli(cli, schema_url):
+def test_warnings_multiple_types_via_cli(ctx, cli):
+    api = ctx.openapi.apps.basic()
     # When --warnings with comma-separated values is used
-    result = cli.run(schema_url, "--warnings=missing_auth,missing_test_data", "--max-examples=1")
+    result = cli.run(api.schema_url, "--warnings=missing_auth,missing_test_data", "--max-examples=1")
 
     # Then warnings can still be triggered for specified types
     # (This just validates the flag is parsed correctly - actual warnings depend on test conditions)

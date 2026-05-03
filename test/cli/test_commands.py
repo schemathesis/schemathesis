@@ -174,10 +174,10 @@ def test_hypothesis_parameters(cli, schema_url):
     # Parameters are validated in `hypothesis.settings`
 
 
-@pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_only_failure(cli, schema_url, workers, snapshot_cli):
-    assert cli.run(schema_url, f"--workers={workers}", "-c not_a_server_error") == snapshot_cli
+def test_cli_run_only_failure(ctx, cli, workers, snapshot_cli):
+    api = ctx.openapi.apps.failure()
+    assert cli.run(api.schema_url, f"--workers={workers}", "-c not_a_server_error") == snapshot_cli
 
 
 @pytest.mark.operations("upload_file")
@@ -250,13 +250,13 @@ def test_cli_run_changed_base_url(cli, schema_url, server, snapshot_cli):
     ("url", "message"),
     [
         ("/doesnt_exist", "Failed to load schema due to client error (HTTP 404 Not Found)"),
-        ("/failure", "Failed to load schema due to server error (HTTP 500 Internal Server Error)"),
+        ("/api/failure", "Failed to load schema due to server error (HTTP 500 Internal Server Error)"),
     ],
 )
-@pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
-    result = cli.run_and_assert(f"{openapi3_base_url}{url}", f"--workers={workers}", exit_code=ExitCode.TESTS_FAILED)
+def test_execute_missing_schema(ctx, cli, url, message, workers):
+    api = ctx.openapi.apps.failure()
+    result = cli.run_and_assert(f"{api.base_url}{url}", f"--workers={workers}", exit_code=ExitCode.TESTS_FAILED)
     assert message in result.stdout
 
 
@@ -1376,14 +1376,14 @@ def test_unsupported_regex(ctx, cli, snapshot_cli, openapi3_base_url):
 
 
 @pytest.mark.parametrize("extra", ["--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"])
-@pytest.mark.operations("basic")
-def test_auth_override_on_protected_operation(cli, schema_url, extra, snapshot_cli):
+def test_auth_override_on_protected_operation(ctx, cli, extra, snapshot_cli):
     # See GH-792
     # When the tested API operation has basic auth
     # And the auth is overridden (directly or via headers)
     # And there is an error during testing
     # Then the code sample representation in the output should have the overridden value
-    assert cli.run(schema_url, "--output-sanitize=false", "--phases=fuzzing", extra) == snapshot_cli
+    api = ctx.openapi.apps.basic()
+    assert cli.run(api.schema_url, "--output-sanitize=false", "--phases=fuzzing", extra) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1473,12 +1473,11 @@ def test_missing_content_and_schema(ctx, cli, location, snapshot_cli, openapi3_b
     assert cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("failure")
-def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli, base_url):
+def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {
-            "/failure": {
+            "/api/failure": {
                 "get": {
                     "responses": {"200": {"description": "OK"}},
                 }
@@ -1498,7 +1497,7 @@ def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli, base_url):
     token = "secret"
     result = cli.run_and_assert(
         str(schema_path),
-        f"--url={base_url}",
+        f"--url={api.base_url}",
         "-c not_a_server_error",
         config={"parameters": {"token": token}},
         exit_code=ExitCode.TESTS_FAILED,
@@ -1520,12 +1519,12 @@ def test_dont_skip_when_generation_is_possible(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--mode", "all") == snapshot_cli
 
 
-@pytest.mark.operations("failure")
-def test_explicit_example_failure_output(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_explicit_example_failure_output(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.failure()
     # When an explicit example fails
     schema_path = ctx.openapi.write_schema(
         {
-            "/failure": {
+            "/api/failure": {
                 "get": {
                     "parameters": [{"in": "query", "name": "key", "example": "foo", "schema": {"type": "string"}}],
                     "responses": {"200": {"description": "OK"}},
@@ -1534,18 +1533,17 @@ def test_explicit_example_failure_output(ctx, cli, openapi3_base_url, snapshot_c
         }
     )
     assert (
-        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--output-sanitize=false", "-c not_a_server_error")
+        cli.run(str(schema_path), f"--url={api.base_url}", "--output-sanitize=false", "-c not_a_server_error")
         == snapshot_cli
     )
 
 
-@pytest.mark.operations("failure")
-def test_curl_with_non_printable_characters(ctx, cli, openapi3_base_url, snapshot_cli, monkeypatch):
+def test_curl_with_non_printable_characters(ctx, cli, snapshot_cli, monkeypatch):
     monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.BASH)
-
+    api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {
-            "/failure": {
+            "/api/failure": {
                 "post": {
                     "requestBody": {
                         "required": True,
@@ -1562,19 +1560,18 @@ def test_curl_with_non_printable_characters(ctx, cli, openapi3_base_url, snapsho
         }
     )
     assert (
-        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--output-sanitize=false", "-c not_a_server_error")
+        cli.run(str(schema_path), f"--url={api.base_url}", "--output-sanitize=false", "-c not_a_server_error")
         == snapshot_cli
     )
 
 
-@pytest.mark.operations("failure")
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires more complex setup")
-def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, openapi3_base_url, snapshot_cli, monkeypatch):
+def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, snapshot_cli, monkeypatch):
     monkeypatch.setattr("schemathesis.core.shell._DETECTED_SHELL", ShellType.UNKNOWN)
-
+    api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {
-            "/failure": {
+            "/api/failure": {
                 "post": {
                     "parameters": [
                         {
@@ -1599,7 +1596,7 @@ def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, openapi3_bas
         }
     )
     assert (
-        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--output-sanitize=false", "-c not_a_server_error")
+        cli.run(str(schema_path), f"--url={api.base_url}", "--output-sanitize=false", "-c not_a_server_error")
         == snapshot_cli
     )
 
@@ -1735,10 +1732,9 @@ def test_rate_limit(ctx, cli):
     assert cli.run(api.schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("failure")
-def test_invalid_tls_verify(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url.replace("http", "https"), "--tls-verify=falst") == snapshot_cli
+def test_invalid_tls_verify(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.failure()
+    assert cli.run(api.schema_url.replace("http", "https"), "--tls-verify=falst") == snapshot_cli
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])

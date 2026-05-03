@@ -96,45 +96,45 @@ def test_as_curl_command_sanitizes_string_query_params(curl):
     curl.assert_valid(command)
 
 
-@pytest.mark.operations("failure")
-@pytest.mark.openapi_version("3.0")
-def test_cli_output(cli, base_url, schema_url, curl):
-    result = cli.run_and_assert(schema_url, exit_code=ExitCode.TESTS_FAILED)
+def test_cli_output(ctx, cli, curl):
+    api = ctx.openapi.apps.failure()
+    result = cli.run_and_assert(api.schema_url, exit_code=ExitCode.TESTS_FAILED)
     lines = result.stdout.splitlines()
     assert "Reproduce with:" in lines
-    line = f"    curl -X GET {base_url}/failure"
+    line = f"    curl -X GET {api.base_url}/api/failure"
     assert line in lines
     command = line.strip()
     curl.assert_valid(command)
 
 
-@pytest.mark.operations("failure")
-@pytest.mark.openapi_version("3.0")
-def test_cli_output_includes_insecure(cli, base_url, schema_url, curl):
-    result = cli.run_and_assert(schema_url, "--tls-verify=false", exit_code=ExitCode.TESTS_FAILED)
+def test_cli_output_includes_insecure(ctx, cli, curl):
+    api = ctx.openapi.apps.failure()
+    result = cli.run_and_assert(api.schema_url, "--tls-verify=false", exit_code=ExitCode.TESTS_FAILED)
     lines = result.stdout.splitlines()
-    line = f"    curl -X GET --insecure {base_url}/failure"
+    line = f"    curl -X GET --insecure {api.base_url}/api/failure"
     assert line in lines
     command = line.strip()
     curl.assert_valid(command)
 
 
-@pytest.mark.operations("failure")
-def test_pytest_subtests_output(testdir, openapi3_base_url, app_schema):
+def test_pytest_subtests_output(ctx, testdir):
+    api = ctx.openapi.apps.failure()
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
-lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
+@pytest.fixture
+def api_schema():
+    return schemathesis.openapi.from_url('{api.schema_url}')
+
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
     case.call_and_validate()
 """,
-        schema=app_schema,
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines([".+ Reproduce with:", f".+ curl -X GET {openapi3_base_url}/failure"])
+    result.stdout.re_match_lines([".+ Reproduce with:", f".+ curl -X GET {api.base_url}/api/failure"])
 
 
 @pytest.mark.hypothesis_nested

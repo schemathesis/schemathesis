@@ -1124,108 +1124,13 @@ def test_stateful_body_generation_consumes_format_inferred_during_fuzzing(ctx, a
     )
 
 
-# The Rails parser must handle three envelope shapes for the same underlying
-# observations. Each parametrisation plants the same bug behind a Rails-shaped
-# size-bound gate but emits the response in a different envelope. The bug is
-# only reached if the parser learned the size bound from that particular shape.
-RAILS_BOUNDED_FIELDS: tuple[tuple[str, int, int], ...] = (
-    ("username", 3, 30),
-    ("title", 5, 80),
-    ("description", 10, 200),
-)
-
-
-def _rails_modern_envelope(issues: list[tuple[str, str]]) -> tuple[dict, int]:
-    body: dict[str, list[str]] = {}
-    for field, message in issues:
-        body.setdefault(field, []).append(message)
-    return body, 422
-
-
-def _rails_legacy_envelope(issues: list[tuple[str, str]]) -> tuple[dict, int]:
-    return {"errors": [f"{field.replace('_', ' ').capitalize()} {msg}" for field, msg in issues]}, 422
-
-
-def _rails_wrapped_envelope(issues: list[tuple[str, str]]) -> tuple[dict, int]:
-    body: dict[str, list[str]] = {}
-    for field, message in issues:
-        body.setdefault(field, []).append(message)
-    return {"errors": body}, 422
-
-
-_RAILS_ENVELOPES = {
-    "modern": _rails_modern_envelope,
-    "legacy": _rails_legacy_envelope,
-    "wrapped": _rails_wrapped_envelope,
-}
-
-
-@pytest.fixture
-def rails_planted_bug_app_factory(ctx, app_runner):
-    # Each parametrisation gets its own server emitting one of the three
-    # Rails envelope shapes. The 422 gate uses the Rails
-    # `is too short (minimum is N characters)` phrasing so the parser can
-    # infer a length constraint and reach the planted 500.
-    def build(envelope_name: str) -> str:
-        envelope = _RAILS_ENVELOPES[envelope_name]
-        schema_body = {
-            "requestBody": {
-                "required": True,
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "username": {"type": "string"},
-                                "title": {"type": "string"},
-                                "description": {"type": "string"},
-                                "tags": {"type": "array", "items": {"type": "string"}},
-                            },
-                            "required": [field for field, _, _ in RAILS_BOUNDED_FIELDS],
-                        }
-                    }
-                },
-            },
-            "responses": {
-                "422": {"description": "Unprocessable Entity"},
-                "500": {"description": "Server Error"},
-            },
-        }
-        app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
-
-        @app.route("/users", methods=["POST"])
-        def create_user():
-            body = request.get_json(silent=True)
-            if not isinstance(body, dict):
-                payload, status = envelope([("base", "must be a valid JSON object")])
-                return jsonify(payload), status
-            issues: list[tuple[str, str]] = []
-            for field, lo, hi in RAILS_BOUNDED_FIELDS:
-                value = body.get(field, "")
-                if not isinstance(value, str):
-                    value = ""
-                if len(value) < lo:
-                    issues.append((field, f"is too short (minimum is {lo} characters)"))
-                elif len(value) > hi:
-                    issues.append((field, f"is too long (maximum is {hi} characters)"))
-            if issues:
-                payload, status = envelope(issues)
-                return jsonify(payload), status
-            return "", 500
-
-        port = app_runner.run_flask_app(app)
-        return f"http://127.0.0.1:{port}/openapi.json"
-
-    return build
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
-@pytest.mark.parametrize("envelope", sorted(_RAILS_ENVELOPES))
-def test_feedback_unmasks_planted_bug_via_rails_envelope(cli, rails_planted_bug_app_factory, envelope, snapshot_cli):
-    url = rails_planted_bug_app_factory(envelope)
+@pytest.mark.parametrize("envelope", ["legacy", "modern", "wrapped"])
+def test_feedback_unmasks_planted_bug_via_rails_envelope(ctx, cli, envelope, snapshot_cli):
+    api = ctx.openapi.apps.rails_planted_bug(envelope=envelope)
     assert (
         cli.run(
-            url,
+            api.schema_url,
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
@@ -1235,69 +1140,12 @@ def test_feedback_unmasks_planted_bug_via_rails_envelope(cli, rails_planted_bug_
     )
 
 
-LARAVEL_BOUNDED_FIELDS: tuple[tuple[str, int, int], ...] = (
-    ("username", 3, 30),
-    ("title", 5, 80),
-    ("description", 10, 200),
-)
-
-
-@pytest.fixture
-def laravel_planted_bug_app(ctx, app_runner):
-    # 422 gate uses Laravel's `field must be at least N characters.` phrasing
-    # so the parser can infer a size bound and reach the planted 500.
-    schema_body = {
-        "requestBody": {
-            "required": True,
-            "content": {
-                "application/json": {
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "username": {"type": "string"},
-                            "title": {"type": "string"},
-                            "description": {"type": "string"},
-                            "tags": {"type": "array", "items": {"type": "string"}},
-                        },
-                        "required": [field for field, _, _ in LARAVEL_BOUNDED_FIELDS],
-                    }
-                }
-            },
-        },
-        "responses": {
-            "422": {"description": "Unprocessable Entity"},
-            "500": {"description": "Server Error"},
-        },
-    }
-    app, _ = ctx.openapi.make_flask_app({"/users": {"post": dict(schema_body)}})
-
-    @app.route("/users", methods=["POST"])
-    def create_user():
-        body = request.get_json(silent=True)
-        if not isinstance(body, dict):
-            return jsonify({"message": "The given data was invalid.", "errors": {}}), 422
-        errors: dict[str, list[str]] = {}
-        for field, lo, hi in LARAVEL_BOUNDED_FIELDS:
-            value = body.get(field, "")
-            if not isinstance(value, str):
-                value = ""
-            if len(value) < lo:
-                errors.setdefault(field, []).append(f"The {field} field must be at least {lo} characters.")
-            elif len(value) > hi:
-                errors.setdefault(field, []).append(f"The {field} field must not be greater than {hi} characters.")
-        if errors:
-            return jsonify({"message": "The given data was invalid.", "errors": errors}), 422
-        return "", 500
-
-    port = app_runner.run_flask_app(app)
-    return f"http://127.0.0.1:{port}/openapi.json"
-
-
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_feedback_unmasks_planted_bug_via_laravel_envelope(cli, laravel_planted_bug_app, snapshot_cli):
+def test_feedback_unmasks_planted_bug_via_laravel_envelope(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.laravel_planted_bug()
     assert (
         cli.run(
-            laravel_planted_bug_app,
+            api.schema_url,
             "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",

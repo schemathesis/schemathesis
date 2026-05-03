@@ -812,8 +812,8 @@ def test(case):
 
 
 @pytest.mark.parametrize("enabled", [True, False])
-@pytest.mark.operations("basic")
-def test_output_sanitization_via_config_file(testdir, openapi3_schema_url, enabled):
+def test_output_sanitization_via_config_file(ctx, testdir, enabled):
+    api = ctx.openapi.apps.basic()
     testdir.make_test(
         f"""
 config = schemathesis.Config.from_dict({{
@@ -822,10 +822,10 @@ config = schemathesis.Config.from_dict({{
         "sanitization": {{"enabled": {enabled}}}
     }}
 }})
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}', config=config)
+schema = schemathesis.openapi.from_url('{api.schema_url}', config=config)
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
-@schema.include(name="GET /basic").parametrize()
+@schema.include(name="GET /api/basic").parametrize()
 def test(case):
     case.call_and_validate()
 """
@@ -1199,8 +1199,8 @@ def test(case):
     result.assert_outcomes(failed=1)
 
 
-@pytest.mark.operations("failure")
-def test_disable_checks_via_config(testdir, openapi3_schema_url):
+def test_disable_checks_via_config(ctx, testdir):
+    api = ctx.openapi.apps.failure()
     testdir.make_test(
         f"""
 config = schemathesis.Config.from_dict({{
@@ -1209,9 +1209,9 @@ config = schemathesis.Config.from_dict({{
         "content_type_conformance": {{"enabled": False}},
     }}
 }})
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}', config=config)
+schema = schemathesis.openapi.from_url('{api.schema_url}', config=config)
 
-@schema.include(name="GET /failure").parametrize()
+@schema.include(name="GET /api/failure").parametrize()
 def test(case):
     case.call_and_validate()
 """
