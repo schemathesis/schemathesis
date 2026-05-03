@@ -549,12 +549,12 @@ def test_null_body(ctx):
     test()
 
 
-@pytest.mark.operations("read_only")
-def test_read_only(schema_url):
+def test_read_only(ctx):
     # When API operation has `readOnly` properties
-    schema = schemathesis.openapi.from_url(schema_url)
+    api = ctx.openapi.apps.read_only()
+    schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=schema["/read_only"]["GET"].as_strategy())
+    @given(case=schema["/api/read_only"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None)
     def test(case):
         # Then `writeOnly` should not affect the response schema
@@ -565,12 +565,12 @@ def test_read_only(schema_url):
     test()
 
 
-@pytest.mark.operations("write_only")
-def test_write_only(schema_url):
+def test_write_only(ctx):
     # When API operation has `writeOnly` properties
-    schema = schemathesis.openapi.from_url(schema_url)
+    api = ctx.openapi.apps.write_only()
+    schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=schema["/write_only"]["POST"].as_strategy())
+    @given(case=schema["/api/write_only"]["POST"].as_strategy())
     @settings(max_examples=1)
     def test(case):
         # Then `writeOnly` should be used only in requests

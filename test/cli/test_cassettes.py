@@ -35,11 +35,11 @@ def load_response_body(cassette, idx):
 
 @pytest.mark.parametrize("mode", [m.value for m in list(GenerationMode)] + ["all"])
 @pytest.mark.parametrize("args", [(), ("--report-preserve-bytes",)], ids=("plain", "base64"))
-@pytest.mark.operations("success", "upload_file")
-def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, mode):
+def test_store_cassette(ctx, cli, cassette_path, hypothesis_max_examples, args, mode):
+    api = ctx.openapi.apps.success_and_upload_file()
     hypothesis_max_examples = hypothesis_max_examples or 2
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples}",
         f"--mode={mode}",
@@ -64,7 +64,8 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         success_idx = None
         for idx in range(len(interactions)):
             body = load_response_body(cassette, idx)
-            if '{"success": true}' in body:
+            normalized = body.replace(" ", "").replace("\n", "")
+            if '{"success":true}' in normalized:
                 success_idx = idx
                 break
         assert success_idx is not None, "Could not find /success interaction in positive mode"

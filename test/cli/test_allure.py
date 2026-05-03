@@ -1,6 +1,5 @@
 import json
 
-import pytest
 from _pytest.main import ExitCode
 
 
@@ -57,10 +56,10 @@ def test_allure_no_report_without_flag(ctx, cli, tmp_path):
     assert not list(tmp_path.glob("**/*-result.json"))
 
 
-@pytest.mark.operations("invalid")
-def test_allure_broken_status_on_non_fatal_error(cli, schema_url, tmp_path):
+def test_allure_broken_status_on_non_fatal_error(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.invalid()
     allure_dir = tmp_path / "allure-results"
-    cli.run_and_assert(schema_url, f"--report-allure-path={allure_dir}", exit_code=ExitCode.TESTS_FAILED)
+    cli.run_and_assert(api.schema_url, f"--report-allure-path={allure_dir}", exit_code=ExitCode.TESTS_FAILED)
     results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
     broken = [r for r in results if r["status"] == "broken"]
     assert broken

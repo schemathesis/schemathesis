@@ -1181,11 +1181,11 @@ def test(case):
     assert "while generating" not in result.stdout.str()
 
 
-@pytest.mark.operations("missing_path_parameter")
-def test_missing_path_parameter(testdir, openapi3_schema_url):
+def test_missing_path_parameter(ctx, testdir):
+    api = ctx.openapi.apps.missing_path_parameter()
     testdir.make_test(
         f"""
-schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{api.schema_url}')
 
 @schema.parametrize()
 @settings(max_examples=3)

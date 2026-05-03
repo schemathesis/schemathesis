@@ -180,10 +180,10 @@ def test_cli_run_only_failure(ctx, cli, workers, snapshot_cli):
     assert cli.run(api.schema_url, f"--workers={workers}", "-c not_a_server_error") == snapshot_cli
 
 
-@pytest.mark.operations("upload_file")
-def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
+def test_cli_binary_body(ctx, cli, hypothesis_max_examples):
+    api = ctx.openapi.apps.upload_file()
     result = cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         "--suppress-health-check=filter_too_much",
         "--mode=positive",
         f"--max-examples={hypothesis_max_examples or 1}",
@@ -339,12 +339,12 @@ def test_unsatisfiable(ctx, cli, workers, snapshot_cli):
     assert cli.run(api.schema_url, "--mode=positive", f"--workers={workers}") == snapshot_cli
 
 
-@pytest.mark.operations("invalid")
-def test_invalid_operation(cli, schema_url, snapshot_cli):
+def test_invalid_operation(ctx, cli, snapshot_cli):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    assert cli.run(schema_url, "--phases=fuzzing", "--mode=positive") == snapshot_cli
+    api = ctx.openapi.apps.invalid()
+    assert cli.run(api.schema_url, "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
 
 def test_invalid_type_with_ref(cli, ctx, openapi3_base_url, snapshot_cli):
@@ -466,14 +466,14 @@ def test_health_check_message(cli, ctx, openapi3_base_url, snapshot_cli):
     assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing") == snapshot_cli
 
 
-@pytest.mark.operations("teapot")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_status_code_conformance(cli, schema_url, workers, snapshot_cli):
+def test_status_code_conformance(ctx, cli, workers, snapshot_cli):
     # When operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
     # Then the whole Schemathesis run should fail
     # And this operation should be marked as failed in the progress line
-    assert cli.run(schema_url, "-c", "status_code_conformance", f"--workers={workers}") == snapshot_cli
+    api = ctx.openapi.apps.teapot()
+    assert cli.run(api.schema_url, "-c", "status_code_conformance", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("headers")
@@ -1114,11 +1114,11 @@ def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
     )
 
 
-@pytest.mark.operations("form")
-def test_urlencoded_form(cli, schema_url):
+def test_urlencoded_form(ctx, cli):
     # When the API operation accepts application/x-www-form-urlencoded
     # Then Schemathesis should generate appropriate payload
-    cli.run_and_assert(schema_url, "--mode=positive")
+    api = ctx.openapi.apps.form()
+    cli.run_and_assert(api.schema_url, "--mode=positive")
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -1187,19 +1187,19 @@ def test_filter_case_sensitivity(cli, schema_url, snapshot_cli):
 
 
 @pytest.mark.parametrize("value", ["--include-by=/x-property == 42", "--exclude-by=/x-property != 42"])
-@pytest.mark.operations("upload_file", "custom_format")
-@pytest.mark.openapi_version("3.0")
-def test_filter_by(cli, schema_url, snapshot_cli, value):
-    assert cli.run(schema_url, "--mode=positive", "--max-examples=1", value) == snapshot_cli
+def test_filter_by(ctx, cli, snapshot_cli, value):
+    api = ctx.openapi.apps.upload_file_and_custom_format()
+    assert cli.run(api.schema_url, "--mode=positive", "--max-examples=1", value) == snapshot_cli
 
 
-@pytest.mark.operations("success")
-def test_colon_in_headers(cli, schema_url, app):
+def test_colon_in_headers(ctx, cli):
+    api = ctx.openapi.apps.success()
     header = "X-FOO"
     value = "bar:spam"
-    cli.run_and_assert(schema_url, f"--header={header}:{value}")
+    cli.run_and_assert(api.schema_url, f"--header={header}:{value}")
 
-    assert app["incoming_requests"][0].headers[header] == value
+    # Werkzeug normalises header names to title case
+    assert api.requests[0].headers["X-Foo"] == value
 
 
 def test_headers_passed_to_schema_loading(cli, ctx, app_runner):
@@ -1400,32 +1400,31 @@ def test_explicit_headers_in_output_on_errors(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.operations("cp866")
-def test_response_payload_encoding(cli, schema_url, snapshot_cli):
+def test_response_payload_encoding(ctx, cli, snapshot_cli):
     # See GH-1073
     # When the "failed" response has non UTF-8 encoding
     # Then it should be displayed according its actual encoding
-    assert cli.run(schema_url) == snapshot_cli
+    api = ctx.openapi.apps.cp866()
+    assert cli.run(api.schema_url) == snapshot_cli
 
 
-@pytest.mark.operations("conformance")
 @pytest.mark.snapshot(replace_test_cases=False)
-def test_response_schema_conformance_deduplication(cli, schema_url, snapshot_cli):
+def test_response_schema_conformance_deduplication(ctx, cli, snapshot_cli):
     # See GH-907
     # When the "response_schema_conformance" check is present
     # And the app return different error messages caused by the same validator
     # Then the errors should be deduplicated
-    assert cli.run(schema_url, "--checks=response_schema_conformance") == snapshot_cli
+    api = ctx.openapi.apps.conformance()
+    assert cli.run(api.schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("malformed_json")
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
-def test_malformed_json_deduplication(cli, schema_url, snapshot_cli):
+def test_malformed_json_deduplication(ctx, cli, snapshot_cli):
     # See GH-1518
     # When responses are not JSON as expected and their content differ each time
     # Then the errors should be deduplicated
-    assert cli.run(schema_url, "--checks=response_schema_conformance") == snapshot_cli
+    api = ctx.openapi.apps.malformed_json()
+    assert cli.run(api.schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
 
 @pytest.mark.parametrize("kind", ["env_var", "arg"])
@@ -1760,11 +1759,11 @@ def test_unresolvable_reference(ctx, cli, open_api_3_schema_with_recoverable_err
 
 
 @pytest.mark.parametrize("value", ["true", "false"])
-@pytest.mark.operations("failure")
-def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, value):
+def test_output_sanitization(ctx, cli, hypothesis_max_examples, value):
+    api = ctx.openapi.apps.failure()
     auth = "secret-auth"
     result = cli.run_and_assert(
-        openapi2_schema_url,
+        api.schema_url,
         f"--max-examples={hypothesis_max_examples or 5}",
         "--seed=1",
         f"-H Authorization: {auth}",
@@ -1781,8 +1780,8 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
 
 @pytest.mark.parametrize("override", [True, False])
 @pytest.mark.parametrize("enabled", [True, False])
-@pytest.mark.operations("failure")
-def test_output_sanitization_via_config(cli, openapi2_schema_url, hypothesis_max_examples, enabled, override):
+def test_output_sanitization_via_config(ctx, cli, hypothesis_max_examples, enabled, override):
+    api = ctx.openapi.apps.failure()
     auth = "secret-auth"
     args = ()
     if override:
@@ -1792,7 +1791,7 @@ def test_output_sanitization_via_config(cli, openapi2_schema_url, hypothesis_max
         else:
             args = ("--output-sanitize=true",)
     result = cli.run_and_assert(
-        openapi2_schema_url,
+        api.schema_url,
         f"--max-examples={hypothesis_max_examples or 5}",
         "--seed=1",
         f"-H Authorization: {auth}",
@@ -2042,16 +2041,15 @@ def custom_strings(ctx, response, case):
         yield module
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("plain_text_body")
-def test_custom_strings(cli, hypothesis_max_examples, schema_url, custom_strings):
+def test_custom_strings(ctx, cli, hypothesis_max_examples, custom_strings):
+    api = ctx.openapi.apps.plain_text_body()
     result = cli.main(
         "run",
         "-c",
         "custom_strings",
         "--generation-allow-x00=false",
         "--generation-codec=ascii",
-        schema_url,
+        api.schema_url,
         f"--max-examples={hypothesis_max_examples or 100}",
         hooks=custom_strings,
     )

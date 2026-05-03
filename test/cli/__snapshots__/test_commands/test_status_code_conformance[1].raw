@@ -5,16 +5,16 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
-     Specification:    Open API 2.0
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
@@ -29,21 +29,21 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-__________________________________ GET /cp866 __________________________________
+_______________________________ POST /api/teapot _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Undocumented Content-Type
+- Undocumented HTTP status code
 
-    Received: text/plain; charset=cp866
-    Documented: application/json
+    Received: 418
+    Documented: 200
 
-[200] OK:
+[418] I'm a Teapot:
 
-    `Тест`
+    `{"success":true}`
 
 Reproduce with:
 
-    curl -X GET http://127.0.0.1/api/cp866
+    curl -X POST http://127.0.0.1/api/teapot
 
 =================================== SUMMARY ====================================
 
@@ -58,7 +58,7 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Undocumented Content-Type: 1
+  ❌ Undocumented HTTP status code: 1
 
 Test cases:
   N generated, N found N unique failures

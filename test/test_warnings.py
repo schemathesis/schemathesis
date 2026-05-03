@@ -18,13 +18,13 @@ def test_warning_on_unauthorized(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.operations("always_incorrect")
-def test_warning_on_no_2xx(cli, openapi3_schema_url, snapshot_cli):
+def test_warning_on_no_2xx(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.always_incorrect()
     # When endpoint does not return 2xx at all
     # Then the output should contain a warning about it
     assert (
         cli.run(
-            openapi3_schema_url,
+            api.schema_url,
             "-c not_a_server_error",
             "--phases=fuzzing",
             "--mode=positive",
@@ -34,11 +34,11 @@ def test_warning_on_no_2xx(cli, openapi3_schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.operations("always_incorrect")
-def test_warning_on_no_2xx_options_only(cli, openapi3_schema_url, snapshot_cli):
+def test_warning_on_no_2xx_options_only(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.always_incorrect()
     assert (
         cli.run(
-            openapi3_schema_url,
+            api.schema_url,
             "--mode=all",
             "--phases=coverage",
             "-c not_a_server_error",

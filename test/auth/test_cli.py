@@ -100,9 +100,8 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli, ope
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success", "custom_format")
-def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
+def test_multiple_threads(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success_and_custom_format()
     module = ctx.write_pymodule(
         f"""
     import time
@@ -133,7 +132,7 @@ def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
     assert (
         cli.main(
             "run",
-            schema_url,
+            api.schema_url,
             "--workers",
             "2",
             "--max-examples=1",
@@ -144,29 +143,30 @@ def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success", "text")
-def test_requests_auth(ctx, cli, schema_url, snapshot_cli):
+def test_requests_auth(ctx, cli, snapshot_cli):
     # When the user registers auth from `requests`
+    api = ctx.openapi.apps.success_and_text()
     expected = "Basic dXNlcjpwYXNz"
     module = ctx.write_pymodule(
         f"""
 from requests.auth import HTTPBasicAuth
 
-schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass")).apply_to(method="GET", path="/success")
+schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass")).apply_to(method="GET", path="/api/success")
 
 @schemathesis.hook
 def after_call(context, case, response):
     request_authorization = response.request.headers.get("Authorization")
-    if case.operation.path == "/success":
+    if case.operation.path == "/api/success":
         assert request_authorization == "{expected}", request_authorization
-    if case.operation.path == "/text":
+    if case.operation.path == "/api/text":
         assert request_authorization is None, request_authorization
 """
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, "--checks=not_a_server_error", "--mode=positive", hooks=module) == snapshot_cli
+    assert (
+        cli.main("run", api.schema_url, "--checks=not_a_server_error", "--mode=positive", hooks=module) == snapshot_cli
+    )
 
 
 @pytest.fixture
@@ -175,24 +175,23 @@ def verify_auth(ctx):
 @schemathesis.check
 def verify_auth(ctx, response, case):
     request_authorization = response.request.headers.get("Authorization")
-    if case.operation.path == "/text":
+    if case.operation.path == "/api/text":
         expected = f"Bearer {TOKEN_1}"
-    if case.operation.path == "/success":
+    if case.operation.path == "/api/success":
         expected = f"Bearer {TOKEN_2}"
     assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
     """) as module:
         yield module
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success", "text")
 @pytest.mark.usefixtures("verify_auth")
-def test_conditional(ctx, cli, schema_url, snapshot_cli):
+def test_conditional(ctx, cli, snapshot_cli):
     # When the user sets up multiple auths applied to different API operations
+    api = ctx.openapi.apps.success_and_text()
     with ctx.check("""
 TOKEN_1 = "ABC"
 
-@schemathesis.auth().apply_to(method="GET", path="/text")
+@schemathesis.auth().apply_to(method="GET", path="/api/text")
 class TokenAuth1:
     def get(self, case, context):
         return TOKEN_1
@@ -203,7 +202,7 @@ class TokenAuth1:
 
 TOKEN_2 = "DEF"
 
-@schemathesis.auth().apply_to(method="GET", path="/success")
+@schemathesis.auth().apply_to(method="GET", path="/api/success")
 class TokenAuth2:
     def get(self, case, context):
         return TOKEN_2
@@ -215,14 +214,14 @@ class TokenAuth2:
 @schemathesis.check
 def verify_auth(ctx, response, case):
     request_authorization = response.request.headers.get("Authorization")
-    if case.operation.path == "/text":
+    if case.operation.path == "/api/text":
         expected = f"Bearer {TOKEN_1}"
-    if case.operation.path == "/success":
+    if case.operation.path == "/api/success":
         expected = f"Bearer {TOKEN_2}"
     assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
     """) as module:
         # Then all auths should be properly applied
-        assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
+        assert cli.main("run", api.schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
 
 
 @pytest.mark.filterwarnings("error")
