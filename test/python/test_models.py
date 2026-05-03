@@ -280,11 +280,11 @@ def custom_check(ctx, response, case):
         {"excluded_checks": (not_a_server_error,)},
     ],
 )
-@pytest.mark.operations("success")
-def test_call_and_validate(openapi3_schema_url, kwargs):
-    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
+def test_call_and_validate(ctx, kwargs):
+    api = ctx.openapi.apps.success()
+    api_schema = schemathesis.openapi.from_url(api.schema_url)
 
-    @given(case=api_schema["/success"]["GET"].as_strategy())
+    @given(case=api_schema["/api/success"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None)
     def test(case):
         case.call_and_validate(**kwargs)
@@ -311,7 +311,6 @@ def test_metadata_has_only_relevant_components(openapi3_schema_url):
     test()
 
 
-@pytest.mark.operations("success")
 def test_call_and_validate_for_asgi(fastapi_app):
     api_schema = schemathesis.openapi.from_dict(fastapi_app.openapi())
 

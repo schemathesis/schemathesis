@@ -79,11 +79,11 @@ def test_ndjson_includes_case_meta(cli, ctx, app_runner, ndjson_path):
         assert component["mode"]
 
 
-@pytest.mark.operations("success")
-def test_store_ndjson(cli, schema_url, ndjson_path, hypothesis_max_examples):
+def test_store_ndjson(ctx, cli, ndjson_path, hypothesis_max_examples):
+    api = ctx.openapi.apps.success()
     hypothesis_max_examples = hypothesis_max_examples or 2
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         f"--max-examples={hypothesis_max_examples}",
         "--seed=1",
@@ -156,14 +156,14 @@ def test_interaction_with_failure(cli, openapi3_schema_url, hypothesis_max_examp
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
-@pytest.mark.operations("success")
-def test_run_subprocess(testdir, ndjson_path, hypothesis_max_examples, schema_url):
+def test_run_subprocess(ctx, testdir, ndjson_path, hypothesis_max_examples):
+    api = ctx.openapi.apps.success()
     testdir.run(
         "schemathesis",
         "run",
         f"--report-ndjson-path={ndjson_path}",
         f"--max-examples={hypothesis_max_examples or 2}",
-        schema_url,
+        api.schema_url,
     )
     events = load_ndjson(ndjson_path)
     assert get_event_type(events[0]) == "Initialize"
@@ -224,10 +224,10 @@ def test_phase_data_in_events(cli, schema_url, ndjson_path):
         assert "phase" in get_event_data(event)
 
 
-@pytest.mark.operations("success")
-def test_binary_body_base64(cli, schema_url, ndjson_path):
+def test_binary_body_base64(ctx, cli, ndjson_path):
+    api = ctx.openapi.apps.success()
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=1",
         "--seed=1",

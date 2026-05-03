@@ -214,10 +214,9 @@ TestStateful = schema.as_state_machine().TestCase
     assert " in step" not in result.stdout.str()
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_no_transitions_error(app_schema):
-    schema = schemathesis.openapi.from_dict(app_schema)
+def test_no_transitions_error(ctx):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_dict(api.spec)
     state_machine_cls = schema.as_state_machine()
 
     with pytest.raises(NoLinksFound):

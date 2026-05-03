@@ -81,8 +81,8 @@ def test_simple_filter(schema_url, is_include):
     test()
 
 
-@pytest.mark.operations("success")
-def test_map_case_filter(ctx, cli, openapi3_schema_url, snapshot_cli):
+def test_map_case_filter(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # All these hooks should not be called because of the applied filter
     with ctx.hook(
         r"""
@@ -111,9 +111,7 @@ except:
     pass
 """
     ) as module:
-        assert (
-            cli.main("run", openapi3_schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
-        )
+        assert cli.main("run", api.schema_url, "--phases=fuzzing", "--max-examples=1", hooks=module) == snapshot_cli
 
 
 def multiple_skip_for(schema):

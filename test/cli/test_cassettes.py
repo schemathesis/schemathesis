@@ -192,19 +192,19 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
-@pytest.mark.operations("success")
-def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_url, snapshot_cli):
+def test_run_subprocess(ctx, testdir, cassette_path, hypothesis_max_examples, snapshot_cli):
+    api = ctx.openapi.apps.success()
     result = testdir.run(
         "schemathesis",
         "run",
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples or 2}",
-        schema_url,
+        api.schema_url,
     )
     assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 9
-    command = f"st run --report-vcr-path={cassette_path} --max-examples={hypothesis_max_examples or 2} {schema_url}"
+    command = f"st run --report-vcr-path={cassette_path} --max-examples={hypothesis_max_examples or 2} {api.schema_url}"
     assert cassette["command"] == command
 
 

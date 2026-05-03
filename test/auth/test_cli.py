@@ -16,9 +16,8 @@ class TokenAuth:
 """
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_custom_auth(ctx, cli, schema_url, snapshot_cli):
+def test_custom_auth(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # When a custom auth is used
     module = ctx.write_pymodule(
         f"""
@@ -32,7 +31,7 @@ def after_call(context, case, response):
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, hooks=module) == snapshot_cli
+    assert cli.main("run", api.schema_url, hooks=module) == snapshot_cli
 
 
 @pytest.mark.parametrize(
@@ -42,9 +41,8 @@ def after_call(context, case, response):
         (("-H", "Authorization: Bearer EXPLICIT"), "Bearer EXPLICIT"),
     ],
 )
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_explicit_auth_precedence(ctx, cli, schema_url, args, expected, snapshot_cli):
+def test_explicit_auth_precedence(ctx, cli, args, expected, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # If explicit auth is passed via CLI
     module = ctx.write_pymodule(
         f"""
@@ -57,7 +55,7 @@ def after_call(context, case, response):
     )
     # Then it overrides the one from the auth provider
     # And the auth should be used
-    assert cli.main("run", schema_url, "--checks=not_a_server_error", *args, hooks=module) == snapshot_cli
+    assert cli.main("run", api.schema_url, "--checks=not_a_server_error", *args, hooks=module) == snapshot_cli
 
 
 def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli, openapi3_base_url):
@@ -227,11 +225,10 @@ def verify_auth(ctx, response, case):
         assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
 @pytest.mark.filterwarnings("error")
 @pytest.mark.parametrize("refresh_interval", [None, 60], ids=["no-cache", "with-cache"])
-def test_auth_get_raises_exception(ctx, cli, schema_url, snapshot_cli, refresh_interval):
+def test_auth_get_raises_exception(ctx, cli, snapshot_cli, refresh_interval):
+    api = ctx.openapi.apps.success()
     # When auth provider's get() method raises an exception (with or without caching)
     decorator = (
         "@schemathesis.auth()"
@@ -250,4 +247,4 @@ class BrokenAuth:
 """
     )
     # Then the error should be caught and displayed clearly
-    assert cli.main("run", schema_url, "--max-examples=1", hooks=module) == snapshot_cli
+    assert cli.main("run", api.schema_url, "--max-examples=1", hooks=module) == snapshot_cli

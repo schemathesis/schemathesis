@@ -77,8 +77,9 @@ def test_fuzz_entry_point_emits_engine_started_and_finished(real_app_schema):
     assert isinstance(collected[-1], events.EngineFinished)
 
 
-@pytest.mark.operations("success")
-def test_fuzz_scenario_events_are_paired(real_app_schema):
+def test_fuzz_scenario_events_are_paired(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
     started_ids: set[uuid.UUID] = set()
     finished_ids: list[uuid.UUID] = []
     stream = from_schema(real_app_schema).fuzz()
@@ -314,9 +315,11 @@ def test_fuzz_multiple_workers_emit_distinct_worker_ids(real_app_schema):
     assert worker_ids == {0, 1}
 
 
-@pytest.mark.operations("success")
 @pytest.mark.usefixtures("restore_checks")
-def test_fuzz_scenario_interrupted_status(real_app_schema):
+def test_fuzz_scenario_interrupted_status(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
+
     @schemathesis.check
     def always_interrupts(ctx, response, case):
         raise KeyboardInterrupt
@@ -325,10 +328,12 @@ def test_fuzz_scenario_interrupted_status(real_app_schema):
     assert any(isinstance(e, events.FuzzScenarioFinished) and e.status == Status.INTERRUPTED for e in collected)
 
 
-@pytest.mark.operations("success")
 @pytest.mark.usefixtures("restore_checks")
-def test_fuzz_scenario_error_status(real_app_schema):
+def test_fuzz_scenario_error_status(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
     # When a check raises an unexpected exception, the scenario must finish with ERROR status.
+
     @schemathesis.check
     def always_errors(ctx, response, case):
         raise RuntimeError("deliberate error")
@@ -357,8 +362,10 @@ def test_fuzz_graphql_schema(ctx):
     assert len(finished_ids) >= 3
 
 
-@pytest.mark.operations("success")
-def test_fuzz_unsatisfied_assumption_preflight_excludes_operation(real_app_schema):
+def test_fuzz_unsatisfied_assumption_preflight_excludes_operation(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
+
     @real_app_schema.hook
     def before_generate_case(context, strategy):
         def reject(case):
@@ -369,12 +376,14 @@ def test_fuzz_unsatisfied_assumption_preflight_excludes_operation(real_app_schem
     collected = list(from_schema(real_app_schema).fuzz(FuzzConfig()))
     errors = [e for e in collected if isinstance(e, events.NonFatalError)]
     assert errors == [
-        events.NonFatalError(error=Unsatisfiable(), phase=None, label="GET /success", related_to_operation=True)
+        events.NonFatalError(error=Unsatisfiable(), phase=None, label="GET /api/success", related_to_operation=True)
     ]
 
 
-@pytest.mark.operations("success")
-def test_fuzz_clears_global_auth_when_config_auth_is_defined(real_app_schema):
+def test_fuzz_clears_global_auth_when_config_auth_is_defined(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
+
     @schemathesis.auth()
     class _TestAuth:
         def get(self, case, context):
@@ -478,8 +487,10 @@ def test_fuzz_network_error_emits_non_fatal_error(real_app_schema):
     assert isinstance(collected[-1], events.EngineFinished)
 
 
-@pytest.mark.operations("success")
-def test_fuzz_finishes_cleanly_when_preflight_excludes_all_operations(real_app_schema):
+def test_fuzz_finishes_cleanly_when_preflight_excludes_all_operations(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
+
     @real_app_schema.hook
     def before_generate_case(context, strategy):
         def fail_generation(case):
@@ -492,10 +503,12 @@ def test_fuzz_finishes_cleanly_when_preflight_excludes_all_operations(real_app_s
     assert isinstance(collected[-1], events.EngineFinished)
 
 
-@pytest.mark.operations("success")
-def test_fuzz_emits_no_scenario_pairs_when_preflight_excludes_only_operation(real_app_schema):
+def test_fuzz_emits_no_scenario_pairs_when_preflight_excludes_only_operation(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
     # When preflight excludes the only operation before any scenario starts,
     # there should be no unmatched fuzz scenario events.
+
     @real_app_schema.hook
     def before_generate_case(context, strategy):
         def fail_generation(case):
@@ -513,10 +526,12 @@ def test_fuzz_emits_no_scenario_pairs_when_preflight_excludes_only_operation(rea
     assert started_ids == finished_ids
 
 
-@pytest.mark.operations("success")
-def test_fuzz_completed_stop_reason_when_preflight_excludes_all_operations(real_app_schema):
+def test_fuzz_completed_stop_reason_when_preflight_excludes_all_operations(ctx):
+    api = ctx.openapi.apps.success()
+    real_app_schema = schemathesis.openapi.from_url(api.schema_url)
     # When preflight excludes all operations due to generation errors, the engine should finish
     # with COMPLETED (natural end), not INTERRUPTED (which implies external stop).
+
     @real_app_schema.hook
     def before_generate_case(context, strategy):
         def fail_generation(case):

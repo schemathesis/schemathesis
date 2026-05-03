@@ -511,8 +511,8 @@ def test_missing_required_header_default_accepts_401(ctx, cli, openapi3_base_url
     verify_missing_required_header(cassette_path, "X-API-Token", "SUCCESS")
 
 
-@pytest.mark.operations("success")
-def test_missing_required_accept_header(ctx, cli, openapi3_base_url, tmp_path):
+def test_missing_required_accept_header(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
     cassette_path = tmp_path / "missing_accept_header.yaml"
 
     schema_path = ctx.openapi.write_schema(
@@ -535,7 +535,7 @@ def test_missing_required_accept_header(ctx, cli, openapi3_base_url, tmp_path):
 
     cli.run(
         str(schema_path),
-        f"--url={openapi3_base_url}",
+        f"--url={api.base_url}",
         f"--report-vcr-path={cassette_path}",
         "--phases=coverage",
         "--mode=negative",
@@ -629,8 +629,8 @@ def test_missing_required_header_default_statuses(ctx, response_factory, status_
 
 
 @pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])
-@pytest.mark.operations("success")
-def test_method_not_allowed(ctx, cli, openapi3_base_url, snapshot_cli, path, method):
+def test_method_not_allowed(ctx, cli, snapshot_cli, path, method):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             path: {
@@ -643,7 +643,7 @@ def test_method_not_allowed(ctx, cli, openapi3_base_url, snapshot_cli, path, met
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}",
             "--phases=coverage",
             "--mode=negative",
         )

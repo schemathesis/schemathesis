@@ -5,9 +5,9 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/api
+     Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
@@ -20,23 +20,21 @@ Schemathesis dev
 
      ⏭  1 skipped
 
- ⏭   Coverage (in 0.00s)
+ 🚫  Coverage (in 0.00s)
 
-     ⏭  1 skipped
+     🚫 1 error
 
  🚫  Fuzzing (in 0.00s)
 
      🚫 1 error
 
 ==================================== ERRORS ====================================
-_________________________________ GET /success _________________________________
-Hook Error
+_______________________________ GET /api/success _______________________________
+Network Error
 
-Your `filter_case` hook rejected all generated test cases
+Connection failed
 
-Schemathesis generated test data, but every case was rejected by your hook.
-
-Tip: Review your `filter_case` hook to ensure it accepts at least some generated cases.
+    Read timed out
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -49,15 +47,15 @@ API Operations:
 
 Test Phases:
   ⏭  Examples
-  ⏭  Coverage
+  🚫 Coverage
   🚫 Fuzzing
   ⏭  Stateful (not applicable)
 
 Errors:
-  🚫 Hook Error: 1
+  🚫 Network Error: 1
 
 Test cases:
-  No test cases were generated
+  N generated
 
 Seed: 42
 

@@ -129,8 +129,6 @@ def test_schema_not_available(cli, workers, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
 @pytest.mark.snapshot_suffix(platform.python_implementation().lower())
 def test_empty_schema_file(testdir, cli, snapshot_cli):
     # When the schema file is empty
@@ -144,24 +142,22 @@ def test_force_color_nocolor(ctx, cli, snapshot_cli):
     assert cli.run(api.schema_url, "--force-color", "--no-color") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_certificates(cli, schema_url, mocker):
+def test_certificates(ctx, cli, mocker):
+    api = ctx.openapi.apps.success()
     request = mocker.spy(requests.Session, "request")
     # When a cert is passed via CLI args
     ca = trustme.CA()
     cert = ca.issue_cert("test.org")
     with cert.private_key_pem.tempfile() as cert_path:
-        cli.run_and_assert(schema_url, f"--request-cert={cert_path}")
+        cli.run_and_assert(api.schema_url, f"--request-cert={cert_path}")
         # Then both schema & test network calls should use this cert
         assert len(request.call_args_list) == 10
         assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_hypothesis_database_with_derandomize(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--generation-database=:memory:", "--generation-deterministic") == snapshot_cli
+def test_hypothesis_database_with_derandomize(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--generation-database=:memory:", "--generation-deterministic") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -316,9 +312,8 @@ def test_connection_timeout(ctx, cli, schema_url, workers, snapshot_cli):
         )
 
 
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_read_content_timeout(cli, mocker, schema_url, snapshot_cli):
+def test_read_content_timeout(ctx, cli, mocker, snapshot_cli):
+    api = ctx.openapi.apps.success()
     original = urllib3.response.HTTPResponse.stream
     count = 0
 
@@ -331,7 +326,7 @@ def test_read_content_timeout(cli, mocker, schema_url, snapshot_cli):
         return original(self, *args, **kwargs)
 
     mocker.patch("urllib3.response.HTTPResponse.stream", stream)
-    assert cli.run(schema_url) == snapshot_cli
+    assert cli.run(api.schema_url) == snapshot_cli
 
 
 @pytest.mark.operations("unsatisfiable")
@@ -552,19 +547,17 @@ def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
     assert cli.run(schema_url, "--phases=fuzzing") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_remote_disconnected_error(mocker, cli, schema_url, snapshot_cli):
+def test_remote_disconnected_error(ctx, mocker, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     mocker.patch(
         "http.client.HTTPResponse.begin",
         side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
     )
-    assert cli.run(schema_url) == snapshot_cli
+    assert cli.run(api.schema_url) == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_remote_disconnected_error_with_empty_header(mocker, cli, schema_url, snapshot_cli):
+def test_remote_disconnected_error_with_empty_header(ctx, mocker, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # When a request has an empty header value and the server disconnects
     # Regression test for IndexError when extracting headers from PreparedRequest with empty values
     protocol_error = ProtocolError("Connection aborted.", RemoteDisconnected("Remote end closed connection"))
@@ -579,14 +572,13 @@ def test_remote_disconnected_error_with_empty_header(mocker, cli, schema_url, sn
 
     mocker.patch("schemathesis.generation.case.Case.call", raise_connection_error)
     # Then it should not crash with IndexError on empty header value
-    assert cli.run(schema_url) == snapshot_cli
+    assert cli.run(api.schema_url) == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
-def test_proxy_error(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--proxy=http://127.0.0.1") == snapshot_cli
+def test_proxy_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--proxy=http://127.0.0.1") == snapshot_cli
 
 
 @pytest.fixture
@@ -673,13 +665,13 @@ def new_check(ctx, response, result):
     assert "new_check" not in cli.run("--help").stdout
 
 
-@pytest.mark.operations("success")
-def test_register_check(new_check, cli, schema_url, snapshot_cli):
+def test_register_check(ctx, new_check, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # When hooks are passed to the CLI call
     # And it contains registering a new check, which always fails for the testing purposes
     # Then CLI run should fail
     # And a message from the new check should be displayed
-    assert cli.main("run", "-c", "new_check", "--mode=positive", schema_url, hooks=new_check) == snapshot_cli
+    assert cli.main("run", "-c", "new_check", "--mode=positive", api.schema_url, hooks=new_check) == snapshot_cli
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -905,14 +897,13 @@ def with_error(ctx, response, case):
         yield module
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
 @pytest.mark.skipif(
     sys.version_info < (3, 11) or sys.version_info >= (3, 13) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
-def test_useful_traceback(cli, schema_url, snapshot_cli, with_error):
-    assert cli.main("run", schema_url, "-c", "with_error", hooks=with_error) == snapshot_cli
+def test_useful_traceback(ctx, cli, snapshot_cli, with_error):
+    api = ctx.openapi.apps.success()
+    assert cli.main("run", api.schema_url, "-c", "with_error", hooks=with_error) == snapshot_cli
 
 
 @pytest.mark.parametrize("media_type", ["multipart/form-data", "multipart/mixed", "multipart/*"])
@@ -1130,10 +1121,10 @@ def test_urlencoded_form(cli, schema_url):
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-@pytest.mark.operations("success")
-def test_targeted(mocker, cli, schema_url, workers):
+def test_targeted(ctx, mocker, cli, workers):
+    api = ctx.openapi.apps.success()
     target = mocker.spy(hypothesis, "target")
-    cli.run_and_assert(schema_url, f"--workers={workers}", "--generation-maximize=response_time")
+    cli.run_and_assert(api.schema_url, f"--workers={workers}", "--generation-maximize=response_time")
 
     target.assert_called_with(mocker.ANY, label="response_time")
 
@@ -1436,10 +1427,9 @@ def test_malformed_json_deduplication(cli, schema_url, snapshot_cli):
 
 
 @pytest.mark.parametrize("kind", ["env_var", "arg"])
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_no_color(monkeypatch, cli, schema_url, kind):
-    args = (schema_url,)
+def test_no_color(ctx, monkeypatch, cli, kind):
+    api = ctx.openapi.apps.success()
+    args = (api.schema_url,)
     if kind == "env_var":
         monkeypatch.setenv("NO_COLOR", "1")
     if kind == "arg":
@@ -1449,12 +1439,11 @@ def test_no_color(monkeypatch, cli, schema_url, kind):
     assert "36m" not in result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
 @pytest.mark.skipif(platform.system() == "Windows", reason="ANSI colors are not properly supported in Windows tests")
-def test_force_color(cli, schema_url):
+def test_force_color(ctx, cli):
+    api = ctx.openapi.apps.success()
     # Using `--force-color` adds ANSI escape codes forcefully
-    result = cli.run_and_assert(schema_url, "--force-color", color=False)
+    result = cli.run_and_assert(api.schema_url, "--force-color", color=False)
 
     assert "[1m" in result.stdout
 
@@ -1518,19 +1507,17 @@ def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli, base_url):
     assert token not in result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_skip_not_negated_tests(cli, schema_url, snapshot_cli):
+def test_skip_not_negated_tests(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # See GH-1463
     # When an endpoint has no parameters to negate
     # Then it should be skipped
-    assert cli.run(schema_url, "--mode", "negative") == snapshot_cli
+    assert cli.run(api.schema_url, "--mode", "negative") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_dont_skip_when_generation_is_possible(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--mode", "all") == snapshot_cli
+def test_dont_skip_when_generation_is_possible(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--mode", "all") == snapshot_cli
 
 
 @pytest.mark.operations("failure")
@@ -1617,12 +1604,12 @@ def test_curl_with_non_printable_characters_unknown_shell(ctx, cli, openapi3_bas
     )
 
 
-@pytest.mark.operations("success")
-def test_skipped_on_no_explicit_examples(cli, openapi3_schema_url, snapshot_cli):
+def test_skipped_on_no_explicit_examples(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # See GH-1323
     # When there are no explicit examples
     # Then tests should be marked as skipped
-    assert cli.run(openapi3_schema_url, "--phases=examples") == snapshot_cli
+    assert cli.run(api.schema_url, "--phases=examples") == snapshot_cli
 
 
 @pytest.fixture
@@ -1743,10 +1730,9 @@ def test_wait_for_schema_503_exhausted(cli, snapshot_cli, app_runner):
     assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=1") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_rate_limit(cli, schema_url):
-    assert cli.run(schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
+def test_rate_limit(ctx, cli):
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1833,9 +1819,9 @@ def test_output_sanitization_via_config(cli, openapi2_schema_url, hypothesis_max
     assert expected in result.stdout, result.stdout
 
 
-@pytest.mark.operations("success")
 @flaky(max_runs=5, min_passes=1)
-def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, openapi3_base_url, snapshot_cli):
+def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -1852,7 +1838,7 @@ def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, o
     )
     response = response_factory.requests(content_type=None, status_code=200)
     mocker.patch("requests.Session.request", return_value=response)
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=all", "--mode=positive") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={api.base_url}", "--checks=all", "--mode=positive") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
@@ -2329,9 +2315,8 @@ def buggy(ctx):
     )
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_custom_cli_option(ctx, cli, schema_url, snapshot_cli):
+def test_custom_cli_option(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     module = ctx.write_pymodule(
         r"""
 from schemathesis import cli, engine
@@ -2366,7 +2351,7 @@ class EventCounter(cli.EventHandler):
     assert (
         cli.main(
             "run",
-            schema_url,
+            api.schema_url,
             "--custom-counter=42",
             "--max-examples=1",
             hooks=module,

@@ -8,12 +8,12 @@ from _pytest.main import ExitCode
 from flask import jsonify
 
 
-@pytest.mark.operations("success")
-def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
+def test_junitxml_option(ctx, cli, hypothesis_max_examples, tmp_path):
+    api = ctx.openapi.apps.success()
     # When option with a path to junit.xml is provided
     xml_path = tmp_path / "junit.xml"
     cli.run_and_assert(
-        schema_url,
+        api.schema_url,
         f"--report-junit-path={xml_path}",
         f"--max-examples={hypothesis_max_examples or 2}",
         "--checks=not_a_server_error",
@@ -104,13 +104,12 @@ def with_error(ctx, response, case):
     sys.version_info < (3, 11) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_error_with_traceback(with_error, cli, schema_url, tmp_path):
+def test_error_with_traceback(ctx, with_error, cli, tmp_path):
+    api = ctx.openapi.apps.success()
     xml_path = tmp_path / "junit.xml"
     cli.main(
         "run",
-        schema_url,
+        api.schema_url,
         "-c",
         "with_error",
         f"--report-junit-path={xml_path}",
@@ -192,12 +191,11 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     assert "Read timed out after 0.01 seconds" in testcases[0][0].text
 
 
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_skipped(cli, tmp_path, schema_url, server_host):
+def test_skipped(ctx, cli, tmp_path):
+    api = ctx.openapi.apps.success()
     xml_path = tmp_path / "junit.xml"
     cli.run(
-        schema_url,
+        api.schema_url,
         f"--report-junit-path={xml_path}",
         "--seed=1",
         "--phases=examples",
@@ -207,10 +205,10 @@ def test_skipped(cli, tmp_path, schema_url, server_host):
     testsuite = tree.getroot()[0]
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
-    assert testcases[0].attrib["name"] == "GET /success"
+    assert testcases[0].attrib["name"] == "GET /api/success"
     assert testcases[0][0].tag == "skipped"
     assert testcases[0][0].attrib["type"] == "skipped"
-    assert extract_message(testcases[0][0], server_host) == "No examples in schema"
+    assert extract_message(testcases[0][0], f"127.0.0.1:{api.port}") == "No examples in schema"
 
 
 @pytest.mark.parametrize("path", ["junit.xml", "does-not-exist/junit.xml"])

@@ -12,7 +12,7 @@ def _graphql_url(ctx):
 
 
 def _openapi_url(ctx):
-    return ctx.request.getfixturevalue("openapi3_schema_url")
+    return ctx.openapi.apps.success().schema_url
 
 
 @pytest.mark.parametrize(
@@ -22,7 +22,6 @@ def _openapi_url(ctx):
         (schemathesis.openapi.from_url, _openapi_url, "openapi"),
     ],
 )
-@pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_maximum_requests(ctx, loader, make_url, kind):
     schema = loader(make_url(ctx))
