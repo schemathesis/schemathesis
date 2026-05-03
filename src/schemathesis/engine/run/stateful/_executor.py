@@ -41,6 +41,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
+from schemathesis.specs.openapi.auth_inference import record_auth_inference
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -165,6 +166,14 @@ def execute_state_machine_loop(
                     operation=case.operation,
                     case=case,
                     response=response,
+                )
+                record_auth_inference(
+                    store=engine.error_feedback,
+                    recorder=self.recorder,
+                    operation=case.operation,
+                    case=case,
+                    response=response,
+                    transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
                 )
 
             cached = check_context_cache.get_or_create(operation=case.operation, ctx=engine, phase="stateful")

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from schemathesis.auths import AuthContext, AuthProvider
     from schemathesis.core.compat import RefResolver
     from schemathesis.generation.case import Case
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
 
 ORIGINAL_SECURITY_TYPE_KEY = "x-original-security-type"
@@ -120,11 +121,9 @@ class OpenApiSecurity:
                             # Don't re-apply auth that was intentionally removed for testing
                             return False
 
-        # Get security requirements for this operation
-        operation_definition = case.operation.definition.raw
-
-        # Security requirements: OR semantics (first match wins), AND semantics (all in requirement)
-        security_requirements = operation_definition.get("security", self.raw_schema.get("security", []))
+        # Security requirements: OR semantics (first match wins), AND semantics (all in requirement).
+        # Auth-inference may attach a runtime overlay; that takes precedence over the raw spec.
+        security_requirements = effective_security_requirements(case.operation, self.raw_schema)
 
         if not security_requirements:
             return False
@@ -267,6 +266,31 @@ def get_security_requirements(schema: Mapping[str, Any], operation: Mapping[str,
 
 def has_optional_auth(schema: Mapping[str, Any], operation: Mapping[str, Any]) -> bool:
     return {} in operation.get("security", schema.get("security", []))
+
+
+def effective_security_requirements(
+    operation: APIOperation, raw_schema: Mapping[str, Any]
+) -> list[Mapping[str, list[str]]]:
+    """Return the operation's security requirements, including any runtime auth-inference overlay."""
+    overlay = operation.schema._inferred_security.get(operation.label)
+    if overlay is not None:
+        return list(overlay)
+    return operation.definition.raw.get("security", raw_schema.get("security", []))
+
+
+def get_effective_security_scheme_names(operation: APIOperation, raw_schema: Mapping[str, Any]) -> list[str]:
+    """Return the scheme names that govern an operation, including auth-inference overlays."""
+    return [
+        key
+        for requirement in effective_security_requirements(operation, raw_schema)
+        if isinstance(requirement, dict)
+        for key in requirement
+    ]
+
+
+def has_effective_optional_auth(operation: APIOperation, raw_schema: Mapping[str, Any]) -> bool:
+    """Return True iff an empty `{}` requirement appears in the effective security list."""
+    return {} in effective_security_requirements(operation, raw_schema)
 
 
 def extract_security_definitions_v2(schema: Mapping[str, Any], resolver: RefResolver) -> Mapping[str, Any]:

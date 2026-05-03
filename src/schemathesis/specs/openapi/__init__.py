@@ -39,9 +39,9 @@ def require_security_scheme(name: str) -> MatcherFunc:
     """
 
     def matcher(ctx: HasAPIOperation) -> bool:
-        from schemathesis.specs.openapi.adapter.security import get_security_requirements
+        from schemathesis.specs.openapi.adapter.security import get_effective_security_scheme_names
 
-        schemes = get_security_requirements(ctx.operation.schema.raw_schema, ctx.operation.definition.raw)
+        schemes = get_effective_security_scheme_names(ctx.operation, ctx.operation.schema.raw_schema)
         return name in schemes
 
     matcher.__name__ = matcher.__qualname__ = f"require_security_scheme({name!r})"

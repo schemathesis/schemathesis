@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback.store import (
     ObservationKind,
     ObservationPayload,
     PatternPayload,
+    RequiresAuthPayload,
     SizeBoundPayload,
     TypeMismatchPayload,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "ObservationKind",
     "ObservationPayload",
     "PatternPayload",
+    "RequiresAuthPayload",
     "SizeBoundPayload",
     "TypeMismatchPayload",
 ]

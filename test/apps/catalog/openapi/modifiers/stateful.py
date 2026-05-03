@@ -280,3 +280,17 @@ class ReuseDeletedIds:
 
     def apply(self, app: Flask, store: UserStore) -> None:
         store.config.reuse_deleted_ids = True
+
+
+@dataclass(slots=True)
+class RequireBearerAuth:
+    """Enable bearer-token enforcement on the server. Spec components advertise the scheme."""
+
+    valid_token: str = "real-token"
+    priority: int = 0
+
+    def apply(self, app: Flask, store: UserStore) -> None:
+        store.config.auth_token = self.valid_token
+        store.config.enforce_auth = True
+        spec = app.config["schema"]
+        spec["components"]["securitySchemes"] = {"BearerAuth": {"type": "http", "scheme": "bearer"}}
