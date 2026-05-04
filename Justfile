@@ -41,6 +41,10 @@ snapshot-update *ARGS:
 test-corpus:
     python -m pytest test-corpus/ -n auto --dist=worksteal
 
+# Launch a catalog test app on PORT (default factory: kitchen_sink). `just serve --list` to see all factories.
+serve PORT="8081" FACTORY="kitchen_sink" *ARGS:
+    python -m test.apps {{PORT}} {{FACTORY}} {{ARGS}}
+
 check:
     uvx prek run --all-files
 

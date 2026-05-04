@@ -1,6 +1,5 @@
 from pathlib import Path
 
-import pytest
 from flask import jsonify
 from hypothesis import given
 from hypothesis import strategies as st
@@ -184,7 +183,6 @@ def test(case):
     result.assert_outcomes(skipped=1)
 
 
-@pytest.mark.openapi_version("3.0")
 def test_multipart_encoding_multiple_content_types(ctx):
     PNG_DATA = b"\x89PNG\r\n\x1a\n" + b"\x00" * 10
     JPEG_DATA = b"\xff\xd8\xff\xe0" + b"\x00" * 10
@@ -245,7 +243,6 @@ def test_multipart_encoding_multiple_content_types(ctx):
     )
 
 
-@pytest.mark.openapi_version("3.0")
 def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
     pdf_data = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"
     schemathesis.openapi.media_type("application/pdf", st.just(pdf_data))

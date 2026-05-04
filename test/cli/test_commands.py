@@ -26,7 +26,7 @@ from schemathesis.core.shell import ShellType
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
-from test.apps.openapi._flask import create_app as create_openapi_app
+from test.apps.catalog.openapi import basic as openapi_basic
 from test.utils import HERE, SIMPLE_PATH, flaky
 
 
@@ -992,7 +992,6 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_typ
     # NOTE, that the actual API operation is not checked in this test
 
 
-@pytest.mark.openapi_version("3.0")
 @pytest.mark.parametrize(
     "field_name,field_schema,content_type",
     [
@@ -1677,8 +1676,8 @@ def test_multiple_generation_modes(ctx, cli, data_generation_check):
     (
         [
             (
-                "schema.yaml",
-                lambda: create_openapi_app(operations=("success",)),
+                "openapi.json",
+                lambda: openapi_basic.success().server,
             ),
             (
                 "graphql",
@@ -1704,7 +1703,7 @@ def test_wait_for_schema(cli, schema_path, make_app, app_runner):
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
 def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
-    app = create_openapi_app(operations=("success",))
+    app = openapi_basic.success().server
     original_run = app.run
 
     def run_with_delay(*args, **kwargs):
@@ -1713,7 +1712,7 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
 
     app.run = run_with_delay
     port = app_runner.run_flask_app(app)
-    schema_url = f"http://127.0.0.1:{port}/schema.yaml"
+    schema_url = f"http://127.0.0.1:{port}/openapi.json"
 
     assert cli.run(schema_url, "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 
