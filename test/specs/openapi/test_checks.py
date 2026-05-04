@@ -770,6 +770,116 @@ def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, res
     assert result is None
 
 
+def test_negative_data_rejection_multi_element_array_string_numeric_element(ctx, response_factory):
+    # GH-3931: a string element like "44" inside the array serializes to the wire form
+    # `?page_size=44`, which Django parses as integer 44. The strict JSON Schema validator
+    # treats "44" as a string (not integer), but the server accepts it.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/model-fk/user/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "page_size",
+                            "in": "query",
+                            "required": False,
+                            "schema": {"type": "integer", "minimum": 1, "maximum": 100},
+                        }
+                    ],
+                    "responses": {
+                        "200": {"description": "Success"},
+                        "400": {"description": "Bad Request"},
+                    },
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/api/model-fk/user/"]["GET"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+            description="Invalid type array (expected integer)",
+            parameter="page_size",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={
+            "page_size": [
+                -1.2097890770124232e65,
+                {"a": None},
+                [[-8.080921524865554e-19], "x"],
+                [],
+                "44",
+            ]
+        },
+    )
+
+    response = response_factory.requests(status_code=200)
+
+    result = negative_data_rejection(
+        CheckContext(
+            override=None,
+            auth=None,
+            headers=None,
+            config=ChecksConfig(),
+            transport_kwargs=None,
+        ),
+        response,
+        case,
+    )
+
+    assert result is None
+
+
+def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, response_factory):
+    # Negative type mutation can turn an integer query into an object. urlencode(doseq=True)
+    # iterates dict keys, so {"5": "x"} produces ?id=5 — the server parses 5 as integer
+    # and the request becomes effectively valid.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/api/items": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "query", "required": False, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "Success"}, "400": {"description": "Bad Request"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operation = schema["/api/items"]["GET"]
+
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+            description="Invalid type object (expected integer)",
+            parameter="id",
+            parameter_location=ParameterLocation.QUERY,
+        ),
+        query={"id": {"5": "x"}},
+    )
+    response = response_factory.requests(status_code=200)
+
+    assert (
+        negative_data_rejection(
+            CheckContext(
+                override=None,
+                auth=None,
+                headers=None,
+                config=ChecksConfig(),
+                transport_kwargs=None,
+            ),
+            response,
+            case,
+        )
+        is None
+    )
+
+
 def test_negative_data_rejection_path_string_numeric_serialization(ctx, response_factory):
     raw_schema = ctx.openapi.build_schema(
         {

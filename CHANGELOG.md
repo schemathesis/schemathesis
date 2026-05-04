@@ -23,6 +23,7 @@
 - Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
 - Drop spec examples invalidated by inferred constraints from the example mixer.
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
+- False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
 
 ### :wrench: Changed
 
