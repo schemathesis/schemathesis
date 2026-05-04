@@ -7,7 +7,10 @@
 - Detect runtime auth requirements from 401/403 responses on operations the spec declares public.
 - Capture identifiers from `{<id>: <object>, ...}` map-by-id GET responses (e.g. team / pod / cluster status maps).
 - Capture every element of list-shaped responses into the pool, not just the first.
+- Capture pool entries from custom wrappers, nested envelopes, and multi-array-root GET responses.
 - Refine generation from 4xx errors (Spring, Pydantic, DRF, Rails, Laravel, ASP.NET, Symfony, Zod, AJV, go-validator).
+- Apply pool overlay to foreign-key fields nested inside request body objects.
+- Track deleted resources and stop re-feeding their identifiers to subsequent operations.
 - GraphQL fuzzing: dispatch producer mutations first and reuse captured identifiers across test cases.
 - GraphQL stateful phase: chained operation scenarios.
 - Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
@@ -16,19 +19,16 @@
 
 - Panic during response validation for schemas with very large `{0,N}` regex quantifiers (e.g. `{0,404600}`).
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
-- Capture pool entries from more GET-list response shapes: custom wrappers, nested envelopes, multi-array roots.
 - Mismatched parent/child path parameters in pool draws for hierarchical operations.
-- Pool keeps re-feeding successfully-deleted resource identifiers to subsequent operations.
-- Apply pool overlay to foreign-key fields nested inside request body objects.
 - Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
 - Drop spec examples invalidated by inferred constraints from the example mixer.
-- Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
 
 ### :wrench: Changed
 
 - Recognize more path parameters as resource identifiers.
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
+- Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 
