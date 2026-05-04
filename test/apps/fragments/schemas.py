@@ -679,3 +679,167 @@ def sessions_and_log_event() -> dict[str, Any]:
             }
         },
     }
+
+
+def deep_leaf_bug() -> dict[str, Any]:
+    return {
+        "/api/deep_leaf_bug": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DeepLeafRoot"}}},
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+
+
+def deep_leaf_bug_components() -> dict[str, Any]:
+    return {
+        "DeepLeafRoot": {
+            "type": "object",
+            "required": ["root_str", "depth1"],
+            "additionalProperties": False,
+            "properties": {
+                "root_str": {"type": "string", "minLength": 4, "maxLength": 12, "pattern": "^[a-z]+$"},
+                "root_int": {"type": "integer", "minimum": 0, "maximum": 100},
+                "depth1": {"$ref": "#/components/schemas/DeepLeafDepth1"},
+            },
+        },
+        "DeepLeafDepth1": {
+            "type": "object",
+            "required": ["d1_enum", "depth2"],
+            "additionalProperties": False,
+            "properties": {
+                "d1_enum": {"type": "string", "enum": ["alpha", "beta", "gamma"]},
+                "d1_num": {"type": "number", "minimum": 1.5, "maximum": 9.5},
+                "depth2": {"$ref": "#/components/schemas/DeepLeafDepth2"},
+            },
+        },
+        "DeepLeafDepth2": {
+            "type": "object",
+            "required": ["d2_str", "depth3"],
+            "additionalProperties": False,
+            "properties": {
+                "d2_str": {"type": "string", "minLength": 2, "maxLength": 6, "pattern": "^[A-Z]{2,6}$"},
+                "d2_arr": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "items": {"type": "integer", "minimum": 10, "maximum": 99},
+                },
+                "depth3": {"$ref": "#/components/schemas/DeepLeafDepth3"},
+            },
+        },
+        "DeepLeafDepth3": {
+            "type": "object",
+            "required": ["leaf_int"],
+            "additionalProperties": False,
+            "properties": {
+                "leaf_uuid": {"type": "string", "format": "uuid"},
+                "leaf_email": {"type": "string", "format": "email"},
+                "leaf_int": {"type": "integer", "minimum": -5, "maximum": 5},
+            },
+        },
+    }
+
+
+def header_constraint_bug() -> dict[str, Any]:
+    return {
+        "/api/header_constraint_bug": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "X-Token",
+                        "in": "header",
+                        "required": True,
+                        "schema": {"type": "string", "pattern": "^[A-Z]{8}$"},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+
+
+def query_array_items_bug() -> dict[str, Any]:
+    return {
+        "/api/query_array_items_bug": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "ids",
+                        "in": "query",
+                        "required": True,
+                        "schema": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 99}},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+
+
+def one_of_branch_bug() -> dict[str, Any]:
+    return {
+        "/api/one_of_branch_bug": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "type": "object",
+                                        "required": ["kind", "value"],
+                                        "properties": {
+                                            "kind": {"type": "string", "enum": ["A"]},
+                                            "value": {"type": "integer", "minimum": 0},
+                                        },
+                                    },
+                                    {
+                                        "type": "object",
+                                        "required": ["kind", "nested"],
+                                        "properties": {
+                                            "kind": {"type": "string", "enum": ["B"]},
+                                            "nested": {
+                                                "type": "object",
+                                                "required": ["pin"],
+                                                "properties": {
+                                                    "pin": {"type": "string", "pattern": "^[0-9]{4}$"},
+                                                },
+                                            },
+                                        },
+                                    },
+                                ],
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }
+
+
+def additional_properties_bug() -> dict[str, Any]:
+    return {
+        "/api/additional_properties_bug": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {"type": "string", "format": "uuid"},
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        }
+    }

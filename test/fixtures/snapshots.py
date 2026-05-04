@@ -56,6 +56,11 @@ class CliSnapshotConfig:
     replace_stateful_statistic: bool = True
     remove_last_line: bool = False
     replace: bool = True
+    # Negative-fuzzing tests where the seed picks a different mutator output across
+    # CI Pythons (constraint-violation / syntax-fuzzing / format-violation). Opt-in
+    # so deterministic tests (coverage phase, hand-crafted check tests) keep the
+    # exact `Invalid component:` content for assertions.
+    replace_invalid_component: bool = False
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> CliSnapshotConfig:
@@ -191,6 +196,36 @@ class CliSnapshotConfig:
         if self.replace_seed:
             data = re.sub(r"--seed=\d+", "--seed=42", data)
             data = re.sub(r"Seed: \d+", "Seed: 42", data)
+        # Hint: "additional properties not defined in the schema (...)" lists the
+        # generated property names verbatim — those names are random Hypothesis output
+        # and shift across runs. Collapse the count + names to a placeholder.
+        data = re.sub(
+            r"contains \d+ additional properties not defined in the schema \(.*?\)\. The server",
+            "contains <N> additional properties not defined in the schema (<NAMES>). The server",
+            data,
+            flags=re.DOTALL,
+        )
+        if self.replace_invalid_component:
+            # Same seed picks different mutator outputs across CI Pythons (constraint
+            # violation vs. syntax fuzzing vs. format violation, etc.). Collapse the
+            # whole `Invalid component:` body to a placeholder so version-specific
+            # case selection doesn't break the snapshot.
+            data = re.sub(
+                r"^([ \t]*Invalid component:).*$",
+                r"\1 <PLACEHOLDER>",
+                data,
+                flags=re.MULTILINE,
+            )
+            # Negative-fuzzing variance can produce body content with non-printable
+            # bytes on some Pythons but not others; the curl advisory then appears
+            # only on those runs. Strip the warning and its trailing blank line so
+            # spacing matches the warning-free runs.
+            data = re.sub(
+                r"^[ \t]*⚠️[ \t]+Request body contains non-printable characters\..*\n\n",
+                "",
+                data,
+                flags=re.MULTILINE,
+            )
         if self.replace_reproduce_with:
             lines = []
             seen = False

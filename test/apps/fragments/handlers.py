@@ -10,7 +10,7 @@ import jsonschema_rs
 from flask import Flask, Response, jsonify, request
 from werkzeug.exceptions import BadRequest, GatewayTimeout, InternalServerError
 
-from test.apps.fragments.schemas import PAYLOAD_SCHEMA
+from test.apps.fragments.schemas import PAYLOAD_SCHEMA, deep_leaf_bug_components
 
 # base64("test:test")
 _BASIC_AUTH_TOKEN = "Basic dGVzdDp0ZXN0"
@@ -315,3 +315,64 @@ def register_sessions_and_log_event(app: Flask) -> None:
         if not isinstance(data, dict) or "message" not in data:
             return "", 400
         return "", 200
+
+
+_DEEP_LEAF_RELAXED_VALIDATOR = jsonschema_rs.Draft7Validator(
+    {
+        "$ref": "#/components/schemas/DeepLeafRoot",
+        "components": {"schemas": {**deep_leaf_bug_components(), "DeepLeafDepth3": {"type": "object"}}},
+    }
+)
+
+
+def register_deep_leaf_bug(app: Flask) -> None:
+    @app.route("/api/deep_leaf_bug", methods=["POST"])
+    def deep_leaf_bug_endpoint() -> Any:
+        body = request.get_json(silent=True)
+        if body is None:
+            return jsonify({"error": "expected json"}), 400
+        if not _DEEP_LEAF_RELAXED_VALIDATOR.is_valid(body):
+            return jsonify({"error": "invalid"}), 400
+        return jsonify({"ok": True}), 200
+
+
+def register_header_constraint_bug(app: Flask) -> None:
+    @app.route("/api/header_constraint_bug", methods=["GET"])
+    def header_constraint_bug_endpoint() -> Any:
+        if not request.headers.get("X-Token"):
+            return jsonify({"error": "X-Token required"}), 400
+        return jsonify({"ok": True}), 200
+
+
+def register_query_array_items_bug(app: Flask) -> None:
+    @app.route("/api/query_array_items_bug", methods=["GET"])
+    def query_array_items_bug_endpoint() -> Any:
+        ids = request.args.getlist("ids")
+        if not ids:
+            return jsonify({"error": "ids required"}), 400
+        try:
+            [int(x) for x in ids]
+        except ValueError:
+            return jsonify({"error": "ids must be integers"}), 400
+        return jsonify({"ok": True}), 200
+
+
+def register_one_of_branch_bug(app: Flask) -> None:
+    @app.route("/api/one_of_branch_bug", methods=["POST"])
+    def one_of_branch_bug_endpoint() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"error": "expected object"}), 400
+        return jsonify({"ok": True}), 200
+
+
+def register_additional_properties_bug(app: Flask) -> None:
+    @app.route("/api/additional_properties_bug", methods=["POST"])
+    def additional_properties_bug_endpoint() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"error": "expected object"}), 400
+        for value in body.values():
+            if not isinstance(value, str):
+                return jsonify({"error": "values must be strings"}), 400
+        return jsonify({"ok": True}), 200

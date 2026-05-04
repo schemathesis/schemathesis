@@ -14,6 +14,7 @@ from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import AcceptedNegativeData, Failure
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, get_type
+from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -460,12 +461,10 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
             return False
 
     phase_data = meta.phase.data
-    if (
-        not isinstance(phase_data, FuzzingPhaseData)
-        or phase_data.parameter_location != location
-        or not phase_data.description
-        or not phase_data.description.startswith("Invalid type")
-    ):
+    if not isinstance(phase_data, FuzzingPhaseData) or phase_data.parameter_location != location:
+        return False
+    # Multi-site mutations are conservatively skipped — can't pin one keyword expectation.
+    if len(phase_data.mutations) != 1 or phase_data.mutations[0].operator != OperatorKind.CHANGE_TYPE:
         return False
 
     container_name = location.container_name
@@ -500,15 +499,12 @@ def _string_type_mutation_becomes_valid_after_serialization(case: Case, location
 
 
 def _has_unverifiable_mutations(case: Case) -> bool:
-    """Check if mutations cannot be verified as actually producing invalid data.
+    """Skip the check when the case applied multiple mutations on disjoint sites.
 
-    When multiple mutations are applied, they can conflict (e.g., one mutates a property's type,
-    another removes that property entirely). In such cases, metadata.description is cleared
-    because we can't accurately describe what was mutated. More importantly, we can't verify
-    that the mutation actually resulted in invalid data being sent - the removed property
-    won't be in the request at all, making the request potentially valid.
-
-    To avoid false positives, skip the check when we can't verify the mutation.
+    With multiple structured mutations, the synthesis of a single human-readable
+    description is ambiguous, so MutationMetadata.description returns None. We can't
+    pin a single-keyword expectation when the case violates several at once, so we
+    conservatively skip rather than risk false positives.
     """
     meta = case.meta
     if meta is None:

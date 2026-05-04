@@ -21,7 +21,7 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-___________________________ POST /items/{kind}/{id} ____________________________
+_________________________ POST /api/one_of_branch_bug __________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - API accepted schema-violating request

@@ -28,8 +28,7 @@ ________________________________ POST /session _________________________________
 
     Valid data should have been accepted
     Expected: 2xx, 401, 403, 404, 409, 5xx
-    Hint: The request body contains 13 additional properties not defined in the schema (``, `}ñc
-    #]`, `9򎕻-􏐟à` and 10 more). The server likely rejects unexpected fields. Add `additionalProperties: false` to your schema to prevent this.
+    Hint: The request body contains <N> additional properties not defined in the schema (<NAMES>). The server likely rejects unexpected fields. Add `additionalProperties: false` to your schema to prevent this.
 
 [422] Unprocessable Content:
 

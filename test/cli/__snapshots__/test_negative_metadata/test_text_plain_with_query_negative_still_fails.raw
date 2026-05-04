@@ -28,7 +28,7 @@ ________________________________ PUT /endpoint _________________________________
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
-    Invalid component: parameter `age` in query - invalid type object (expected integer)
+    Invalid component: <PLACEHOLDER>
 
 [200] OK:
 

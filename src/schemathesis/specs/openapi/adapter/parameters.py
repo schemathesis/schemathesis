@@ -38,6 +38,7 @@ if TYPE_CHECKING:
 
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.specs.openapi.extra_data_source import VariantUsageTracker
+    from schemathesis.specs.openapi.negative.mutations import MutationTargetDescriptor
 
 
 MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
@@ -316,6 +317,7 @@ class OpenApiComponent(ABC):
         "_raw_schema",
         "_validation_schema",
         "_examples",
+        "_mutation_targets",
     )
 
     def __post_init__(self) -> None:
@@ -324,6 +326,7 @@ class OpenApiComponent(ABC):
         self._raw_schema: JsonSchema | NotSet = NOT_SET
         self._validation_schema: JsonSchema | NotSet = NOT_SET
         self._examples: list | NotSet = NOT_SET
+        self._mutation_targets: tuple | NotSet = NOT_SET
 
     @property
     def optimized_schema(self) -> JsonSchema:
@@ -412,6 +415,23 @@ class OpenApiComponent(ABC):
             self._examples = self._extract_examples()
         assert not isinstance(self._examples, NotSet)
         return self._examples
+
+    @property
+    def mutation_targets(self) -> tuple[MutationTargetDescriptor, ...]:
+        """Pre-computed walk recipes for every mutation target reachable from `optimized_schema`.
+
+        Cached for the component's lifetime so strategy rebuilds against the unmodified
+        `optimized_schema` skip the walk. Callers must NOT pass these descriptors when
+        the schema reaching the strategy has been transformed (e.g. by error-feedback
+        adjustments) — those calls fall through to a fresh `compute_mutation_targets` against
+        the transformed schema so newly-synthesized targets are picked up.
+        """
+        from schemathesis.specs.openapi.negative.mutations import compute_mutation_targets
+
+        if self._mutation_targets is NOT_SET:
+            self._mutation_targets = compute_mutation_targets(self.optimized_schema)
+        assert not isinstance(self._mutation_targets, NotSet)
+        return self._mutation_targets
 
     def _extract_examples(self) -> list[object]:
         """Extract examples from definition and schema.
@@ -538,6 +558,7 @@ class OpenApiBody(OpenApiComponent):
         "_raw_schema",
         "_validation_schema",
         "_examples",
+        "_mutation_targets",
         "_positive_strategy_cache",
         "_negative_strategy_cache",
         "_is_negatable",
@@ -691,6 +712,11 @@ class OpenApiBody(OpenApiComponent):
                 store=error_feedback,
             )
         assert isinstance(operation.schema, OpenApiSchema)
+        # Reuse the precomputed target walk recipes when the strategy is generating against
+        # `optimized_schema` directly (no error-feedback adjustment fired).
+        target_descriptors = (
+            self.mutation_targets if generation_mode.is_negative and schema is self.optimized_schema else None
+        )
         strategy = strategy_factory(
             schema,
             operation.label,
@@ -699,6 +725,7 @@ class OpenApiBody(OpenApiComponent):
             generation_config,
             operation.schema.adapter.jsonschema_validator_cls,
             self.name_to_uri,
+            target_descriptors=target_descriptors,
         )
 
         # Mix in schema examples for positive mode (20% example, 80% generated)

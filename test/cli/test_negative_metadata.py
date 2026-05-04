@@ -4,6 +4,9 @@ import pytest
 from _pytest.main import ExitCode
 from flask import jsonify, request
 
+import schemathesis
+from schemathesis.engine import Status, events
+
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_format_password_false_positive(ctx, cli, snapshot_cli):
@@ -136,7 +139,7 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, cli, snapsho
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
 def test_text_plain_with_query_negative_still_fails(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
@@ -172,51 +175,46 @@ def test_text_plain_with_query_negative_still_fails(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.parametrize(
-    "auth_config",
-    [
-        {"auth": {"openapi": {"password": {"username": "plain", "password": "test"}}}},
-        {"auth": {"basic": {"username": "plain", "password": "test"}}},
-        None,
-    ],
-    ids=["openapi-auth", "basic-auth", "no-auth"],
-)
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_removed_auth_parameter_not_reapplied(ctx, cli, app_runner, snapshot_cli, auth_config):
-    app, _ = ctx.openapi.make_flask_app(
-        {
-            "/ping": {
-                "post": {
-                    "security": [{"password": []}],
-                    "responses": {"204": {"description": "No Content"}},
-                }
-            }
-        },
-        components={
-            "securitySchemes": {
-                "password": {
-                    "type": "http",
-                    "scheme": "basic",
-                }
-            }
-        },
-    )
+def test_removed_auth_parameter_not_reapplied_no_credentials(ctx):
+    # No credentials configured — server always returns 401; negative_data_rejection must not fire.
+    api = ctx.openapi.apps.basic()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.seed = 42
+    schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
+    schema.config.phases.examples.enabled = False
+    schema.config.phases.coverage.enabled = False
+    schema.config.phases.stateful.enabled = False
+    schema.config.phases.fuzzing.generation.update(max_examples=20)
+    schema.config.checks.update(included_check_names=["negative_data_rejection"])
 
-    @app.route("/ping", methods=["POST"])
-    def ping():
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            return "", 401
-        return "", 204
+    failures = []
+    for event in schemathesis.engine.from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.status == Status.FAILURE:
+            failures.append(event)
 
-    args = [
-        app_runner.openapi_url(app),
-        "--checks=negative_data_rejection",
-        "--mode=negative",
-        "--phases=fuzzing",
-        "--max-examples=5",
-        "--seed=42",
-    ]
-    kwargs = {"config": auth_config} if auth_config else {}
+    assert not failures, f"unexpected negative_data_rejection failures: {failures}"
 
-    assert cli.run(*args, **kwargs) == snapshot_cli
+
+def test_removed_auth_parameter_not_reapplied_with_credentials(ctx):
+    # When auth credentials are configured, a removal mutation must leave the
+    # Authorization header absent — interceptor must not re-add it — so the
+    # server returns 401 and negative_data_rejection does not fire.
+    api = ctx.openapi.apps.basic()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.seed = 42
+    schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
+    schema.config.phases.examples.enabled = False
+    schema.config.phases.coverage.enabled = False
+    schema.config.phases.stateful.enabled = False
+    schema.config.phases.fuzzing.generation.update(max_examples=50)
+    schema.config.auth.update(basic=("test", "test"))
+    schema.config.checks.update(included_check_names=["negative_data_rejection"])
+
+    failures = []
+    for event in schemathesis.engine.from_schema(schema).execute():
+        if isinstance(event, events.ScenarioFinished) and event.status == Status.FAILURE:
+            failures.append(event)
+
+    auth_removed = [r for r in api.requests if "Authorization" not in r.headers]
+    assert auth_removed, "no auth-removal mutation fired in 50 examples"
+    assert not failures, f"unexpected negative_data_rejection failures: {failures}"

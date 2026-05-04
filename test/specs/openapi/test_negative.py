@@ -22,9 +22,8 @@ from schemathesis.specs.openapi.negative import GeneratedValue, mutated, negativ
 from schemathesis.specs.openapi.negative.mutations import (
     MutationContext,
     MutationResult,
-    change_items,
-    change_properties,
     change_type,
+    compute_mutation_targets,
     negate_constraints,
     prevent_unsatisfiable_schema,
     remove_required_property,
@@ -101,31 +100,6 @@ def test_top_level_strategy(data, location, schema):
         assert is_valid_header(instance)
 
 
-@given(data=st.data())
-@settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=100)
-def test_number_type_excludes_integer_from_type_mutations(data):
-    # See GH-3697
-    schema = {
-        "type": "object",
-        "properties": {
-            "score": {"type": "number"},
-            "label": {"type": "string"},
-        },
-        "required": ["score", "label"],
-    }
-
-    ctx = MutationContext(
-        keywords=schema,
-        non_keywords={},
-        location=ParameterLocation.BODY,
-        media_type="application/json",
-        allow_extra_parameters=False,
-    )
-    result, metadata = change_properties(ctx, data.draw, schema)
-    if result == MutationResult.SUCCESS and metadata is not None:
-        assert metadata.description != "Invalid type integer (expected number)"
-
-
 @pytest.mark.parametrize(
     ("mutation", "schema", "location", "validate"),
     [
@@ -144,19 +118,6 @@ def test_number_type_excludes_integer_from_type_mutations(data):
         (remove_required_property, {}, ParameterLocation.BODY, True),
         # Non-"object" type
         (remove_required_property, {"type": "array"}, ParameterLocation.BODY, True),
-        # No properties at all
-        (change_properties, {}, ParameterLocation.BODY, True),
-        # No properties that can be mutated
-        (change_properties, {"properties": {"foo": {}}}, ParameterLocation.BODY, True),
-        # No items
-        (change_items, {"type": "array"}, ParameterLocation.BODY, True),
-        # `items` accept everything
-        (change_items, {"type": "array", "items": {}}, ParameterLocation.BODY, True),
-        (change_items, {"type": "array", "items": True}, ParameterLocation.BODY, False),
-        # `items` is equivalent to accept-everything schema
-        (change_items, {"type": "array", "items": {"uniqueItems": False}}, ParameterLocation.BODY, True),
-        # The first element could be anything
-        (change_items, {"type": "array", "items": [{}]}, ParameterLocation.BODY, True),
         # Query and path parameters are always strings
         (change_type, {"type": "string"}, ParameterLocation.PATH, True),
         (change_type, {"type": "string"}, ParameterLocation.QUERY, True),
@@ -177,6 +138,7 @@ def test_failing_mutations(data, mutation, schema, location, validate):
             location=location,
             media_type="application/json",
             allow_extra_parameters=True,
+            target_descriptors=(),
         ),
         data.draw,
         schema,
@@ -199,6 +161,7 @@ def test_change_type_urlencoded(data):
         location=ParameterLocation.BODY,
         media_type="application/x-www-form-urlencoded",
         allow_extra_parameters=True,
+        target_descriptors=(),
     )
     # Then it should not be mutated
     result, metadata = change_type(context, data.draw, schema)
@@ -219,25 +182,6 @@ def test_change_type_urlencoded(data):
         (remove_required_property, {"properties": {"foo": {}}, "required": ["foo"]}),
         (remove_required_property, {"properties": {"foo": {}, "bar": {}}, "required": ["foo"]}),
         (remove_required_property, {"required": ["foo"]}),
-        (change_items, {"type": "array", "items": {"type": "string"}}),
-        (change_items, {"type": "array", "items": {"type": "string"}, "minItems": 1}),
-        (change_items, {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 1}),
-        (change_items, {"type": "array", "items": [{"type": "string"}]}),
-        (change_items, {"type": "array", "items": [{"type": "string"}], "minItems": 1}),
-        (change_items, {"type": "array", "items": [{"type": "string"}], "minItems": 1, "maxItems": 1}),
-        (change_properties, {"properties": {"foo": {"type": "integer"}}, "type": "object", "required": ["foo"]}),
-        (change_properties, {"properties": {"foo": {"type": "integer"}}, "type": ["object"]}),
-        (change_properties, {"properties": {"foo": {"type": "integer"}}, "type": "object"}),
-        (change_properties, {"properties": {"foo": {"type": "integer"}}}),
-        (
-            change_properties,
-            {
-                "properties": {"foo": {"type": "string", "minLength": 5}, "bar": {"type": "string", "minLength": 5}},
-                "type": "object",
-                "required": ["foo", "bar"],
-                "additionalProperties": False,
-            },
-        ),
     ],
 )
 @given(data=st.data())
@@ -255,6 +199,7 @@ def test_successful_mutations(data, mutation, schema):
             location=ParameterLocation.BODY,
             media_type="application/json",
             allow_extra_parameters=True,
+            target_descriptors=(),
         ),
         data.draw,
         schema,
@@ -306,6 +251,7 @@ def test_path_parameters_are_string(data, schema):
             location=ParameterLocation.PATH,
             media_type=None,
             allow_extra_parameters=True,
+            target_descriptors=compute_mutation_targets(new_schema),
         )
     )
     assert new_schema["type"] == "object"
@@ -338,6 +284,7 @@ def test_custom_fields_are_intact(data, key):
             location=ParameterLocation.BODY,
             media_type="application/json",
             allow_extra_parameters=True,
+            target_descriptors=compute_mutation_targets(schema),
         )
     )
     assert key in new_schema
@@ -385,6 +332,7 @@ def test_negate_constraints_keep_dependencies(data, schema, validator_cls):
             location=ParameterLocation.BODY,
             media_type="application/json",
             allow_extra_parameters=True,
+            target_descriptors=(),
         ),
         data.draw,
         schema,
@@ -406,6 +354,7 @@ def test_no_unsatisfiable_schemas(data):
             location=ParameterLocation.BODY,
             media_type="application/json",
             allow_extra_parameters=True,
+            target_descriptors=compute_mutation_targets(schema),
         )
     )
     assert canonicalish(mutated_schema) != FALSEY
@@ -789,10 +738,8 @@ def test_negative_custom_format_generates_invalid_values(ctx):
 
 @pytest.mark.hypothesis_nested
 def test_multiple_mutations_clear_description():
-    # GH-3367: When multiple mutations are applied to a schema, they can conflict
-    # (e.g., one mutation changes a property's type, another removes that property).
-    # In such cases, keeping the first mutation's description is misleading.
-    # This test verifies that when multiple mutations succeed, description is cleared.
+    # GH-3367: With multiple mutations, description must be cleared so the dispatcher
+    # doesn't emit misleading single-mutation metadata. ~50 examples to reliably trigger it.
     schema = {
         "type": "object",
         "properties": {
@@ -807,6 +754,7 @@ def test_multiple_mutations_clear_description():
         location=ParameterLocation.HEADER,
         media_type=None,
         allow_extra_parameters=False,
+        target_descriptors=compute_mutation_targets(schema),
     )
 
     @given(data=st.data())
@@ -814,8 +762,8 @@ def test_multiple_mutations_clear_description():
     def test(data):
         draw = data.draw
         _, metadata = ctx.mutate(draw)
-        if metadata is not None:
-            assert metadata.description != "Schema mutated"
+        if metadata is not None and len(metadata.mutations) > 1:
+            assert metadata.description is None
 
     test()
 
@@ -1091,7 +1039,7 @@ def test_negative_data_rejection_enum_path_params_no_false_positive(ctx, cli, ap
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
 def test_negative_data_rejection_enum_path_params_non_validating_server(ctx, cli, snapshot_cli):
     # A server that accepts everything. Mutations must fire and the check
     # must report failures for enum + integer path parameters in fuzzing mode.

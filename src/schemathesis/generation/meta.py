@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
+
+if TYPE_CHECKING:
+    from schemathesis.specs.openapi.negative.mutations import Mutation
 
 
 class TestPhase(str, Enum):
@@ -99,7 +103,7 @@ class ComponentInfo:
     __slots__ = ("mode",)
 
 
-@dataclass
+@dataclass(slots=True)
 class FuzzingPhaseData:
     """Metadata specific to fuzzing phase."""
 
@@ -107,11 +111,10 @@ class FuzzingPhaseData:
     parameter: str | None
     parameter_location: ParameterLocation | None
     location: str | None
+    mutations: tuple[Mutation, ...] = ()
 
-    __slots__ = ("description", "parameter", "parameter_location", "location")
 
-
-@dataclass
+@dataclass(slots=True)
 class StatefulPhaseData:
     """Metadata specific to stateful phase."""
 
@@ -119,11 +122,10 @@ class StatefulPhaseData:
     parameter: str | None
     parameter_location: ParameterLocation | None
     location: str | None
+    mutations: tuple[Mutation, ...] = ()
 
-    __slots__ = ("description", "parameter", "parameter_location", "location")
 
-
-@dataclass
+@dataclass(slots=True)
 class ExamplesPhaseData:
     """Metadata specific to examples phase."""
 
@@ -131,8 +133,7 @@ class ExamplesPhaseData:
     parameter: str | None
     parameter_location: ParameterLocation | None
     location: str | None
-
-    __slots__ = ("description", "parameter", "parameter_location", "location")
+    mutations: tuple[Mutation, ...] = ()
 
 
 @dataclass
@@ -231,10 +232,10 @@ class CaseMetadata:
         """Store hash after validation to detect future changes."""
         self._last_validated_hashes[location] = value
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to a plain dict for cross-process transport."""
         phase_data = self.phase.data
-        phase_data_dict: dict[str, str | None] = {
+        phase_data_dict: dict[str, Any] = {
             "type": type(phase_data).__name__,
             "description": phase_data.description,
             "location": phase_data.location,
@@ -245,6 +246,8 @@ class CaseMetadata:
         }
         if isinstance(phase_data, CoveragePhaseData):
             phase_data_dict["scenario"] = phase_data.scenario.value
+        elif isinstance(phase_data, (FuzzingPhaseData, StatefulPhaseData, ExamplesPhaseData)):
+            phase_data_dict["mutations"] = [m.to_dict() for m in phase_data.mutations]
         return {
             "generation": {
                 "time": self.generation.time,
@@ -287,6 +290,7 @@ class CaseMetadata:
                 parameter=phase_data_raw["parameter"],
                 parameter_location=param_loc,
                 location=phase_data_raw["location"],
+                mutations=_load_mutations(phase_data_raw),
             )
         elif phase_data_type == "StatefulPhaseData":
             phase_data = StatefulPhaseData(
@@ -294,6 +298,7 @@ class CaseMetadata:
                 parameter=phase_data_raw["parameter"],
                 parameter_location=param_loc,
                 location=phase_data_raw["location"],
+                mutations=_load_mutations(phase_data_raw),
             )
         else:
             phase_data = ExamplesPhaseData(
@@ -301,6 +306,14 @@ class CaseMetadata:
                 parameter=phase_data_raw["parameter"],
                 parameter_location=param_loc,
                 location=phase_data_raw["location"],
+                mutations=_load_mutations(phase_data_raw),
             )
         phase = PhaseInfo(name=TestPhase(data["phase"]["name"]), data=phase_data)
         return cls(generation=generation, components=components, phase=phase)
+
+
+def _load_mutations(raw: dict[str, Any]) -> tuple[Mutation, ...]:
+    # Avoid Hypothesis import at module level
+    from schemathesis.specs.openapi.negative.mutations import Mutation
+
+    return tuple(Mutation.from_dict(m) for m in raw.get("mutations", ()))

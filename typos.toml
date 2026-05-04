@@ -1,5 +1,14 @@
 [default]
-extend-ignore-re = ["DELET", "RESTFul", "parametrized", "worke", "secon", "\\{Nd\\}"]
+extend-ignore-re = [
+    "DELET",
+    "RESTFul",
+    "parametrized",
+    "worke",
+    "secon",
+    "\\{Nd\\}",
+    # UUID-shaped literals
+    "[0-9a-fg-]{36}",
+]
 
 [default.extend-words]
 Nd = "Nd"

@@ -309,18 +309,21 @@ def openapi_cases(
                     parameter=metadata.parameter,
                     parameter_location=parameter_location,
                     location=metadata.location,
+                    mutations=metadata.mutations,
                 ),
                 TestPhase.FUZZING: FuzzingPhaseData(
                     description=metadata.description,
                     parameter=metadata.parameter,
                     parameter_location=parameter_location,
                     location=metadata.location,
+                    mutations=metadata.mutations,
                 ),
                 TestPhase.STATEFUL: StatefulPhaseData(
                     description=metadata.description,
                     parameter=metadata.parameter,
                     parameter_location=parameter_location,
                     location=metadata.location,
+                    mutations=metadata.mutations,
                 ),
             }[phase]
             phase_data = cast(ExamplesPhaseData | FuzzingPhaseData | StatefulPhaseData, _phase_data)
@@ -854,6 +857,7 @@ def make_positive_strategy(
     validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
     validation_schema: JsonSchema | None = None,
+    target_descriptors: tuple | None = None,
 ) -> st.SearchStrategy:
     """Strategy for generating values that fit the schema."""
     custom_formats = _build_custom_formats(generation_config, GenerationMode.POSITIVE)
@@ -881,6 +885,7 @@ def make_negative_strategy(
     validator_cls: type[jsonschema_rs.Validator],
     name_to_uri: dict[str, str] | None = None,
     validation_schema: JsonSchema | None = None,
+    target_descriptors: tuple | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(generation_config, GenerationMode.NEGATIVE)
     return negative_schema(
@@ -893,6 +898,7 @@ def make_negative_strategy(
         validator_cls=validator_cls,
         validation_schema=validation_schema,
         name_to_uri=name_to_uri,
+        target_descriptors=target_descriptors,
     )
 
 
