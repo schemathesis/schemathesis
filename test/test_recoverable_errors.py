@@ -95,12 +95,19 @@ def test_(case):
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-def test_in_cli(ctx, cli, open_api_3_schema_with_recoverable_errors, workers, openapi3_base_url, snapshot_cli):
+def test_in_cli(ctx, cli, app_runner, open_api_3_schema_with_recoverable_errors, workers, snapshot_cli):
+    app = ctx.openapi.make_permissive_flask_app(open_api_3_schema_with_recoverable_errors)
+    port = app_runner.run_flask_app(app)
     schema_path = ctx.makefile(open_api_3_schema_with_recoverable_errors)
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     assert (
-        cli.run(str(schema_path), f"--workers={workers}", f"--url={openapi3_base_url}", "-c not_a_server_error")
+        cli.run(
+            str(schema_path),
+            f"--workers={workers}",
+            f"--url=http://127.0.0.1:{port}/api",
+            "-c not_a_server_error",
+        )
         == snapshot_cli
     )
 

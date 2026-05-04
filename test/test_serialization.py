@@ -330,25 +330,28 @@ def test_internal_raw_query_marker_does_not_consume_user_query_parameter(ctx):
 
 
 @pytest.mark.filterwarnings("error")
-def test_multipart_examples_serialization(ctx, cli, openapi3_base_url, snapshot_cli):
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/test": {
-                "post": {
-                    "requestBody": {
-                        "content": {
-                            "multipart/form-data": {
-                                "example": {"key": {}},
-                                "schema": {"title": "Test"},
-                            }
+def test_multipart_examples_serialization(ctx, cli, app_runner, snapshot_cli):
+    paths = {
+        "/test": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "multipart/form-data": {
+                            "example": {"key": {}},
+                            "schema": {"title": "Test"},
                         }
                     }
                 }
             }
         }
-    )
+    }
+    schema = ctx.openapi.build_schema(paths)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_path = ctx.openapi.write_schema(paths)
     assert (
-        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=response_schema_conformance") == snapshot_cli
+        cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}/api", "--checks=response_schema_conformance")
+        == snapshot_cli
     )
 
 

@@ -44,13 +44,14 @@ def test_default_status_code(response_status, status_codes, matching, response_f
     assert filter_function(StepOutput(response, None)) is matching
 
 
-def test_custom_rule(testdir, openapi3_base_url):
+def test_custom_rule(ctx, testdir):
+    api = ctx.openapi.apps.success()
     # When the state machine contains a failing rule that does not expect `Case`
     testdir.make_test(
         f"""
 from hypothesis.stateful import initialize, rule
 
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 
 class APIWorkflow(schema.as_state_machine()):
 

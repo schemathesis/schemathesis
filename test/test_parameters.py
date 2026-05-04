@@ -1,6 +1,7 @@
 import datetime
 
 import pytest
+from flask import jsonify
 from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis.errors import FailedHealthCheck, NoSuchExample, Unsatisfiable
 
@@ -634,7 +635,7 @@ def test_exclude_chars_and_no_x00_for_headers(ctx):
     test()
 
 
-def test_parameter_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
     # When a parameter has a boolean true schema (accepts anything in OpenAPI 3.1)
     paths = {
         "/success": {
@@ -684,9 +685,10 @@ def test_parameter_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapsho
     test_negative()
 
     schema_path = ctx.openapi.write_schema(paths, version="3.1.0")
+    api = ctx.openapi.apps.success()
 
     assert (
-        cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--checks=not_a_server_error")
+        cli.run(str(schema_path), "--max-examples=1", f"--url={api.base_url}/api", "--checks=not_a_server_error")
         == snapshot_cli
     )
 
@@ -718,7 +720,7 @@ def test_parameter_with_boolean_false_schema(ctx):
     assert parameter.optimized_schema is False
 
 
-def test_request_body_with_boolean_true_schema(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_request_body_with_boolean_true_schema(ctx, cli, app_runner, snapshot_cli):
     # When a request body has a boolean true schema
     paths = {
         "/payload": {
@@ -759,15 +761,20 @@ def test_request_body_with_boolean_true_schema(ctx, cli, openapi3_base_url, snap
     with pytest.raises((Unsatisfiable, FailedHealthCheck)):
         test_negative()
 
-    schema_path = ctx.openapi.write_schema(paths, version="3.1.0")
+    app, _ = ctx.openapi.make_flask_app(paths, version="3.1.0")
 
+    @app.route("/payload", methods=["POST"])
+    def payload():
+        return jsonify({}), 200
+
+    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--checks=not_a_server_error")
+        cli.run(f"http://127.0.0.1:{port}/openapi.json", "--max-examples=1", "--checks=not_a_server_error")
         == snapshot_cli
     )
 
 
-def test_parameter_type_detection(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_parameter_type_detection(ctx, cli, snapshot_cli):
     # See GH-3149
     schema_path = ctx.openapi.write_schema(
         {
@@ -786,7 +793,8 @@ def test_parameter_type_detection(ctx, cli, openapi3_base_url, snapshot_cli):
             }
         }
     )
+    api = ctx.openapi.apps.success()
     assert (
-        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=not_a_server_error", "--max-examples=5")
+        cli.run(str(schema_path), f"--url={api.base_url}/api", "--checks=not_a_server_error", "--max-examples=5")
         == snapshot_cli
     )

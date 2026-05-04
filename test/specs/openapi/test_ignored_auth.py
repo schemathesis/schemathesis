@@ -311,9 +311,9 @@ def test_explicit_auth_cli(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
 @pytest.mark.parametrize("with_error", [True, False])
-def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
+def test_stateful_in_cli_no_error(ctx, cli, with_error, snapshot_cli):
+    api = ctx.openapi.apps.success_and_basic()
     target = "ignored" if with_error else "valid"
     schema_path = ctx.openapi.write_schema(
         {
@@ -370,7 +370,7 @@ def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
     assert (
         cli.run(
             str(schema_path),
-            f"--url={base_url}",
+            f"--url={api.base_url}/api",
             "-c",
             "ignored_auth",
             "--header=Authorization: Basic dGVzdDp0ZXN0",

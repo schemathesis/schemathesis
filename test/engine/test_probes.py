@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import ANY
 
 import pytest
+from flask import Flask, request
 from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
@@ -11,7 +12,28 @@ from schemathesis.engine.run import probes
 
 
 @pytest.fixture
-def ctx(openapi_30):
+def null_byte_strict_url(app_runner):
+    # NullByteInHeader probe expects 400 when the server rejects the byte; Flask/Werkzeug accept it by default.
+    app = Flask(__name__)
+
+    @app.before_request
+    def _reject_null_bytes():
+        for value in request.headers.values():
+            if "\x00" in value:
+                return ("rejected", 400)
+        return None
+
+    @app.route("/", defaults={"_path": ""})
+    @app.route("/<path:_path>")
+    def _ok(_path: str):
+        return "ok"
+
+    port = app_runner.run_flask_app(app)
+    return f"http://127.0.0.1:{port}/"
+
+
+@pytest.fixture
+def engine_ctx(openapi_30):
     return EngineContext(schema=openapi_30, stop_event=threading.Event())
 
 
@@ -33,13 +55,13 @@ DEFAULT_HEADERS = {
         {"basic_auth": ("test", "test")},
     ],
 )
-def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
+def test_detect_null_byte_detected(engine_ctx, null_byte_strict_url, kwargs):
     session = Session()
-    ctx.schema.config.update(base_url=openapi3_base_url)
+    engine_ctx.schema.config.update(base_url=null_byte_strict_url)
     if "auth" in kwargs:
         session.auth = kwargs["auth"]
-    ctx.schema.config.update(**kwargs)
-    results = probes.run(ctx)
+    engine_ctx.schema.config.update(**kwargs)
+    results = probes.run(engine_ctx)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -51,15 +73,15 @@ def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
     ]
 
 
-def test_detect_null_byte_with_response(ctx, openapi3_base_url, response_factory):
-    ctx.schema.config.update(base_url=openapi3_base_url)
-    result = probes.run(ctx)[0]
+def test_detect_null_byte_with_response(engine_ctx, null_byte_strict_url, response_factory):
+    engine_ctx.schema.config.update(base_url=null_byte_strict_url)
+    result = probes.run(engine_ctx)[0]
     result.response = response_factory.requests(content=b'{"success": true}')
 
 
-def test_detect_null_byte_error(ctx):
-    ctx.schema.config.update(base_url="http://127.0.0.1:1")
-    results = probes.run(ctx)
+def test_detect_null_byte_error(engine_ctx):
+    engine_ctx.schema.config.update(base_url="http://127.0.0.1:1")
+    results = probes.run(engine_ctx)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -71,8 +93,8 @@ def test_detect_null_byte_error(ctx):
     ]
 
 
-def test_detect_null_byte_skipped(ctx):
-    results = probes.run(ctx)
+def test_detect_null_byte_skipped(engine_ctx):
+    results = probes.run(engine_ctx)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -84,6 +106,7 @@ def test_detect_null_byte_skipped(ctx):
     ]
 
 
-def test_ctrl_c(cli, mocker, openapi3_schema_url, snapshot_cli):
+def test_ctrl_c(ctx, cli, mocker, snapshot_cli):
+    api = ctx.openapi.apps.success()
     mocker.patch("schemathesis.engine.run.probes.send", side_effect=KeyboardInterrupt)
-    assert cli.run(openapi3_schema_url) == snapshot_cli
+    assert cli.run(api.schema_url) == snapshot_cli

@@ -327,13 +327,13 @@ def test_extract_top_level(operation):
     ]
 
 
-def test_examples_from_cli(ctx, app, cli, base_url, schema_with_examples):
+def test_examples_from_cli(ctx, cli, schema_with_examples):
+    api = ctx.openapi.apps.success()
     schema = schema_with_examples.raw_schema
-    app["config"].update({"schema_data": schema})
     schema_path = ctx.makefile(schema)
     result = cli.run_and_assert(
         str(schema_path),
-        f"--url={base_url}",
+        f"--url={api.base_url}/api",
         "--phases=examples",
         "--checks=not_a_server_error",
     )
@@ -389,7 +389,8 @@ def explicit_header(ctx, response, case):
         yield module
 
 
-def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_header):
+def test_parameter_override(ctx, cli, snapshot_cli, explicit_header):
+    api = ctx.openapi.apps.success()
     schema_file = ctx.openapi.write_schema(
         {
             "/success": {
@@ -421,7 +422,7 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
             str(schema_file),
             "--seed=23",
             "--phases=examples",
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--checks=explicit_header",
             hooks=explicit_header,
             config={
@@ -2043,81 +2044,85 @@ def test_find_matching_in_responses_empty():
     assert list(find_matching_in_responses({}, "id")) == []
 
 
-def test_config_override_with_examples(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_config_override_with_examples(ctx, cli, app_runner, snapshot_cli):
     # See GH-3000
-    schema_file = ctx.openapi.write_schema(
-        {
-            "/{primary}/subs/{secondary}": {
-                "put": {
-                    "parameters": [
-                        {"name": "primary", "in": "path", "required": True, "schema": {"type": "string"}},
-                        {
-                            "name": "secondary",
-                            "in": "path",
-                            "schema": {"type": "string"},
-                            "example": "whatever",
-                            "required": True,
-                        },
-                    ],
-                    "requestBody": {
+    paths = {
+        "/{primary}/subs/{secondary}": {
+            "put": {
+                "parameters": [
+                    {"name": "primary", "in": "path", "required": True, "schema": {"type": "string"}},
+                    {
+                        "name": "secondary",
+                        "in": "path",
+                        "schema": {"type": "string"},
+                        "example": "whatever",
                         "required": True,
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Schema"}}},
                     },
-                    "responses": {"201": {"description": "OK"}},
-                }
-            },
-        },
-        components={
-            "schemas": {
-                "Schema": {
-                    "type": "object",
-                    "properties": {"property": {"schema": {"type": "string"}, "example": "whatever"}},
-                }
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Schema"}}},
+                },
+                "responses": {"201": {"description": "OK"}},
             }
         },
-    )
+    }
+    components = {
+        "schemas": {
+            "Schema": {
+                "type": "object",
+                "properties": {"property": {"schema": {"type": "string"}, "example": "whatever"}},
+            }
+        }
+    }
+    schema = ctx.openapi.build_schema(paths, components=components)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_file = ctx.openapi.write_schema(paths, components=components)
     assert (
         cli.main(
             "run",
             str(schema_file),
             "--phases=examples",
-            f"--url={openapi3_base_url}",
+            f"--url=http://127.0.0.1:{port}/api",
             config={"parameters": {"path.primary": "primary"}},
         )
         == snapshot_cli
     )
 
 
-def test_path_parameters_example_escaping(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_path_parameters_example_escaping(ctx, cli, app_runner, snapshot_cli):
     # See GH-3003
-    schema_file = ctx.openapi.write_schema(
-        {
-            "/networks/{network}": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "network",
-                            "in": "path",
-                            "required": True,
-                            "schema": {
-                                "type": "string",
-                                "format": "ipv6-network",
-                                "example": "fd00::/64",
-                            },
+    paths = {
+        "/networks/{network}": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "network",
+                        "in": "path",
+                        "required": True,
+                        "schema": {
+                            "type": "string",
+                            "format": "ipv6-network",
+                            "example": "fd00::/64",
                         },
-                    ],
-                    # Set `202` to trigger a failure
-                    "responses": {"202": {"description": "Ok"}},
-                }
+                    },
+                ],
+                # Set `202` to trigger a failure
+                "responses": {"202": {"description": "Ok"}},
             }
         }
-    )
+    }
+    schema = ctx.openapi.build_schema(paths)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_file = ctx.openapi.write_schema(paths)
 
     result = cli.main(
         "run",
         str(schema_file),
         "--phases=examples",
-        f"--url={openapi3_base_url}",
+        f"--url=http://127.0.0.1:{port}/api",
     )
 
     assert result == snapshot_cli
@@ -2165,8 +2170,9 @@ def test_non_recursive_duplicate_refs_unit(ctx):
 
 
 @pytest.mark.filterwarnings("error")
-def test_empty_ref_in_allof(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_empty_ref_in_allof(ctx, cli, snapshot_cli):
     # When the schema contains an empty $ref within allOf
+    api = ctx.openapi.apps.success()
     schema_file = ctx.openapi.write_schema(
         {
             "/items": {
@@ -2207,14 +2213,15 @@ def test_empty_ref_in_allof(ctx, cli, snapshot_cli, openapi3_base_url):
             "run",
             str(schema_file),
             "--phases=examples",
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
         )
         == snapshot_cli
     )
 
 
 @pytest.mark.filterwarnings("error")
-def test_empty_all_of(ctx, cli, snapshot_cli, openapi2_base_url):
+def test_empty_all_of(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     schema_file = ctx.openapi.write_schema(
         {
             "/items": {
@@ -2238,44 +2245,44 @@ def test_empty_all_of(ctx, cli, snapshot_cli, openapi2_base_url):
             "run",
             str(schema_file),
             "--phases=examples",
-            f"--url={openapi2_base_url}",
+            f"--url={api.base_url}/api",
         )
         == snapshot_cli
     )
 
 
 @pytest.mark.filterwarnings("error")
-def test_multiple_hops_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
-    schema_file = ctx.openapi.write_schema(
-        {
-            "/test": {
-                "post": {
-                    "parameters": [{"$ref": "#/components/parameters/TraceSpan"}],
-                    "requestBody": {
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Query"}}}
-                    },
-                }
+def test_multiple_hops_in_examples(ctx, cli, app_runner, snapshot_cli):
+    paths = {
+        "/test": {
+            "post": {
+                "parameters": [{"$ref": "#/components/parameters/TraceSpan"}],
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Query"}}}},
             }
-        },
-        components={
-            "parameters": {"TraceSpan": {"example": {}, "in": "header", "name": "Zan", "schema": {}}},
-            "schemas": {
-                "ArrayExpression": {},
-                "Expression": {
-                    "oneOf": [
-                        {"$ref": "#/components/schemas/ArrayExpression"},
-                        {"$ref": "#/components/schemas/MemberExpression"},
-                    ]
-                },
-                "MemberExpression": {
-                    "properties": {
-                        "key": {"$ref": "#/components/schemas/Expression"},
-                    }
-                },
-                "Query": {"$ref": "#/components/schemas/Expression"},
+        }
+    }
+    components = {
+        "parameters": {"TraceSpan": {"example": {}, "in": "header", "name": "Zan", "schema": {}}},
+        "schemas": {
+            "ArrayExpression": {},
+            "Expression": {
+                "oneOf": [
+                    {"$ref": "#/components/schemas/ArrayExpression"},
+                    {"$ref": "#/components/schemas/MemberExpression"},
+                ]
             },
+            "MemberExpression": {
+                "properties": {
+                    "key": {"$ref": "#/components/schemas/Expression"},
+                }
+            },
+            "Query": {"$ref": "#/components/schemas/Expression"},
         },
-    )
+    }
+    schema = ctx.openapi.build_schema(paths, components=components)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_file = ctx.openapi.write_schema(paths, components=components)
 
     assert (
         cli.main(
@@ -2283,7 +2290,7 @@ def test_multiple_hops_in_examples(ctx, cli, openapi3_base_url, snapshot_cli):
             str(schema_file),
             "--phases=examples",
             "--checks=not_a_server_error",
-            f"--url={openapi3_base_url}",
+            f"--url=http://127.0.0.1:{port}/api",
         )
         == snapshot_cli
     )

@@ -5,41 +5,36 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
-     Base URL:         http://127.0.0.1/
+     Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
-     Operations:       2 selected / 2 total
-     Configuration:    /tmp/config.toml
+     Operations:       3 selected / 3 total
 
 
  ✅  API capabilities:
 
      Supports NULL byte in headers:    ✓
 
- ⏭   Examples (in 0.00s)
+ ✅  Stateful (in 0.00s)
 
-     ⏭  2 skipped
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total
 
- ✅  Coverage (in 0.00s)
-
-     ✅ 2 passed
-
- ✅  Fuzzing (in 0.00s)
-
-     ✅ 2 passed
+     ✅ N passed
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 2/2
-  Tested: 2
+  Selected: 3/3
+  Tested: 1
+  Skipped: 2
 
 Test Phases:
-  ⏭  Examples
-  ✅ Coverage
-  ✅ Fuzzing
-  ⏭  Stateful (not applicable)
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ✅ Stateful
 
 Test cases:
   N generated, N passed

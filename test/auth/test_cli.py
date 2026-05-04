@@ -58,42 +58,44 @@ def after_call(context, case, response):
     assert cli.main("run", api.schema_url, "--checks=not_a_server_error", *args, hooks=module) == snapshot_cli
 
 
-def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, app_runner, snapshot_cli):
     # When the schema defines multiple auth mechanisms on the same operation
     # And the user passes an explicit `Authorization` header
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/health": {
-                "get": {
-                    "summary": "",
-                    "responses": {"200": {"description": "OK"}},
-                }
+    paths = {
+        "/health": {
+            "get": {
+                "summary": "",
+                "responses": {"200": {"description": "OK"}},
             }
-        },
-        components={
-            "securitySchemes": {
-                "bearerAuth": {
-                    "type": "http",
-                    "scheme": "bearer",
-                    "bearerFormat": "uuid",
-                    "description": '* Thing access: "Authorization: Thing <thing_key>"\n',
-                },
-                "basicAuth": {
-                    "type": "http",
-                    "scheme": "basic",
-                    "description": '* Things access: "Authorization: Basic <base64-encoded_credentials>"\n',
-                },
-            }
-        },
-        security=[{"bearerAuth": []}, {"basicAuth": []}],
-    )
+        }
+    }
+    components = {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "uuid",
+                "description": '* Thing access: "Authorization: Thing <thing_key>"\n',
+            },
+            "basicAuth": {
+                "type": "http",
+                "scheme": "basic",
+                "description": '* Things access: "Authorization: Basic <base64-encoded_credentials>"\n',
+            },
+        }
+    }
+    security = [{"bearerAuth": []}, {"basicAuth": []}]
+    schema = ctx.openapi.build_schema(paths, components=components, security=security)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_path = ctx.openapi.write_schema(paths, components=components, security=security)
     # Then it should be able to generate requests
     assert (
         cli.run(
             str(schema_path),
             "-H",
             "Authorization: Bearer foo",
-            f"--url={openapi3_base_url}",
+            f"--url=http://127.0.0.1:{port}/api",
             "--checks=not_a_server_error",
         )
         == snapshot_cli

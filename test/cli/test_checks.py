@@ -27,7 +27,8 @@ def test_register_returns_a_value(new_check):
     assert new_check is not None
 
 
-def test_negative_data_rejection(ctx, cli, openapi3_base_url):
+def test_negative_data_rejection(ctx, cli):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -40,7 +41,7 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
     )
     cli.run_and_assert(
         str(schema_path),
-        f"--url={openapi3_base_url}",
+        f"--url={api.base_url}/api",
         "--checks",
         "negative_data_rejection",
         "--mode",
@@ -688,7 +689,8 @@ def schema(ctx):
         ["200", 201, 400, 401],
     ],
 )
-def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, expected_statuses):
+def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, expected_statuses):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.makefile(schema)
     kwargs = {}
     if expected_statuses is not None:
@@ -697,7 +699,7 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--max-examples=5",
             "--checks=positive_data_acceptance",
             **kwargs,
@@ -706,10 +708,11 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_
     )
 
 
-def test_not_a_server_error(cli, snapshot_cli, openapi3_schema_url):
+def test_not_a_server_error(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success_and_failure()
     assert (
         cli.run(
-            openapi3_schema_url,
+            api.schema_url,
             "--max-examples=5",
             "--checks=not_a_server_error",
             "--mode=positive",

@@ -6,6 +6,7 @@ import platform
 
 import pytest
 import yaml
+from fastapi import FastAPI
 from flask import Flask, Response
 
 import schemathesis
@@ -13,18 +14,25 @@ from schemathesis.core.errors import LoaderError
 from test.utils import make_schema
 
 
-def test_openapi_asgi_loader(fastapi_app, run_test):
+def test_openapi_asgi_loader(run_test):
     # When an ASGI app is loaded via `from_asgi`
-    schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
+    app = FastAPI()
+
+    @app.get("/users")
+    async def users():
+        return {"success": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     strategy = schema["/users"]["GET"].as_strategy()
     # Then it should successfully make calls
     run_test(strategy)
 
 
-def test_openapi_wsgi_loader(flask_app, run_test):
+def test_openapi_wsgi_loader(ctx, run_test):
     # When a WSGI app is loaded via `from_wsgi`
-    schema = schemathesis.openapi.from_wsgi("/schema.yaml", flask_app)
-    strategy = schema["/success"]["GET"].as_strategy()
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    strategy = schema["/api/success"]["GET"].as_strategy()
     # Then it should successfully make calls
     run_test(strategy)
 

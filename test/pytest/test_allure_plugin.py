@@ -3,7 +3,8 @@ from pathlib import Path
 from test.utils import load_json_or_fail
 
 
-def test_allure_xdist_stable_path_without_explicit_path(testdir, openapi3_base_url, tmp_path, ctx):
+def test_allure_xdist_stable_path_without_explicit_path(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     schema_dict = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
     testdir.makepyfile(
         f"""
@@ -13,7 +14,7 @@ from pathlib import Path
 from schemathesis.config._report import ReportFormat
 
 schema = schemathesis.openapi.from_dict({schema_dict!r})
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(formats=[ReportFormat.ALLURE], directory=Path(r"{tmp_path}"))
 
 @schema.parametrize()
@@ -28,7 +29,8 @@ def test_api(case):
     assert list((tmp_path / "allure").glob("*-result.json"))
 
 
-def test_allure_feature_labels_via_xdist(testdir, openapi3_base_url, tmp_path, ctx):
+def test_allure_feature_labels_via_xdist(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     schema_dict = ctx.openapi.build_schema(
         {"/users": {"get": {"tags": ["users", "readonly"], "responses": {"200": {"description": "OK"}}}}},
@@ -39,7 +41,7 @@ import schemathesis
 from hypothesis import settings
 
 schema = schemathesis.openapi.from_dict({schema_dict!r})
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -57,7 +59,8 @@ def test_api(case):
     assert set(feature_labels) == {"users", "readonly"}
 
 
-def test_allure_dynamic_calls_via_xdist(testdir, openapi3_base_url, tmp_path, ctx):
+def test_allure_dynamic_calls_via_xdist(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     schema_dict = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
     testdir.makepyfile(
@@ -67,7 +70,7 @@ import schemathesis
 from hypothesis import settings
 
 schema = schemathesis.openapi.from_dict({schema_dict!r})
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -93,7 +96,8 @@ def test_api(case):
     assert (allure_dir / attachment["source"]).read_text() == "xdist body"
 
 
-def test_allure_report_written_via_xdist(testdir, openapi3_base_url):
+def test_allure_report_written_via_xdist(testdir, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = str(testdir.tmpdir.join("allure-results"))
     schema_dict = {
         "openapi": "3.0.2",
@@ -106,7 +110,7 @@ import schemathesis
 from hypothesis import settings
 
 schema = schemathesis.openapi.from_dict({schema_dict!r})
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -125,11 +129,12 @@ def test_api(case):
     assert data["status"] in ("passed", "failed", "broken")
 
 
-def test_allure_report_written_via_plugin(testdir, openapi3_base_url, tmp_path):
+def test_allure_report_written_via_plugin(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -148,11 +153,12 @@ def test_api(case):
     assert data["testCaseId"] == data["historyId"]
 
 
-def test_allure_report_failure_written_via_plugin(testdir, openapi3_base_url, tmp_path):
+def test_allure_report_failure_written_via_plugin(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.failure()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -173,12 +179,13 @@ def test_api(case):
     assert any("curl" in m.lower() for m in step_messages)
 
 
-def test_allure_attachment_via_forwarder(testdir, openapi3_base_url, tmp_path):
+def test_allure_attachment_via_forwarder(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 import allure
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -196,12 +203,13 @@ def test_api(case):
     assert any(a["name"] == "my-note" for a in data.get("attachments", []))
 
 
-def test_allure_link_via_forwarder(testdir, openapi3_base_url, tmp_path):
+def test_allure_link_via_forwarder(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 import allure
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -219,12 +227,13 @@ def test_api(case):
     assert any(lnk["name"] == "API Docs" for lnk in data.get("links", []))
 
 
-def test_allure_description_via_forwarder(testdir, openapi3_base_url, tmp_path):
+def test_allure_description_via_forwarder(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 import allure
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()
@@ -242,12 +251,13 @@ def test_api(case):
     assert data.get("description") == "Custom description"
 
 
-def test_allure_title_override_via_forwarder(testdir, openapi3_base_url, tmp_path):
+def test_allure_title_override_via_forwarder(testdir, tmp_path, ctx):
+    api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"
     testdir.make_test(
         f"""
 import allure
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.reports.update(allure_path=r"{allure_dir}")
 
 @schema.parametrize()

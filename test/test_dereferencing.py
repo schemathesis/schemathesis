@@ -578,10 +578,11 @@ def test_complex_dereference(complex_schema):
     }
 
 
-def test_remote_reference_to_yaml(swagger_20, schema_url):
-    scope, resolved = swagger_20.resolver.resolve(f"{schema_url}#/info/title")
+def test_remote_reference_to_yaml(ctx, swagger_20):
+    api = ctx.openapi.apps.success()
+    scope, resolved = swagger_20.resolver.resolve(f"{api.schema_url}#/info/title")
     assert scope.endswith("#/info/title")
-    assert resolved == "Example API"
+    assert resolved == "Test"
 
 
 def assert_unique_objects(item):
@@ -707,8 +708,9 @@ def test_uncommon_type_in_generation(ctx, testdir, key, expected):
         test()
 
 
-def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_cli):
     # See GH-2300
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -745,7 +747,7 @@ def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_c
     assert (
         cli.run(
             str(raw_schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--checks=not_a_server_error",
             "--mode=all",
             config={"warnings": False},
@@ -754,31 +756,34 @@ def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_c
     )
 
 
-def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema({"/test": {"$ref": "paths/test.json"}})
     root = testdir.mkdir("root")
     raw_schema_path = root / "openapi.json"
     raw_schema_path.write_text(json.dumps(schema), "utf8")
 
-    assert cli.run(str(raw_schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(raw_schema_path), f"--url={api.base_url}/api") == snapshot_cli
 
 
-def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/test": {
-                "post": {
-                    "$ref": "#/0",
-                    "responses": {
-                        "default": {
-                            "description": "Ok",
-                        }
-                    },
-                }
+def test_unresolvable_operation(ctx, cli, app_runner, snapshot_cli):
+    paths = {
+        "/test": {
+            "post": {
+                "$ref": "#/0",
+                "responses": {
+                    "default": {
+                        "description": "Ok",
+                    }
+                },
             }
         }
-    )
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=fuzzing") == snapshot_cli
+    }
+    schema = ctx.openapi.build_schema(paths)
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_path = ctx.openapi.write_schema(paths)
+    assert cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}/api", "--phases=fuzzing") == snapshot_cli
 
 
 @pytest.mark.parametrize(
@@ -842,13 +847,14 @@ def test_unresolvable_operation(ctx, cli, snapshot_cli, openapi3_base_url):
     ],
 )
 @pytest.mark.filterwarnings("error")
-def test_multiple_hops_references(ctx, cli, openapi3_base_url, snapshot_cli, paths, components):
+def test_multiple_hops_references(ctx, cli, snapshot_cli, paths, components):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(paths, components=components)
     # There should be no recursion error in another thread
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--phases=examples",
             "--checks=not_a_server_error",
             config={"warnings": False},
@@ -858,7 +864,8 @@ def test_multiple_hops_references(ctx, cli, openapi3_base_url, snapshot_cli, pat
 
 
 @pytest.mark.filterwarnings("error")
-def test_multiple_hops_references_swagger(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_multiple_hops_references_swagger(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/items": {
@@ -909,7 +916,7 @@ def test_multiple_hops_references_swagger(ctx, cli, openapi3_base_url, snapshot_
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--phases=examples",
             "--checks=not_a_server_error",
             config={"warnings": False},
@@ -919,21 +926,22 @@ def test_multiple_hops_references_swagger(ctx, cli, openapi3_base_url, snapshot_
 
 
 @pytest.mark.filterwarnings("error")
-def test_responses_in_another_file(ctx, cli, openapi3_base_url, snapshot_cli):
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/api/v1/items": {
-                "get": {
-                    "responses": {
-                        "200": {"description": "ОК"},
-                        "400": {"$ref": "./schemas/responses.json#/BadRequest"},
-                        "500": {"$ref": "./schemas/responses.json#/InternalServerError"},
-                    }
+def test_responses_in_another_file(ctx, cli, app_runner, snapshot_cli):
+    paths = {
+        "/api/v1/items": {
+            "get": {
+                "responses": {
+                    "200": {"description": "ОК"},
+                    "400": {"$ref": "./schemas/responses.json#/BadRequest"},
+                    "500": {"$ref": "./schemas/responses.json#/InternalServerError"},
                 }
             }
-        },
-        version="3.1.0",
-    )
+        }
+    }
+    schema = ctx.openapi.build_schema(paths, version="3.1.0")
+    app = ctx.openapi.make_permissive_flask_app(schema)
+    port = app_runner.run_flask_app(app)
+    schema_path = ctx.openapi.write_schema(paths, version="3.1.0")
     ctx.makefile(
         {
             "BadRequest": {"content": {"application/json": {"schema": {"$ref": "#/Error"}}}},
@@ -943,7 +951,7 @@ def test_responses_in_another_file(ctx, cli, openapi3_base_url, snapshot_cli):
         filename="responses",
         parent="schemas",
     )
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}/api") == snapshot_cli
 
 
 def test_iter_when_ref_resolves_to_none_in_body(ctx):

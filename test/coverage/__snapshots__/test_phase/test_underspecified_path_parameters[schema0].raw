@@ -14,29 +14,29 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ❌  Coverage (in 0.00s)
 
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-___________________ TRACE /organizations/{organization_id}/ ____________________
+____________________ PUT /organizations/{organization_id}/ _____________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Unsupported methods
 
-    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
+    Unsupported method PUT returned 200, expected 405 Method Not Allowed
 
     Return 405 for methods not listed in the OpenAPI spec
 
-[404] Not Found:
+[200] OK:
 
-    `404: Not Found`
+    `{}`
 
 Reproduce with:
 
-    curl -X TRACE http://127.0.0.1/api/organizations/null/
+    curl -X PUT http://127.0.0.1/api/organizations/null/
 
 =================================== SUMMARY ====================================
 

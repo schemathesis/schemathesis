@@ -41,8 +41,10 @@ def test_api(case):
 
 
 @pytest.mark.hypothesis_nested
-def test_cookies(fastapi_app):
-    @fastapi_app.get("/cookies")
+def test_cookies():
+    app = FastAPI()
+
+    @app.get("/cookies")
     def cookies(token: str = Cookie(None)):
         return {"token": token}
 
@@ -73,7 +75,7 @@ def test_cookies(fastapi_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call(app=fastapi_app)
+        response = case.call(app=app)
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 
@@ -81,17 +83,19 @@ def test_cookies(fastapi_app):
 
 
 @pytest.mark.hypothesis_nested
-def test_null_byte(fastapi_app):
+def test_null_byte():
+    app = FastAPI()
+
     class Payload(BaseModel):
         name: str
 
-    @fastapi_app.post("/data")
+    @app.post("/data")
     def post_create(payload: Payload):
         payload = payload.model_dump()
         assert "\x00" not in payload["name"]
         return {"success": True}
 
-    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
     schema.config.generation.update(allow_x00=False)
 
     strategy = schema["/data"]["POST"].as_strategy()
@@ -109,14 +113,16 @@ def test_null_byte(fastapi_app):
 
 
 @pytest.mark.hypothesis_nested
-def test_null_byte_in_headers(fastapi_app):
-    @fastapi_app.post("/data")
+def test_null_byte_in_headers():
+    app = FastAPI()
+
+    @app.post("/data")
     def operation(x_header: Annotated[str, Header()], x_cookie: Annotated[str, Cookie()]):
         assert "\x00" not in x_header
         assert "\x00" not in x_cookie
         return {"success": True}
 
-    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
     schema.config.generation.update(allow_x00=False)
 
     strategy = schema["/data"]["POST"].as_strategy()

@@ -179,6 +179,12 @@ def empty() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def no_operations() -> OpenAPIApp:
+    spec = build_schema({})
+    app = make_flask_app_from_schema(spec)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def empty_string() -> OpenAPIApp:
     spec = build_schema(schemas.empty_string())
     app = make_flask_app_from_schema(spec)
@@ -281,6 +287,30 @@ def invalid() -> OpenAPIApp:
     spec = build_schema(schemas.invalid())
     app = make_flask_app_from_schema(spec)
     handlers.register_invalid(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def chunked_success() -> OpenAPIApp:
+    """`/api/success` returning JSON via a generator so Werkzeug emits Transfer-Encoding: chunked."""
+    spec = build_schema(schemas.success())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_chunked_success(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def success_text_and_write_only() -> OpenAPIApp:
+    """Composite for filter-combination tests.
+
+    `/api/success` passes, `/api/text` fails on content-type, `/api/write_only` fails on random input.
+    """
+    spec = build_schema(
+        {**schemas.success(), **schemas.text(), **schemas.write_only()},
+        components=schemas.READ_WRITE_COMPONENTS,
+    )
+    app = make_flask_app_from_schema(spec)
+    handlers.register_success(app)
+    handlers.register_text(app)
+    handlers.register_write_only(app)
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 

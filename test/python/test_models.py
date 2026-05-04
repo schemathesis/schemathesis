@@ -4,6 +4,7 @@ from unittest.mock import ANY
 
 import pytest
 import requests
+from fastapi import FastAPI
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
@@ -123,8 +124,9 @@ def test_case_repr(swagger_20, kwargs, expected):
 
 @pytest.mark.parametrize("override", [False, True])
 @pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
-def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
-    base_url = converter(base_url)
+def test_as_transport_kwargs(ctx, override, swagger_20, converter):
+    api = ctx.openapi.apps.success()
+    base_url = converter(f"{api.base_url}/api")
     operation = APIOperation(
         "/success",
         "GET",
@@ -144,7 +146,7 @@ def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
         "method": "GET",
         "params": {},
         "cookies": {"TOKEN": "secret"},
-        "url": f"http://127.0.0.1:{server['port']}/api/success",
+        "url": f"{api.base_url}/api/success",
     }
     response = requests.request(**data)
     assert response.status_code == 200
@@ -187,13 +189,14 @@ def test_reserved_characters_in_operation_name(swagger_20):
         ({"UsEr-agEnT": "foo/1.0"}, {"UsEr-agEnT": "foo/1.0", "X-Key": "foo"}),
     ],
 )
-def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
+def test_as_transport_kwargs_override_user_agent(ctx, swagger_20, headers, expected):
+    api = ctx.openapi.apps.success()
     operation = APIOperation(
         "/success",
         "GET",
         {},
         swagger_20,
-        base_url=openapi2_base_url,
+        base_url=f"{api.base_url}/api",
         responses=swagger_20._parse_responses({}, ""),
         security=swagger_20._parse_security({}),
     )
@@ -206,7 +209,7 @@ def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swag
         "method": "GET",
         "params": {},
         "cookies": {},
-        "url": f"http://127.0.0.1:{server['port']}/api/success",
+        "url": f"{api.base_url}/api/success",
     }
     assert case.headers == original_headers
     response = requests.request(**data)
@@ -250,7 +253,9 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
 
 
 @pytest.mark.parametrize("override", [False, True])
-def test_call(override, base_url, swagger_20):
+def test_call(ctx, override, swagger_20):
+    api = ctx.openapi.apps.success()
+    base_url = f"{api.base_url}/api"
     operation = APIOperation(
         "/success",
         "GET",
@@ -312,8 +317,14 @@ def test_metadata_has_only_relevant_components(ctx):
     test()
 
 
-def test_call_and_validate_for_asgi(fastapi_app):
-    api_schema = schemathesis.openapi.from_dict(fastapi_app.openapi())
+def test_call_and_validate_for_asgi():
+    app = FastAPI()
+
+    @app.get("/users")
+    async def users():
+        return {"success": True}
+
+    api_schema = schemathesis.openapi.from_dict(app.openapi())
 
     @given(case=api_schema["/users"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
@@ -432,9 +443,20 @@ def test_validate_response_schema_path(
     assert failure.instance_path == instance_path
 
 
-@pytest.mark.operations
-def test_response_from_requests(base_url):
-    response = requests.get(f"{base_url}/cookies", timeout=1)
+def test_response_from_requests(ctx, app_runner):
+    app, _ = ctx.openapi.make_flask_app({"/cookies": {"get": {"responses": {"200": {"description": "OK"}}}}})
+
+    @app.route("/api/cookies")
+    def set_cookies():
+        from flask import make_response
+
+        response = make_response("")
+        response.set_cookie("foo", "bar")
+        response.set_cookie("baz", "spam")
+        return response
+
+    port = app_runner.run_flask_app(app)
+    response = requests.get(f"http://127.0.0.1:{port}/api/cookies", timeout=1)
     serialized = Response.from_requests(response, True)
     assert serialized.content == b""
     assert serialized.status_code == 200

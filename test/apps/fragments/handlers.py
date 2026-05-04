@@ -193,6 +193,16 @@ def register_write_only(app: Flask) -> None:
         raise InternalServerError
 
 
+def register_chunked_success(app: Flask) -> None:
+    @app.route("/api/success", methods=["GET"])
+    def chunked_success_endpoint() -> Any:
+        def generate():
+            yield b'{"success":'
+            yield b" true}"
+
+        return Response(generate(), content_type="application/json")
+
+
 def register_text(app: Flask) -> None:
     @app.route("/api/text", methods=["GET"])
     def text_endpoint() -> Any:
@@ -232,13 +242,35 @@ def register_slow(app: Flask) -> None:
         return jsonify({"success": True})
 
 
+# Hop-by-hop and entity headers from RFC 7230 plus WSGI-managed framing — emitting these
+# as response headers conflicts with the server's own framing and aborts the response.
+_RESPONSE_RESERVED_HEADERS: frozenset[str] = frozenset(
+    {
+        "host",
+        "content-length",
+        "content-type",
+        "transfer-encoding",
+        "connection",
+        "keep-alive",
+        "te",
+        "trailer",
+        "upgrade",
+        "expect",
+        "proxy-authenticate",
+        "proxy-authorization",
+    }
+)
+
+
 def register_headers(app: Flask) -> None:
     @app.route("/api/headers", methods=["GET"])
     def headers_endpoint() -> Any:
         values = dict(request.headers)
-        # Werkzeug rejects response headers containing CR/LF/NUL; drop those values
-        # so fuzzed inputs don't kill the connection mid-response.
-        safe = {k: v for k, v in values.items() if not any(c in v for c in "\r\n\x00")}
+        safe = {
+            k: v
+            for k, v in values.items()
+            if k.lower() not in _RESPONSE_RESERVED_HEADERS and not any(c in v for c in "\r\n\x00")
+        }
         return Response(json.dumps(values), content_type="application/json", headers=safe)
 
 

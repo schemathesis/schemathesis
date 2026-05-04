@@ -25,7 +25,7 @@ def test_absolute_urls_for_apps(loader):
 
 
 def _openapi_url(ctx):
-    return ctx.request.getfixturevalue("openapi3_schema_url")
+    return ctx.openapi.apps.success().schema_url
 
 
 def _graphql_url(ctx):
@@ -66,6 +66,7 @@ def test_uri_loader_custom_kwargs(mocker, target, loader):
     assert mocked.call_args[1]["headers"] == {"X-Test": "foo", "User-Agent": USER_AGENT}
 
 
-def test_auth_loader_options(schema_url, app):
-    schemathesis.openapi.from_url(schema_url, auth=("test", "test"))
-    assert app["schema_requests"][0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"
+def test_auth_loader_options(ctx):
+    api = ctx.openapi.apps.success()
+    schemathesis.openapi.from_url(api.schema_url, auth=("test", "test"))
+    assert api.schema_requests[0].headers["Authorization"] == "Basic dGVzdDp0ZXN0"

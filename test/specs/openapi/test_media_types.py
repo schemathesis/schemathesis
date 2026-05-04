@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from flask import jsonify
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -50,8 +51,8 @@ def test_pdf_generation(ctx):
     test()
 
 
-def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi3_base_url):
-    schema_path = ctx.openapi.write_schema(
+def test_explicit_example_with_custom_media_type(ctx, cli, app_runner, snapshot_cli):
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/csv": {
                 "post": {
@@ -69,9 +70,14 @@ def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi
             },
         }
     )
-    schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
 
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli
+    @app.route("/csv", methods=["POST"])
+    def csv_handler():
+        return jsonify({}), 200
+
+    schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
+    port = app_runner.run_flask_app(app)
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--mode=positive") == snapshot_cli
 
 
 def test_malformed_registered_media_type_is_skipped(ctx):
@@ -106,11 +112,12 @@ def test_malformed_registered_media_type_is_skipped(ctx):
     test()
 
 
-def test_coverage_phase(testdir, openapi3_base_url):
+def test_coverage_phase(ctx, testdir):
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
 schemathesis.openapi.media_type("image/jpeg", st.just(b""))
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.phases.examples.enabled = False
 schema.config.phases.fuzzing.enabled = False
 
@@ -141,10 +148,11 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
-def test_non_serializable_example(testdir, openapi3_base_url):
+def test_non_serializable_example(ctx, testdir):
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.phases.examples.enabled = False
 schema.config.phases.fuzzing.enabled = False
 
@@ -279,12 +287,13 @@ def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
     test()
 
 
-def test_custom_media_type_strategy_in_coverage_phase(testdir, openapi3_base_url):
+def test_custom_media_type_strategy_in_coverage_phase(ctx, testdir):
     # Regression test for GH-3345
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
 schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.phases.examples.enabled = False
 schema.config.phases.fuzzing.enabled = False
 
@@ -350,12 +359,13 @@ def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
     test()
 
 
-def test_multipart_encoding_with_custom_strategy_parametrize(testdir, openapi3_base_url):
+def test_multipart_encoding_with_custom_strategy_parametrize(ctx, testdir):
     # Regression test for GH-3345 - positive mode cases should have consistent PDF bytes
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
 schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 
 @schema.include(path_regex="upload").parametrize()
 def test(case):
@@ -391,12 +401,13 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
-def test_multipart_encoding_required_body_parameter_coverage(testdir, openapi3_base_url):
+def test_multipart_encoding_required_body_parameter_coverage(ctx, testdir):
     # Regression test for GH-3345 - parameter coverage should still be generated
+    api = ctx.openapi.apps.success()
     testdir.make_test(
         f"""
 schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 schema.config.phases.fuzzing.enabled = False
 
 param_values_seen = set()

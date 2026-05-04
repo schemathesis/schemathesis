@@ -134,9 +134,9 @@ def extract_message(testcase, server_host):
     )
 
 
-def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
+def test_binary_response(ctx, cli, app_runner, tmp_path):
     xml_path = tmp_path / "junit.xml"
-    schema_path = ctx.openapi.write_schema(
+    app, _ = ctx.openapi.make_flask_app(
         {
             "/binary": {
                 "get": {
@@ -150,9 +150,21 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
             },
         }
     )
+
+    @app.route("/api/binary")
+    def binary():
+        from flask import Response
+
+        return Response(
+            b"\xa7\xf5=\x18H\xc7\xff'\xf0\xeep\x06M-RX",
+            content_type="application/octet-stream",
+            status=500,
+        )
+
+    port = app_runner.run_flask_app(app)
     cli.run(
-        str(schema_path),
-        f"--url={openapi3_base_url}",
+        f"http://127.0.0.1:{port}/openapi.json",
+        f"--url=http://127.0.0.1:{port}/api",
         "--checks=all",
         f"--report-junit-path={xml_path}",
         "--exclude-checks=positive_data_acceptance",
@@ -165,7 +177,7 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
     assert testcases[0][0].tag == "failure"
     assert testcases[0][0].attrib["type"] == "failure"
     assert (
-        extract_message(testcases[0][0], server_host)
+        extract_message(testcases[0][0], f"127.0.0.1:{port}")
         == "1. Test Case ID: <PLACEHOLDER>  - Server error  [500] Internal Server Error:      <BINARY>  Reproduce with:      curl -X GET http://localhost/api/binary"
     )
 
@@ -212,13 +224,13 @@ def test_skipped(ctx, cli, tmp_path):
 
 
 @pytest.mark.parametrize("path", ["junit.xml", "does-not-exist/junit.xml"])
-@pytest.mark.openapi_version("3.0")
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unclear how to trigger the permission error on Windows")
-def test_permission_denied(cli, tmp_path, schema_url, path):
+def test_permission_denied(ctx, cli, tmp_path, path):
+    api = ctx.openapi.apps.success()
     dir_path = tmp_path / "output"
     dir_path.mkdir(mode=0o555)
     xml_path = dir_path / path
-    result = cli.run_and_assert(schema_url, f"--report-junit-path={xml_path}", exit_code=ExitCode.INTERRUPTED)
+    result = cli.run_and_assert(api.schema_url, f"--report-junit-path={xml_path}", exit_code=ExitCode.INTERRUPTED)
 
     assert "Permission denied" in result.stdout or "Permission denied" in result.stderr
 

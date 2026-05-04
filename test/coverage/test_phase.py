@@ -1060,37 +1060,40 @@ def test_required_header_as_string(ctx):
         {"const": 42},
     ],
 )
-def test_underspecified_path_parameters(ctx, cli, snapshot_cli, openapi3_base_url, schema):
+def test_underspecified_path_parameters(ctx, cli, app_runner, snapshot_cli, schema):
     # There should be no "Path parameter 'organization_id' is not defined"
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/organizations/{organization_id}/": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "organization_id",
-                            "in": "path",
-                            "required": True,
-                            "schema": schema,
-                        }
-                    ],
-                    "responses": {"200": {"description": "Successful Response"}},
-                }
+    paths = {
+        "/organizations/{organization_id}/": {
+            "get": {
+                "parameters": [
+                    {
+                        "name": "organization_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": schema,
+                    }
+                ],
+                "responses": {"200": {"description": "Successful Response"}},
             }
         }
-    )
+    }
+    full_schema = ctx.openapi.build_schema(paths)
+    app = ctx.openapi.make_permissive_flask_app(full_schema)
+    port = app_runner.run_flask_app(app)
+    schema_path = ctx.openapi.write_schema(paths)
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url=http://127.0.0.1:{port}/api",
             "--phases=coverage",
         )
         == snapshot_cli
     )
 
 
-def test_path_parameters_arent_missing(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_path_parameters_arent_missing(ctx, cli, snapshot_cli):
     # When `--mode=negative`, still generate path parameters if they can't be negated
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/organizations/{organization_id}/": {
@@ -1117,7 +1120,7 @@ def test_path_parameters_arent_missing(ctx, cli, snapshot_cli, openapi3_base_url
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--checks=not_a_server_error",
             "--phases=coverage",
             "--mode=negative",
@@ -1127,7 +1130,8 @@ def test_path_parameters_arent_missing(ctx, cli, snapshot_cli, openapi3_base_url
 
 
 @pytest.mark.filterwarnings("error")
-def test_path_parameters_without_schema(ctx, cli, snapshot_cli, openapi2_base_url):
+def test_path_parameters_without_schema(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/{param}": {
@@ -1147,7 +1151,7 @@ def test_path_parameters_without_schema(ctx, cli, snapshot_cli, openapi2_base_ur
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi2_base_url}",
+            f"--url={api.base_url}/api",
             "--checks=not_a_server_error",
             "--phases=coverage",
             "--mode=negative",
@@ -2055,7 +2059,8 @@ def test_negative_query_parameter(ctx, schema, expected, required):
     assert urls == expected
 
 
-def test_negative_data_rejection(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_negative_data_rejection(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     raw_schema = build_schema(
         ctx,
         [
@@ -2076,7 +2081,7 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url, snapshot_cli):
             str(schema_path),
             "-c",
             "negative_data_rejection",
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--mode=all",
             "--max-examples=10",
             "--phases=coverage",
@@ -2202,7 +2207,8 @@ def test_request_body_without_validation_keywords(ctx):
 
 
 @pytest.mark.openapi_version("3.0")
-def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_unspecified_http_methods(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     raw_schema = {
         "/foo": {
             "post": {
@@ -2257,7 +2263,7 @@ def failed(ctx, response, case):
                 "-c",
                 "failed,unsupported_method",
                 "--include-method=POST",
-                f"--url={openapi3_base_url}",
+                f"--url={api.base_url}/api",
                 "--mode=negative",
                 "--max-examples=10",
                 "--continue-on-failure",
@@ -2301,7 +2307,8 @@ def test_avoid_testing_unexpected_methods(ctx):
 
 
 @pytest.mark.openapi_version("3.0")
-def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     raw_schema = {
         "/foo": {
             "post": {
@@ -2320,7 +2327,7 @@ def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli, openapi
             "run",
             str(schema_path),
             "--checks=unsupported_method",
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--phases=coverage",
             "--mode=negative",
             config={
@@ -2336,7 +2343,8 @@ def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli, openapi
 
 
 @pytest.mark.openapi_version("3.0")
-def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     # Regression test for GH-3322
     # When coverage phase tests unexpected HTTP methods (e.g., PATCH on a GET endpoint),
     # the failure header should show the actual tested method, not the original endpoint's method
@@ -2352,7 +2360,7 @@ def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli, 
             "run",
             str(schema_path),
             "--checks=unsupported_method",
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--phases=coverage",
             "--mode=negative",
         )
@@ -2360,8 +2368,9 @@ def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli, 
     )
 
 
-def test_missing_authorization(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_missing_authorization(ctx, cli, snapshot_cli):
     # The reproduction code should not contain auth if it is explicitly specified
+    api = ctx.openapi.apps.failure()
     schema_path = ctx.openapi.write_schema(
         {"/failure": {"get": {"security": [{"ApiKeyAuth": None}]}}},
         version="2.0",
@@ -2373,7 +2382,7 @@ def test_missing_authorization(ctx, cli, snapshot_cli, openapi3_base_url):
             str(schema_path),
             "-c",
             "not_a_server_error",
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--header=Authorization: Bearer SECRET",
             "--phases=coverage",
             "--mode=negative",
@@ -2382,7 +2391,8 @@ def test_missing_authorization(ctx, cli, snapshot_cli, openapi3_base_url):
     )
 
 
-def test_unnecessary_auth_warning(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_unnecessary_auth_warning(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.basic()
     # If a test for missing Authorization is the only thing that happen, there should be no warning for missing Authorization header
     schema_path = ctx.openapi.write_schema(
         {
@@ -2404,7 +2414,7 @@ def test_unnecessary_auth_warning(ctx, cli, snapshot_cli, openapi3_base_url):
         cli.main(
             "run",
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--header=Authorization: Basic dGVzdDp0ZXN0",
             "--max-examples=5",
         )

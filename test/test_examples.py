@@ -28,7 +28,8 @@ def schema():
 
 
 @pytest.mark.hypothesis_nested
-def test_examples_validity(schema, openapi3_base_url):
+def test_examples_validity(ctx, schema):
+    api = ctx.openapi.apps.success()
     operation = next(schema.get_all_operations()).ok()
     strategy = get_strategies_from_examples(operation)[0]
 
@@ -37,6 +38,6 @@ def test_examples_validity(schema, openapi3_base_url):
     def test(case):
         # Generated examples should have valid parameters
         # E.g. headers should be latin-1 encodable
-        case.call(base_url=openapi3_base_url)
+        case.call(base_url=f"{api.base_url}/api")
 
     test()

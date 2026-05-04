@@ -41,10 +41,9 @@ servers:
 
 
 @pytest.fixture(scope="module")
-def schema_url(server):
-    # In this module we don't care about resetting the app or testing different Open API versions
-    # Only whether Schemathesis crashes on allowed input
-    return f"http://127.0.0.1:{server['port']}/schema.yaml"
+def schema_url():
+    # `mocked_schema` intercepts the network fetch, so the URL just needs to parse.
+    return "http://127.0.0.1/schema.yaml"
 
 
 @st.composite

@@ -4,14 +4,16 @@ import pytest
 
 
 @pytest.mark.parametrize("is_lazy", [False, True])
-def test_config_proxy_is_used(testdir, is_lazy, openapi3_base_url):
+def test_config_proxy_is_used(ctx, testdir, is_lazy):
+    api = ctx.openapi.apps.success()
+    base_url = f"{api.base_url}/api"
     proxy_url = "http://127.0.0.1:8080"
     if is_lazy:
         schema_setup = f"""
 @pytest.fixture
 def api_schema():
     config = SchemathesisConfig()
-    config.projects.default.update(proxy="{proxy_url}", base_url="{openapi3_base_url}")
+    config.projects.default.update(proxy="{proxy_url}", base_url="{base_url}")
     return schemathesis.openapi.from_dict(raw_schema, config=config)
 
 schema = schemathesis.pytest.from_fixture("api_schema")
@@ -19,7 +21,7 @@ schema = schemathesis.pytest.from_fixture("api_schema")
     else:
         schema_setup = f"""
 config = SchemathesisConfig()
-config.projects.default.update(proxy="{proxy_url}", base_url="{openapi3_base_url}")
+config.projects.default.update(proxy="{proxy_url}", base_url="{base_url}")
 schema = schemathesis.openapi.from_dict(raw_schema, config=config)
 """
 
@@ -39,14 +41,16 @@ def test_proxy(case):
 
 
 @pytest.mark.parametrize("is_lazy", [False, True])
-def test_config_request_timeout_is_used(testdir, is_lazy, openapi3_base_url):
+def test_config_request_timeout_is_used(ctx, testdir, is_lazy):
+    api = ctx.openapi.apps.slow()
+    base_url = f"{api.base_url}/api"
     timeout = 0.01
     if is_lazy:
         schema_setup = f"""
 @pytest.fixture
 def api_schema():
     config = SchemathesisConfig()
-    config.projects.default.update(request_timeout={timeout}, base_url="{openapi3_base_url}")
+    config.projects.default.update(request_timeout={timeout}, base_url="{base_url}")
     return schemathesis.openapi.from_dict(raw_schema, config=config)
 
 schema = schemathesis.pytest.from_fixture("api_schema")
@@ -54,7 +58,7 @@ schema = schemathesis.pytest.from_fixture("api_schema")
     else:
         schema_setup = f"""
 config = SchemathesisConfig()
-config.projects.default.update(request_timeout={timeout}, base_url="{openapi3_base_url}")
+config.projects.default.update(request_timeout={timeout}, base_url="{base_url}")
 schema = schemathesis.openapi.from_dict(raw_schema, config=config)
 """
 
