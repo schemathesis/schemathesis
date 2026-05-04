@@ -6,10 +6,8 @@ from typing import TYPE_CHECKING, Any
 from unicodedata import normalize
 from urllib.parse import quote_plus, unquote
 
-import jsonschema_rs
-
 from schemathesis.core.errors import UnboundPrefix
-from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.transforms import transform
 
 
@@ -178,7 +176,7 @@ def _write_xml(
     tag: str,
     schema: dict[str, Any] | None,
     namespace_stack: list[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
 ) -> None:
     if isinstance(value, dict):
         _write_object(buffer, value, tag, schema, namespace_stack, resolver)
@@ -213,7 +211,7 @@ def _write_object(
     tag: str,
     schema: dict[str, Any] | None,
     stack: list[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
@@ -277,7 +275,7 @@ def _write_array(
     tag: str,
     schema: dict[str, Any] | None,
     stack: list[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)

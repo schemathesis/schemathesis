@@ -7,8 +7,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import asdict, dataclass
 from typing import Any, TypeAlias
 
-import jsonschema_rs
-
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import encode_pointer, get_template_fields
 from schemathesis.resources.descriptors import Cardinality
@@ -456,7 +455,7 @@ def extract_fk_fields(fields: list[str]) -> list[FKField]:
 
 def extract_nested_fk_fields(
     schema: Mapping[str, Any],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     pointer: str = "",
     max_depth: int = 5,
 ) -> list[NestedFKField]:

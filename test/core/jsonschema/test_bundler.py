@@ -1,12 +1,12 @@
+from typing import Any
+
 import pytest
 
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle, prepare_for_generation, prepare_for_validation
-from schemathesis.core.jsonschema import bundler as bundler_mod
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, bundle, bundle_for_generation, bundle_for_validation
 from schemathesis.core.jsonschema.bundler import BundleError, unbundle, unbundle_path
 from schemathesis.core.jsonschema.resolver import make_root_resolver
-from schemathesis.core.transforms import deepclone
 from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 
 USER = {"type": "string"}
@@ -435,7 +435,7 @@ def test_bundle_recursive_not_inlined():
     }
 
 
-def test_prepare_for_generation_inlines_recursive_references():
+def test_bundle_for_generation_inlines_recursive_references():
     schema = {"$ref": "#/definitions/Node"}
     store = {
         "definitions": {
@@ -450,7 +450,7 @@ def test_prepare_for_generation_inlines_recursive_references():
 
     resolver = make_root_resolver(store)
 
-    assert prepare_for_generation(schema, resolver).schema == {
+    assert bundle_for_generation(schema, resolver).schema == {
         "type": "object",
         "properties": {
             "child": {
@@ -461,7 +461,7 @@ def test_prepare_for_generation_inlines_recursive_references():
     }
 
 
-def test_prepare_for_validation_preserves_recursive_references():
+def test_bundle_for_validation_preserves_recursive_references():
     schema = {"$ref": "#/definitions/Node"}
     store = {
         "definitions": {
@@ -476,7 +476,7 @@ def test_prepare_for_validation_preserves_recursive_references():
 
     resolver = make_root_resolver(store)
 
-    assert prepare_for_validation(schema, resolver).schema == {
+    assert bundle_for_validation(schema, resolver).schema == {
         "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
         BUNDLE_STORAGE_KEY: {
             "schema1": {
@@ -503,23 +503,24 @@ def test_bundle_non_recursive_inlined():
     assert bundle(schema, resolver, inline_recursive=False).schema == {"type": "object"}
 
 
+def _strip_remote_refs(value: Any) -> Any:
+    if isinstance(value, dict):
+        ref = value.get("$ref")
+        if isinstance(ref, str) and ref.startswith(("http://", "https://")):
+            return {}
+        return {key: _strip_remote_refs(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_strip_remote_refs(item) for item in value]
+    return value
+
+
 @pytest.mark.parametrize("schema", [SWAGGER_20, OPENAPI_30, OPENAPI_31])
-def test_bundles_open_api_schemas(schema, monkeypatch):
-    # This is a smoke test, they should be bundled without errors
-    original_resolve_reference_with_uri = bundler_mod.resolve_reference_with_uri
-
-    def fake_resolve_reference_with_uri(resolver, reference):
-        if reference.startswith(("http://", "https://")):
-            return reference, resolver, {}
-        return original_resolve_reference_with_uri(resolver, reference)
-
-    monkeypatch.setattr(
-        bundler_mod,
-        "resolve_reference_with_uri",
-        fake_resolve_reference_with_uri,
-    )
-    resolver = make_root_resolver(deepclone(schema))
-    bundle(deepclone(schema), resolver, inline_recursive=True)
+def test_bundles_open_api_schemas(schema):
+    # Smoke test: official meta-schemas bundle without errors. Remote refs are stripped
+    # so the test stays offline.
+    schema = _strip_remote_refs(schema)
+    resolver = make_root_resolver(schema)
+    bundle(schema, resolver, inline_recursive=True)
 
 
 def test_bundle_infinite_recursive_required_cycle_message():

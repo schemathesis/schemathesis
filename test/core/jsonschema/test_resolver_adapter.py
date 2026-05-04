@@ -40,10 +40,7 @@ def test_build_registry_uses_file_retrieval_for_relative_references(tmp_path):
     root.write_text(json.dumps(root_schema))
     defs.write_text(json.dumps(defs_schema))
 
-    registry = build_registry(root_schema, location=root.as_uri())
-    resolver = registry.resolver(root.as_uri())
-
-    assert isinstance(registry, jsonschema_rs.Registry)
+    resolver = make_root_resolver(root_schema, location=root.as_uri())
 
     next_resolver, resolved_root = resolve_reference(resolver, "")
     next_resolver, resolved_target = resolve_reference(next_resolver, resolved_root["$ref"])

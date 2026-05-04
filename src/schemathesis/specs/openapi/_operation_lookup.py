@@ -6,11 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import OperationNotFound
-from schemathesis.core.jsonschema.resolver import resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
+from schemathesis.core.transforms import decode_pointer, encode_pointer
 
 if TYPE_CHECKING:
-    import jsonschema_rs
-
     from schemathesis.specs.openapi.schemas import APIOperation, OpenApiSchema
 
 
@@ -19,7 +18,7 @@ class OperationLookupEntry:
     path: str
     method: str
     scope: str
-    resolver: jsonschema_rs.Resolver
+    resolver: Resolver
     definition: dict[str, Any]
     shared_parameters: tuple[dict[str, Any], ...]
     __slots__ = ("path", "method", "scope", "resolver", "definition", "shared_parameters")
@@ -146,8 +145,7 @@ class OperationLookup:
 
     @staticmethod
     def _canonical_operation_reference(path: str, method: str) -> str:
-        encoded_path = path.replace("~", "~0").replace("/", "~1")
-        return f"#/paths/{encoded_path}/{method}"
+        return f"#/paths/{encode_pointer(path)}/{method}"
 
 
 def _parse_reference_path_method(reference: str) -> tuple[str, str]:
@@ -156,4 +154,4 @@ def _parse_reference_path_method(reference: str) -> tuple[str, str]:
     if not separator:
         raise OperationNotFound(f"Operation '{reference}' not found", reference)
     encoded_path, method = suffix.rsplit("/", maxsplit=1)
-    return encoded_path.replace("~1", "/").replace("~0", "~"), method
+    return decode_pointer(encoded_path), method

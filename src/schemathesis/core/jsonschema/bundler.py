@@ -3,11 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-import jsonschema_rs
-
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.references import sanitize
 from schemathesis.core.jsonschema.resolver import (
+    Resolver,
     resolve_reference_uri,
     resolve_reference_with_uri,
 )
@@ -16,6 +15,9 @@ from schemathesis.core.transforms import decode_pointer, deepclone
 
 BUNDLE_STORAGE_KEY = "x-bundled"
 REFERENCE_TO_BUNDLE_PREFIX = f"#/{BUNDLE_STORAGE_KEY}"
+# Combinator keys that get per-variant exception handling — bundle_value falls back
+# to ordinary recursion for everything else, so the dict-comp path skips the call.
+_ONEOF_ANYOF = frozenset({"oneOf", "anyOf"})
 
 # Cache for bundled parameters: parameter object id -> (bundled definition, name_to_uri mapping)
 BundleCache = dict[int, tuple[dict[str, Any], dict[str, str]]]
@@ -48,7 +50,7 @@ class Bundler:
     def __init__(self) -> None:
         self.counter = 0
 
-    def bundle(self, schema: JsonSchema, resolver: jsonschema_rs.Resolver, *, inline_recursive: bool) -> Bundle:
+    def bundle(self, schema: JsonSchema, resolver: Resolver, *, inline_recursive: bool) -> Bundle:
         """Bundle a JSON Schema by embedding all references."""
         # Inlining recursive reference is required (for now) for data generation, but is unsound for data validation
         if not isinstance(schema, dict):
@@ -76,33 +78,32 @@ class Bundler:
         def bundle_value(
             key: str,
             value: Any,
-            current_resolver: jsonschema_rs.Resolver,
+            current_resolver: Resolver,
         ) -> Any:
-            """Walk a child value, with per-variant exception handling for `oneOf`/`anyOf`."""
-            if isinstance(value, list) and key in ("oneOf", "anyOf"):
-                survivors: list = []
-                last_error: InfiniteRecursiveReference | None = None
-                for item in value:
-                    if not isinstance(item, dict | list):
-                        survivors.append(item)
-                        continue
-                    try:
-                        survivors.append(bundle_recursive(item, current_resolver))
-                    except InfiniteRecursiveReference as exc:
-                        # The variant cycles back; drop it. Kept alternatives still
-                        # satisfy the original combinator. If none survive, re-raise —
-                        # the cycle is unbreakable.
-                        last_error = exc
-                if not survivors and last_error is not None:
-                    raise last_error
-                return survivors
-            if isinstance(value, dict | list):
-                return bundle_recursive(value, current_resolver)
-            return value
+            """Walk a `oneOf`/`anyOf` value, dropping variants that cycle back to an in-flight scope."""
+            if not isinstance(value, list):
+                # Defensive: spec lists, but tolerate non-list values found in real schemas.
+                if isinstance(value, dict):
+                    return bundle_recursive(value, current_resolver)
+                return value
+            survivors: list = []
+            last_error: InfiniteRecursiveReference | None = None
+            for item in value:
+                if not isinstance(item, (dict, list)):
+                    survivors.append(item)
+                    continue
+                try:
+                    survivors.append(bundle_recursive(item, current_resolver))
+                except InfiniteRecursiveReference as exc:
+                    # Variant cycles back; drop it so the combinator stays satisfiable.
+                    last_error = exc
+            if not survivors and last_error is not None:
+                raise last_error
+            return survivors
 
         def bundle_recursive(
             current: JsonSchema | list[JsonSchema],
-            current_resolver: jsonschema_rs.Resolver,
+            current_resolver: Resolver,
         ) -> JsonSchema | list[JsonSchema]:
             """Recursively process and bundle references in the current schema."""
             # Local lookup is cheaper and it matters for large schemas.
@@ -130,13 +131,19 @@ class Bundler:
                                 key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                                 if key == "$ref"
                                 else _bundle_value(key, value, current_resolver)
+                                if key in _ONEOF_ANYOF
+                                else (
+                                    _bundle_recursive(value, current_resolver)
+                                    if isinstance(value, (dict, list))
+                                    else value
+                                )
                                 for key, value in current.items()
                             }
                     resolved_uri, next_resolver, resolved_schema = resolve_reference_with_uri(
                         current_resolver, reference
                     )
 
-                    if not isinstance(resolved_schema, dict | bool):
+                    if not isinstance(resolved_schema, (dict, bool)):
                         raise BundleError(reference, resolved_schema)
                     def_name = get_def_name(resolved_uri)
 
@@ -178,6 +185,12 @@ class Bundler:
 
                             result = {
                                 key: _bundle_value(key, value, current_resolver)
+                                if key in _ONEOF_ANYOF
+                                else (
+                                    _bundle_recursive(value, current_resolver)
+                                    if isinstance(value, (dict, list))
+                                    else value
+                                )
                                 for key, value in current.items()
                                 if key != "$ref"
                             }
@@ -214,6 +227,10 @@ class Bundler:
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
                             else _bundle_value(key, value, current_resolver)
+                            if key in _ONEOF_ANYOF
+                            else (
+                                _bundle_recursive(value, current_resolver) if isinstance(value, (dict, list)) else value
+                            )
                             for key, value in current.items()
                         }
                     else:
@@ -222,13 +239,22 @@ class Bundler:
                             key: f"{REFERENCE_TO_BUNDLE_PREFIX}/{def_name}"
                             if key == "$ref"
                             else _bundle_value(key, value, current_resolver)
+                            if key in _ONEOF_ANYOF
+                            else (
+                                _bundle_recursive(value, current_resolver) if isinstance(value, (dict, list)) else value
+                            )
                             for key, value in current.items()
                         }
-                return {key: _bundle_value(key, value, current_resolver) for key, value in current.items()}
+                return {
+                    key: _bundle_value(key, value, current_resolver)
+                    if key in _ONEOF_ANYOF
+                    else (_bundle_recursive(value, current_resolver) if isinstance(value, (dict, list)) else value)
+                    for key, value in current.items()
+                }
             elif isinstance(current, list):
                 result_list: list[JsonSchema] = [
                     _bundle_recursive(item, current_resolver)  # type: ignore[misc]
-                    if isinstance(item, dict | list)
+                    if isinstance(item, (dict, list))
                     else item
                     for item in current
                 ]
@@ -253,28 +279,28 @@ class Bundler:
             bundled[BUNDLE_STORAGE_KEY] = defs
         return Bundle(schema=bundled, name_to_uri={v: k for k, v in uri_to_name.items()})
 
-    def prepare_for_generation(self, schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+    def bundle_for_generation(self, schema: JsonSchema, resolver: Resolver) -> Bundle:
         """Prepare schema for data generation by inlining recursive references."""
         return self.bundle(schema, resolver, inline_recursive=True)
 
-    def prepare_for_validation(self, schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+    def bundle_for_validation(self, schema: JsonSchema, resolver: Resolver) -> Bundle:
         """Prepare schema for validation while preserving recursive references."""
         return self.bundle(schema, resolver, inline_recursive=False)
 
 
-def bundle(schema: JsonSchema, resolver: jsonschema_rs.Resolver, *, inline_recursive: bool) -> Bundle:
+def bundle(schema: JsonSchema, resolver: Resolver, *, inline_recursive: bool) -> Bundle:
     """Bundle a JSON Schema by embedding all references."""
     return Bundler().bundle(schema, resolver, inline_recursive=inline_recursive)
 
 
-def prepare_for_generation(schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+def bundle_for_generation(schema: JsonSchema, resolver: Resolver) -> Bundle:
     """Prepare schema for data generation by inlining recursive references."""
-    return Bundler().prepare_for_generation(schema, resolver)
+    return Bundler().bundle_for_generation(schema, resolver)
 
 
-def prepare_for_validation(schema: JsonSchema, resolver: jsonschema_rs.Resolver) -> Bundle:
+def bundle_for_validation(schema: JsonSchema, resolver: Resolver) -> Bundle:
     """Prepare schema for validation while preserving recursive references."""
-    return Bundler().prepare_for_validation(schema, resolver)
+    return Bundler().bundle_for_validation(schema, resolver)
 
 
 def unbundle_path(path: list[str | int], name_to_uri: dict[str, str]) -> list[str | int]:
@@ -331,7 +357,7 @@ def unbundle(schema: JsonSchema | list[JsonSchema], name_to_uri: dict[str, str])
                     else:
                         components["schemas"][bundled_name] = unbundle(bundled_schema, name_to_uri)
                 result["components"] = components
-            elif isinstance(value, dict | list):
+            elif isinstance(value, (dict, list)):
                 result[key] = unbundle(value, name_to_uri)
             else:
                 result[key] = value

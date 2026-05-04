@@ -4,11 +4,9 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-import jsonschema_rs
-
 from schemathesis.config import ApiKeyAuthConfig, DynamicTokenAuthConfig, HttpBasicAuthConfig, HttpBearerAuthConfig
 from schemathesis.config._error import ConfigError
-from schemathesis.core.jsonschema.resolver import resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation.meta import CoveragePhaseData, FuzzingPhaseData, StatefulPhaseData
 from schemathesis.specs.openapi.auths import (
@@ -55,15 +53,13 @@ class OpenApiSecurity:
 
     raw_schema: Mapping[str, Any]
     adapter: SpecificationAdapter
-    resolver: jsonschema_rs.Resolver
+    resolver: Resolver
     _auth_provider_cache: dict[str, AuthProvider]
     _resolved_definitions: Mapping[str, Mapping[str, Any]] | None
 
     __slots__ = ("raw_schema", "adapter", "resolver", "_auth_provider_cache", "_resolved_definitions")
 
-    def __init__(
-        self, raw_schema: Mapping[str, Any], adapter: SpecificationAdapter, resolver: jsonschema_rs.Resolver
-    ) -> None:
+    def __init__(self, raw_schema: Mapping[str, Any], adapter: SpecificationAdapter, resolver: Resolver) -> None:
         self.raw_schema = raw_schema
         self.adapter = adapter
         self.resolver = resolver
@@ -176,7 +172,7 @@ class OpenApiSecurityParameters:
         cls,
         schema: Mapping[str, Any],
         operation: Mapping[str, Any],
-        resolver: jsonschema_rs.Resolver,
+        resolver: Resolver,
         adapter: SpecificationAdapter,
     ) -> OpenApiSecurityParameters:
         return cls(list(adapter.extract_security_parameters(schema, operation, resolver)))
@@ -186,7 +182,7 @@ class OpenApiSecurityParameters:
 
 
 def extract_security_parameters_v2(
-    schema: Mapping[str, Any], operation: Mapping[str, Any], resolver: jsonschema_rs.Resolver
+    schema: Mapping[str, Any], operation: Mapping[str, Any], resolver: Resolver
 ) -> Iterator[Mapping[str, Any]]:
     """Extract all required security parameters for this operation."""
     defined = extract_security_definitions_v2(schema, resolver)
@@ -218,7 +214,7 @@ def extract_security_parameters_v2(
 def extract_security_parameters_v3(
     schema: Mapping[str, Any],
     operation: Mapping[str, Any],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
 ) -> Iterator[Mapping[str, Any]]:
     """Extract all required security parameters for this operation."""
     defined = extract_security_definitions_v3(schema, resolver)
@@ -297,11 +293,11 @@ def has_effective_optional_auth(operation: APIOperation, raw_schema: Mapping[str
     return {} in effective_security_requirements(operation, raw_schema)
 
 
-def extract_security_definitions_v2(schema: Mapping[str, Any], resolver: jsonschema_rs.Resolver) -> Mapping[str, Any]:
+def extract_security_definitions_v2(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
     return schema.get("securityDefinitions", {})
 
 
-def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: jsonschema_rs.Resolver) -> Mapping[str, Any]:
+def extract_security_definitions_v3(schema: Mapping[str, Any], resolver: Resolver) -> Mapping[str, Any]:
     """In Open API 3 security definitions are located in ``components`` and may have references inside."""
     components = schema.get("components", {})
     security_schemes = components.get("securitySchemes", {})

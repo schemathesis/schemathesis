@@ -3,11 +3,10 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
-import jsonschema_rs
-
 from schemathesis.core import media_types
 from schemathesis.core.errors import MalformedMediaType
 from schemathesis.core.jsonschema import maybe_resolve_bundled
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import get_type
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
@@ -34,7 +33,7 @@ def extract_inputs(
     operation: APIOperation,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
 ) -> Iterator[InputSlot]:
@@ -84,7 +83,7 @@ def _resolve_parameter_dependency(
     operation: APIOperation,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> InputSlot | None:
     """Connect a parameter to its resource definition, creating placeholder if needed.
@@ -182,7 +181,7 @@ def _find_resource_in_responses(
     resource_name: str,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> ResourceDefinition | None:
     """Search operation's successful responses for a specific resource definition.

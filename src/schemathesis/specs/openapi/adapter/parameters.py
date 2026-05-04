@@ -16,6 +16,7 @@ from schemathesis.core.adapter import OperationParameter
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS, BundleError, Bundler, make_validator
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY, BundleCache
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 from schemathesis.core.media_types import FORM_MEDIA_TYPES
 from schemathesis.core.parameters import HEADER_LOCATIONS, ParameterLocation
@@ -798,7 +799,7 @@ def extract_parameter_schema_v3(parameter: Mapping[str, Any]) -> JsonSchema:
 
 def _bundle_parameter(
     parameter: Mapping,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     bundler: Bundler,
     bundle_cache: dict[int, tuple[dict[str, Any], dict[str, str]]],
 ) -> tuple[dict[str, Any], dict[str, str]]:
@@ -814,7 +815,7 @@ def _bundle_parameter(
     if schema is not None:
         definition = dict(definition)
         try:
-            bundled = bundler.prepare_for_generation(
+            bundled = bundler.bundle_for_generation(
                 schema,
                 parameter_resolver,
             )
@@ -835,7 +836,7 @@ def _bundle_parameter(
                 media_type_object = dict(media_type_object)
                 nested_schema = media_type_object.get("schema")
                 if isinstance(nested_schema, dict):
-                    bundled = bundler.prepare_for_generation(
+                    bundled = bundler.bundle_for_generation(
                         nested_schema,
                         parameter_resolver,
                     )
@@ -873,7 +874,7 @@ def iter_parameters_v2(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     adapter: SpecificationAdapter,
     bundler: Bundler,
     bundle_cache: BundleCache,
@@ -935,7 +936,7 @@ def iter_parameters_v3(
     definition: Mapping[str, Any],
     shared_parameters: Sequence[Mapping[str, Any]],
     default_media_types: list[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     adapter: SpecificationAdapter,
     bundler: Bundler,
     bundle_cache: BundleCache,
@@ -990,7 +991,7 @@ def iter_parameters_v3(
                         resource_name = resource_name_from_ref(items["$ref"])
                 try:
                     to_bundle = cast(dict[str, Any], schema)
-                    bundled = bundler.prepare_for_generation(
+                    bundled = bundler.bundle_for_generation(
                         to_bundle,
                         body_resolver,
                     )
