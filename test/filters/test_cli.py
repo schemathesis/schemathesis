@@ -62,14 +62,15 @@ def cassette_path(tmp_path):
         ),
     ),
 )
-def test_filters_with_cli_options(ctx, cli, args, expected, cassette_path, openapi3_base_url):
+def test_filters_with_cli_options(ctx, cli, args, expected, cassette_path):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(SCHEMA)
 
     assert_filtered(
         cli,
         schema_path,
         cassette_path,
-        openapi3_base_url,
+        f"{api.base_url}/api",
         expected,
         args=[f"--{key}={value}" for key, value in args.items()],
         kwargs={},
@@ -101,14 +102,15 @@ def test_filters_with_cli_options(ctx, cli, args, expected, cassette_path, opena
         ),
     ),
 )
-def test_filters_with_config(ctx, cli, args, expected, cassette_path, openapi3_base_url):
+def test_filters_with_config(ctx, cli, args, expected, cassette_path):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(SCHEMA)
 
     assert_filtered(
         cli,
         schema_path,
         cassette_path,
-        openapi3_base_url,
+        f"{api.base_url}/api",
         expected,
         args=[],
         kwargs={"config": {"operations": [{**arg, "enabled": False} for arg in args]}},
@@ -144,27 +146,28 @@ def test_filters_with_config(ctx, cli, args, expected, cassette_path, openapi3_b
         ),
     ],
 )
-def test_cli_and_config_intersection(ctx, cli, cli_args, config, expected, cassette_path, openapi3_base_url):
+def test_cli_and_config_intersection(ctx, cli, cli_args, config, expected, cassette_path):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(SCHEMA)
 
     assert_filtered(
         cli,
         schema_path,
         cassette_path,
-        openapi3_base_url,
+        f"{api.base_url}/api",
         expected,
         args=[f"--{key}={value}" for key, value in cli_args.items()],
         kwargs={"config": {"operations": [{**item, "enabled": False} for item in config]}},
     )
 
 
-def assert_filtered(cli, schema_path, cassette_path, openapi3_base_url, expected, *, args, kwargs):
+def assert_filtered(cli, schema_path, cassette_path, base_url, expected, *, args, kwargs):
     result = cli.run(
         str(schema_path),
         "--checks=not_a_server_error",
         "--max-examples=1",
         "--phases=fuzzing",
-        f"--url={openapi3_base_url}",
+        f"--url={base_url}",
         f"--report-vcr-path={cassette_path}",
         *args,
         **kwargs,

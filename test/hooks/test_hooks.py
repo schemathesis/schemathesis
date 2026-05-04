@@ -275,10 +275,12 @@ def test_register_invalid_hook_spec(dispatcher):
             pass
 
 
-def test_save_test_function(wsgi_app_schema):
-    assert wsgi_app_schema.test_function is None
+def test_save_test_function(ctx):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    assert schema.test_function is None
 
-    @wsgi_app_schema.parametrize()
+    @schema.parametrize()
     def test(case):
         pass
 
@@ -286,11 +288,13 @@ def test_save_test_function(wsgi_app_schema):
 
 
 @pytest.mark.parametrize("apply_first", [True, False])
-def test_local_dispatcher(wsgi_app_schema, apply_first):
-    assert wsgi_app_schema.hooks.scope == HookScope.SCHEMA
+def test_local_dispatcher(ctx, apply_first):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
+    assert schema.hooks.scope == HookScope.SCHEMA
 
     # When there are schema-level hooks
-    @wsgi_app_schema.hook("map_query")
+    @schema.hook("map_query")
     def schema_hook(context, query):
         return query
 
@@ -299,8 +303,8 @@ def test_local_dispatcher(wsgi_app_schema, apply_first):
         return cookies
 
     # And order of decorators is any
-    apply = wsgi_app_schema.hooks.apply(local_hook, name="map_cookies")
-    parametrize = wsgi_app_schema.parametrize()
+    apply = schema.hooks.apply(local_hook, name="map_cookies")
+    parametrize = schema.parametrize()
     if apply_first:
 
         def wrap(x):
@@ -433,14 +437,16 @@ def test_before_process_path_hook(ctx):
     test()
 
 
-def test_register_wrong_scope(wsgi_app_schema):
+def test_register_wrong_scope(ctx):
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", api.wsgi_app)
     with pytest.raises(
         ValueError,
         match=r"Cannot register hook 'before_load_schema' on SCHEMA scope dispatcher. "
         r"Use a dispatcher with GLOBAL scope\(s\) instead",
     ):
 
-        @wsgi_app_schema.hook
+        @schema.hook
         def before_load_schema(ctx, raw_schema):
             pass
 

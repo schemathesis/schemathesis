@@ -8,7 +8,7 @@ Schemathesis dev
  ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
-     Specification:    Open API 3.0.0
+     Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
 
 
@@ -16,9 +16,9 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✓
 
- 🚫  Examples (in 0.00s)
+ ⏭   Examples (in 0.00s)
 
-     🚫 1 error
+     ⏭  1 skipped
 
  🚫  Coverage (in 0.00s)
 
@@ -29,10 +29,13 @@ Schemathesis dev
      🚫 1 error
 
 ==================================== ERRORS ====================================
-__________________________________ POST /foo ___________________________________
+__________________________________ POST /data __________________________________
 Schema Error
 
-Schema `#/components/schemas/Node` has a required reference to itself
+Malformed media type: `application.json`
+
+Location:
+    requestBody -> content -> application.json
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -44,7 +47,7 @@ API Operations:
   Errored: 1
 
 Test Phases:
-  🚫 Examples
+  ⏭  Examples
   🚫 Coverage
   🚫 Fuzzing
   ⏭  Stateful (not applicable)

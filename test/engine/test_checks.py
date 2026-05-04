@@ -567,7 +567,7 @@ def assert_no_media_types(response_factory, schema, definition):
     assert response_schema_conformance(CTX, response, case) is None
 
 
-def test_response_conformance_unresolvable_file(ctx, cli, openapi3_base_url, snapshot_cli):
+def test_response_conformance_unresolvable_file(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
             "/test": {
@@ -591,8 +591,9 @@ def test_response_conformance_unresolvable_file(ctx, cli, openapi3_base_url, sna
         },
         version="2.0",
     )
+    api = ctx.openapi.apps.success()
     assert (
-        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=response_schema_conformance") == snapshot_cli
+        cli.run(str(schema_path), f"--url={api.base_url}/api", "--checks=response_schema_conformance") == snapshot_cli
     )
 
 

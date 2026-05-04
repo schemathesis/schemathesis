@@ -70,13 +70,15 @@ def test_register_invalid(auth_storage):
         class Invalid: ...
 
 
-def test_apply_twice(openapi3_schema, auth_provider_class):
+def test_apply_twice(ctx, auth_provider_class):
     # When auth is registered twice
     # Then it is an error
+    api = ctx.openapi.apps.success()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     with pytest.raises(IncorrectUsage, match="`test` has already been decorated with `apply`"):
 
-        @openapi3_schema.auth(auth_provider_class)
-        @openapi3_schema.auth(auth_provider_class)
+        @schema.auth(auth_provider_class)
+        @schema.auth(auth_provider_class)
         def test(case):
             pass
 
@@ -175,10 +177,11 @@ MULTI_SCOPE_SCHEMA = {
 }
 
 
-def test_auth_cache_with_scopes(openapi3_base_url):
+def test_auth_cache_with_scopes(ctx):
     # See GH-1775
+    api = ctx.openapi.apps.success()
     schema = schemathesis.openapi.from_dict(MULTI_SCOPE_SCHEMA)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
 
     counts = {}
 

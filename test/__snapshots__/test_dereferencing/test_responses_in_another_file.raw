@@ -14,7 +14,7 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ⏭   Examples (in 0.00s)
 
@@ -24,43 +24,27 @@ Schemathesis dev
 
      ❌ 1 failed
 
- ❌  Fuzzing (in 0.00s)
+ ✅  Fuzzing (in 0.00s)
 
-     ❌ 1 failed
+     ✅ 1 passed
 
 =================================== FAILURES ===================================
-_____________________________ TRACE /api/v1/items ______________________________
+______________________________ PUT /api/v1/items _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Unsupported methods
 
-    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
+    Unsupported method PUT returned 200, expected 405 Method Not Allowed
 
     Return 405 for methods not listed in the OpenAPI spec
 
-[404] Not Found:
+[200] OK:
 
-    `404: Not Found`
-
-Reproduce with:
-
-    curl -X TRACE http://127.0.0.1/api/api/v1/items
-
-______________________________ GET /api/v1/items _______________________________
-1. Test Case ID: <PLACEHOLDER>
-
-- Undocumented HTTP status code
-
-    Received: 404
-    Documented: 200, 400, 500
-
-[404] Not Found:
-
-    `404: Not Found`
+    `{}`
 
 Reproduce with:
 
-    curl -X GET http://127.0.0.1/api/api/v1/items
+    curl -X PUT http://127.0.0.1/api/api/v1/items
 
 =================================== SUMMARY ====================================
 
@@ -71,11 +55,10 @@ API Operations:
 Test Phases:
   ⏭  Examples
   ❌ Coverage
-  ❌ Fuzzing
+  ✅ Fuzzing
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Undocumented HTTP status code: 1
   ❌ Unsupported methods: 1
 
 Test cases:
@@ -83,4 +66,4 @@ Test cases:
 
 Seed: 42
 
-============================= 2 failures in 1.00s ==============================
+============================== 1 failure in 1.00s ==============================

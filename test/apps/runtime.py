@@ -39,6 +39,7 @@ class OpenAPIServer:
     spec: Schema
     wsgi_app: Flask | FastAPI
     requests: list[CapturedRequest] = field(default_factory=list)
+    schema_requests: list[CapturedRequest] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -58,8 +59,10 @@ class OpenAPIApp:
     def make_server(self, port: int) -> OpenAPIServer:
         base_url = f"http://127.0.0.1:{port}"
         captured: list[CapturedRequest] = []
+        schema_requests: list[CapturedRequest] = []
         if isinstance(self.server, Flask):
             captured = self.server.config.setdefault("captured_requests", captured)
+            schema_requests = self.server.config.setdefault("captured_schema_requests", schema_requests)
         return OpenAPIServer(
             schema_url=f"{base_url}/openapi.json",
             base_url=base_url,
@@ -67,6 +70,7 @@ class OpenAPIApp:
             spec=self.spec,
             wsgi_app=self.server,
             requests=captured,
+            schema_requests=schema_requests,
         )
 
 

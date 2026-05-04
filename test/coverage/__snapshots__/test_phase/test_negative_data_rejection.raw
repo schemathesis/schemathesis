@@ -14,7 +14,7 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ❌  Coverage (in 0.00s)
 
@@ -32,7 +32,7 @@ _________________________________ GET /success _________________________________
 
 [200] OK:
 
-    `{"success": true}`
+    `{"success":true}`
 
 Reproduce with:
 

@@ -330,11 +330,12 @@ def test(case):
 
 
 @pytest.mark.parametrize("settings", ["", "@settings(deadline=None)"])
-def test_parametrized_fixture(testdir, openapi3_base_url, settings):
+def test_parametrized_fixture(ctx, testdir, settings):
+    api = ctx.openapi.apps.success()
     # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
         f"""
-schema.config.update(base_url="{openapi3_base_url}")
+schema.config.update(base_url="{api.base_url}/api")
 
 @pytest.fixture(params=["a", "b"])
 def parametrized_lazy_schema(request):
@@ -642,7 +643,8 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
-def test_async_fixture(testdir, openapi3_schema_url):
+def test_async_fixture(ctx, testdir):
+    api = ctx.openapi.apps.success_and_failure()
     testdir.make_test(
         f"""
 import pytest_asyncio
@@ -651,7 +653,7 @@ import schemathesis
 
 @pytest_asyncio.fixture
 async def lazy_schema():
-    return schemathesis.openapi.from_url('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{api.schema_url}')
 
 
 schema = schemathesis.pytest.from_fixture("lazy_schema")

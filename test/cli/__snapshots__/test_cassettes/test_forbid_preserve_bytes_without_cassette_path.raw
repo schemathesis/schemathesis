@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: schemathesis run [OPTIONS] LOCATION
+Try 'schemathesis run -h' for help.
+
+Error: Can't use `--report-preserve-bytes` without enabling cassette formats. Enable VCR or HAR format with `--report=vcr`, `--report-vcr-path`, `--report=har`, or `--report-har-path`

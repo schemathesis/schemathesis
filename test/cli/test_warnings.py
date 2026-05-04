@@ -47,7 +47,7 @@ fail-on = ["missing_auth"]
     assert "Authentication failed" in result.stdout
 
 
-def test_missing_deserializer_warning_displayed(cli, ctx, openapi3_base_url):
+def test_missing_deserializer_warning_displayed(cli, ctx):
     # Given a schema with a custom media type that has no deserializer
     schema_path = ctx.openapi.write_schema(
         {
@@ -68,7 +68,8 @@ def test_missing_deserializer_warning_displayed(cli, ctx, openapi3_base_url):
         }
     )
 
-    result = cli.run(str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1")
+    api = ctx.openapi.apps.success()
+    result = cli.run(str(schema_path), f"--url={api.base_url}/api", "--max-examples=1")
 
     # Then the warning should be displayed in both summary and detailed sections
     assert "⚠️ Schema validation skipped: 1 operation cannot validate responses" in result.stdout
@@ -81,7 +82,7 @@ def test_missing_deserializer_warning_displayed(cli, ctx, openapi3_base_url):
     assert "💡 Register a deserializer with @schemathesis.deserializer() to enable validation" in result.stdout
 
 
-def test_missing_deserializer_warning_with_fail_on(cli, ctx, openapi3_base_url, tmp_path, monkeypatch):
+def test_missing_deserializer_warning_with_fail_on(cli, ctx, tmp_path, monkeypatch):
     # Given a schema with a custom media type and config that fails on missing deserializer
     schema_path = ctx.openapi.write_schema(
         {
@@ -109,8 +110,9 @@ fail-on = ["missing_deserializer"]
 """)
     monkeypatch.chdir(tmp_path)
 
+    api = ctx.openapi.apps.success()
     result = cli.run_and_assert(
-        str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1", exit_code=ExitCode.TESTS_FAILED
+        str(schema_path), f"--url={api.base_url}/api", "--max-examples=1", exit_code=ExitCode.TESTS_FAILED
     )
 
     # Then the warning should be displayed and test should fail
@@ -118,7 +120,7 @@ fail-on = ["missing_deserializer"]
     assert "Schema validation skipped" in result.stdout
 
 
-def test_warnings_off_via_cli(cli, ctx, openapi3_base_url):
+def test_warnings_off_via_cli(cli, ctx):
     # When --warnings=off is used, warnings should not be displayed
     schema_path = ctx.openapi.write_schema(
         {
@@ -139,14 +141,15 @@ def test_warnings_off_via_cli(cli, ctx, openapi3_base_url):
         }
     )
 
-    result = cli.run(str(schema_path), f"--url={openapi3_base_url}", "--warnings=off", "--max-examples=1")
+    api = ctx.openapi.apps.success()
+    result = cli.run(str(schema_path), f"--url={api.base_url}/api", "--warnings=off", "--max-examples=1")
 
     # Then no warnings should be displayed
     assert "WARNINGS" not in result.stdout
     assert "Schema validation skipped" not in result.stdout
 
 
-def test_warnings_specific_type_via_cli(cli, ctx, openapi3_base_url):
+def test_warnings_specific_type_via_cli(cli, ctx):
     # When --warnings=missing_deserializer is used, only that warning type is shown
     schema_path = ctx.openapi.write_schema(
         {
@@ -167,8 +170,9 @@ def test_warnings_specific_type_via_cli(cli, ctx, openapi3_base_url):
         }
     )
 
+    api = ctx.openapi.apps.success()
     result = cli.run(
-        str(schema_path), f"--url={openapi3_base_url}", "--warnings=missing_deserializer", "--max-examples=1"
+        str(schema_path), f"--url={api.base_url}/api", "--warnings=missing_deserializer", "--max-examples=1"
     )
 
     # Then the specified warning should be displayed

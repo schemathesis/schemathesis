@@ -179,6 +179,12 @@ def empty() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def no_operations() -> OpenAPIApp:
+    spec = build_schema({})
+    app = make_flask_app_from_schema(spec)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def empty_string() -> OpenAPIApp:
     spec = build_schema(schemas.empty_string())
     app = make_flask_app_from_schema(spec)

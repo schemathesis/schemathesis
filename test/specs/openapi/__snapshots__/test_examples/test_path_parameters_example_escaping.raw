@@ -14,7 +14,7 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  ❌  Examples (in 0.00s)
 
@@ -26,12 +26,12 @@ ___________________________ GET /networks/{network} ____________________________
 
 - Undocumented HTTP status code
 
-    Received: 404
+    Received: 200
     Documented: 202
 
-[404] Not Found:
+[200] OK:
 
-    `404: Not Found`
+    `{}`
 
 Reproduce with:
 

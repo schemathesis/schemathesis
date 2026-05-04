@@ -14,7 +14,7 @@ Schemathesis dev
 
  ✅  API capabilities:
 
-     Supports NULL byte in headers:    ✘
+     Supports NULL byte in headers:    ✓
 
  🚫  Examples (in 0.00s)
 
@@ -48,14 +48,6 @@ Error details:
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
-=================================== WARNINGS ===================================
-
-Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
-
-  - GET /bar
-
-💡 Provide realistic parameter values in your config file so tests can access existing resources
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -72,12 +64,9 @@ Test Phases:
 Errors:
   🚫 Schema Error: 2
 
-Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
-
 Test cases:
   N generated, N passed
 
 Seed: 42
 
-========================= 2 errors, 1 warning in 1.00s =========================
+============================== 2 errors in 1.00s ===============================

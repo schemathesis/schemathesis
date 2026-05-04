@@ -738,7 +738,8 @@ def test_invalid_custom_strategy(values, error):
 @pytest.mark.parametrize(
     "definition", [{"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"}]
 )
-def test_valid_headers(openapi2_base_url, swagger_20, definition):
+def test_valid_headers(ctx, swagger_20, definition):
+    api = ctx.openapi.apps.success()
     operation = APIOperation(
         "/api/success",
         "GET",
@@ -746,7 +747,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         schema=swagger_20,
         responses=swagger_20._parse_responses({}, ""),
         security=swagger_20._parse_security({}),
-        base_url=openapi2_base_url,
+        base_url=api.base_url,
         headers=OpenApiParameterSet(
             ParameterLocation.HEADER,
             [OpenApiParameter.from_definition(definition=definition, name_to_uri={}, adapter=v2)],
@@ -823,15 +824,12 @@ def make_swagger(*parameters):
     ],
 )
 @pytest.mark.hypothesis_nested
-def test_valid_form_data(request, raw_schema):
-    if "swagger" in raw_schema:
-        base_url = request.getfixturevalue("openapi2_base_url")
-    else:
-        base_url = request.getfixturevalue("openapi3_base_url")
+def test_valid_form_data(ctx, raw_schema):
+    api = ctx.openapi.apps.success()
     # When the request definition contains a schema, matching values of which cannot be encoded to multipart
     # straightforwardly
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.update(base_url=base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
 
     @given(case=schema["/form"]["POST"].as_strategy())
     @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=10)
@@ -843,7 +841,8 @@ def test_valid_form_data(request, raw_schema):
 
 
 @pytest.mark.hypothesis_nested
-def test_optional_form_data(ctx, openapi3_base_url):
+def test_optional_form_data(ctx):
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/form": {
@@ -866,7 +865,7 @@ def test_optional_form_data(ctx, openapi3_base_url):
     # Note, this test is similar to the one above, but has a simplified schema & conditions
     # It is done mostly due to performance reasons
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
 
     @given(case=schema["/form"]["POST"].as_strategy())
     @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], max_examples=1)
@@ -1004,7 +1003,8 @@ def test_jsonify_python_specific_types(value, expected):
     assert jsonify_python_specific_types(value) == expected
 
 
-def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/data": {
@@ -1025,7 +1025,7 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3
     # Then it should be able to generate requests
     assert (
         cli.run(
-            str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--phases=fuzzing", "--mode=positive"
+            str(schema_path), "--max-examples=1", f"--url={api.base_url}/api", "--phases=fuzzing", "--mode=positive"
         )
         == snapshot_cli
     )

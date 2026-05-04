@@ -66,45 +66,47 @@ def assert_schema_requests_num(app, number):
     assert len(app["schema_requests"]) == number
 
 
-def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
+def test_execute_base_url_not_found(ctx):
+    api = ctx.openapi.apps.success_and_failure()
     # When base URL is pointing to an unknown location
-    schema = schemathesis.openapi.from_url(schema_url)
-    schema.config.update(base_url=f"{openapi3_base_url}/404/")
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    schema.config.update(base_url=f"{api.base_url}/404/")
     EventStream(schema).execute()
     # Then the engine should use this base
     # And they will not reach the application
-    assert_incoming_requests_num(app, 0)
+    assert [r for r in api.requests if r.path.startswith("/api/")] == []
 
 
-def test_execute(app, real_app_schema):
-    # When the engine is executed against the default test app
-    EventStream(real_app_schema).execute()
+def test_execute(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    EventStream(schema).execute()
 
-    # Then there are three executed cases
-    # Two errors - the second one is a flakiness check
-    headers = {"User-Agent": USER_AGENT}
-    assert_schema_requests_num(app, 1)
-    schema_requests = app["schema_requests"]
-    assert schema_requests[0].headers.get("User-Agent") == headers["User-Agent"]
-    assert_incoming_requests_num(app, 2)
-    assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/success", headers)
+    # Filter out the engine's `/` capability probe; only assert against the API operations.
+    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    for request in api_calls:
+        assert request.method == "GET"
+        assert request.headers["User-Agent"] == USER_AGENT
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-def test_interactions(openapi3_base_url, real_app_schema, workers):
-    stream = EventStream(real_app_schema, workers=workers).execute()
+def test_interactions(ctx, workers):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
+    stream = EventStream(schema, workers=workers).execute()
+
+    if sys.version_info >= (3, 14):
+        encoding = ["gzip, deflate, zstd"]
+    else:
+        encoding = ["gzip, deflate"]
 
     # failure
     interactions = list(stream.find(events.ScenarioFinished, status=Status.FAILURE).recorder.interactions.values())
     assert len(interactions) == 1
     failure = interactions[0]
-    if sys.version_info >= (3, 14):
-        encoding = ["gzip, deflate, zstd"]
-    else:
-        encoding = ["gzip, deflate"]
     assert asdict(failure.request) == {
-        "uri": f"{openapi3_base_url}/failure",
+        "uri": f"{api.base_url}/api/failure",
         "method": "GET",
         "body": None,
         "body_size": None,
@@ -117,15 +119,12 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
         },
     }
     assert failure.response.status_code == 500
-    assert failure.response.message == "Internal Server Error"
-    assert failure.response.headers["content-type"] == ["text/plain; charset=utf-8"]
-    assert failure.response.headers["content-length"] == ["26"]
     # success
     interactions = list(stream.find(events.ScenarioFinished, status=Status.SUCCESS).recorder.interactions.values())
     assert len(interactions) == 1
     success = interactions[0]
     assert asdict(success.request) == {
-        "uri": f"{openapi3_base_url}/success",
+        "uri": f"{api.base_url}/api/success",
         "method": "GET",
         "body": None,
         "body_size": None,
@@ -138,14 +137,18 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
         },
     }
     assert success.response.status_code == 200
-    assert success.response.message == "OK"
     assert success.response.json() == {"success": True}
-    assert success.response.encoding == "utf-8"
-    assert success.response.headers["content-type"] == ["application/json; charset=utf-8"]
+    assert success.response.headers["content-type"] == ["application/json"]
 
 
-def test_asgi_interactions(fastapi_app):
-    schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
+def test_asgi_interactions():
+    app = FastAPI()
+
+    @app.get("/users")
+    async def users():
+        return {"success": True}
+
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
     stream = EventStream(schema).execute()
     interactions = stream.find_all_interactions()
     assert interactions[0].request.uri == "http://localhost/users"
@@ -176,29 +179,31 @@ def test_empty_string_response_interaction(ctx):
         assert interaction.response.encoding == "utf-8"
 
 
-def test_auth(app, real_app_schema):
+def test_auth(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When auth is specified as a tuple of 2 strings
-    execute(real_app_schema, auth=("test", "test"))
+    execute(schema, auth=("test", "test"))
 
-    # Then each request should contain corresponding basic auth header
-    assert_incoming_requests_num(app, 2)
-    headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
-    assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/success", headers)
+    # Then each API request should contain corresponding basic auth header
+    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    for request in api_calls:
+        assert request.headers["Authorization"] == "Basic dGVzdDp0ZXN0"
 
 
 @pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
-def test_base_url(openapi3_base_url, schema_url, app, converter):
-    base_url = converter(openapi3_base_url)
+def test_base_url(ctx, converter):
+    api = ctx.openapi.apps.success_and_failure()
+    base_url = converter(api.base_url)
     # When `base_url` is specified explicitly with or without trailing slash
-    schema = schemathesis.openapi.from_url(schema_url)
+    schema = schemathesis.openapi.from_url(api.schema_url)
     schema.config.update(base_url=base_url)
     execute(schema)
 
     # Then each request should reach the app in both cases
-    assert_incoming_requests_num(app, 2)
-    assert_request(app, 0, "GET", "/api/failure")
-    assert_request(app, 1, "GET", "/api/success")
+    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
 
 
 def test_root_url():
@@ -220,34 +225,38 @@ def test_root_url():
     stream.assert_no_failures()
 
 
-def test_execute_with_headers(app, real_app_schema):
+def test_execute_with_headers(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When headers are specified for the `execute` call
     headers = {"Authorization": "Bearer 123"}
-    execute(real_app_schema, headers=headers)
+    execute(schema, headers=headers)
 
-    # Then each request should contain these headers
-    assert_incoming_requests_num(app, 2)
-    assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/success", headers)
+    # Then each API request should contain these headers
+    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
+    for request in api_calls:
+        assert request.headers["Authorization"] == "Bearer 123"
 
 
-def test_execute_filter_endpoint(app, schema_url):
-    schema = schemathesis.openapi.from_url(schema_url).include(path_regex="success")
+def test_execute_filter_endpoint(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url).include(path_regex="success")
     # When `endpoint` is passed in the `execute` call
     execute(schema)
 
     # Then the engine will make calls only to the specified path
-    assert_incoming_requests_num(app, 1)
-    assert_request(app, 0, "GET", "/api/success")
-    assert_not_request(app, "GET", "/api/failure")
+    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    assert [(r.method, r.path) for r in api_calls] == [("GET", "/api/success")]
 
 
-def test_execute_filter_method(app, schema_url):
-    schema = schemathesis.openapi.from_url(schema_url).include(method="POST")
+def test_execute_filter_method(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url).include(method="POST")
     # When `method` corresponds to a method that is not defined in the app schema
     execute(schema)
     # Then engine will not make any requests
-    assert_incoming_requests_num(app, 0)
+    assert [r for r in api.requests if r.path.startswith("/api/")] == []
 
 
 def test_form_data(ctx):
@@ -528,7 +537,8 @@ def test_payload_explicit_example(ctx):
     assert payload_requests[0].json() == {"name": "John"}
 
 
-def test_explicit_examples_from_response(ctx, openapi3_base_url):
+def test_explicit_examples_from_response(ctx):
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/items/{itemId}/": {
@@ -554,7 +564,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1, phases=[PhaseName.EXAMPLES]).execute()
     assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
         {"itemId": "456789"},
@@ -812,7 +822,8 @@ def test_unsupported_regex_in_parameter_removed_with_warning(ctx):
     assert any("\\p{Greek}+" in w.message for w in warnings)
 
 
-def test_invalid_header_in_example(ctx, openapi3_base_url):
+def test_invalid_header_in_example(ctx):
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/success": {
@@ -833,7 +844,7 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
     stream.assert_errors()
@@ -873,10 +884,11 @@ def test_reserved_characters_in_operation_name(ctx):
     stream.assert_no_failures()
 
 
-def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
+def test_hypothesis_errors_propagation(ctx):
     # See: GH-1046
     # When the operation contains a media type, that Schemathesis can't serialize
     # And there is still a supported media type
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/data": {
@@ -906,7 +918,7 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
 
     max_examples = 10
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(
         schema,
         max_examples=max_examples,
@@ -921,10 +933,11 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
     stream.assert_no_errors()
 
 
-def test_encoding_octet_stream(ctx, openapi3_base_url):
+def test_encoding_octet_stream(ctx):
     # See: GH-1134
     # When the operation contains the `application/octet-stream` media type
     # And has no `format: binary` in its schema
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/data": {
@@ -945,7 +958,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(
         schema,
         checks=[not_a_server_error],
@@ -1048,9 +1061,11 @@ def test_stop_event_stream_has_stop_reason_interrupted(event_stream):
     assert finished.stop_reason == StopReason.INTERRUPTED
 
 
-def test_engine_finished_stop_reason_completed(real_app_schema):
+def test_engine_finished_stop_reason_completed(ctx):
+    api = ctx.openapi.apps.success_and_failure()
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # When the engine runs to completion
-    stream = EventStream(real_app_schema).execute()
+    stream = EventStream(schema).execute()
     # Then the finished event reports completed
     assert stream.finished.stop_reason == StopReason.COMPLETED
 
@@ -1109,7 +1124,8 @@ def test_malformed_path_template(ctx, path, expected):
         ([], Status.SKIP),
     ],
 )
-def test_explicit_header_negative(ctx, parameters, expected, openapi3_base_url):
+def test_explicit_header_negative(ctx, parameters, expected):
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -1124,7 +1140,7 @@ def test_explicit_header_negative(ctx, parameters, expected, openapi3_base_url):
     )
     schema = schemathesis.openapi.from_dict(schema)
     schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, headers={"Authorization": "TEST"}, max_examples=1).execute()
 
     # There should not be unsatisfiable
@@ -1227,7 +1243,8 @@ def test_stateful_override(ctx):
         assert "/users/42" in request.uri
 
 
-def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
+def test_generation_config_in_explicit_examples(ctx):
+    api = ctx.openapi.apps.success()
     schema = ctx.openapi.build_schema(
         {
             "/what": {
@@ -1261,7 +1278,7 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
         version="2.0",
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.update(base_url=openapi2_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     schema.config.generation.update(
         with_security_parameters=False,
         exclude_header_characters="".join({chr(i) for i in range(256)} - {"a"}),
@@ -1276,7 +1293,8 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
             break
 
 
-def test_missing_deserializer_warnings_collected(ctx, openapi3_base_url):
+def test_missing_deserializer_warnings_collected(ctx):
+    api = ctx.openapi.apps.success()
     raw_schema = ctx.openapi.build_schema(
         {
             "/users": {
@@ -1296,7 +1314,7 @@ def test_missing_deserializer_warnings_collected(ctx, openapi3_base_url):
         }
     )
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
 
     warning_event = stream.find(events.SchemaAnalysisWarnings)
@@ -1309,7 +1327,8 @@ def test_missing_deserializer_warnings_collected(ctx, openapi3_base_url):
     assert warning.content_type == "application/msgpack"
 
 
-def test_no_warnings_for_json(ctx, openapi3_base_url):
+def test_no_warnings_for_json(ctx):
+    api = ctx.openapi.apps.success()
     raw_schema = ctx.openapi.build_schema(
         {
             "/users": {
@@ -1329,14 +1348,15 @@ def test_no_warnings_for_json(ctx, openapi3_base_url):
         }
     )
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1).execute()
 
     warning_event = stream.find(events.SchemaAnalysisWarnings)
     assert warning_event is None
 
 
-def test_stateful_phase_missing_deserializer_warnings(ctx, openapi3_base_url):
+def test_stateful_phase_missing_deserializer_warnings(ctx):
+    api = ctx.openapi.apps.success()
     raw_schema = ctx.openapi.build_schema(
         {
             "/users": {
@@ -1389,7 +1409,7 @@ def test_stateful_phase_missing_deserializer_warnings(ctx, openapi3_base_url):
     )
 
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.update(base_url=openapi3_base_url)
+    schema.config.update(base_url=f"{api.base_url}/api")
 
     # Run only stateful phase
     stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()

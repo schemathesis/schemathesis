@@ -1,18 +1,15 @@
 import pytest
-from flask import jsonify, request
+from flask import Flask, jsonify, request
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 
 
-@pytest.fixture
-def schema(flask_app):
-    return schemathesis.openapi.from_wsgi("/schema.yaml", flask_app)
-
-
 @pytest.mark.hypothesis_nested
-def test_cookies(flask_app):
-    @flask_app.route("/cookies", methods=["GET"])
+def test_cookies():
+    app = Flask(__name__)
+
+    @app.route("/cookies", methods=["GET"])
     def cookies():
         return jsonify(request.cookies)
 
@@ -43,7 +40,7 @@ def test_cookies(flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call(app=flask_app)
+        response = case.call(app=app)
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 
@@ -68,8 +65,9 @@ def test_form_data(ctx):
 
 
 @pytest.mark.hypothesis_nested
-def test_binary_body(mocker, flask_app):
+def test_binary_body(ctx, mocker):
     # When an API operation accepts a binary input
+    api = ctx.openapi.apps.upload_file()
     schema = schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
@@ -91,7 +89,7 @@ def test_binary_body(mocker, flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call(app=flask_app)
+        response = case.call(app=api.wsgi_app)
         assert response.status_code == 200
         assert response.json() == {"size": mocker.ANY}
 
@@ -104,10 +102,12 @@ def test_app_with_parametrize(testdir):
     testdir.makepyfile(
         """
     import schemathesis
-    from test.apps.openapi._flask.app import app
     from hypothesis import settings
+    from test.apps.catalog.openapi.basic import success_and_failure
 
-    schema = schemathesis.openapi.from_wsgi("/schema.yaml", app)
+    api = success_and_failure()
+    app = api.server
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app)
 
     called = False
 

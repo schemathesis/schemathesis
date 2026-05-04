@@ -95,6 +95,9 @@ class OpenAPIApps:
     def empty(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.empty())
 
+    def no_operations(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.no_operations())
+
     def empty_string(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.empty_string())
 
@@ -362,6 +365,9 @@ class OpenApiContext:
 
     def make_flask_app_from_schema(self, schema: dict[str, Any]) -> Flask:
         return builders.make_flask_app_from_schema(schema)
+
+    def make_permissive_flask_app(self, schema: dict[str, Any]) -> Flask:
+        return builders.make_permissive_flask_app(schema)
 
 
 @dataclass

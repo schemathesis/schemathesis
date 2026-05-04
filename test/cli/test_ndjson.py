@@ -174,8 +174,8 @@ def test_run_subprocess(ctx, testdir, ndjson_path, hypothesis_max_examples):
 
 
 @pytest.mark.parametrize("in_config", [True, False])
-@pytest.mark.openapi_version("3.0")
-def test_report_dir(cli, schema_url, tmp_path, in_config):
+def test_report_dir(ctx, cli, tmp_path, in_config):
+    api = ctx.openapi.apps.success()
     report_dir = tmp_path / "reports"
     args = ["--max-examples=1"]
     kwargs = {}
@@ -183,15 +183,15 @@ def test_report_dir(cli, schema_url, tmp_path, in_config):
         kwargs["config"] = {"reports": {"ndjson": {"enabled": True}, "directory": str(report_dir)}}
     else:
         args = ["--report=ndjson", f"--report-dir={report_dir}", *args]
-    cli.run(schema_url, *args, **kwargs)
+    cli.run(api.schema_url, *args, **kwargs)
     assert report_dir.exists()
     assert list(report_dir.glob("*.ndjson"))
 
 
-@pytest.mark.openapi_version("3.0")
-def test_all_event_types(cli, schema_url, ndjson_path):
+def test_all_event_types(ctx, cli, ndjson_path):
+    api = ctx.openapi.apps.success()
     cli.run(
-        schema_url,
+        api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=1",
         "--seed=1",
@@ -207,10 +207,10 @@ def test_all_event_types(cli, schema_url, ndjson_path):
     assert "EngineFinished" in event_types
 
 
-@pytest.mark.openapi_version("3.0")
-def test_phase_data_in_events(cli, schema_url, ndjson_path):
+def test_phase_data_in_events(ctx, cli, ndjson_path):
+    api = ctx.openapi.apps.success()
     cli.run(
-        schema_url,
+        api.schema_url,
         f"--report-ndjson-path={ndjson_path}",
         "--max-examples=1",
         "--seed=1",

@@ -145,10 +145,10 @@ def test_interaction_status(ctx, cli, hypothesis_max_examples, cassette_path):
     # Then their statuses should be reflected in the "status" field
     # And it should not be overridden by the overall test status
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
-    assert "500 Internal Server Error" in load_response_body(cassette, 0)
+    assert "Internal Server Error" in load_response_body(cassette, 0)
 
 
-def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
+def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples):
     # See GH-708
     # When the schema expects an input that is not ascii and represented as UTF-8
     # And is not representable in CP1251. E.g. "àààà"
@@ -175,9 +175,10 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
         },
         format="yaml",
     )
+    api = ctx.openapi.apps.success()
     result = cli.run_and_assert(
         str(schema_path),
-        f"--url={openapi3_base_url}",
+        f"--url={api.base_url}/api",
         f"--max-examples={hypothesis_max_examples or 1}",
         f"--report-vcr-path={cassette_path}",
         "--checks=not_a_server_error",
@@ -320,16 +321,16 @@ def test_output_sanitization(ctx, cli, hypothesis_max_examples, cassette_path, v
     )
 
 
-@pytest.mark.openapi_version("3.0")
-def test_forbid_preserve_bytes_without_cassette_path(cli, schema_url, snapshot_cli):
+def test_forbid_preserve_bytes_without_cassette_path(ctx, cli, snapshot_cli):
     # When `--report-preserve-bytes` is specified without `--report-vcr-path` or `--report=vcr`
     # Then it is an error
-    assert cli.run(schema_url, "--report-preserve-bytes") == snapshot_cli
+    api = ctx.openapi.apps.success()
+    assert cli.run(api.schema_url, "--report-preserve-bytes") == snapshot_cli
 
 
 @pytest.mark.parametrize("in_config", [True, False])
-@pytest.mark.openapi_version("3.0")
-def test_report_dir(cli, schema_url, tmp_path, in_config):
+def test_report_dir(ctx, cli, tmp_path, in_config):
+    api = ctx.openapi.apps.success()
     # When report directory is specified with a report format
     report_dir = tmp_path / "reports"
     args = [
@@ -340,7 +341,7 @@ def test_report_dir(cli, schema_url, tmp_path, in_config):
         kwargs["config"] = {"reports": {"junit": {"enabled": True}, "directory": str(report_dir)}}
     else:
         args = ["--report=junit", f"--report-dir={report_dir}", *args]
-    cli.run(schema_url, *args, **kwargs)
+    cli.run(api.schema_url, *args, **kwargs)
     # And the report should be created in the specified directory
     assert report_dir.exists()
     assert list(report_dir.glob("*.xml"))
@@ -361,7 +362,7 @@ def test_report_dir(cli, schema_url, tmp_path, in_config):
         }
     else:
         args = [f"--report-dir={report_dir}", "--report=vcr,har,ndjson", *args]
-    cli.run(schema_url, *args, **kwargs)
+    cli.run(api.schema_url, *args, **kwargs)
     # Then all reports should be created in the specified directory
     assert list(report_dir.glob("*.yaml"))
     assert list(report_dir.glob("*.json"))

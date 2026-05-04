@@ -414,8 +414,9 @@ def test_non_json_response(ctx, cli, snapshot_cli, content):
     )
 
 
-def test_unique_inputs(ctx, cli, snapshot_cli, openapi3_base_url):
+def test_unique_inputs(ctx, cli, snapshot_cli):
     # See GH-2977
+    api = ctx.openapi.apps.success()
     schema_path = ctx.openapi.write_schema(
         {
             "/items": {
@@ -438,7 +439,7 @@ def test_unique_inputs(ctx, cli, snapshot_cli, openapi3_base_url):
     assert (
         cli.run(
             str(schema_path),
-            f"--url={openapi3_base_url}",
+            f"--url={api.base_url}/api",
             "--phases=stateful",
             "--generation-unique-inputs",
             "--max-examples=10",
