@@ -6,8 +6,8 @@ from typing import Any
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject
 
 
-def sanitize(schema: JsonSchema, *, is_recursive_ref: Callable[[str], bool] | None = None) -> set[str]:
-    """Remove $ref from optional locations.
+def prune_optional_refs(schema: JsonSchema, *, is_recursive_ref: Callable[[str], bool] | None = None) -> None:
+    """Remove $ref from optional locations, mutating `schema` in place.
 
     `is_recursive_ref`, if provided, returns ``True`` for $ref strings that point back
     to a schema currently being inlined. Such refs are dropped from `oneOf`/`anyOf`
@@ -16,7 +16,7 @@ def sanitize(schema: JsonSchema, *, is_recursive_ref: Callable[[str], bool] | No
     nested it's a real constraint on a sub-value).
     """
     if isinstance(schema, bool):
-        return set()
+        return
 
     if is_recursive_ref is not None and isinstance(schema, dict):
         _drop_recursive_top_level_allof(schema, is_recursive_ref)
@@ -61,6 +61,9 @@ def sanitize(schema: JsonSchema, *, is_recursive_ref: Callable[[str], bool] | No
                     if isinstance(item, dict):
                         stack.append(item)
 
+
+def collect_all_references(schema: JsonSchema | list[JsonSchema]) -> set[str]:
+    """Return every `$ref` value found anywhere in `schema`."""
     remaining: set[str] = set()
     _collect_all_references(schema, remaining)
     return remaining

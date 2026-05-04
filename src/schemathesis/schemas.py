@@ -41,7 +41,7 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
+from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope, defines, dispatch, to_filterable_hook
 
 if TYPE_CHECKING:
     import httpx
@@ -382,10 +382,13 @@ class BaseSchema(Mapping):
         return None
 
     def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
-        dispatch(name, context, *args, **kwargs)
-        self.hooks.dispatch(name, context, *args, **kwargs)
+        # Fast path: skip the per-dispatcher loop overhead when nothing is registered.
+        if defines(name):
+            dispatch(name, context, *args, **kwargs)
+        if self.hooks.defines(name):
+            self.hooks.dispatch(name, context, *args, **kwargs)
         local_dispatcher = self.get_local_hook_dispatcher()
-        if local_dispatcher is not None:
+        if local_dispatcher is not None and local_dispatcher.defines(name):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
@@ -709,14 +712,18 @@ class APIOperation(Generic[P, R, S]):
         return chain(self.path_parameters, self.headers, self.cookies, self.query)
 
     def _lookup_container(self, location: str) -> ParameterSet[P] | PayloadAlternatives[P] | None:
-        return {
-            "path": self.path_parameters,
-            "header": self.headers,
-            "cookie": self.cookies,
-            "query": self.query,
-            "querystring": self.query,
-            "body": self.body,
-        }.get(location)
+        # Hand-rolled chain — the function is hot and is called per parameter on every operation.
+        if location == "query" or location == "querystring":
+            return self.query
+        if location == "path":
+            return self.path_parameters
+        if location == "header":
+            return self.headers
+        if location == "cookie":
+            return self.cookies
+        if location == "body":
+            return self.body
+        return None
 
     def add_parameter(self, parameter: P) -> None:
         # If the parameter has a typo, then by default, there will be an error from `jsonschema` earlier.
