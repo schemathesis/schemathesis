@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import threading
-from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
 
 from schemathesis.core.warnings import SchemathesisWarning
 
-# Sliding-window 405 rate rule: if `METHOD_NOT_ALLOWED_RATE` of the last
-# `METHOD_NOT_ALLOWED_WINDOW` responses are undocumented 405s, the operation
-# is treated as not implemented. Tolerates intermittent body-validation 4xx
-# responses (operations where the path matches but the method doesn't).
-METHOD_NOT_ALLOWED_WINDOW = 10
-METHOD_NOT_ALLOWED_RATE = 0.8
+# Fires only on operations that 405 from the first call; any non-405 cancels
+# the streak permanently. High enough to ride out noisy early-response orderings.
+METHOD_NOT_ALLOWED_THRESHOLD = 10
 
 
 class SchedulingDirective(str, Enum):
@@ -35,8 +31,14 @@ _DEFAULT_VERDICT = Verdict(directive=SchedulingDirective.RUN)
 
 
 @dataclass(slots=True)
+class _Counters:
+    method_not_allowed: int = 0
+    other: int = 0
+
+
+@dataclass(slots=True)
 class _OperationRecord:
-    window: deque[bool] = field(default_factory=lambda: deque(maxlen=METHOD_NOT_ALLOWED_WINDOW))
+    counters: _Counters = field(default_factory=_Counters)
     verdict: Verdict = _DEFAULT_VERDICT
 
 
@@ -65,17 +67,16 @@ class Supervisor:
                 return
             # Documented 405s mean the spec contract anticipates them; respect that and
             # don't treat them as evidence of an unimplemented method.
-            is_undocumented_405 = status_code == 405 and not is_documented_status
-            record.window.append(is_undocumented_405)
-            if len(record.window) < METHOD_NOT_ALLOWED_WINDOW:
-                return
-            hits = sum(record.window)
-            if hits / METHOD_NOT_ALLOWED_WINDOW >= METHOD_NOT_ALLOWED_RATE:
+            if status_code == 405 and not is_documented_status:
+                record.counters.method_not_allowed += 1
+            else:
+                record.counters.other += 1
+            if record.counters.other == 0 and record.counters.method_not_allowed >= METHOD_NOT_ALLOWED_THRESHOLD:
                 record.verdict = Verdict(
                     directive=SchedulingDirective.SKIP,
                     reason=(
-                        f"Skipped after {hits} of last {METHOD_NOT_ALLOWED_WINDOW} responses "
-                        f"were `405 Method Not Allowed`"
+                        f"Skipped after {record.counters.method_not_allowed} consecutive "
+                        f"`405 Method Not Allowed` responses"
                     ),
                     warning=SchemathesisWarning.METHOD_NOT_ALLOWED,
                 )

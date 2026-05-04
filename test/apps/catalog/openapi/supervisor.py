@@ -16,7 +16,8 @@ class UnimplementedMethodStore:
 
 
 # Body has six fields so the Coverage phase generates enough positive-mode mutations
-# to fill the supervisor's 10-response window before later phases queue scenarios.
+# to drive the supervisor's streak past `METHOD_NOT_ALLOWED_THRESHOLD` before later
+# phases queue scenarios.
 _MISSING_BODY_PROPERTIES: dict[str, dict[str, str]] = {
     "name": {"type": "string"},
     "size": {"type": "integer"},
