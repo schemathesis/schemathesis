@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from schemathesis.core.errors import InfiniteRecursiveReference
-from schemathesis.core.jsonschema.references import sanitize
+from schemathesis.core.jsonschema.references import prune_optional_refs
 from schemathesis.core.jsonschema.resolver import (
     Resolver,
     resolve_reference_uri,
@@ -180,8 +180,8 @@ class Bundler:
                                     return False
                                 return target_uri in inlining_for_recursion
 
-                            # Sanitize to remove optional recursive references
-                            sanitize(cloned, is_recursive_ref=_is_recursive)
+                            # Drop self-refs from optional positions so the cloned schema is generatable.
+                            prune_optional_refs(cloned, is_recursive_ref=_is_recursive)
 
                             result = {
                                 key: _bundle_value(key, value, current_resolver)

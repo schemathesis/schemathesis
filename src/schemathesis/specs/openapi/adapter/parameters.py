@@ -48,6 +48,18 @@ INVALID_SCHEMA_MESSAGE = (
     "Can not generate data for {location} parameter `{name}`! Its schema should be an object or boolean, got {schema}"
 )
 
+# `parameter["in"]` value -> `ParameterLocation`. `querystring` is a known alias for
+# `query` that some specs use; everything else falls back to UNKNOWN at the call site.
+_IN_TO_LOCATION: dict[str | None, ParameterLocation] = {
+    "query": ParameterLocation.QUERY,
+    "querystring": ParameterLocation.QUERY,
+    "header": ParameterLocation.HEADER,
+    "path": ParameterLocation.PATH,
+    "cookie": ParameterLocation.COOKIE,
+    "body": ParameterLocation.BODY,
+    None: ParameterLocation.UNKNOWN,
+}
+
 # Probability of using captured resource values vs generated values in hybrid strategy.
 CAPTURED_VALUES_PROBABILITY = 0.8
 
@@ -483,14 +495,9 @@ class OpenApiParameter(OpenApiComponent):
     @property
     def location(self) -> ParameterLocation:
         """Where this parameter is located."""
-        location = self.definition.get("in")
-        if location == "querystring":
-            # It is checked explicitly as the `ParameterLocation.QUERY` has a different value
-            return ParameterLocation.QUERY
-        try:
-            return ParameterLocation(location)
-        except ValueError:
-            return ParameterLocation.UNKNOWN
+        # Direct dict lookup beats `ParameterLocation(value)` — the enum dispatch
+        # (`EnumType.__call__` → `Enum.__new__`) is the slow path here.
+        return _IN_TO_LOCATION.get(self.definition.get("in"), ParameterLocation.UNKNOWN)
 
     def _get_raw_schema(self) -> JsonSchema:
         """Get raw parameter schema."""

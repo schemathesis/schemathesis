@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from schemathesis.core.jsonschema.references import sanitize
+from schemathesis.core.jsonschema.references import collect_all_references, prune_optional_refs
 
 
 def ref_schema(ref: str) -> dict[str, Any]:
@@ -156,8 +156,9 @@ def array_schema(items: Any, **kwargs) -> dict[str, Any]:
         ([], set()),
     ],
 )
-def test_sanitize(schema, expected):
-    assert sanitize(schema) == expected
+def test_prune_optional_refs(schema, expected):
+    prune_optional_refs(schema)
+    assert collect_all_references(schema) == expected
 
 
 @pytest.mark.parametrize(
@@ -169,15 +170,16 @@ def test_sanitize(schema, expected):
         ({"additionalProperties": ref_schema("#/ref1")}, {"additionalProperties": False}),
     ],
 )
-def test_sanitize_schema_modifications(schema, expected_modification):
-    sanitize(schema)
+def test_prune_optional_refs_schema_modifications(schema, expected_modification):
+    prune_optional_refs(schema)
     for key, expected_value in expected_modification.items():
         assert schema[key] == expected_value
 
 
-def test_sanitize_preserves_schema_without_references():
+def test_prune_optional_refs_preserves_schema_without_references():
     original = object_schema({"name": {"type": "string"}}, required=["name"])
     schema = original.copy()
 
-    assert sanitize(schema) == set()
+    prune_optional_refs(schema)
+    assert collect_all_references(schema) == set()
     assert schema == original

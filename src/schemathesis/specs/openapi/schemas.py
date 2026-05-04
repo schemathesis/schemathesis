@@ -394,6 +394,9 @@ class OpenApiSchema(BaseSchema):
         if paths is None:
             return statistic
 
+        # Hoist the filter check out of the per-operation loop: when no filters are
+        # configured, every operation is selected and we skip the per-call dispatch.
+        filters_active = not self.filter_set.is_empty()
         should_skip = self._should_skip
         links_keyword = self.adapter.links_keyword
         root_resolver = self.root_resolver
@@ -414,7 +417,7 @@ class OpenApiSchema(BaseSchema):
                     if method not in HTTP_METHODS or not definition:
                         continue
                     statistic.operations.total += 1
-                    is_selected = not should_skip(path, method, definition)
+                    is_selected = not should_skip(path, method, definition) if filters_active else True
                     if is_selected:
                         statistic.operations.selected += 1
                         # Store both identifiers
@@ -459,13 +462,16 @@ class OpenApiSchema(BaseSchema):
         if paths is None:
             return
         root_resolver = self.root_resolver
+        filters_active = not self.filter_set.is_empty()
         should_skip = self._should_skip
         for path, path_item in paths.items():
             try:
                 if "$ref" in path_item:
                     _, path_item = resolve_reference(root_resolver, path_item["$ref"])
                 for method, definition in path_item.items():
-                    if should_skip(path, method, definition):
+                    if method not in HTTP_METHODS:
+                        continue
+                    if filters_active and should_skip(path, method, definition):
                         continue
                     yield method, path, definition
             except SCHEMA_PARSING_ERRORS:
@@ -498,6 +504,7 @@ class OpenApiSchema(BaseSchema):
         context = HookContext()
         # Optimization: local variables are faster than attribute access
         dispatch_hook = self.dispatch_hook
+        filters_active = not self.filter_set.is_empty()
         should_skip = self._should_skip
         iter_parameters = self._iter_parameters
         make_operation = self.make_operation
@@ -517,7 +524,7 @@ class OpenApiSchema(BaseSchema):
                     if method not in HTTP_METHODS:
                         continue
                     try:
-                        if should_skip(path, method, entry):
+                        if filters_active and should_skip(path, method, entry):
                             continue
                         parameters = iter_parameters(entry, shared_parameters, resolver=path_resolver)
                         operation = make_operation(
