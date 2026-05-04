@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
+    FormatPayload,
     NumericBoundPayload,
     ObservationKind,
     ObservationPayload,
@@ -16,6 +17,7 @@ from schemathesis.core.parameters import ParameterLocation
 
 ClassificationResult = tuple[ObservationKind, ObservationPayload | None]
 RegexHandler = Callable[[re.Match[str]], ClassificationResult]
+DictHandler = Callable[[dict], tuple[ClassificationResult, ...]]
 
 # Operations using these methods bind from query, not body — observations
 # attribute under QUERY for them.
@@ -68,3 +70,37 @@ def numeric_bound(*, direction: BoundDirection, exclusive: bool) -> RegexHandler
         )
 
     return handler
+
+
+def required_handler(_data: dict) -> tuple[ClassificationResult, ...]:
+    """A `DictHandler` that emits a single MUST_NOT_BE_BLANK observation regardless of input."""
+    return ((ObservationKind.MUST_NOT_BE_BLANK, None),)
+
+
+def format_handler(format_name: str) -> DictHandler:
+    """Build a `DictHandler` that emits a constant FORMAT(name=format_name) observation."""
+
+    def handler(_data: dict) -> tuple[ClassificationResult, ...]:
+        return ((ObservationKind.FORMAT, FormatPayload(name=format_name)),)
+
+    return handler
+
+
+def int_or_none(value: object) -> int | None:
+    """Parse a string into an int; return None if the value is not a string or not parseable."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def float_or_none(value: object) -> float | None:
+    """Parse a string into a float; return None if the value is not a string or not parseable."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
