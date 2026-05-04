@@ -22,6 +22,7 @@ from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
+from test.apps.catalog.openapi import symfony as openapi_symfony
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi import zod as openapi_zod
@@ -278,6 +279,9 @@ class OpenAPIApps:
 
     def go_validator_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_go_validator.planted_bug())
+
+    def symfony_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_symfony.planted_bug())
 
 
 @dataclass(slots=True)

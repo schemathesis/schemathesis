@@ -10,6 +10,7 @@ from schemathesis.core.error_feedback.parsers.extractors import (
     RegexHandler,
     location_for_method,
     numeric_bound,
+    required_handler,
     size_bound,
 )
 from schemathesis.core.error_feedback.store import (
@@ -146,16 +147,12 @@ def _type_handler(error: dict) -> tuple[ClassificationResult, ...]:
     return ((ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=expected)),)
 
 
-def _required_handler(_error: dict) -> tuple[ClassificationResult, ...]:
-    return ((ObservationKind.MUST_NOT_BE_BLANK, None),)
-
-
 _KEYWORD_HANDLERS: dict[str, KeywordHandler] = {
     "format": _format_handler,
     "pattern": _pattern_handler,
     "enum": _enum_handler,
     "type": _type_handler,
-    "required": _required_handler,
+    "required": required_handler,
     "minLength": _size_handler(BoundDirection.MIN),
     "maxLength": _size_handler(BoundDirection.MAX),
     "minItems": _size_handler(BoundDirection.MIN),

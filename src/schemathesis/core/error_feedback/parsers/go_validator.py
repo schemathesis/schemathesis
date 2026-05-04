@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.parsers.extractors import (
     ClassificationResult,
+    DictHandler,
+    float_or_none,
+    format_handler,
     location_for_method,
     lowercase_first_letter,
+    required_handler,
 )
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
@@ -25,7 +28,6 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 ParameterPath = tuple[str | int, ...]
-TagHandler = Callable[[dict], tuple[ClassificationResult, ...]]
 
 _FORMAT_TAGS: dict[str, str] = {"email": "email", "url": "uri", "uuid": "uuid"}
 _NUMERIC_KINDS: frozenset[str] = frozenset(
@@ -55,24 +57,6 @@ def _split_namespace(namespace: str) -> ParameterPath:
         if match.group(2) is not None:
             segments.append(int(match.group(2)))
     return tuple(segments)
-
-
-def _parse_numeric(param: str) -> float | None:
-    try:
-        return float(param)
-    except ValueError:
-        return None
-
-
-def _required_handler(_issue: dict) -> tuple[ClassificationResult, ...]:
-    return ((ObservationKind.MUST_NOT_BE_BLANK, None),)
-
-
-def _format_tag_handler(format_name: str) -> TagHandler:
-    def handler(_issue: dict) -> tuple[ClassificationResult, ...]:
-        return ((ObservationKind.FORMAT, FormatPayload(name=format_name)),)
-
-    return handler
 
 
 def _datetime_handler(issue: dict) -> tuple[ClassificationResult, ...]:
@@ -106,11 +90,11 @@ def _len_handler(issue: dict) -> tuple[ClassificationResult, ...]:
     return ((ObservationKind.SIZE_BOUND, SizeBoundPayload(min=value, max=value)),)
 
 
-def _bound_handler(direction: BoundDirection, exclusive: bool) -> TagHandler:
+def _bound_handler(direction: BoundDirection, exclusive: bool) -> DictHandler:
     """`gte`/`lte`/`gt`/`lt` — always numeric per validator/v10 semantics."""
 
     def handler(issue: dict) -> tuple[ClassificationResult, ...]:
-        bound = _parse_numeric(issue.get("param", ""))
+        bound = float_or_none(issue.get("param"))
         if bound is None:
             return ()
         return (
@@ -123,7 +107,7 @@ def _bound_handler(direction: BoundDirection, exclusive: bool) -> TagHandler:
     return handler
 
 
-def _polymorphic_bound_handler(direction: BoundDirection) -> TagHandler:
+def _polymorphic_bound_handler(direction: BoundDirection) -> DictHandler:
     """`min`/`max` — payload depends on field kind: SIZE_BOUND for string/slice/array/map, NUMERIC_BOUND for numbers."""
 
     def handler(issue: dict) -> tuple[ClassificationResult, ...]:
@@ -143,7 +127,7 @@ def _polymorphic_bound_handler(direction: BoundDirection) -> TagHandler:
             )
             return ((ObservationKind.SIZE_BOUND, payload),)
         if kind in _NUMERIC_KINDS:
-            bound = _parse_numeric(param)
+            bound = float_or_none(param)
             if bound is None:
                 return ()
             return (
@@ -157,11 +141,11 @@ def _polymorphic_bound_handler(direction: BoundDirection) -> TagHandler:
     return handler
 
 
-_TAG_HANDLERS: dict[str, TagHandler] = {
-    "required": _required_handler,
-    "email": _format_tag_handler("email"),
-    "url": _format_tag_handler("uri"),
-    "uuid": _format_tag_handler("uuid"),
+_TAG_HANDLERS: dict[str, DictHandler] = {
+    "required": required_handler,
+    "email": format_handler("email"),
+    "url": format_handler("uri"),
+    "uuid": format_handler("uuid"),
     "datetime": _datetime_handler,
     "oneof": _oneof_handler,
     "len": _len_handler,
