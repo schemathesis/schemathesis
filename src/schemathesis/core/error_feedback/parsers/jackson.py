@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from schemathesis.core.error_feedback.field_inference import infer_path_from_request
 from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
@@ -10,11 +11,13 @@ from schemathesis.core.error_feedback.store import (
     NumericBoundPayload,
     Observation,
     ObservationKind,
+    ObservationPayload,
     TypeMismatchPayload,
 )
 from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 # Jackson `MismatchedInputException` / `InvalidFormatException` text. The verb
@@ -22,9 +25,14 @@ if TYPE_CHECKING:
 # in jackson-databind 2.10 (Sep 2019). The type capture allows any non-backtick
 # character on the modern path so generic types like `java.util.List<E>` come
 # through verbatim — the consumer's type-to-format map ignores unknown shapes.
+# 2.10+ — String source: `Cannot deserialize value of type `X` from String "Y"`.
+# This is the only variant that captures the rejected value — used by the field-inference
+# fallback when a reference chain is absent.
+_JACKSON_STRING_SOURCE = re.compile(
+    r'Cannot deserialize value of type `(?P<type>[^`]+)` from String "(?P<value>[^"]*)"'
+)
 _JACKSON_TYPE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # 2.10+ — String source: `Cannot deserialize value of type \`X\` from String "Y"`.
-    re.compile(r'Cannot deserialize value of type `(?P<type>[^`]+)` from String "(?P<value>[^"]*)"'),
+    _JACKSON_STRING_SOURCE,
     # 2.10+ — non-String source (object / array / boolean): `Cannot deserialize
     # instance of \`X\` out of <token>`. Different verb form ("instance of" vs
     # "value of type") because Jackson distinguishes the input shape internally.
@@ -114,9 +122,10 @@ def _match_enum_values(message: str) -> tuple[str, ...] | None:
 class JacksonParser:
     """Parser for Jackson `InvalidFormatException` messages naming the offending Java type.
 
-    Library-level (not Spring-specific) — Jackson messages surface in any
-    framework that uses it as the JSON binder. Field attribution requires a
-    `through reference chain: ...` segment; messages without one are skipped.
+    Library-level (not Spring-specific) — Jackson messages surface in any framework using
+    Jackson as the JSON binder. Field attribution prefers the `through reference chain: ...`
+    segment when present; when absent, falls back to matching the rejected value against
+    the request's parameter slots.
     """
 
     priority = 5
@@ -138,6 +147,7 @@ class JacksonParser:
         *,
         operation: APIOperation,
         body: object,
+        case: Case,
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
             return ()
@@ -145,51 +155,52 @@ class JacksonParser:
         observations: list[Observation] = []
         for message in _carrier_strings(body):
             path = _extract_path(message)
-            if path is None:
-                continue
-            # A single Jackson enum-deserialization error carries both the
-            # offending Java type AND the accepted values; emit both kinds so
-            # the consumers (TypeMismatchAdjustment + EnumAdjustment) each get
-            # what they need.
             type_match = _match_type(message)
-            if type_match is not None:
-                observations.append(
-                    Observation(
-                        operation_label=operation_label,
-                        location=ParameterLocation.BODY,
-                        parameter_path=path,
-                        kind=ObservationKind.TYPE_MISMATCH,
-                        raw_message=message,
-                        payload=TypeMismatchPayload(type_name=type_match),
-                    )
-                )
             enum_values = _match_enum_values(message)
-            if enum_values is not None:
-                observations.append(
-                    Observation(
-                        operation_label=operation_label,
-                        location=ParameterLocation.BODY,
-                        parameter_path=path,
-                        kind=ObservationKind.ENUM,
-                        raw_message=message,
-                        payload=EnumPayload(values=enum_values),
-                    )
-                )
             overflow_match = _JACKSON_NUMERIC_OVERFLOW.search(message)
+
+            constraints: list[tuple[ObservationKind, ObservationPayload]] = []
+            if type_match is not None:
+                constraints.append((ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name=type_match)))
+            if enum_values is not None:
+                constraints.append((ObservationKind.ENUM, EnumPayload(values=enum_values)))
             if overflow_match is not None:
                 minimum, maximum = _JAVA_INT_BOUNDS[overflow_match.group("size")]
                 for bound, direction in (
                     (float(minimum), BoundDirection.MIN),
                     (float(maximum), BoundDirection.MAX),
                 ):
-                    observations.append(
-                        Observation(
-                            operation_label=operation_label,
-                            location=ParameterLocation.BODY,
-                            parameter_path=path,
-                            kind=ObservationKind.NUMERIC_BOUND,
-                            raw_message=message,
-                            payload=NumericBoundPayload(bound=bound, direction=direction, exclusive=False),
-                        )
+                    constraints.append(
+                        (
+                            ObservationKind.NUMERIC_BOUND,
+                            NumericBoundPayload(bound=bound, direction=direction, exclusive=False),
+                        ),
                     )
+
+            if not constraints:
+                continue
+
+            if path is not None:
+                location, slot_path = ParameterLocation.BODY, path
+            else:
+                string_match = _JACKSON_STRING_SOURCE.search(message)
+                if string_match is None or not string_match.group("value"):
+                    # Message variant has no captured string source; nothing to walk against.
+                    continue
+                slot = infer_path_from_request(case=case, rejected_value=string_match.group("value"))
+                if slot is None:
+                    continue
+                location, slot_path = slot
+
+            for kind, payload in constraints:
+                observations.append(
+                    Observation(
+                        operation_label=operation_label,
+                        location=location,
+                        parameter_path=slot_path,
+                        kind=kind,
+                        raw_message=message,
+                        payload=payload,
+                    )
+                )
         return tuple(observations)

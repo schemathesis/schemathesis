@@ -28,6 +28,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import decode_pointer
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 KeywordHandler = Callable[[dict], tuple[ClassificationResult, ...]]
@@ -330,7 +331,7 @@ class AjvParser:
             return bool(_split_fastify_clauses(body["message"]))
         return False
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         errors = _extract_array_errors(body)
         if errors is not None:
             return _array_observations(errors, operation.label, location_for_method(operation.method))

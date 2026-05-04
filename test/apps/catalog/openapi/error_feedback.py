@@ -484,7 +484,7 @@ def jackson_typed_planted_bug() -> OpenAPIApp:
 def jackson_typed_planted_bug_ref_bundled() -> OpenAPIApp:
     # Body schema references `components.schemas.User`, which itself $refs another component —
     # this two-hop chain is what schemathesis's loader turns into the `x-bundled` form
-    # observed on real Spring/PTS specs.
+    # observed on real Spring specs.
     address_schema = {"type": "object", "properties": {"street": {"type": "string"}}}
     user_schema = {
         "type": "object",

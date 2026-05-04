@@ -25,6 +25,7 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 ParameterPath = tuple[str | int, ...]
@@ -243,7 +244,7 @@ class GoValidatorParser:
             return True
         return _is_default_envelope(body)
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         location = location_for_method(operation.method)
         issues = _extract_structured(body)
         if issues is not None:

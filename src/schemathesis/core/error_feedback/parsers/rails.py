@@ -21,6 +21,7 @@ from schemathesis.core.error_feedback.store import (
 )
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 WalkPair = tuple[tuple[str | int, ...], str]
@@ -242,7 +243,7 @@ class RailsParser:
         messages = (message for _, message in _walk_observations(inner))
         return _has_rails_vocabulary(messages)
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         location = location_for_method(operation.method)
         observations: list[Observation] = []
         for path, message in _walk_observations(_unwrap_ar_envelope(body)):

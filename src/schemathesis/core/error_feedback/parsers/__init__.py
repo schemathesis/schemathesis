@@ -6,6 +6,7 @@ from schemathesis.core.error_feedback.store import Observation
 from schemathesis.core.registries import Registry
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 
@@ -23,6 +24,7 @@ class ResponseParser(Protocol):
         *,
         operation: APIOperation,
         body: object,
+        case: Case,
     ) -> tuple[Observation, ...]:
         """Extract observations from the body. Empty tuple means no signal."""
         ...  # pragma: no cover

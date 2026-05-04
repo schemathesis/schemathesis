@@ -17,6 +17,7 @@ from schemathesis.core.error_feedback.store import (
 )
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 CodeHandler = Callable[[dict], tuple[ClassificationResult, ...]]
@@ -150,7 +151,7 @@ class ZodParser:
         issues = _extract_issues(body)
         return issues is not None and _has_zod_signature(issues)
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         issues = _extract_issues(body)
         if issues is None or not _has_zod_signature(issues):
             return ()
