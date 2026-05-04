@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import TYPE_CHECKING
 
 LOCATION_TO_CONTAINER = {
     "path": "path_parameters",
@@ -29,20 +30,25 @@ class ParameterLocation(str, Enum):
     BODY = "body"
     UNKNOWN = None
 
-    @property
-    def container_name(self) -> str:
-        return {
-            "path": "path_parameters",
-            "query": "query",
-            "header": "headers",
-            "cookie": "cookies",
-            "body": "body",
-        }[self]
+    if TYPE_CHECKING:
+        container_name: str
+        is_in_header: bool
 
-    @property
-    def is_in_header(self) -> bool:
-        return self in HEADER_LOCATIONS
 
+# Stored as direct instance attributes (faster than @property + descriptor dispatch
+# on every access — these are queried in hot strategy / check / examples paths).
+ParameterLocation.QUERY.container_name = "query"
+ParameterLocation.HEADER.container_name = "headers"
+ParameterLocation.PATH.container_name = "path_parameters"
+ParameterLocation.COOKIE.container_name = "cookies"
+ParameterLocation.BODY.container_name = "body"
+
+ParameterLocation.QUERY.is_in_header = False
+ParameterLocation.HEADER.is_in_header = True
+ParameterLocation.PATH.is_in_header = False
+ParameterLocation.COOKIE.is_in_header = True
+ParameterLocation.BODY.is_in_header = False
+ParameterLocation.UNKNOWN.is_in_header = False
 
 HEADER_LOCATIONS = frozenset([ParameterLocation.HEADER, ParameterLocation.COOKIE])
 

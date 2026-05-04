@@ -758,7 +758,8 @@ def get_parameters_strategy(
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
     container = getattr(operation, location.container_name)
-    if container:
+    # Direct list bool check skips ParameterSet.__len__ method dispatch.
+    if container.items:
         return container.get_strategy(
             operation,
             generation_config,
