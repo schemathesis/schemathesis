@@ -8,6 +8,7 @@ import jsonschema_rs
 
 from schemathesis.core.errors import InfiniteRecursiveReference
 from schemathesis.core.jsonschema.bundler import BundleError
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import get_type
 from schemathesis.specs.openapi.adapter.parameters import resource_name_from_ref
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
@@ -56,7 +57,7 @@ def extract_resources_from_responses(
     operation: APIOperation,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> Iterator[tuple[OpenApiResponse, ExtractedResource]]:
     """Extract resource definitions from operation's successful responses.
@@ -85,7 +86,7 @@ def iter_resources_from_response(
     response: OpenApiResponse,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> Iterator[ExtractedResource]:
     schema = response.get_raw_schema()
@@ -129,7 +130,7 @@ def iter_resources_from_response(
                 yield map_resource
                 return None
 
-    current_resolver = response.resolver if isinstance(response.resolver, jsonschema_rs.Resolver) else resolver
+    current_resolver = response.resolver if response.resolver is not None else resolver
     parent_ref = schema.get("$ref")
     _, resolved = maybe_resolve_with_resolver(schema, current_resolver)
 
@@ -256,7 +257,7 @@ def iter_resources_from_response(
                                         )
 
 
-def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: jsonschema_rs.Resolver) -> str | None:
+def _recover_ref_from_allof(*, branches: list[dict], pointer: str, resolver: Resolver) -> str | None:
     """Recover original $ref from allOf branches after canonicalization.
 
     Canonicalization inlines all $refs, losing resource name information.
@@ -372,7 +373,7 @@ def _extract_resource_and_cardinality(
     path: str,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     parent_ref: str | None = None,
 ) -> tuple[ResourceDefinition, Cardinality] | None:
     """Extract resource from schema and determine cardinality."""
@@ -423,7 +424,7 @@ def _extract_resource_from_schema(
     path: str,
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     parent_ref: str | None = None,
 ) -> ResourceDefinition | None:
     """Extract resource definition from a schema."""

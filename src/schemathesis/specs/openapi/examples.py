@@ -9,13 +9,15 @@ from typing import TYPE_CHECKING, Any, cast, overload
 
 import jsonschema_rs
 import requests
+from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 
 from schemathesis.config import GenerationConfig
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InfiniteRecursiveReference, UnresolvableReference
 from schemathesis.core.jsonschema import is_valid, make_validator_for
 from schemathesis.core.jsonschema.bundler import BUNDLE_STORAGE_KEY
-from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -240,7 +242,7 @@ def extract_top_level(
             param_validator: jsonschema_rs.Validator | None = (
                 None if isinstance(param_schema, bool) else make_validator_for(param_schema)
             )
-        except Exception:
+        except jsonschema_rs.ValidationError:
             param_validator = None
         for definition in definitions:
             if definition is parameter.definition:
@@ -253,7 +255,7 @@ def extract_top_level(
                 #   combined schema, which would reject strings valid for multiple branches).
                 try:
                     validator = None if isinstance(definition, bool) else make_validator_for(definition)
-                except Exception:
+                except jsonschema_rs.ValidationError:
                     validator = None
             # Open API 2 also supports `example`
             for example_keyword in {"example", parameter.adapter.example_keyword}:
@@ -301,7 +303,7 @@ def extract_top_level(
             body_validator: jsonschema_rs.Validator | None = (
                 None if isinstance(body_schema, bool) else make_validator_for(body_schema)
             )
-        except Exception:
+        except jsonschema_rs.ValidationError:
             body_validator = None
 
         if "schema" in body.definition:
@@ -354,30 +356,30 @@ def extract_top_level(
 @overload
 def _resolve_bundled(
     schema: dict[str, Any],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     reference_path: tuple[str, ...],
     *,
     merge_ref_siblings: bool,
-) -> tuple[dict[str, Any], tuple[str, ...], jsonschema_rs.Resolver]: ...
+) -> tuple[dict[str, Any], tuple[str, ...], Resolver]: ...
 
 
 @overload
 def _resolve_bundled(
     schema: bool,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     reference_path: tuple[str, ...],
     *,
     merge_ref_siblings: bool,
-) -> tuple[bool, tuple[str, ...], jsonschema_rs.Resolver]: ...
+) -> tuple[bool, tuple[str, ...], Resolver]: ...
 
 
 def _resolve_bundled(
     schema: dict[str, Any] | bool,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     reference_path: tuple[str, ...],
     *,
     merge_ref_siblings: bool,
-) -> tuple[dict[str, Any] | bool, tuple[str, ...], jsonschema_rs.Resolver]:
+) -> tuple[dict[str, Any] | bool, tuple[str, ...], Resolver]:
     """Resolve $ref if present."""
     if isinstance(schema, dict):
         reference = schema.get("$ref")
@@ -394,7 +396,7 @@ def _resolve_bundled(
 
             try:
                 next_resolver, resolved_schema = resolve_reference(resolver, reference)
-            except Exception as exc:
+            except RefResolutionError as exc:
                 raise UnresolvableReference(reference) from exc
 
             # In OAS 3.1 (JSON Schema draft 2020-12), sibling keywords alongside $ref
@@ -413,10 +415,10 @@ def _resolve_bundled(
 def _expand_subschemas(
     *,
     schema: dict[str, Any] | bool,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     reference_path: tuple[str, ...],
     merge_ref_siblings: bool,
-) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...], jsonschema_rs.Resolver], None, None]:
+) -> Generator[tuple[dict[str, Any] | bool, tuple[str, ...], Resolver], None, None]:
     """Expand schema and all its subschemas."""
     try:
         schema, current_path, current_resolver = _resolve_bundled(
@@ -583,7 +585,7 @@ def extract_from_schemas(
             continue
         try:
             body_validator: jsonschema_rs.Validator | None = make_validator_for(schema)
-        except Exception:
+        except jsonschema_rs.ValidationError:
             body_validator = None
         resolver = make_root_resolver(schema)
         bundle_storage = schema.get(BUNDLE_STORAGE_KEY)
@@ -618,7 +620,7 @@ def _yield_examples_from_properties(
     properties: dict[str, Any],
     example_keyword: str,
     examples_container_keyword: str,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     current_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
     merge_ref_siblings: bool,
@@ -684,7 +686,7 @@ def _yield_examples_from_properties(
                 subschema[BUNDLE_STORAGE_KEY] = bundle_storage
             try:
                 generated = _generate_single_example(subschema, config)
-            except Exception:
+            except (InvalidArgument, Unsatisfiable, jsonschema_rs.ValidationError, jsonschema_rs.ReferencingError):
                 continue
             if not is_valid(generated, subschema):
                 continue
@@ -704,7 +706,7 @@ def _yield_examples_per_branch(
     branches: list[dict[str, Any]],
     example_keyword: str,
     examples_container_keyword: str,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     current_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
     merge_ref_siblings: bool,
@@ -751,7 +753,7 @@ def extract_from_schema(
     schema: dict[str, Any],
     example_keyword: str,
     examples_container_keyword: str,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     reference_path: tuple[str, ...],
     bundle_storage: dict[str, Any] | None,
     merge_ref_siblings: bool,

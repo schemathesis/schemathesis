@@ -19,17 +19,48 @@ from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 
 IN_MEMORY_BASE_URI = "urn:schemathesis:root"
-
-# Side table mapping a resolver's base URI to the original (un-cloned) root schema.
-# `jsonschema_rs.Registry` deep-clones the schema with sorted dict keys, so we keep
-# the original around to walk local fragments ourselves and preserve insertion order
-# (which matters for HTTP method iteration, link ordering, etc.).
-_ROOT_SCHEMAS: dict[str, Any] = {}
-# Per-document JSON-pointer walk cache. Invalidated only when the root schema *object*
-# for a base URI is replaced (see `make_root_resolver`); in-place mutations of the
-# stored dict are not detected and would return stale entries.
-_FRAGMENT_CACHES: dict[str, dict[str, Any]] = {}
 _FRAGMENT_MISS = object()
+
+
+class Resolver:
+    """Wraps `jsonschema_rs.Resolver` with a bound schema and per-instance fragment cache.
+
+    The bound schema lets us walk local fragments directly instead of going through
+    `Registry.lookup()`, which deep-clones the result every call. The cache is per
+    instance so multiple in-memory resolvers don't share or invalidate each other's
+    walk results.
+    """
+
+    __slots__ = ("base_uri", "inner", "schema", "fragment_cache")
+
+    def __init__(self, inner: jsonschema_rs.Resolver, schema: Any) -> None:
+        self.inner = inner
+        self.schema = schema
+        # Frozen on the wrapper so hot-path callers don't pay a property+attribute hop.
+        self.base_uri: str = inner.base_uri
+        self.fragment_cache: dict[str, Any] = {}
+
+    def lookup(self, reference: str) -> Any:
+        return self.inner.lookup(reference)
+
+    def resolve_local_fragment(self, fragment: str) -> Any:
+        """Walk the bound schema to `fragment`. Returns `UNRESOLVABLE` if the walk fails."""
+        cache = self.fragment_cache
+        cached = cache.get(fragment, _FRAGMENT_MISS)
+        if cached is not _FRAGMENT_MISS:
+            return cached
+        # `#` and `#/` both reference the document root in common OpenAPI usage, even though
+        # strictly RFC 6901 says `/` is `schema[""]`. Real-world multi-file YAML schemas
+        # rely on the lenient interpretation.
+        if not fragment or fragment == "/":
+            value: Any = self.schema
+        else:
+            # Tolerate refs like `#components/parameters/X` (no leading `/`) that schemas
+            # in the wild produce.
+            pointer = fragment if fragment.startswith("/") else f"/{fragment}"
+            value = resolve_pointer(self.schema, pointer)
+        cache[fragment] = value
+        return value
 
 
 def _normalize_location(location: str) -> str:
@@ -115,18 +146,13 @@ def build_registry(
     try:
         return jsonschema_rs.Registry([(base_uri, root_schema)], draft=draft, retriever=retrieve)
     except ValueError:
-        # `jsonschema_rs.Registry` rejects non-string dict keys. YAML-loaded schemas can
-        # produce bool keys (bare `on:`/`off:`/`yes:` get parsed as `True`/`False`),
-        # which the previous Python resolver tolerated. Retry with stringified keys.
-        return jsonschema_rs.Registry([(base_uri, _coerce_string_keys(root_schema))], draft=draft, retriever=retrieve)
-
-
-def _coerce_string_keys(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {(k if isinstance(k, str) else str(k)): _coerce_string_keys(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_coerce_string_keys(item) for item in value]
-    return value
+        # Schema content can fail registry construction in ways we want to defer:
+        # YAML can parse bare `on:`/`off:` as bool keys, and a single broken external
+        # `$ref` (e.g. `./other.json#/...` from an in-memory schema) trips eager ref
+        # resolution. Registering an empty schema lets loading succeed; local fragment
+        # lookups go through the resolver's bound schema, and unresolvable refs surface
+        # per-operation.
+        return jsonschema_rs.Registry([(base_uri, {})], draft=draft, retriever=retrieve)
 
 
 def make_root_resolver(
@@ -134,14 +160,10 @@ def make_root_resolver(
     *,
     location: str | None = None,
     draft: int | None = None,
-) -> jsonschema_rs.Resolver:
+) -> Resolver:
+    registry = build_registry(root_schema, location=location, draft=draft)
     base_uri = _normalize_location(location) if location else IN_MEMORY_BASE_URI
-    registry = build_registry(root_schema, location=base_uri, draft=draft)
-    if _ROOT_SCHEMAS.get(base_uri) is not root_schema:
-        # Schema for this URI changed (or first registration) — drop stale fragment cache.
-        _FRAGMENT_CACHES.pop(base_uri, None)
-    _ROOT_SCHEMAS[base_uri] = root_schema
-    return registry.resolver(base_uri)
+    return Resolver(registry.resolver(base_uri), root_schema)
 
 
 @lru_cache(maxsize=4096)
@@ -175,42 +197,11 @@ def resolve_reference_uri(base_uri: str, reference: str) -> str:
     return _resolve_reference_uri_with_document(base_uri, reference)[0]
 
 
-def resolve_reference(resolver: jsonschema_rs.Resolver, reference: str) -> tuple[jsonschema_rs.Resolver, Any]:
+def resolve_reference(resolver: Resolver, reference: str) -> tuple[Resolver, Any]:
     return resolve_reference_with_uri(resolver, reference)[1:]
 
 
-def _resolve_local_fragment(document_uri: str, fragment: str) -> Any:
-    """Walk the cached root schema for `document_uri` to `fragment`.
-
-    Returns `UNRESOLVABLE` if the document is not registered or the fragment cannot be
-    walked. Per-document caching makes repeated lookups of the same fragment O(1).
-    """
-    original = _ROOT_SCHEMAS.get(document_uri)
-    if original is None:
-        return UNRESOLVABLE
-    cache = _FRAGMENT_CACHES.get(document_uri)
-    if cache is None:
-        cache = _FRAGMENT_CACHES[document_uri] = {}
-    cached = cache.get(fragment, _FRAGMENT_MISS)
-    if cached is not _FRAGMENT_MISS:
-        return cached
-    # `#` and `#/` both reference the document root in common OpenAPI usage, even though
-    # strictly RFC 6901 says `/` is `schema[""]`. Treating `/` as the root matches what
-    # `RefResolver` did and what real-world schemas (e.g. multi-file YAML) rely on.
-    if not fragment or fragment == "/":
-        value: Any = original
-    else:
-        # Tolerate refs like `#components/parameters/X` (no leading `/`) that schemas in
-        # the wild produce; legacy `RefResolver.resolve` accepted them.
-        pointer = fragment if fragment.startswith("/") else f"/{fragment}"
-        value = resolve_pointer(original, pointer)
-    cache[fragment] = value
-    return value
-
-
-def resolve_reference_with_uri(
-    resolver: jsonschema_rs.Resolver, reference: str
-) -> tuple[str, jsonschema_rs.Resolver, Any]:
+def resolve_reference_with_uri(resolver: Resolver, reference: str) -> tuple[str, Resolver, Any]:
     """Resolve a `$ref` and return `(target_uri, target_resolver, target_value)`.
 
     The bundler needs the absolute target URI for cycle and visited-set bookkeeping
@@ -227,11 +218,9 @@ def resolve_reference_with_uri(
                 return resolve_reference_with_uri(external_resolver, f"#{fragment}")
             return resolved_uri, external_resolver, document
 
-        # Local fragment: walk the original schema to preserve key insertion order.
-        # `jsonschema_rs.Resolver.lookup()` returns a deep-cloned dict with sorted keys,
-        # which silently breaks order-sensitive callers (e.g. HTTP method iteration on
-        # `$ref`-ed path items, or link order in stateful inference).
-        value = _resolve_local_fragment(current_document_uri, fragment)
+        # Local fragment: walk the bound schema directly. `Registry.lookup()` deep-clones
+        # the result on every call; walking the original returns a reference and is faster.
+        value = resolver.resolve_local_fragment(fragment)
         if value is not UNRESOLVABLE:
             return resolved_uri, resolver, value
 
@@ -243,4 +232,5 @@ def resolve_reference_with_uri(
         else:
             error.__notes__ = [reference]
         raise error from exc
-    return resolved_uri, resolved.resolver, resolved.contents
+    # Bind `resolved.contents` so subsequent local-fragment walks land in the right document.
+    return resolved_uri, Resolver(resolved.resolver, resolved.contents), resolved.contents

@@ -35,7 +35,7 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 
 from schemathesis.core import INTERNAL_BUFFER_SIZE, NOT_SET
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.jsonschema.types import JsonSchema, JsonSchemaObject, get_type
 from schemathesis.core.media_types import is_xml_parts
 from schemathesis.core.parameters import ParameterLocation
@@ -216,7 +216,7 @@ class CoverageContext:
     custom_formats: dict[str, st.SearchStrategy]
     validator_cls: type[jsonschema_rs.Validator]
     update_pattern: Callable[[str, int | None, int | None], str] | None
-    _resolver: jsonschema_rs.Resolver | None
+    _resolver: Resolver | None
     _schema_generation_cache: dict[tuple[Any, ...], Any]
     allow_extra_parameters: bool
 
@@ -247,7 +247,7 @@ class CoverageContext:
         custom_formats: dict[str, st.SearchStrategy],
         validator_cls: type[jsonschema_rs.Validator],
         update_pattern: Callable[[str, int | None, int | None], str] | None = None,
-        _resolver: jsonschema_rs.Resolver | None = None,
+        _resolver: Resolver | None = None,
         _schema_generation_cache: dict[tuple[Any, ...], Any] | None = None,
         allow_extra_parameters: bool = True,
     ) -> None:
@@ -265,7 +265,7 @@ class CoverageContext:
         self.allow_extra_parameters = allow_extra_parameters
 
     @property
-    def resolver(self) -> jsonschema_rs.Resolver:
+    def resolver(self) -> Resolver:
         """Lazy-initialized cached resolver."""
         if self._resolver is None:
             self._resolver = make_root_resolver(self.root_schema)
@@ -497,7 +497,7 @@ class CoverageContext:
         cache_key = _schema_generation_cache_key(schema)
         cached = self._schema_generation_cache.get(cache_key, NOT_SET)
         if cached is not NOT_SET:
-            return deepclone(cached) if isinstance(cached, dict | list) else cached
+            return deepclone(cached) if isinstance(cached, (dict, list)) else cached
 
         # Deep clone to prevent hypothesis_jsonschema from mutating the original schema
         cloned = deepclone(schema)
@@ -515,7 +515,7 @@ class CoverageContext:
             strategy = strategy.filter(lambda v: not isinstance(v, str) or validator.is_valid(v))
         generated = self.generate_from(strategy)
         self._schema_generation_cache[cache_key] = (
-            deepclone(generated) if isinstance(generated, dict | list) else generated
+            deepclone(generated) if isinstance(generated, (dict, list)) else generated
         )
         return generated
 
@@ -586,7 +586,7 @@ def _convert_bytes_for_hashing(value: Any) -> Any:
 
 
 def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
-    if isinstance(value, dict | list):
+    if isinstance(value, (dict, list)):
         # Convert bytes to a hashable representation before JSON encoding
         converted = _convert_bytes_for_hashing(value)
         serialized = _encode(converted)

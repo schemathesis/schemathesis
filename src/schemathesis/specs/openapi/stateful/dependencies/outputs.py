@@ -3,8 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
-import jsonschema_rs
-
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.models import (
@@ -33,7 +32,7 @@ def extract_outputs(
     inputs: list[InputSlot],
     resources: ResourceMap,
     updated_resources: set[str],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
 ) -> Iterator[OutputSlot]:
     """Extract resources from API operation's responses."""

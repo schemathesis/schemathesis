@@ -7,6 +7,7 @@ import requests
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
 from schemathesis.core.failures import Failure
+from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response as HTTPResponse
@@ -105,6 +106,36 @@ def test_resolving_relative_files():
     operations = list(schema.get_all_operations())
     errors = [op.err() for op in operations if isinstance(op, Err)]
     assert not errors
+
+
+def test_in_memory_schemas_have_isolated_resolver_caches():
+    # Creating a second in-memory resolver must not corrupt the first one's lookups.
+    schema_a = {"definitions": {"A": {"type": "string"}, "Broken": {"$ref": "./missing.json#/x"}}}
+    schema_b = {"definitions": {"B": {"type": "integer"}}}
+
+    resolver_a = make_root_resolver(schema_a)
+    make_root_resolver(schema_b)
+    _, value_a = resolve_reference(resolver_a, "#/definitions/A")
+    assert value_a == {"type": "string"}
+
+
+def test_in_memory_schema_with_relative_external_ref(ctx):
+    # In-memory schemas with broken external refs (Azure-style `./other.json#/...` from
+    # nested definitions) load successfully; resolution is deferred to schema use.
+    raw_schema = ctx.openapi.build_schema(
+        {"/users": {"get": {"responses": {"200": {"schema": {"$ref": "#/definitions/Container"}}}}}},
+        version="2.0",
+        definitions={
+            "Container": {
+                "type": "object",
+                "properties": {"peering": {"$ref": "./other.json#/definitions/Peering"}},
+            }
+        },
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    operations = list(schema.get_all_operations())
+    assert len(operations) == 1
+    assert isinstance(operations[0], Ok)
 
 
 def test_schema_parsing_error(simple_schema):

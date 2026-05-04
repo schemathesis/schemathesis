@@ -10,7 +10,8 @@ from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InvalidSchema, MalformedMediaType
 from schemathesis.core.jsonschema import FANCY_REGEX_OPTIONS
-from schemathesis.core.jsonschema.bundler import Bundle, prepare_for_validation
+from schemathesis.core.jsonschema.bundler import Bundle, bundle_for_validation
+from schemathesis.core.jsonschema.resolver import Resolver
 from schemathesis.core.jsonschema.types import JsonSchema
 from schemathesis.specs.openapi import types
 from schemathesis.specs.openapi.adapter.protocol import SpecificationAdapter
@@ -53,7 +54,7 @@ class OpenApiResponse:
 
     status_code: str
     definition: Mapping[str, Any]
-    resolver: jsonschema_rs.Resolver
+    resolver: Resolver
     scope: str
     adapter: SpecificationAdapter
 
@@ -172,7 +173,7 @@ class OpenApiResponses:
     """Collection of OpenAPI response definitions."""
 
     _inner: dict[str, OpenApiResponse]
-    resolver: jsonschema_rs.Resolver
+    resolver: Resolver
     scope: str
     adapter: SpecificationAdapter
 
@@ -182,7 +183,7 @@ class OpenApiResponses:
     def from_definition(
         cls,
         definition: types.v3.Responses | types.v2.Responses,
-        resolver: jsonschema_rs.Resolver,
+        resolver: Resolver,
         scope: str,
         adapter: SpecificationAdapter,
     ) -> OpenApiResponses:
@@ -255,7 +256,7 @@ class OpenApiResponses:
 
 def _iter_resolved_responses(
     definition: types.v3.Responses | types.v2.Responses,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     adapter: SpecificationAdapter,
 ) -> Iterator[tuple[str, OpenApiResponse]]:
@@ -281,7 +282,7 @@ def _iter_resolved_responses(
 
 
 def extract_response_schema_v2(
-    response: Mapping[str, Any], resolver: jsonschema_rs.Resolver, scope: str, nullable_keyword: str
+    response: Mapping[str, Any], resolver: Resolver, scope: str, nullable_keyword: str
 ) -> Bundle | None:
     """Extract and prepare response schema for Swagger 2.0."""
     schema = extract_raw_response_schema_v2(response)
@@ -297,7 +298,7 @@ def extract_raw_response_schema_v2(response: Mapping[str, Any]) -> JsonSchema | 
 
 def extract_response_schema_v3(
     response: Mapping[str, Any],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     nullable_keyword: str,
     *,
@@ -329,13 +330,16 @@ def extract_raw_response_schema_v3(response: Mapping[str, Any]) -> JsonSchema | 
 
 def _prepare_schema(
     schema: JsonSchema,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     nullable_keyword: str,
     *,
     upgrade_legacy_exclusive_bounds: bool = False,
 ) -> Bundle:
-    bundled = _bundle_in_scope(schema, resolver, scope)
+    try:
+        bundled = bundle_for_validation(schema, resolver)
+    except RefResolutionError as exc:
+        raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
     # Do not clone the schema, as bundling already does it
     converted = to_json_schema(
         bundled.schema,
@@ -350,7 +354,7 @@ def _prepare_schema(
 
 def prepare_response_media_type_schema(
     schema: JsonSchema,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     nullable_keyword: str,
     *,
@@ -379,7 +383,7 @@ def resolve_response_media_type_v2(response: Mapping[str, Any], media_type: str 
 def extract_schema_for_media_type_v2(
     response: Mapping[str, Any],
     media_type: str | None,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     nullable_keyword: str,
 ) -> Bundle | None:
@@ -440,7 +444,7 @@ def resolve_response_media_type_v3(response: Mapping[str, Any], media_type: str 
 def extract_schema_for_media_type_v3(
     response: Mapping[str, Any],
     media_type: str | None,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     nullable_keyword: str,
     *,
@@ -486,13 +490,6 @@ def _is_sse_media_type(value: str) -> bool:
         return False
 
 
-def _bundle_in_scope(schema: JsonSchema, resolver: jsonschema_rs.Resolver, scope: str) -> Bundle:
-    try:
-        return prepare_for_validation(schema, resolver)
-    except RefResolutionError as exc:
-        raise InvalidSchema.from_reference_resolution_error(exc, None, None) from None
-
-
 @dataclass
 class OpenApiResponseHeaders:
     """Collection of OpenAPI response header definitions."""
@@ -514,7 +511,7 @@ class OpenApiResponseHeader:
 
     name: str
     definition: Mapping[str, Any]
-    resolver: jsonschema_rs.Resolver
+    resolver: Resolver
     scope: str
     adapter: SpecificationAdapter
 
@@ -560,7 +557,7 @@ class OpenApiResponseHeader:
 
 def _iter_resolved_headers(
     definition: types.v3.Headers | types.v2.Headers,
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     adapter: SpecificationAdapter,
 ) -> Iterator[tuple[str, OpenApiResponseHeader]]:
@@ -577,14 +574,14 @@ def _iter_resolved_headers(
 
 
 def extract_header_schema_v2(
-    header: Mapping[str, Any], resolver: jsonschema_rs.Resolver, scope: str, nullable_keyword: str
+    header: Mapping[str, Any], resolver: Resolver, scope: str, nullable_keyword: str
 ) -> Bundle:
     return _prepare_schema(cast(dict, header), resolver, scope, nullable_keyword)
 
 
 def extract_header_schema_v3(
     header: Mapping[str, Any],
-    resolver: jsonschema_rs.Resolver,
+    resolver: Resolver,
     scope: str,
     nullable_keyword: str,
     *,

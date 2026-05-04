@@ -35,7 +35,7 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.jsonschema import Bundler
 from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX, BundleCache
-from schemathesis.core.jsonschema.resolver import make_root_resolver, resolve_reference
+from schemathesis.core.jsonschema.resolver import Resolver, make_root_resolver, resolve_reference
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.spec import CoverageCapabilities
@@ -576,7 +576,7 @@ class OpenApiSchema(BaseSchema):
         self,
         definition: dict[str, Any],
         shared_parameters: Sequence[dict[str, Any]],
-        resolver: jsonschema_rs.Resolver | None = None,
+        resolver: Resolver | None = None,
     ) -> list[OperationParameter]:
         return list(
             self.adapter.iter_parameters(
@@ -591,7 +591,7 @@ class OpenApiSchema(BaseSchema):
         )
 
     def _parse_responses(
-        self, definition: dict[str, Any], scope: str, resolver: jsonschema_rs.Resolver | None = None
+        self, definition: dict[str, Any], scope: str, resolver: Resolver | None = None
     ) -> OpenApiResponses:
         responses = definition.get("responses", {})
         return OpenApiResponses.from_definition(
@@ -618,7 +618,7 @@ class OpenApiSchema(BaseSchema):
         parameters: list[OperationParameter],
         definition: dict[str, Any],
         scope: str,
-        resolver: jsonschema_rs.Resolver | None = None,
+        resolver: Resolver | None = None,
     ) -> APIOperation:
         __tracebackhide__ = True
         base_url = self.get_base_url()
@@ -666,7 +666,7 @@ class OpenApiSchema(BaseSchema):
         return operation
 
     @property
-    def root_resolver(self) -> jsonschema_rs.Resolver:
+    def root_resolver(self) -> Resolver:
         if not hasattr(self, "_root_resolver"):
             self._root_resolver = make_root_resolver(self.raw_schema, location=self.location)
         return self._root_resolver
@@ -1048,7 +1048,7 @@ class MethodMap(Mapping):
     """
 
     _parent: APIOperationMap
-    _resolver: jsonschema_rs.Resolver
+    _resolver: Resolver
     # Reference resolution scope
     _scope: str
     # Methods are stored for this path
