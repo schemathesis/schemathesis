@@ -66,6 +66,10 @@ if TYPE_CHECKING:
     from schemathesis.resources import ExtraDataSource
 
 
+# Reused on every per-draw call; allocating once avoids ~600ns of `LazyStrategy` construction.
+_NONE_STRATEGY: st.SearchStrategy = st.none()
+
+
 @dataclass(repr=False)
 class GraphQLOperationDefinition(OperationDefinition):
     field_name: str
@@ -565,7 +569,7 @@ def _generate_parameter(
     # Schemathesis does not generate anything but `body` for GraphQL, hence use `None`
     container = location.container_name
     if isinstance(explicit, NotSet):
-        strategy = apply_to_all_dispatchers(operation, context, hooks, st.none(), container)
+        strategy = apply_to_all_dispatchers(operation, context, hooks, _NONE_STRATEGY, container)
     else:
         strategy = apply_to_all_dispatchers(operation, context, hooks, st.just(explicit), container)
     return draw(strategy)
