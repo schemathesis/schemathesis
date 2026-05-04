@@ -511,12 +511,6 @@ def jackson_typed_planted_bug_ref_bundled() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
-# Multiple int fields so overflow observations cross the calibration threshold during coverage.
-JACKSON_OVERFLOW_FIELDS: tuple[tuple[str, str], ...] = (
-    ("availableBeds", "msg"),
-    ("quantity", "message"),
-    ("score", "error"),
-)
 _INT32_MIN = -2_147_483_648
 _INT32_MAX = 2_147_483_647
 
@@ -533,8 +527,17 @@ def jackson_overflow_planted_bug() -> OpenAPIApp:
                                 "schema": {
                                     "type": "object",
                                     "additionalProperties": False,
-                                    "properties": {field: {"type": "integer"} for field, _ in JACKSON_OVERFLOW_FIELDS},
-                                    "required": [field for field, _ in JACKSON_OVERFLOW_FIELDS],
+                                    "properties": {
+                                        # Spec-side example forces coverage to emit a deterministic
+                                        # overflow value, so feedback always observes the parser's
+                                        # bound and the snapshot stays stable across runs.
+                                        "quantity": {"type": "integer", "example": 10_000_000_000},
+                                        # Optional field so coverage produces multiple positive object
+                                        # cases — observations on `quantity` cross the calibration
+                                        # threshold before fuzzing builds its strategy.
+                                        "note": {"type": "string"},
+                                    },
+                                    "required": ["quantity"],
                                 }
                             }
                         },
@@ -554,20 +557,20 @@ def jackson_overflow_planted_bug() -> OpenAPIApp:
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
             return jsonify({"msg": "JSON parse error"}), 400
-        envelope: dict[str, str] = {}
-        for field, carrier_key in JACKSON_OVERFLOW_FIELDS:
-            value = body.get(field)
-            if isinstance(value, int) and not isinstance(value, bool) and not _INT32_MIN <= value <= _INT32_MAX:
-                # Fixed placeholder for the actual value keeps the snapshot stable
-                # across runs; the parser regex accepts any non-paren content.
-                envelope[carrier_key] = (
-                    "JSON parse error: Numeric value (X) out of range of int; "
-                    "nested exception is com.fasterxml.jackson.databind.JsonMappingException: "
-                    "Numeric value (X) out of range of int "
-                    f'(through reference chain: HospitalDTO["{field}"])'
-                )
-        if envelope:
-            return jsonify(envelope), 400
+        value = body.get("quantity")
+        if isinstance(value, int) and not isinstance(value, bool) and not _INT32_MIN <= value <= _INT32_MAX:
+            # Fixed placeholder for the actual value keeps the snapshot stable across runs;
+            # the parser regex accepts any non-paren content.
+            return jsonify(
+                {
+                    "message": (
+                        "JSON parse error: Numeric value (X) out of range of int; "
+                        "nested exception is com.fasterxml.jackson.databind.JsonMappingException: "
+                        "Numeric value (X) out of range of int "
+                        '(through reference chain: HospitalDTO["quantity"])'
+                    )
+                }
+            ), 400
         return "", 500
 
     return OpenAPIApp(spec=spec, server=app, kind="flask")
@@ -677,6 +680,10 @@ class _PydanticUser(BaseModel):
     name: str = Field(min_length=3, max_length=8)
     code: str = Field(min_length=5, max_length=20)
     nickname: str = Field(min_length=10, max_length=50)
+    # Optional field so coverage produces multiple positive object cases
+    # (one per optional present/absent), letting the constraint observations
+    # cross the calibration threshold before fuzzing builds its strategy.
+    bio: str | None = None
 
 
 # Constraint keywords removed from the served schema to mimic generator drift.

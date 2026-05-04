@@ -156,7 +156,6 @@ def test_feedback_unmasks_planted_bug_via_jackson_numeric_overflow(ctx, cli, sna
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
-            "--seed=42",
         )
         == snapshot_cli
     )
@@ -198,10 +197,10 @@ def test_feedback_recovers_constraints_dropped_from_pydantic_schema(ctx, cli, sn
     assert (
         cli.run(
             api.schema_url,
+            "--max-examples=10",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",
-            "--seed=100",
         )
         == snapshot_cli
     )

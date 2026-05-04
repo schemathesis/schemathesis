@@ -371,7 +371,6 @@ def before_generate_case(context, strategy):
             "run",
             str(schema_file),
             "--url=http://127.0.0.1:1",
-            "--seed=23",
             "--phases=fuzzing",
             hooks=module,
         )
@@ -421,7 +420,6 @@ def test_parameter_override(ctx, cli, snapshot_cli, explicit_header):
         cli.main(
             "run",
             str(schema_file),
-            "--seed=23",
             "--phases=examples",
             f"--url={api.base_url}/api",
             "--checks=explicit_header",

@@ -988,14 +988,14 @@ def test_graphql(ctx):
 @pytest.mark.usefixtures("restore_checks")
 def test_interrupted_in_test(ctx):
     api = ctx.openapi.apps.success()
-    openapi3_schema = schemathesis.openapi.from_url(api.schema_url)
+    schema = schemathesis.openapi.from_url(api.schema_url)
 
     # When an interrupt happens within a test body (check is called within a test body)
     @schemathesis.check
     def interrupt_check(ctx, response, case):
         raise KeyboardInterrupt
 
-    stream = EventStream(openapi3_schema, checks=(interrupt_check,)).execute()
+    stream = EventStream(schema, checks=(interrupt_check,)).execute()
     interrupted = stream.find(events.Interrupted)
     # Then the `Interrupted` event should be emitted
     assert interrupted is not None
@@ -1007,12 +1007,12 @@ def test_interrupted_in_test(ctx):
 
 def test_interrupted_outside_test(ctx, mocker):
     api = ctx.openapi.apps.success()
-    openapi3_schema = schemathesis.openapi.from_url(api.schema_url)
+    schema = schemathesis.openapi.from_url(api.schema_url)
     # See GH-1325
     # When an interrupt happens outside a test body
     mocker.patch("schemathesis.engine.events.ScenarioFinished.__init__", side_effect=KeyboardInterrupt)
 
-    stream = EventStream(openapi3_schema).execute()
+    stream = EventStream(schema).execute()
     try:
         interrupted = stream.find(events.Interrupted)
         # Then the `Interrupted` event should be emitted

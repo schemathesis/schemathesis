@@ -1563,7 +1563,6 @@ def test_readonly_in_allof_branch_does_not_collapse_positive_generation(ctx, app
             "--mode=positive",
             "--phases=fuzzing",
             "--max-examples=10",
-            "--seed=42",
         )
         == snapshot_cli
     )
