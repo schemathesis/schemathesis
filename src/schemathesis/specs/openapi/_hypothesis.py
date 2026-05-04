@@ -68,6 +68,10 @@ SLASH = "/"
 # Probability of generating valid headers in negative mode
 VALID_HEADER_PROBABILITY = 0.95
 _PLAIN_HEADER_FORMATS = {HEADER_FORMAT} | set(KNOWN_HEADER_FORMATS.values())
+# Strategies that take no varying input are deterministic and reusable; allocating
+# them once at import avoids ~300–600ns of fresh `LazyStrategy` construction per call.
+_NONE_STRATEGY: st.SearchStrategy = st.none()
+_JUST_NOT_SET: st.SearchStrategy = st.just(NOT_SET)
 StrategyFactory = Callable[
     [JsonSchema, str, ParameterLocation, str | None, GenerationConfig, type[jsonschema_rs.Validator]],
     st.SearchStrategy,
@@ -429,7 +433,7 @@ def _maybe_set_optional_body(
         and draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
         < OPTIONAL_BODY_RATE
     ):
-        strategy |= st.just(NOT_SET)
+        strategy |= _JUST_NOT_SET
     return strategy
 
 
@@ -519,7 +523,7 @@ def _build_form_strategy_with_encoding(
     # Build fixed dictionary strategy with optional properties
     required = set(schema.get("required", []))
     required_strategies = {k: v for k, v in property_strategies.items() if k in required}
-    optional_strategies = {k: st.just(NOT_SET) | v for k, v in property_strategies.items() if k not in required}
+    optional_strategies = {k: _JUST_NOT_SET | v for k, v in property_strategies.items() if k not in required}
 
     def _unwrap(value: Any) -> Any:
         return value.value if isinstance(value, GeneratedValue) else value
@@ -770,7 +774,7 @@ def get_parameters_strategy(
             error_feedback=error_feedback,
         )
     # No parameters defined for this location
-    return st.none()
+    return _NONE_STRATEGY
 
 
 def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:

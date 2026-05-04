@@ -19,7 +19,6 @@ from schemathesis.reporting.har import HarWriter
 from schemathesis.reporting.vcr import VcrWriter
 from schemathesis.specs.openapi._hypothesis import get_parameters_strategy
 from schemathesis.specs.openapi.stateful import dependencies
-from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -290,21 +289,6 @@ def test_dependency_analysis(benchmark, schema):
 def test_link_generation(benchmark, schema):
     graph = dependencies.analyze(schema)
     benchmark(lambda: list(graph.iter_links()))
-
-
-@pytest.mark.benchmark(group="dependency-layers")
-@pytest.mark.parametrize(
-    "schema",
-    [
-        BBCI_SCHEMA,
-        VMWARE_SCHEMA,
-        STRIPE_SCHEMA,
-    ],
-    ids=("bbci", "vmware", "stripe"),
-)
-def test_dependency_layers(benchmark, schema):
-    graph = dependencies.analyze(schema)
-    benchmark(compute_dependency_layers, graph)
 
 
 def _load_from_file(loader, json_string):

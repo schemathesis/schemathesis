@@ -60,6 +60,10 @@ _IN_TO_LOCATION: dict[str | None, ParameterLocation] = {
     None: ParameterLocation.UNKNOWN,
 }
 
+# Reused for the common case where no parameters are excluded — avoids
+# allocating a fresh empty frozenset on every cache lookup.
+_EMPTY_EXCLUDE_KEY: frozenset[str] = frozenset()
+
 # Probability of using captured resource values vs generated values in hybrid strategy.
 CAPTURED_VALUES_PROBABILITY = 0.8
 
@@ -1114,7 +1118,7 @@ class OpenApiParameterSet(ParameterSet):
 
     def get_schema_with_exclusions(self, exclude: Iterable[str]) -> dict[str, Any]:
         """Get cached schema with specified parameters excluded."""
-        exclude_key = frozenset(exclude)
+        exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
 
         if exclude_key in self._schema_cache:
             return self._schema_cache[exclude_key]
@@ -1154,7 +1158,7 @@ class OpenApiParameterSet(ParameterSet):
         error_feedback: ErrorFeedbackStore | None = None,
     ) -> st.SearchStrategy:
         """Get a Hypothesis strategy for this parameter set with specified exclusions."""
-        exclude_key = frozenset(exclude)
+        exclude_key = _EMPTY_EXCLUDE_KEY if not exclude else frozenset(exclude)
         feedback_generation = error_feedback.generation if error_feedback is not None else None
         cache_key = (exclude_key, generation_mode, feedback_generation)
 
