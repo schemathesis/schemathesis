@@ -1187,8 +1187,16 @@ The following required headers are missing from the response:
         ("false", {"type": "boolean"}, False),
         ("1", {"type": "boolean"}, True),
         ("0", {"type": "boolean"}, False),
+        # Array type — Swagger 2.0 collectionFormat splits the wire value into items.
+        ("a,b,c", {"type": "array", "items": {"type": "string"}}, ["a", "b", "c"]),
+        (
+            "1,2,3",
+            {"type": "array", "items": {"type": "integer"}, "collectionFormat": "csv"},
+            [1, 2, 3],
+        ),
+        ("a b c", {"type": "array", "items": {"type": "string"}, "collectionFormat": "ssv"}, ["a", "b", "c"]),
+        ("a,b", {"type": "array", "items": {"type": "string"}, "collectionFormat": "multi"}, "a,b"),
         # Unsupported type
-        ("test", {"type": "array"}, "test"),
         ("test", {"type": "object"}, "test"),
         # No type specified
         ("test", {}, "test"),

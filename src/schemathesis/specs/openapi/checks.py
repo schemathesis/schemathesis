@@ -216,7 +216,15 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
 
 
-def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | float | None | bool:
+_COLLECTION_FORMAT_DELIMITERS = {
+    "csv": ",",
+    "ssv": " ",
+    "tsv": "\t",
+    "pipes": "|",
+}
+
+
+def _coerce_header_value(value: str, schema: dict[str, Any]) -> Any:
     schema_type = schema.get("type")
 
     if schema_type == "string":
@@ -235,6 +243,16 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | floa
         return None
     if schema_type == "boolean":
         return string_to_boolean(value)
+    if schema_type == "array":
+        # Swagger 2.0: array headers use `collectionFormat` (default `csv`) to define
+        # how items are joined into a single header value. Split the wire form into
+        # items, then coerce each one against `items` so non-string element types validate.
+        collection_format = schema.get("collectionFormat", "csv")
+        delimiter = _COLLECTION_FORMAT_DELIMITERS.get(collection_format)
+        if delimiter is None:
+            return value
+        items_schema = schema.get("items") or {}
+        return [_coerce_header_value(item, items_schema) for item in value.split(delimiter)]
     return value
 
 

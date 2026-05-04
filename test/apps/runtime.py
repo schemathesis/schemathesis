@@ -26,6 +26,7 @@ class CapturedRequest:
     query: dict[str, str]
     headers: dict[str, str]
     body: bytes
+    raw_query: str = ""
 
     def json(self) -> Any:
         return json.loads(self.body)
