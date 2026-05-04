@@ -2206,7 +2206,6 @@ def test_request_body_without_validation_keywords(ctx):
     run_positive_test(operation, test)
 
 
-@pytest.mark.openapi_version("3.0")
 def test_unspecified_http_methods(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     raw_schema = {
@@ -2273,7 +2272,6 @@ def failed(ctx, response, case):
         )
 
 
-@pytest.mark.openapi_version("3.0")
 def test_avoid_testing_unexpected_methods(ctx):
     raw_schema = {
         "/foo": {
@@ -2306,7 +2304,6 @@ def test_avoid_testing_unexpected_methods(ctx):
     assert not methods
 
 
-@pytest.mark.openapi_version("3.0")
 def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     raw_schema = {
@@ -2342,7 +2339,6 @@ def test_avoid_testing_unexpected_methods_in_cli(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
 def test_coverage_failure_shows_actual_method_in_header(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.success()
     # Regression test for GH-3322
@@ -2422,7 +2418,6 @@ def test_unnecessary_auth_warning(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.openapi_version("3.0")
 def test_nested_parameters(ctx):
     schema = ctx.openapi.build_schema(
         {

@@ -581,9 +581,11 @@ def test_find_operation_by_id_no_paths_on_openapi_3_1():
 
 
 @pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
-def test_ssl_error(server):
+def test_ssl_error(ctx):
+    api = ctx.openapi.apps.success()
     with pytest.raises(LoaderError) as exc:
-        schemathesis.openapi.from_url(f"https://127.0.0.1:{server['port']}")
+        # Hit the HTTP server over HTTPS to trigger an SSL handshake failure.
+        schemathesis.openapi.from_url(f"https://127.0.0.1:{api.port}")
     assert exc.value.message == "SSL verification problem"
     assert exc.value.extras[0].startswith(
         (

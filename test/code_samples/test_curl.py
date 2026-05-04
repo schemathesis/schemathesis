@@ -1,6 +1,8 @@
 import pytest
 from _pytest.main import ExitCode
+from fastapi import FastAPI
 from hypothesis import HealthCheck, given, settings
+from pydantic import BaseModel, ConfigDict, Field
 
 import schemathesis
 from schemathesis import Case
@@ -15,9 +17,35 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.generation.modes import GenerationMode
-from test.apps.openapi._fastapi import create_app
-from test.apps.openapi._fastapi.app import app
 
+
+def _make_get_users_app() -> FastAPI:
+    app = FastAPI()
+
+    @app.get("/users")
+    async def root() -> dict:
+        return {"success": True}
+
+    return app
+
+
+class _User(BaseModel):
+    first_name: str = Field(min_length=3)
+    last_name: str = Field(min_length=3)
+    model_config = ConfigDict(extra="forbid")
+
+
+def _make_create_user_app() -> FastAPI:
+    app = FastAPI()
+
+    @app.post("/users/", status_code=201)
+    def create_user(user: _User) -> dict:
+        return {"id": "0"}
+
+    return app
+
+
+app = _make_get_users_app()
 schema = schemathesis.openapi.from_dict(app.openapi())
 schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
@@ -65,7 +93,7 @@ def test_non_utf_8_body(curl):
 
 
 def test_json_payload(curl):
-    new_app = create_app(operations=["create_user"])
+    new_app = _make_create_user_app()
     schema = schemathesis.openapi.from_dict(new_app.openapi())
     case = schema["/users/"]["POST"].Case(body={"foo": 42}, media_type="application/json")
     command = case.as_curl_command()

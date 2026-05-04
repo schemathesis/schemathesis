@@ -5,8 +5,6 @@ import schemathesis
 from schemathesis.core.errors import InvalidStateMachine
 from schemathesis.core.result import Ok
 
-pytestmark = [pytest.mark.openapi_version("3.0")]
-
 
 @pytest.fixture
 def customer_order_schema():

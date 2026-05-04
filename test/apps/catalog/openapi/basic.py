@@ -374,3 +374,64 @@ def success_and_basic() -> OpenAPIApp:
     handlers.register_success(app)
     handlers.register_basic(app)
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+# Every fragment in `test/apps/fragments/schemas.py`, including deliberately-broken ones.
+# Used by the local launcher (`python -m test.apps`) to expose everything for manual debugging.
+_KITCHEN_SINK_FRAGMENTS = (
+    "success",
+    "failure",
+    "multiple_failures",
+    "payload",
+    "unsatisfiable",
+    "flaky",
+    "ignored_auth",
+    "multipart",
+    "csv_payload",
+    "form",
+    "upload_file",
+    "always_incorrect",
+    "empty",
+    "empty_string",
+    "recursive",
+    "invalid_response",
+    "invalid_path_parameter",
+    "missing_path_parameter",
+    "reserved",
+    "conformance",
+    "cp866",
+    "read_only",
+    "write_only",
+    "text",
+    "plain_text_body",
+    "teapot",
+    "malformed_json",
+    "invalid",
+    "slow",
+    "headers",
+    "path_variable",
+    "custom_format",
+    "basic",
+)
+
+
+def kitchen_sink() -> OpenAPIApp:
+    paths: dict = {}
+    for fragment in _KITCHEN_SINK_FRAGMENTS:
+        for path, methods in getattr(schemas, fragment)().items():
+            paths.setdefault(path, {}).update(methods)
+    components = {
+        "securitySchemes": {
+            **_BASIC_AUTH_SCHEME["securitySchemes"],
+            **_API_KEY_SCHEME["securitySchemes"],
+            **_HEISEN_AUTH_SCHEME["securitySchemes"],
+        },
+        "schemas": dict(schemas.READ_WRITE_COMPONENTS["schemas"]),
+    }
+    spec = {**build_schema(paths, components=components), "x-definitions": {"Node": _NODE_DEFINITION}}
+    app = make_flask_app_from_schema(spec)
+    for fragment in _KITCHEN_SINK_FRAGMENTS:
+        register = getattr(handlers, f"register_{fragment}", None)
+        if register is not None:
+            register(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")

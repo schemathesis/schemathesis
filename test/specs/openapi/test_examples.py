@@ -5,6 +5,7 @@ from unittest.mock import ANY
 
 import jsonschema_rs
 import pytest
+from flask import Flask, Response
 from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
@@ -1022,8 +1023,15 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
     test()
 
 
-def test_external_value(ctx, server):
+def test_external_value(ctx, app_runner):
     # When the API schema contains examples via `externalValue` keyword
+    answer_app = Flask(__name__)
+
+    @answer_app.route("/answer.json")
+    def answer():
+        return Response(b"42", content_type="application/json")
+
+    port = app_runner.run_flask_app(answer_app)
     schema = ctx.openapi.build_schema(
         {
             "/test/": {
@@ -1032,9 +1040,7 @@ def test_external_value(ctx, server):
                         "content": {
                             "application/json": {
                                 "schema": {"type": "integer"},
-                                "examples": {
-                                    "answer": {"externalValue": f"http://127.0.0.1:{server['port']}/answer.json"}
-                                },
+                                "examples": {"answer": {"externalValue": f"http://127.0.0.1:{port}/answer.json"}},
                             }
                         }
                     },

@@ -23,13 +23,10 @@ import schemathesis.cli
 from schemathesis.cli.commands.run.handlers import output
 from schemathesis.core.transport import Response
 
-from .apps import openapi
-from .apps.openapi.schema import OpenAPIVersion, Operation
 from .utils import make_schema
 
 pytest_plugins = [
     "pytester",
-    "aiohttp.pytest_plugin",
     "pytest_mock",
     "test.fixtures.ctx",
     "test.fixtures.app_runner",
@@ -40,9 +37,6 @@ pytest_plugins = [
 ]
 
 logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
-# The capability probe deliberately sends a NULL byte header; aiohttp logs the parser rejection
-# at ERROR level once per test, polluting captured-log output for unrelated failures.
-logging.getLogger("aiohttp.server").setLevel(logging.CRITICAL)
 
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
@@ -53,122 +47,9 @@ output.SCHEMATHESIS_VERSION = "dev"
 
 @pytest.fixture(scope="session")
 def hypothesis_max_examples():
-    """Take `max_examples` value if it is not default.
-
-    If it is default, then return None, so individual tests can use appropriate values.
-    """
+    # Returns max_examples when overridden via `--hypothesis-profile`, else None so each test can pick its own.
     value = settings().max_examples
-    return None if value == 100 else value  # Hypothesis uses 100 examples by default
-
-
-@pytest.fixture(scope="session")
-def _app():
-    """A global AioHTTP application with configurable API operations."""
-    return openapi._aiohttp.create_app(("success", "failure"))
-
-
-@pytest.fixture
-def operations(request):
-    marker = request.node.get_closest_marker("operations")
-    if marker:
-        if marker.args and marker.args[0] == "__all__":
-            operations = tuple(item for item in Operation.__members__ if item != "all")
-        else:
-            operations = marker.args
-    else:
-        operations = ("success", "failure")
-    return operations
-
-
-@pytest.fixture
-def reset_app(_app, operations):
-    def inner(version):
-        openapi._aiohttp.reset_app(_app, operations, version)
-
-    return inner
-
-
-@pytest.fixture
-def app(openapi_version, _app, reset_app):
-    """Set up the global app for a specific test.
-
-    NOTE. It might cause race conditions when `pytest-xdist` is used, but they have very low probability.
-    """
-    reset_app(openapi_version)
-    return _app
-
-
-@pytest.fixture
-def open_api_3():
-    return OpenAPIVersion("3.0")
-
-
-@pytest.fixture
-def openapi_2_app(_app, reset_app):
-    reset_app(OpenAPIVersion("2.0"))
-    return _app
-
-
-@pytest.fixture
-def openapi_3_app(_app, reset_app):
-    reset_app(OpenAPIVersion("3.0"))
-    return _app
-
-
-@pytest.fixture(scope="session")
-def server(_app, app_runner):
-    """Run the app on an unused port."""
-    port = app_runner.run_aiohttp_app(_app)
-    return {"port": port}
-
-
-@pytest.fixture
-def server_host(server):
-    return f"127.0.0.1:{server['port']}"
-
-
-@pytest.fixture
-def server_address(server_host):
-    return f"http://{server_host}"
-
-
-@pytest.fixture
-def base_url(server_address, app):
-    """Base URL for the running application."""
-    return f"{server_address}/api"
-
-
-@pytest.fixture
-def openapi2_base_url(server_address, openapi_2_app):
-    return f"{server_address}/api"
-
-
-@pytest.fixture
-def openapi3_base_url(server_address, openapi_3_app):
-    return f"{server_address}/api"
-
-
-@pytest.fixture
-def schema_url(server_address, app):
-    """URL of the schema of the running application."""
-    return f"{server_address}/schema.yaml"
-
-
-@pytest.fixture
-def openapi2_schema_url(server_address, openapi_2_app):
-    """URL of the schema of the running application."""
-    return f"{server_address}/schema.yaml"
-
-
-@pytest.fixture
-def openapi3_schema_url(server_address, openapi_3_app):
-    """URL of the schema of the running application."""
-    return f"{server_address}/schema.yaml"
-
-
-@pytest.fixture
-def openapi3_schema(openapi3_schema_url):
-    return schemathesis.openapi.from_url(openapi3_schema_url)
+    return None if value == 100 else value
 
 
 @pytest.fixture
@@ -535,15 +416,10 @@ def openapi_31():
 
 
 @pytest.fixture
-def app_schema(openapi_version, operations):
-    return openapi._aiohttp.make_openapi_schema(operations=operations, version=openapi_version)
-
-
-@pytest.fixture
 def testdir(testdir):
     def maker(
         content,
-        pytest_plugins=("aiohttp.pytest_plugin",),
+        pytest_plugins=(),
         sanitize_output=True,
         generation_modes=None,
         schema=None,
@@ -633,36 +509,6 @@ def testdir(testdir):
     testdir.make_graphql_schema_file = make_graphql_schema_file
 
     return testdir
-
-
-@pytest.fixture
-def wsgi_app_factory():
-    return openapi._flask.create_app
-
-
-@pytest.fixture
-def flask_app(wsgi_app_factory, operations):
-    return wsgi_app_factory(operations)
-
-
-@pytest.fixture
-def asgi_app_factory():
-    return openapi._fastapi.create_app
-
-
-@pytest.fixture
-def fastapi_app(asgi_app_factory):
-    return asgi_app_factory()
-
-
-@pytest.fixture
-def real_app_schema(schema_url):
-    return schemathesis.openapi.from_url(schema_url)
-
-
-@pytest.fixture
-def wsgi_app_schema(flask_app):
-    return schemathesis.openapi.from_wsgi("/schema.yaml", flask_app)
 
 
 @pytest.fixture

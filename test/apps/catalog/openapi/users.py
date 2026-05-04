@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 from uuid import uuid4
 
+from fastapi import FastAPI, HTTPException, Query
 from flask import Flask, jsonify, request
+from pydantic import BaseModel, ConfigDict, Field
 
 from test.apps.builders import build_schema, make_flask_app_from_schema
 from test.apps.fragments import handlers, schemas
@@ -207,3 +209,50 @@ def crud_with_failure() -> OpenAPIApp:
     _register_users_handlers(app)
     handlers.register_failure(app)
     return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+class _CreateUser(BaseModel):
+    first_name: str = Field(min_length=3)
+    last_name: str = Field(min_length=3)
+    model_config = ConfigDict(extra="forbid")
+
+
+class _UpdateUser(BaseModel):
+    first_name: str = Field(min_length=3)
+    # Planted bug: nullable last_name slips past validation, then GET /users/{id}
+    # blows up when concatenating it into a full_name.
+    last_name: str | None = Field(None, min_length=3, json_schema_extra={"nullable": True})
+    model_config = ConfigDict(extra="forbid")
+
+
+def crud_asgi() -> OpenAPIApp:
+    app = FastAPI()
+    users: dict[str, dict[str, Any]] = {}
+
+    @app.post("/users/", status_code=201)
+    def create_user(user: _CreateUser) -> dict[str, str]:
+        user_id = str(uuid4())
+        users[user_id] = {**user.model_dump(), "id": user_id}
+        return {"id": user_id}
+
+    @app.get("/users/{user_id}")
+    def get_user(user_id: str, uid: str = Query(...), code: int = Query(...)) -> dict[str, str]:
+        if user_id not in users:
+            raise HTTPException(status_code=404, detail="Not found")
+        user = users[user_id]
+        try:
+            full_name = user["first_name"] + " " + user["last_name"]
+        except TypeError as exc:
+            raise HTTPException(status_code=500, detail="We got a problem!") from exc
+        return {"id": user["id"], "full_name": full_name}
+
+    @app.patch("/users/{user_id}")
+    def update_user(user_id: str, update: _UpdateUser, common: int = Query(...)) -> dict[str, Any]:
+        if user_id not in users:
+            raise HTTPException(status_code=404, detail="Not found")
+        user = users[user_id]
+        for field in ("first_name", "last_name"):
+            user[field] = getattr(update, field)
+        return user
+
+    return OpenAPIApp(spec=app.openapi(), server=app, kind="fastapi")

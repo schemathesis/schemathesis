@@ -108,6 +108,7 @@ async def test_(request, aiohttp_client, app, case):
     assert app["saved_requests"][0].method == "GET"
     assert app["saved_requests"][0].path == "/users"
 """,
+        pytest_plugins=("aiohttp.pytest_plugin",),
         generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")

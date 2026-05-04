@@ -180,6 +180,9 @@ ignore = [
   "SIM910", # delete default arguments in .get() in some cases
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"test/apps/__main__.py" = ["T201"]  # CLI launcher prints to stdout
+
 [tool.ruff.lint.isort]
 known-first-party = ["schemathesis"]
 known-third-party = [
