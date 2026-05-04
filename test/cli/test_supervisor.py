@@ -6,6 +6,7 @@ import schemathesis
 from schemathesis.core.warnings import SchemathesisWarning
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.run import PhaseName
+from schemathesis.engine.supervisor import METHOD_NOT_ALLOWED_THRESHOLD
 from schemathesis.generation import GenerationMode
 
 
@@ -48,10 +49,8 @@ def test_persistent_405_skips_op_in_later_phases(ctx):
 
 
 def test_baked_cases_short_circuit_after_supervisor_fires(ctx):
-    # After the window fills mid-Coverage, the remaining baked cases for the same
-    # operation must short-circuit before reaching the server — otherwise eager
-    # `@example` baking in Coverage / Examples burns the full mutation set on a
-    # known-dead operation.
+    # Eager-baked Coverage cases past the supervisor's fire point must skip
+    # the server call instead of running the full mutation set.
     api = ctx.openapi.apps.unimplemented_method()
     store = api.wsgi_app.config["store"]
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -61,11 +60,12 @@ def test_baked_cases_short_circuit_after_supervisor_fires(ctx):
 
     list(from_schema(schema).execute())
 
-    assert store.hits["missing"] >= 10, f"window should have filled; got {store.hits['missing']} hits"
-    # 50 max_examples × Fuzzing + ~30+ Coverage mutations = >50 without the fix.
-    assert store.hits["missing"] <= 25, (
-        f"Expected server calls bounded after supervisor fires; got {store.hits['missing']} hits "
-        f"(remaining baked cases did not short-circuit)"
+    assert store.hits["missing"] >= METHOD_NOT_ALLOWED_THRESHOLD, (
+        f"streak threshold should have been reached; got {store.hits['missing']} hits"
+    )
+    # Without the short-circuit: 50 Fuzzing examples + Coverage mutations would all run.
+    assert store.hits["missing"] <= METHOD_NOT_ALLOWED_THRESHOLD + 5, (
+        f"Expected server calls bounded after supervisor fires; got {store.hits['missing']} hits"
     )
     assert store.hits["items"] > 0, "GET /items should still be exercised"
 
@@ -100,9 +100,8 @@ def test_method_not_allowed_warning_can_fail_the_run(cli, ctx):
 
 
 def test_stateful_skips_supervisor_blocked_operations(ctx):
-    # Coverage fills the supervisor window on the 405-only POST. Stateful must honor
-    # the resulting SKIP verdict via the `TransitionController` precondition gate so
-    # the dead operation never gets selected as a state-machine transition.
+    # Stateful's `TransitionController` must reject rules whose target operation
+    # has a SKIP verdict so the dead op is never selected as a transition.
     api = ctx.openapi.apps.linked_with_unimplemented_method()
     store = api.wsgi_app.config["store"]
     schema = schemathesis.openapi.from_url(api.schema_url)
@@ -119,8 +118,8 @@ def test_stateful_skips_supervisor_blocked_operations(ctx):
             saw_stateful_finish = True
 
     assert saw_stateful_finish, "Stateful phase did not run"
-    assert missing_hits_pre_stateful >= 10, (
-        f"window should have filled before Stateful started; got {missing_hits_pre_stateful} pre-Stateful hits"
+    assert missing_hits_pre_stateful >= METHOD_NOT_ALLOWED_THRESHOLD, (
+        f"streak should have triggered before Stateful started; got {missing_hits_pre_stateful} pre-Stateful hits"
     )
     stateful_missing_hits = store.hits["missing"] - missing_hits_pre_stateful
     assert stateful_missing_hits == 0, (
