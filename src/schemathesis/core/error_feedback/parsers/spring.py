@@ -19,6 +19,7 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 # Bean Validation messages we recognize as "this field is required and non-blank":
@@ -184,6 +185,7 @@ class SpringParser:
         *,
         operation: APIOperation,
         body: object,
+        case: Case,
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
             return ()

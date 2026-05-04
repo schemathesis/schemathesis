@@ -21,6 +21,7 @@ from schemathesis.core.error_feedback.store import (
 )
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 WalkPair = tuple[tuple[str | int, ...], str]
@@ -165,7 +166,7 @@ class LaravelParser:
         errors = _extract_errors(body)
         return errors is not None and _has_laravel_vocabulary(errors)
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         errors = _extract_errors(body)
         if errors is None:
             return ()

@@ -20,6 +20,7 @@ from schemathesis.core.error_feedback.store import (
 from schemathesis.core.parameters import ParameterLocation
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 # HTTP frameworks (FastAPI, Litestar, Starlette) prepend a location segment to
@@ -154,6 +155,7 @@ class PydanticParser:
         *,
         operation: APIOperation,
         body: object,
+        case: Case,
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
             return ()

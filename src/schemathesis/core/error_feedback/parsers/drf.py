@@ -21,6 +21,7 @@ from schemathesis.core.error_feedback.store import (
 )
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 WalkPair = tuple[tuple[str | int, ...], str]
@@ -174,7 +175,7 @@ class DRFParser:
             return True
         return _has_string_list_leaf(body)
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         location = location_for_method(operation.method)
         observations: list[Observation] = []
         for path, message in _walk(body):

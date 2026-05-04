@@ -25,6 +25,7 @@ from schemathesis.core.error_feedback.store import (
 )
 
 if TYPE_CHECKING:
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 ParameterPath = tuple[str | int, ...]
@@ -219,7 +220,7 @@ class SymfonyParser:
         violations = _extract_violations(body)
         return violations is not None and _has_symfony_signature(violations)
 
-    def parse(self, *, operation: APIOperation, body: object) -> tuple[Observation, ...]:
+    def parse(self, *, operation: APIOperation, body: object, case: Case) -> tuple[Observation, ...]:
         violations = _extract_violations(body)
         if violations is None or not _has_symfony_signature(violations):
             return ()
