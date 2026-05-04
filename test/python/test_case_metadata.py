@@ -3,6 +3,7 @@ from hypothesis import Phase, given, settings
 from hypothesis import strategies as st
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
@@ -15,6 +16,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
+from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 
 
 def make_negative_meta(location, parameter=None, description="Test mutation"):
@@ -674,3 +676,36 @@ def test_revalidation_with_openapi_30_boolean_exclusive_minimum(ctx):
     case.body = {"Pitch": 10}
 
     assert case.meta.components[ParameterLocation.BODY].mode == GenerationMode.POSITIVE
+
+
+def test_case_metadata_round_trip_preserves_fuzzing_mutations():
+    # xdist controller-side recorders rebuild metadata via from_dict; without
+    # serializing `mutations`, structured mutation records are lost in parallel runs.
+    mutation = Mutation(
+        path=("user", "email"),
+        schema_pointer="/properties/user/properties/email",
+        channel=MutationChannel.VALUE,
+        operator=OperatorKind.VALUE_VIOLATOR,
+        keywords=("format:email",),
+        parameter="email",
+        original_value="user@example.com",
+        new_value="useratexample.com",
+    )
+    meta = CaseMetadata(
+        generation=GenerationInfo(time=0.0, mode=GenerationMode.NEGATIVE),
+        components={ParameterLocation.BODY: ComponentInfo(mode=GenerationMode.NEGATIVE)},
+        phase=PhaseInfo(
+            name=TestPhase.FUZZING,
+            data=FuzzingPhaseData(
+                description="Violates `format:email`",
+                parameter="email",
+                parameter_location=ParameterLocation.BODY,
+                location="/properties/user/properties/email",
+                mutations=(mutation,),
+            ),
+        ),
+    )
+
+    restored = CaseMetadata.from_dict(meta.to_dict())
+
+    assert restored.phase.data.mutations == (mutation,)

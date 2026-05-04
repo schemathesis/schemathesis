@@ -28,7 +28,7 @@ _________________________________ POST /items __________________________________
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
-    Invalid component: in body - violates `allOf` ([{'$ref': '#/components/schemas/Item'}, {'$ref': '#/components/schemas/Category'}])
+    Invalid component: <PLACEHOLDER>
 
 [201] Created:
 

@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import enum
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, TypeAlias, TypeVar
+from typing import Any, Literal, TypeAlias, TypeVar
 
 from hypothesis import reject
 from hypothesis import strategies as st
-from hypothesis.strategies._internal.featureflags import FeatureStrategy
-from hypothesis_jsonschema._canonicalise import canonicalish
+from hypothesis.strategies._internal.featureflags import FeatureFlags, FeatureStrategy
 
-from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type, unbundle
+from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY, get_type
+from schemathesis.core.jsonschema.bundler import REFERENCE_TO_BUNDLE_PREFIX
 from schemathesis.core.jsonschema.types import JsonSchemaObject
 from schemathesis.core.media_types import is_xml
+from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import JsonValue, deepclone
 
 from .types import Draw, Schema
 from .utils import can_negate, is_binary_format
@@ -25,15 +28,446 @@ from .utils import can_negate, is_binary_format
 T = TypeVar("T")
 
 
-@dataclass
-class MutationMetadata:
-    """Metadata about a mutation that was applied."""
+class MutationChannel(str, enum.Enum):
+    """Where a mutation lives in the per-case pipeline."""
 
+    SCHEMA = "schema"
+    VALUE = "value"
+
+
+PathKeyword: TypeAlias = Literal[
+    "properties", "items", "oneOf", "anyOf", "allOf", "additionalProperties", "patternProperties"
+]
+PathSelector: TypeAlias = str | int | None
+
+# Defensive cap on schema-walk recursion depth.
+MAX_WALK_DEPTH = 32
+# Cap on extra mutation targets per case beyond the always-chosen primary.
+MAX_SECONDARY_TARGETS = 2
+
+
+@dataclass(slots=True)
+class Mutation:
+    """One mutation applied during a negative-fuzzing case.
+
+    Records the schema/value alteration so callers can attribute the case to a
+    specific path, operator, and keyword set.
+    """
+
+    path: tuple[str | int, ...]
+    schema_pointer: str
+    channel: MutationChannel
+    operator: OperatorKind
+    keywords: tuple[str, ...]
     parameter: str | None
-    description: str | None
-    location: str | None
+    original_value: JsonValue | None
+    new_value: JsonValue | None
 
-    __slots__ = ("parameter", "description", "location")
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "path": list(self.path),
+            "schema_pointer": self.schema_pointer,
+            "channel": self.channel.value,
+            "operator": self.operator.value,
+            "keywords": list(self.keywords),
+            "parameter": self.parameter,
+            "original_value": self.original_value,
+            "new_value": self.new_value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Mutation:
+        return cls(
+            path=tuple(data["path"]),
+            schema_pointer=data["schema_pointer"],
+            channel=MutationChannel(data["channel"]),
+            operator=OperatorKind(data["operator"]),
+            keywords=tuple(data["keywords"]),
+            parameter=data["parameter"],
+            original_value=data["original_value"],
+            new_value=data["new_value"],
+        )
+
+
+class MutationMetadata:
+    """Per-case metadata: the structured Mutation records applied this case.
+
+    The `description` / `parameter` / `location` properties summarize the
+    single-mutation case. The `description` constructor argument lets a
+    producer supply a hand-formatted string (e.g. syntax fuzzing emits
+    "Invalid syntax: random bytes" directly); `NOT_SET` means "derive from
+    mutations", while explicit `None` means "no description for this case".
+    """
+
+    __slots__ = ("mutations", "_description")
+
+    mutations: tuple[Mutation, ...]
+    _description: str | None | NotSet
+
+    def __init__(
+        self,
+        mutations: tuple[Mutation, ...],
+        description: str | None | NotSet = NOT_SET,
+    ) -> None:
+        self.mutations = mutations
+        self._description = description
+
+    @property
+    def description(self) -> str | None:
+        if not isinstance(self._description, NotSet):
+            return self._description
+        if not self.mutations or len(self.mutations) > 1:
+            return None
+        mutation = self.mutations[0]
+        message = f"Violates `{', '.join(mutation.keywords)}` at {mutation.schema_pointer}"
+        if mutation.original_value is not None:
+            message += f" (expected {mutation.original_value})"
+        return message
+
+    @property
+    def parameter(self) -> str | None:
+        return self.mutations[0].parameter if len(self.mutations) == 1 else None
+
+    @property
+    def location(self) -> str | None:
+        if len(self.mutations) != 1:
+            return None
+        return self.mutations[0].schema_pointer or None
+
+
+@dataclass(slots=True)
+class PathStep:
+    """One ancestor on the root-to-target chain for a MutationTarget."""
+
+    # Schema dict to write `required` into during propagation.
+    parent: JsonSchemaObject
+    # JSON-Schema keyword the parent used to descend.
+    keyword: PathKeyword
+    # Child identifier within that keyword.
+    selector: PathSelector
+
+
+@dataclass(slots=True)
+class MutationTarget:
+    """A candidate mutation target plus its ancestor chain."""
+
+    schema: JsonSchemaObject
+    path: tuple[PathStep, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class WalkStep:
+    """One hop in a MutationTargetDescriptor's root-to-target walk recipe."""
+
+    keyword: PathKeyword | Literal["$ref"]
+    selector: PathSelector
+
+
+@dataclass(frozen=True, slots=True)
+class MutationTargetDescriptor:
+    """Identity-free walk recipe for one mutation target.
+
+    Materialization replays the walk against a per-case cloned schema to produce
+    a concrete `MutationTarget` record with resolved parents. Frozen so cached
+    descriptors cannot be mutated by downstream consumers.
+    """
+
+    walk: tuple[WalkStep, ...]
+
+
+def compute_mutation_targets(raw_schema: JsonSchemaObject | bool) -> tuple[MutationTargetDescriptor, ...]:
+    """Return walk recipes for every reachable mutation target in `raw_schema`."""
+    if not isinstance(raw_schema, dict):
+        return ()
+    bundle = raw_schema.get(BUNDLE_STORAGE_KEY)
+    bundle_map: JsonSchemaObject = bundle if isinstance(bundle, dict) else {}
+    descriptors: list[MutationTargetDescriptor] = []
+
+    def walk(node: object, recipe: tuple[WalkStep, ...], stack: tuple[int, ...]) -> None:
+        if not isinstance(node, dict):
+            return
+        if id(node) in stack or len(stack) > MAX_WALK_DEPTH:
+            return
+        new_stack = stack + (id(node),)
+
+        # Bundled $ref: dereference and descend into the target. Unreachable targets (missing or cyclic) yield
+        # no descriptor for the inner walk. Fall through afterwards: OpenAPI 3.1 / JSON Schema 2019-09+ allow
+        # `$ref` to have sibling keywords (e.g. `{$ref, minLength: 3}`), so the wrapper itself can carry
+        # mutable constraints.
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith(REFERENCE_TO_BUNDLE_PREFIX):
+            target_name = ref.rsplit("/", 1)[-1]
+            target = bundle_map.get(target_name)
+            if isinstance(target, dict) and id(target) not in new_stack:
+                walk(target, recipe + (WalkStep("$ref", target_name),), new_stack)
+
+        # Skip nodes with no mutable content (empty `{}`, external `$ref`-only wrappers). Operators have
+        # nothing to negate at such targets; emitting a descriptor would waste a primary slot on
+        # guaranteed-FAILURE dispatch.
+        if any(key != BUNDLE_STORAGE_KEY and key != "$ref" for key in node):
+            descriptors.append(MutationTargetDescriptor(walk=recipe))
+
+        properties = node.get("properties")
+        if isinstance(properties, dict):
+            for name, sub in properties.items():
+                walk(sub, recipe + (WalkStep("properties", name),), new_stack)
+        items = node.get("items")
+        if isinstance(items, dict):
+            walk(items, recipe + (WalkStep("items", None),), new_stack)
+        elif isinstance(items, list):
+            for index, item in enumerate(items):
+                walk(item, recipe + (WalkStep("items", index),), new_stack)
+        additional = node.get("additionalProperties")
+        if isinstance(additional, dict):
+            walk(additional, recipe + (WalkStep("additionalProperties", None),), new_stack)
+        pattern_props = node.get("patternProperties")
+        if isinstance(pattern_props, dict):
+            for pattern, sub in pattern_props.items():
+                walk(sub, recipe + (WalkStep("patternProperties", pattern),), new_stack)
+        for keyword in ("oneOf", "anyOf", "allOf"):
+            branches = node.get(keyword)
+            if isinstance(branches, list):
+                for index, branch in enumerate(branches):
+                    walk(branch, recipe + (WalkStep(keyword, index),), new_stack)
+
+    walk(raw_schema, (), ())
+    return tuple(descriptors)
+
+
+def _descend(node: JsonSchemaObject, keyword: PathKeyword, selector: PathSelector) -> JsonSchemaObject:
+    """Navigate one structural keyword from `node`. Caller resolves $refs separately."""
+    match keyword:
+        case "properties":
+            return node["properties"][selector]
+        case "items":
+            return node["items"] if selector is None else node["items"][selector]
+        case "oneOf" | "anyOf" | "allOf":
+            return node[keyword][selector]
+        case "additionalProperties":
+            return node["additionalProperties"]
+        case "patternProperties":
+            return node["patternProperties"][selector]
+
+
+def _materialize_one(
+    new_schema: JsonSchemaObject,
+    descriptor: MutationTargetDescriptor,
+    bundle_map: JsonSchemaObject,
+) -> MutationTarget | None:
+    """Replay one descriptor against `new_schema` and return the resolved MutationTarget.
+
+    Returns `None` when the walk can't be followed (e.g., a `properties` hop where
+    the parent has no `properties` key, or a `$ref` hop into a missing bundle entry).
+    This happens when error-feedback adjustments transform the schema between
+    strategy build and case generation.
+    """
+    steps: list[PathStep] = []
+    current: JsonSchemaObject = new_schema
+    for hop in descriptor.walk:
+        if hop.keyword == "$ref":
+            assert isinstance(hop.selector, str)
+            target = bundle_map.get(hop.selector) if isinstance(bundle_map, dict) else None
+            if not isinstance(target, dict):
+                return None
+            current = target
+            continue
+        try:
+            next_node = _descend(current, hop.keyword, hop.selector)
+        except (KeyError, IndexError, TypeError):
+            return None
+        steps.append(PathStep(parent=current, keyword=hop.keyword, selector=hop.selector))
+        current = next_node
+    # The walk explicitly steps through every `$ref` via a `WalkStep("$ref", …)` hop, so a node ending the
+    # walk on `$ref` is intentional — sibling-bearing wrappers (`{$ref, minLength: 3}`) need their siblings
+    # mutated, not the dereferenced target. Don't defensively dereference here.
+    return MutationTarget(schema=current, path=tuple(steps))
+
+
+def _materialize_targets(
+    new_schema: JsonSchemaObject, descriptors: tuple[MutationTargetDescriptor, ...]
+) -> list[MutationTarget]:
+    """Replay every descriptor against `new_schema` and return the resolved targets."""
+    bundle = new_schema.get(BUNDLE_STORAGE_KEY)
+    bundle_map = bundle if isinstance(bundle, dict) else {}
+    targets: list[MutationTarget] = []
+    for descriptor in descriptors:
+        target = _materialize_one(new_schema, descriptor, bundle_map)
+        if target is not None:
+            targets.append(target)
+    return targets
+
+
+def _propagate_required_path(path: tuple[PathStep, ...]) -> None:
+    """Force `required` (or equivalent) at each ancestor along `path`, mutating parents in place."""
+    for step in path:
+        selector = step.selector
+        parent = step.parent
+        match step.keyword:
+            case "properties":
+                assert isinstance(selector, str)
+                required = parent.setdefault("required", [])
+                if selector not in required:
+                    required.append(selector)
+            case "items":
+                assert selector is None or isinstance(selector, int)
+                min_required = 1 if selector is None else selector + 1
+                if parent.get("minItems", 0) < min_required:
+                    parent["minItems"] = min_required
+            case "oneOf" | "anyOf" as keyword:
+                assert isinstance(selector, int)
+                branches = parent[keyword]
+                # Earlier sibling propagation may already have collapsed this list to one branch.
+                if selector < len(branches):
+                    parent[keyword] = [branches[selector]]
+            case "allOf":
+                pass
+            case "additionalProperties":
+                synthesized = _synthesize_property_name(parent)
+                parent.setdefault("properties", {})[synthesized] = parent["additionalProperties"]
+                required = parent.setdefault("required", [])
+                if synthesized not in required:
+                    required.append(synthesized)
+            case "patternProperties":
+                assert isinstance(selector, str)
+                synthesized_pattern = _synthesize_pattern_property_name(selector)
+                if synthesized_pattern is None:
+                    continue
+                parent.setdefault("properties", {})[synthesized_pattern] = parent["patternProperties"][selector]
+                required = parent.setdefault("required", [])
+                if synthesized_pattern not in required:
+                    required.append(synthesized_pattern)
+
+
+def _disjoint_descriptor_pool(
+    candidates: tuple[MutationTargetDescriptor, ...], chosen: list[MutationTargetDescriptor]
+) -> list[MutationTargetDescriptor]:
+    """Filter descriptors that don't conflict with any already-chosen one.
+
+    Two walks conflict when one is a prefix of the other (chain), or when they
+    diverge at a `oneOf`/`anyOf` step (sibling branches; the schema mutation at
+    the chosen branch collapses the alternative). Used by the dispatcher to
+    drop disqualified candidates before materialization.
+    """
+
+    def is_on_chain(a: tuple[WalkStep, ...], b: tuple[WalkStep, ...]) -> bool:
+        shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+        return longer[: len(shorter)] == shorter
+
+    def shares_oneof_sibling(a: tuple[WalkStep, ...], b: tuple[WalkStep, ...]) -> bool:
+        for step_a, step_b in zip(a, b, strict=False):
+            if step_a == step_b:
+                continue
+            if step_a.keyword in ("oneOf", "anyOf") and step_a.keyword == step_b.keyword:
+                return True
+            return False
+        return False
+
+    def keep(candidate: MutationTargetDescriptor) -> bool:
+        for picked in chosen:
+            if is_on_chain(candidate.walk, picked.walk):
+                return False
+            if shares_oneof_sibling(candidate.walk, picked.walk):
+                return False
+        return True
+
+    return [candidate for candidate in candidates if keep(candidate)]
+
+
+def _absolutize(target: MutationTarget, local: Mutation) -> Mutation:
+    """Prefix a local Mutation's path/schema_pointer with the target's path-from-root.
+
+    Also derives the parameter name from the path's last `properties` step when the
+    operator didn't set one explicitly. Operators only set `parameter` when negating
+    a single-element `required` list; for any other mutation on a parameter-shaped
+    target (a single property under root), we want the parameter name to surface
+    in error messages so callers see "parameter `X` in <location>" instead of just
+    "in <location>".
+    """
+    body_path_prefix: tuple[str | int, ...] = tuple(
+        step.selector for step in target.path if step.keyword == "properties" and isinstance(step.selector, str)
+    )
+    pointer_segments: list[str] = []
+    for step in target.path:
+        pointer_segments.append(step.keyword)
+        if step.selector is not None:
+            pointer_segments.append(str(step.selector))
+    schema_pointer_prefix = "/" + "/".join(pointer_segments) if pointer_segments else ""
+    parameter = local.parameter
+    if parameter is None:
+        for step in reversed(target.path):
+            if step.keyword == "properties" and isinstance(step.selector, str):
+                parameter = step.selector
+                break
+    return Mutation(
+        path=body_path_prefix + local.path,
+        schema_pointer=schema_pointer_prefix + local.schema_pointer,
+        channel=local.channel,
+        operator=local.operator,
+        keywords=local.keywords,
+        parameter=parameter,
+        original_value=local.original_value,
+        new_value=local.new_value,
+    )
+
+
+def _synthesize_property_name(parent: JsonSchemaObject) -> str:
+    """Return a property name not already in `parent.properties`."""
+    properties = parent.get("properties", {})
+    if "k" not in properties:
+        return "k"
+    counter = 0
+    while f"k{counter}" in properties:
+        counter += 1
+    return f"k{counter}"
+
+
+# Curated probe set covering common JSON-Schema patternProperties shapes: lowercase / uppercase /
+# alphanumeric / kebab- / snake- / CamelCase / digit. Tried in order, so the simplest matching name wins.
+_PATTERN_NAME_CANDIDATES = ("x", "X", "0", "x0", "Xx", "_x", "x-y", "x_y", "foo", "Foo")
+
+
+def _synthesize_pattern_property_name(pattern: str) -> str | None:
+    """Return a literal property name matching `pattern`, or `None` if no candidate satisfies it."""
+    try:
+        regex = re.compile(pattern)
+    except re.error:
+        return None
+    for candidate in _PATTERN_NAME_CANDIDATES:
+        if regex.search(candidate) is not None:
+            return candidate
+    return None
+
+
+def metadata_with_description_override(
+    *,
+    operator: OperatorKind,
+    parameter: str | None,
+    description: str | None,
+    location: str | None,
+    keywords: tuple[str, ...] = (),
+) -> MutationMetadata:
+    """Build a MutationMetadata whose description is supplied directly.
+
+    Used by the syntax-fuzzing path: the random-bytes payload has no structured
+    keyword/path to attribute the violation to, so the producer hands in a
+    pre-formatted message ("Invalid syntax: random bytes") instead of having
+    `description` derive one from a Mutation record.
+    """
+    return MutationMetadata(
+        mutations=(
+            Mutation(
+                path=(),
+                schema_pointer=location or "",
+                channel=MutationChannel.SCHEMA,
+                operator=operator,
+                keywords=keywords,
+                parameter=parameter,
+                original_value=None,
+                new_value=None,
+            ),
+        ),
+        description=description,
+    )
 
 
 class MutationResult(int, enum.Enum):
@@ -58,7 +492,12 @@ class MutationResult(int, enum.Enum):
         return other
 
 
-Mutation: TypeAlias = Callable[["MutationContext", Draw, Schema], tuple[MutationResult, MutationMetadata | None]]
+# Mutator contract:
+#   - SUCCESS  -> (MutationResult.SUCCESS, MutationMetadata(mutations=(one_mutation,)))
+#   - FAILURE  -> (MutationResult.FAILURE, None)
+# The dispatcher relies on len(mutations) == 1 for any successful operator return;
+# operators must not produce multi-mutation metadata.
+Mutator: TypeAlias = Callable[["MutationContext", Draw, Schema], tuple[MutationResult, MutationMetadata | None]]
 ANY_TYPE_KEYS = {"$ref", "allOf", "anyOf", "const", "else", "enum", "if", "not", "oneOf", "then", "type"}
 TYPE_SPECIFIC_KEYS = {
     "number": ("multipleOf", "maximum", "exclusiveMaximum", "minimum", "exclusiveMinimum"),
@@ -78,23 +517,29 @@ TYPE_SPECIFIC_KEYS = {
 }
 
 
-@dataclass
 class MutationContext:
     """Meta information about the current mutation state."""
 
-    # The original schema
-    keywords: Schema  # only keywords
-    non_keywords: Schema  # everything else
-    # Schema location within API operation (header, query, etc)
-    location: ParameterLocation
-    # Payload media type, if available
-    media_type: str | None
-    # Whether generating unexpected parameters is permitted
-    allow_extra_parameters: bool
-    # Mapping from bundled schema names to original URIs (for unbundling)
-    name_to_uri: dict[str, str]
+    __slots__ = (
+        "keywords",
+        "non_keywords",
+        "location",
+        "media_type",
+        "allow_extra_parameters",
+        "name_to_uri",
+        "target_descriptors",
+    )
 
-    __slots__ = ("keywords", "non_keywords", "location", "media_type", "allow_extra_parameters", "name_to_uri")
+    # Validation keywords only.
+    keywords: Schema
+    # Everything else (extensions, x-bundled, etc.).
+    non_keywords: Schema
+    location: ParameterLocation
+    media_type: str | None
+    allow_extra_parameters: bool
+    # Bundled name -> original URI, for error display.
+    name_to_uri: dict[str, str]
+    target_descriptors: tuple[MutationTargetDescriptor, ...]
 
     def __init__(
         self,
@@ -105,6 +550,7 @@ class MutationContext:
         media_type: str | None,
         allow_extra_parameters: bool,
         name_to_uri: dict[str, str] | None = None,
+        target_descriptors: tuple[MutationTargetDescriptor, ...],
     ) -> None:
         self.keywords = keywords
         self.non_keywords = non_keywords
@@ -112,6 +558,7 @@ class MutationContext:
         self.media_type = media_type
         self.allow_extra_parameters = allow_extra_parameters
         self.name_to_uri = name_to_uri or {}
+        self.target_descriptors = target_descriptors
 
     @property
     def is_path_location(self) -> bool:
@@ -127,78 +574,95 @@ class MutationContext:
         This is necessary when working with nested schemas (e.g., property schemas)
         that may contain bundled references but don't have the x-bundled key themselves.
         """
+        # NOTE: nested targets get the *original* bundle reference, while `mutate()` clones the
+        # bundle for the root schema. Operators today only read bundle entries, so the aliasing is
+        # latent — but if any future operator writes into a bundle entry on a nested target, the
+        # mutation will leak across cases. Clone here (or thread `bundle_map`) before that happens.
         if BUNDLE_STORAGE_KEY in self.non_keywords and BUNDLE_STORAGE_KEY not in schema:
             schema[BUNDLE_STORAGE_KEY] = self.non_keywords[BUNDLE_STORAGE_KEY]
 
     def mutate(self, draw: Draw) -> tuple[Schema, MutationMetadata | None]:
-        # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
-        # taken as-is. Therefore, we can only apply mutations that won't change the Open API semantics of the schema.
-        mutations: list[Mutation]
-        if self.location in (ParameterLocation.HEADER, ParameterLocation.COOKIE, ParameterLocation.QUERY):
-            # These objects follow this pattern:
-            # {
-            #     "properties": properties,
-            #     "additionalProperties": False,
-            #     "type": "object",
-            #     "required": required
-            # }
-            # Open API semantics expect mapping; therefore, they should have the "object" type.
-            # We can:
-            #   - remove required parameters
-            #   - negate constraints (only `additionalProperties` in this case)
-            #   - mutate individual properties
-            mutations = draw(ordered((remove_required_property, negate_constraints, change_properties)))
-        elif self.is_path_location:
-            # The same as above, but we can only mutate individual properties as their names are predefined in the
-            # path template, and all of them are required.
-            mutations = [change_properties]
-        else:
-            # Body can be of any type and does not have any specific type semantic.
-            mutations = draw(ordered(get_mutations(draw, self.keywords)))
-        # Deep copy all keywords to avoid modifying the original schema
+        """Target-dispatch: pick one primary target uniformly + up to 2 disjoint secondaries.
+
+        One operator runs per chosen target; `required` is propagated along each path.
+        """
         new_schema = deepclone(self.keywords)
-        # Add x-bundled before mutations so they can resolve bundled references
         if BUNDLE_STORAGE_KEY in self.non_keywords:
-            new_schema[BUNDLE_STORAGE_KEY] = self.non_keywords[BUNDLE_STORAGE_KEY]
-        enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))
-        # Always apply at least one mutation, otherwise everything is rejected, and we'd like to avoid it
-        # for performance reasons
-        always_applied_mutation = draw(st.sampled_from(mutations))
-        result, metadata = always_applied_mutation(self, draw, new_schema)
-        num_successful = 1 if result == MutationResult.SUCCESS else 0
-        for mutation in mutations:
-            if mutation is not always_applied_mutation and enabled_mutations.is_enabled(mutation.__name__):
-                mut_result, mut_metadata = mutation(self, draw, new_schema)
-                result |= mut_result
-                if mut_result == MutationResult.SUCCESS:
-                    num_successful += 1
-                    if metadata is None:
-                        metadata = mut_metadata
-        # When multiple mutations succeed, they can conflict (e.g., one mutates a property, another removes it).
-        # Merging metadata from multiple mutations is non-trivial, so clear the description to avoid misleading
-        # error messages. We preserve `parameter` and `parameter_location` as they're used for auth exclusion logic
-        if num_successful > 1 and metadata is not None:
-            metadata = MutationMetadata(
-                parameter=metadata.parameter,
-                description=None,
-                location=metadata.location,
-            )
-        if result == MutationResult.FAILURE:
-            # If we failed to apply anything, then reject the whole case
+            new_schema[BUNDLE_STORAGE_KEY] = deepclone(self.non_keywords[BUNDLE_STORAGE_KEY])
+
+        descriptors = self.target_descriptors
+        if not descriptors:
             reject()
-        new_schema.update(self.non_keywords)
+        bundle = new_schema.get(BUNDLE_STORAGE_KEY)
+        bundle_map = bundle if isinstance(bundle, dict) else {}
+
+        random_state = draw(st.randoms())
+        # Operator-swarm mask: each case sees a random subset of operators
+        # (Groce et al., "Swarm Testing", ISSTA '12, DOI 10.1145/2338965.2336763).
+        enabled_operators = draw(st.shared(FeatureStrategy(), key="operators"))
+
+        # Uniform sampling over a precomputed list of every reachable site counters the root-bias diagnosed
+        # in Regehr, "Helping Generative Fuzzers Avoid Looking Only Where the Light is Good"
+        # (blog.regehr.org/archives/1700, 2019): without it, deeper leaves draw exponentially less weight than the root
+        primary_descriptor = draw(st.sampled_from(descriptors)) if len(descriptors) > 1 else descriptors[0]
+        primary = _materialize_one(new_schema, primary_descriptor, bundle_map)
+        if primary is None:
+            reject()
+        assert primary is not None
+        primary_operators = self._applicable_operators(primary)
+        if not primary_operators:
+            reject()
+
+        chosen_descriptors: list[MutationTargetDescriptor] = [primary_descriptor]
+        chosen: list[tuple[MutationTarget, list[Mutator]]] = [(primary, primary_operators)]
+
+        for _ in range(MAX_SECONDARY_TARGETS):
+            if random_state.random() >= 0.3:
+                continue
+            pool = _disjoint_descriptor_pool(descriptors, chosen_descriptors)
+            if not pool:
+                break
+            secondary_descriptor = draw(st.sampled_from(pool)) if len(pool) > 1 else pool[0]
+            secondary = _materialize_one(new_schema, secondary_descriptor, bundle_map)
+            if secondary is None:
+                continue
+            secondary_operators = self._applicable_operators(secondary)
+            if not secondary_operators:
+                continue
+            chosen_descriptors.append(secondary_descriptor)
+            chosen.append((secondary, secondary_operators))
+
+        mutations: list[Mutation] = []
+        for target, applicable in chosen:
+            mutation = self._apply_one_at_target(draw, target, applicable, enabled_operators)
+            if mutation is None:
+                continue
+            mutations.append(_absolutize(target, mutation))
+            _propagate_required_path(target.path)
+
+        if not mutations:
+            reject()
+
+        # Non-keyword fields pass through; keep the already-cloned bundle if operators mutated targets inside it.
+        for key, value in self.non_keywords.items():
+            if key == BUNDLE_STORAGE_KEY and key in new_schema:
+                continue
+            new_schema[key] = value
         if self.location.is_in_header:
-            # All headers should have names that can be sent over network
             new_schema["propertyNames"] = {"type": "string", "format": "_header_name"}
             for sub_schema in new_schema.get("properties", {}).values():
                 sub_schema["type"] = "string"
-                if len(sub_schema) == 1:
-                    sub_schema["format"] = "_header_value"
+                # `_header_value` keeps generated values within RFC 9110 codepoints so `is_valid_header` doesn't
+                # reject them. Without this, mutated header sub-schemas (e.g. `{type: string, not: {pattern: …}}`)
+                # produce non-Latin-1 strings that the upstream filter discards, forcing Hypothesis to fall back
+                # to empty values that hide bugs.
+                sub_schema.setdefault("format", "_header_value")
             if self.allow_extra_parameters and draw(st.booleans()):
-                # In headers, `additionalProperties` are False by default, which means that Schemathesis won't generate
-                # any headers that are not defined. This change adds the possibility of generating valid extra headers
+                # Headers default `additionalProperties: False`, so without this branch Schemathesis can never generate
+                # undeclared header names — opt in here to exercise that surface when extra parameters are allowed.
                 new_schema["additionalProperties"] = {"type": "string", "format": "_header_value"}
-        # Empty array or objects may match the original schema
+        # Empty arrays / objects may still validate against the original schema,
+        # turning a "negative" case into a positive one — force at least one element.
         if "array" in get_type(new_schema) and new_schema.get("items") and "minItems" not in new_schema.get("not", {}):
             new_schema.setdefault("minItems", 1)
         if (
@@ -207,14 +671,45 @@ class MutationContext:
             and "minProperties" not in new_schema.get("not", {})
         ):
             new_schema.setdefault("minProperties", 1)
-        return new_schema, metadata
+
+        return new_schema, MutationMetadata(mutations=tuple(mutations))
+
+    def _apply_one_at_target(
+        self, draw: Draw, target: MutationTarget, applicable: list[Mutator], enabled_operators: FeatureFlags
+    ) -> Mutation | None:
+        """Pick one operator from the swarm-masked applicable set; apply at target.schema."""
+        self.ensure_bundle(target.schema)
+        masked = [operator for operator in applicable if enabled_operators.is_enabled(operator.__name__)]
+        candidates = masked or applicable
+        for operator in draw(ordered(candidates, unique_by=lambda fn: fn.__name__)):
+            result, metadata = operator(self, draw, target.schema)
+            if result == MutationResult.SUCCESS and metadata is not None and metadata.mutations:
+                return metadata.mutations[0]
+        return None
+
+    def _applicable_operators(self, target: MutationTarget) -> list[Mutator]:
+        """Per-location applicability table.
+
+        BODY accepts every operator at every target. HEADER/COOKIE/QUERY/PATH
+        preserve the root parameter object (negation only — never type-change or
+        required-removal that would strip declared params); deeper per-parameter
+        schemas additionally accept change_type.
+        """
+        is_root = len(target.path) == 0
+        if self.location == ParameterLocation.BODY:
+            return [negate_constraints, change_type, remove_required_property]
+        if self.location.is_in_header or self.location == ParameterLocation.QUERY:
+            return [negate_constraints] if is_root else [negate_constraints, change_type]
+        if self.location == ParameterLocation.PATH:
+            return [] if is_root else [negate_constraints, change_type]
+        return []
 
 
-def for_types(*allowed_types: str) -> Callable[[Mutation], Mutation]:
+def for_types(*allowed_types: str) -> Callable[[Mutator], Mutator]:
     """Immediately return FAILURE for schemas with types not from ``allowed_types``."""
     _allowed_types = set(allowed_types)
 
-    def wrapper(mutation: Mutation) -> Mutation:
+    def wrapper(mutation: Mutator) -> Mutator:
         @wraps(mutation)
         def inner(ctx: MutationContext, draw: Draw, schema: Schema) -> tuple[MutationResult, MutationMetadata | None]:
             types = get_type(schema)
@@ -237,7 +732,6 @@ def remove_required_property(
     """
     required = schema.get("required")
     if not required:
-        # No required properties - can't mutate
         return MutationResult.FAILURE, None
     if len(required) == 1:
         property_name = draw(st.sampled_from(sorted(required)))
@@ -248,24 +742,26 @@ def remove_required_property(
         property_name = draw(st.sampled_from(candidates))
     required.remove(property_name)
     if not required:
-        # In JSON Schema Draft 4, `required` must contain at least one string
-        # To keep the schema conformant, remove the `required` key completely
+        # Draft 4 requires `required` to be non-empty when present.
         del schema["required"]
-    # An optional property still can be generated, and to avoid it, we need to remove it from other keywords.
+    # Drop the property too; an optional property would still be generatable.
     properties = schema.get("properties", {})
     properties.pop(property_name, None)
     if properties == {}:
         schema.pop("properties", None)
     schema["type"] = "object"
-    # This property still can be generated via `patternProperties`, but this implementation doesn't cover this case
-    # Its probability is relatively low, and the complete solution compatible with Draft 4 will require extra complexity
-    # The output filter covers cases like this
-    metadata = MutationMetadata(
+    # `patternProperties` can still produce this name; the output filter catches that case.
+    mutation = Mutation(
+        path=(),
+        schema_pointer=f"/properties/{property_name}",
+        channel=MutationChannel.SCHEMA,
+        operator=OperatorKind.REMOVE_REQUIRED_PROPERTY,
+        keywords=("required",),
         parameter=property_name,
-        description="Required property removed",
-        location=f"/properties/{property_name}",
+        original_value=None,
+        new_value=None,
     )
-    return MutationResult.SUCCESS, metadata
+    return MutationResult.SUCCESS, MutationMetadata(mutations=(mutation,))
 
 
 def change_type(
@@ -273,21 +769,15 @@ def change_type(
 ) -> tuple[MutationResult, MutationMetadata | None]:
     """Change type of values accepted by a schema."""
     if "type" not in schema:
-        # The absence of this keyword means that the schema values can be of any type;
-        # Therefore, we can't choose a different type
+        # No `type`: schema accepts every type; nothing to change.
         return MutationResult.FAILURE, None
     if ctx.media_type == "application/x-www-form-urlencoded":
-        # Form data should be an object, do not change it
+        # Form data must stay object-shaped.
         return MutationResult.FAILURE, None
-    # For headers, query and path parameters, if the current type is string, then it already
-    # includes all possible values as those parameters will be stringified before sending,
-    # therefore it can't be negated.
     old_types = get_type(schema)
-    # For string types, type mutations are meaningless when the wire format stringifies all values:
-    # - path/query/header/cookie: parameters are always serialized as strings
-    # - XML body: _escape_xml() converts any value to its string representation
-    #   (False -> "False", 0 -> "0", None -> "")
-    # - binary/byte body: accepts any bytes (no effective type constraint)
+    # `string` is wire-equivalent to "anything" for string-stringifying transports — path/query/header/cookie
+    # always serialize to strings, XML bodies stringify via `_escape_xml`, binary/byte bodies accept any bytes.
+    # Skip rather than emit a mutation that won't change what reaches the server.
     if "string" in old_types and (
         ctx.location.is_in_header
         or ctx.is_path_location
@@ -300,7 +790,6 @@ def change_type(
         return MutationResult.FAILURE, None
     candidates = _get_type_candidates_with_weights(ctx, schema, draw)
     if not candidates:
-        # Schema covers all possible types, not possible to choose something else
         return MutationResult.FAILURE, None
     if len(candidates) == 1:
         new_type = candidates.pop()
@@ -309,7 +798,6 @@ def change_type(
         _ensure_path_string_not_numeric(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
     else:
-        # Choose one type that will be present in the final candidates list
         candidate = draw(st.sampled_from(sorted(candidates)))
         candidates.remove(candidate)
         enabled_types = draw(st.shared(FeatureStrategy(), key="types"))
@@ -323,18 +811,23 @@ def change_type(
         _ensure_path_string_not_numeric(ctx, schema, old_types)
         prevent_unsatisfiable_schema(schema, new_type)
 
-    old_type_str = " | ".join(sorted(old_types)) if len(old_types) > 1 else old_types[0]
-    metadata = MutationMetadata(
+    mutation = Mutation(
+        path=(),
+        schema_pointer="",
+        channel=MutationChannel.SCHEMA,
+        operator=OperatorKind.CHANGE_TYPE,
+        keywords=("type",),
         parameter=None,
-        description=f"Invalid type {new_type} (expected {old_type_str})",
-        location=None,
+        original_value=" | ".join(sorted(old_types)) if len(old_types) > 1 else old_types[0],
+        new_value=new_type,
     )
-    return MutationResult.SUCCESS, metadata
+    return MutationResult.SUCCESS, MutationMetadata(mutations=(mutation,))
 
 
 def _ensure_query_serializes_to_non_empty(ctx: MutationContext, schema: Schema) -> None:
     if ctx.is_query_location and schema.get("type") == "array":
-        # Query parameters with empty arrays or arrays of `None` or empty arrays / objects will not appear in the final URL
+        # Empty arrays / `None` items / empty objects all serialize to a missing query string, which the request
+        # would never carry — force at least one value-bearing element so the mutation actually reaches the server.
         schema["minItems"] = schema.get("minItems") or 1
         schema.setdefault("items", {}).update({"not": {"enum": [None, [], {}]}})
 
@@ -351,36 +844,35 @@ def _ensure_path_string_not_numeric(ctx: MutationContext, schema: Schema, old_ty
         return
     if "integer" not in old_types and "number" not in old_types:
         return
-    # Exclude strings that look like numbers (integers or floats, positive or negative)
     schema["not"] = {"pattern": r"^-?\d+\.?\d*$"}
 
 
 def _get_type_candidates(ctx: MutationContext, schema: Schema) -> set[str]:
     types = set(get_type(schema))
     if ctx.is_path_location:
-        # Deprioritize null/boolean for path parameters to improve test budget efficiency
+        # Path params: skip null/boolean by default — they rarely surface real
+        # bugs and waste budget; `_get_type_candidates_with_weights` adds them back occasionally.
         candidates = {"string", "integer", "number"} - types
     else:
         candidates = {"string", "integer", "number", "object", "array", "boolean", "null"} - types
+    # Every integer is a number and vice versa from the validator's perspective —
+    # neither swap produces values the original schema rejects.
     if "integer" in types and "number" in candidates:
-        # Do not change "integer" to "number" as any integer is also a number
         candidates.remove("number")
     if "number" in types and "integer" in candidates:
-        # Do not change "number" to "integer" as any integer is also a number
         candidates.remove("integer")
     return candidates
 
 
-# Probability of adding null/boolean type mutations for path parameters.
+# Per-case probability for surfacing null/boolean as path-parameter mutations.
 PATH_NULL_BOOLEAN_PROBABILITY = 0.05
 
 
 def _get_type_candidates_with_weights(ctx: MutationContext, schema: Schema, draw: Draw) -> set[str]:
-    """Get type candidates with weighted selection for path parameters."""
+    """Path-aware candidate set: re-introduces null/boolean at low probability."""
     candidates = _get_type_candidates(ctx, schema)
     if ctx.is_path_location:
         types = set(get_type(schema))
-        # Occasionally add null/boolean for path parameters to ensure some coverage
         random = draw(st.randoms())
         if "null" not in types and random.random() < PATH_NULL_BOOLEAN_PROBABILITY:
             candidates.add("null")
@@ -390,10 +882,9 @@ def _get_type_candidates_with_weights(ctx: MutationContext, schema: Schema, draw
 
 
 def prevent_unsatisfiable_schema(schema: Schema, new_type: str) -> None:
-    """Adjust schema keywords to avoid unsatisfiable schemas."""
+    """Drop keywords that would conflict with `new_type` in the schema and its `not` branch."""
     drop_not_type_specific_keywords(schema, new_type)
     if "not" in schema:
-        # The "not" sub-schema should be cleaned too
         drop_not_type_specific_keywords(schema["not"], new_type)
         if not schema["not"]:
             del schema["not"]
@@ -405,160 +896,6 @@ def drop_not_type_specific_keywords(schema: Schema, new_type: str) -> None:
     for keyword in tuple(schema):
         if keyword not in keywords and keyword not in ANY_TYPE_KEYS:
             schema.pop(keyword, None)
-
-
-@for_types("object")
-def change_properties(
-    ctx: MutationContext, draw: Draw, schema: Schema
-) -> tuple[MutationResult, MutationMetadata | None]:
-    """Mutate individual object schema properties.
-
-    Effect: Some properties will not validate the original schema
-    """
-    properties = sorted(schema.get("properties", {}).items())
-    if not properties:
-        # No properties to mutate
-        return MutationResult.FAILURE, None
-    # Order properties randomly and iterate over them until at least one mutation is successfully applied to at least
-    # one property
-    ordered_properties = [
-        (name, canonicalish(subschema) if isinstance(subschema, bool) else subschema)
-        for name, subschema in draw(ordered(properties, unique_by=lambda x: x[0]))
-    ]
-    nested_metadata = None
-    for property_name, property_schema in ordered_properties:
-        ctx.ensure_bundle(property_schema)
-        result, nested_metadata = apply_until_success(ctx, draw, property_schema)
-        if result == MutationResult.SUCCESS:
-            # It is still possible to generate "positive" cases, for example, when this property is optional.
-            # They are filtered out on the upper level anyway, but to avoid performance penalty we adjust the schema
-            # so the generated samples are less likely to be "positive"
-            required = schema.setdefault("required", [])
-            if property_name not in required:
-                required.append(property_name)
-            # If `type` is already there, then it should contain "object" as we check it upfront
-            # Otherwise restrict `type` to "object"
-            if "type" not in schema:
-                schema["type"] = "object"
-            break
-    else:
-        # No successful mutations
-        return MutationResult.FAILURE, None
-    enabled_properties = draw(st.shared(FeatureStrategy(), key="properties"))
-    enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))
-    for name, property_schema in properties:
-        # Skip already mutated property
-        if name == property_name:
-            # Pylint: `properties` variable has at least one element as it is checked at the beginning of the function
-            # Then those properties are ordered and iterated over, therefore `property_name` is always defined
-            continue
-        if enabled_properties.is_enabled(name):
-            ctx.ensure_bundle(property_schema)
-            for mutation in get_mutations(draw, property_schema):
-                if enabled_mutations.is_enabled(mutation.__name__):
-                    mutation(ctx, draw, property_schema)
-
-    # Use nested metadata description if available, otherwise use generic description
-    if nested_metadata and nested_metadata.description:
-        description = nested_metadata.description
-    else:
-        description = "Property constraint violated"
-
-    metadata = MutationMetadata(
-        parameter=property_name,
-        description=description,
-        location=f"/properties/{property_name}",
-    )
-    return MutationResult.SUCCESS, metadata
-
-
-def apply_until_success(
-    ctx: MutationContext, draw: Draw, schema: Schema
-) -> tuple[MutationResult, MutationMetadata | None]:
-    for mutation in get_mutations(draw, schema):
-        result, metadata = mutation(ctx, draw, schema)
-        if result == MutationResult.SUCCESS:
-            return MutationResult.SUCCESS, metadata
-    return MutationResult.FAILURE, None
-
-
-@for_types("array")
-def change_items(ctx: MutationContext, draw: Draw, schema: Schema) -> tuple[MutationResult, MutationMetadata | None]:
-    """Mutate individual array items.
-
-    Effect: Some items will not validate the original schema
-    """
-    items = schema.get("items", {})
-    if not items:
-        # No items to mutate
-        return MutationResult.FAILURE, None
-    # For query/path/header/cookie, string items cannot be meaningfully mutated
-    # because all types serialize to strings anyway
-    if ctx.location.is_in_header or ctx.is_path_location or ctx.is_query_location:
-        items = schema.get("items", {})
-        if isinstance(items, dict):
-            items_types = get_type(items)
-            if "string" in items_types:
-                return MutationResult.FAILURE, None
-    if isinstance(items, dict):
-        return _change_items_object(ctx, draw, schema, items)
-    if isinstance(items, list):
-        return _change_items_array(ctx, draw, schema, items)
-    return MutationResult.FAILURE, None
-
-
-def _change_items_object(
-    ctx: MutationContext, draw: Draw, schema: Schema, items: Schema
-) -> tuple[MutationResult, MutationMetadata | None]:
-    ctx.ensure_bundle(items)
-    result = MutationResult.FAILURE
-    metadata = None
-    for mutation in get_mutations(draw, items):
-        mut_result, mut_metadata = mutation(ctx, draw, items)
-        result |= mut_result
-        if metadata is None and mut_metadata is not None:
-            metadata = mut_metadata
-    if result == MutationResult.FAILURE:
-        return MutationResult.FAILURE, None
-    min_items = schema.get("minItems", 0)
-    schema["minItems"] = max(min_items, 1)
-    # Use nested metadata description if available, update location to show it's in array items
-    if metadata:
-        metadata = MutationMetadata(
-            parameter=None,
-            description=f"Array item: {metadata.description}",
-            location="/items",
-        )
-    return MutationResult.SUCCESS, metadata
-
-
-def _change_items_array(
-    ctx: MutationContext, draw: Draw, schema: Schema, items: list
-) -> tuple[MutationResult, MutationMetadata | None]:
-    latest_success_index = None
-    metadata = None
-    for idx, item in enumerate(items):
-        ctx.ensure_bundle(item)
-        result = MutationResult.FAILURE
-        for mutation in get_mutations(draw, item):
-            mut_result, mut_metadata = mutation(ctx, draw, item)
-            result |= mut_result
-            if metadata is None and mut_metadata is not None:
-                metadata = mut_metadata
-        if result == MutationResult.SUCCESS:
-            latest_success_index = idx
-    if latest_success_index is None:
-        return MutationResult.FAILURE, None
-    min_items = schema.get("minItems", 0)
-    schema["minItems"] = max(min_items, latest_success_index + 1)
-    # Use nested metadata description if available, update location to show specific array index
-    if metadata:
-        metadata = MutationMetadata(
-            parameter=None,
-            description=f"Array item at index {latest_success_index}: {metadata.description}",
-            location=f"/items/{latest_success_index}",
-        )
-    return MutationResult.SUCCESS, metadata
 
 
 def negate_constraints(
@@ -578,13 +915,12 @@ def negate_constraints(
     negated_keys = []
 
     def is_mutation_candidate(k: str, v: Any) -> bool:
-        # Should we negate this key?
         if k == "required":
             return v != []
         if k in ("example", "examples", BUNDLE_STORAGE_KEY):
             return False
         if ctx.is_path_location and k == "minLength" and v == 1:
-            # Empty path parameter will be filtered out
+            # Negating `minLength: 1` produces empty paths that the transport drops anyway.
             return False
         if (
             not ctx.allow_extra_parameters
@@ -601,10 +937,9 @@ def negate_constraints(
     candidates = []
     mutation_candidates = [key for key, value in copied.items() if is_mutation_candidate(key, value)]
     if mutation_candidates:
-        # There should be at least one mutated keyword
+        # Pin one keyword as required-to-negate so the case isn't all-pass at low feature mask.
         candidate = draw(st.sampled_from([key for key, value in copied.items() if is_mutation_candidate(key, value)]))
         candidates.append(candidate)
-        # If the chosen candidate has dependency, then the dependency should also be present in the final schema
         if candidate in DEPENDENCIES:
             candidates.append(DEPENDENCIES[candidate])
     for key, value in copied.items():
@@ -612,65 +947,44 @@ def negate_constraints(
             if key in candidates or enabled_keywords.is_enabled(key):
                 is_negated = True
                 negated_keys.append(key)
-                # `format` is handled specially: removing it allows generating arbitrary strings
-                # that likely won't match the format. Using `not: {format: ...}` doesn't work
-                # because hypothesis-jsonschema treats format as annotation-only.
+                # `format` is dropped rather than wrapped in `not:` — hypothesis-jsonschema treats format as
+                # annotation-only, so removing it lets us generate values that won't match without validator help.
                 if key != "format":
                     negated = schema.setdefault("not", {})
                     negated[key] = value
                     if key in DEPENDENCIES:
-                        # If this keyword has a dependency, then it should be also negated
                         dependency = DEPENDENCIES[key]
                         if dependency not in negated and dependency in copied:
                             negated[dependency] = copied[dependency]
         else:
             schema[key] = value
     if is_negated:
-        # Build concise description from negated constraints
-        descriptions = []
         parameter = None
+        original_required: list[str] | None = None
         for key in negated_keys:
             value = copied[key]
-            if key == "required" and len(value) == 1:
-                parameter = value[0]
-            # Special case: format required properties list nicely with quoted names
-            if key == "required" and isinstance(value, list) and len(value) <= 3:
-                props = ", ".join(f"`{prop}`" for prop in value)
-                descriptions.append(f"`{key}` ({props})")
-            else:
-                # Unbundle values to show original $ref paths instead of internal bundled ones
-                display_value = unbundle(value, ctx.name_to_uri) if ctx.name_to_uri else value
-                descriptions.append(f"`{key}` ({display_value})")
-
-        constraint_desc = ", ".join(descriptions)
-        metadata = MutationMetadata(
+            if key == "required":
+                # Carry the full list so `transport.prepare.get_exclude_headers` can
+                # diff it against the actually-sent headers when `parameter` stays None.
+                original_required = list(value)
+                if len(value) == 1:
+                    parameter = value[0]
+                break
+        mutation = Mutation(
+            path=(),
+            schema_pointer="",
+            channel=MutationChannel.SCHEMA,
+            operator=OperatorKind.NEGATE_CONSTRAINTS,
+            keywords=tuple(negated_keys),
             parameter=parameter,
-            description=f"Violates {constraint_desc}",
-            location=None,
+            original_value=original_required,
+            new_value=None,
         )
-        return MutationResult.SUCCESS, metadata
+        return MutationResult.SUCCESS, MutationMetadata(mutations=(mutation,))
     return MutationResult.FAILURE, None
 
 
 DEPENDENCIES = {"exclusiveMaximum": "maximum", "exclusiveMinimum": "minimum"}
-
-
-def get_mutations(draw: Draw, schema: JsonSchemaObject) -> tuple[Mutation, ...]:
-    """Get mutations possible for a schema."""
-    types = get_type(schema)
-    # On the top-level of Open API schemas, types are always strings, but inside "schema" objects, they are the same as
-    # in JSON Schema, where it could be either a string or an array of strings.
-    options: list[Mutation]
-    if list(schema) == ["type"]:
-        # When there is only `type` in schema then `negate_constraints` is not applicable
-        options = [change_type]
-    else:
-        options = [negate_constraints, change_type]
-    if "object" in types:
-        options.extend([change_properties, remove_required_property])
-    elif "array" in types:
-        options.append(change_items)
-    return draw(ordered(options))
 
 
 def ident(x: T) -> T:

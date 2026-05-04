@@ -24,6 +24,7 @@ from test.apps.catalog.openapi import go_validator as openapi_go_validator
 from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import litestar as openapi_litestar
 from test.apps.catalog.openapi import marshmallow as openapi_marshmallow
+from test.apps.catalog.openapi import nested as openapi_nested
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
@@ -386,6 +387,21 @@ class OpenAPIApps:
 
     def swagger_v2_kitchen_sink(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.kitchen_sink())
+
+    def deep_leaf_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_nested.deep_leaf_bug())
+
+    def header_constraint_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_nested.header_constraint_bug())
+
+    def query_array_items_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_nested.query_array_items_bug())
+
+    def one_of_branch_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_nested.one_of_branch_bug())
+
+    def additional_properties_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_nested.additional_properties_bug())
 
 
 @dataclass(slots=True)

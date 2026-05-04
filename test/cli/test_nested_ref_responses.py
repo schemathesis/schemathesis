@@ -144,7 +144,7 @@ def test_nested_ref_in_response_definition(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_invalid_component=True)
 def test_bundled_ref_in_negative_testing_description(ctx, cli, snapshot_cli):
     # When a request body schema has $ref with multiple definitions, the negative testing (fuzzing)
     # phase may negate the $ref constraint. The error description should show the original reference

@@ -7,6 +7,7 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
+from schemathesis.core.mutations import OperatorKind
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -30,6 +31,7 @@ from schemathesis.specs.openapi.checks import (
     positive_data_acceptance,
     response_schema_conformance,
 )
+from schemathesis.specs.openapi.negative.mutations import Mutation, MutationChannel
 
 
 @pytest.mark.parametrize(
@@ -103,6 +105,22 @@ def build_metadata(
     parameter_location=None,
     location=None,
 ):
+    # When the test pins a type-mutation description, also populate the structured
+    # Mutation record so the case carries what the engine produces for the same case.
+    mutations: tuple[Mutation, ...] = ()
+    if description.startswith("Invalid type") and parameter is not None:
+        mutations = (
+            Mutation(
+                path=(parameter,),
+                schema_pointer=f"/properties/{parameter}",
+                channel=MutationChannel.SCHEMA,
+                operator=OperatorKind.CHANGE_TYPE,
+                keywords=("type",),
+                parameter=parameter,
+                original_value=None,
+                new_value=None,
+            ),
+        )
     return CaseMetadata(
         generation=GenerationInfo(
             time=0.1,
@@ -126,6 +144,7 @@ def build_metadata(
                 parameter=parameter,
                 parameter_location=parameter_location,
                 location=location,
+                mutations=mutations,
             ),
         ),
     )
