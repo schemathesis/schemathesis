@@ -22,7 +22,7 @@ from schemathesis.config import (
     FuzzingPhaseConfig,
     OperationOrdering,
 )
-from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, SpecificationMetadata, deserialization
+from schemathesis.core import INJECTED_PATH_PARAMETER_KEY, NOT_SET, NotSet, Specification, deserialization
 from schemathesis.core.adapter import OperationParameter, ResponsesContainer
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
@@ -121,8 +121,8 @@ class OpenApiSchema(BaseSchema):
 
     @cached_property
     @override
-    def specification(self) -> SpecificationMetadata:
-        return SpecificationMetadata.openapi(version=self._spec_version)
+    def specification(self) -> Specification:
+        return Specification.openapi(version=self._spec_version)
 
     @cached_property
     def security(self) -> OpenApiSecurity:

@@ -26,18 +26,18 @@ class SpecificationFeature(str, enum.Enum):
 
 
 @dataclass
-class SpecificationMetadata:
+class Specification:
     kind: SpecificationKind
     version: str
 
     __slots__ = ("kind", "version")
 
     @classmethod
-    def openapi(cls, version: str) -> SpecificationMetadata:
+    def openapi(cls, version: str) -> Specification:
         return cls(kind=SpecificationKind.OPENAPI, version=version)
 
     @classmethod
-    def graphql(cls, version: str) -> SpecificationMetadata:
+    def graphql(cls, version: str) -> Specification:
         return cls(kind=SpecificationKind.GRAPHQL, version=version)
 
     @property

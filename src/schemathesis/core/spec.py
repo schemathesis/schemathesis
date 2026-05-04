@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from schemathesis.auths import AuthContext, AuthStorage
     from schemathesis.config import GenerationConfig, ProjectConfig
-    from schemathesis.core import NotSet, SpecificationMetadata
+    from schemathesis.core import NotSet, Specification
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.core.result import Result
@@ -42,20 +42,15 @@ class CoverageCapabilities:
     validator_cls: type[jsonschema_rs.Validator] | None
 
 
-class Specification(Protocol):
-    """The contract every concrete schema implementation satisfies.
-
-    Annotate against this in framework code that only needs schema-level
-    operations; `_check_protocol_conformance` below makes mypy enforce that
-    concrete schemas provide every member.
-    """
+class ApiSchema(Protocol):
+    """The contract every concrete schema implementation satisfies."""
 
     config: ProjectConfig
     hooks: HookDispatcher
     auth: AuthStorage
 
     @property
-    def specification(self) -> SpecificationMetadata: ...
+    def specification(self) -> Specification: ...
 
     def validate(self) -> None: ...
 
@@ -156,7 +151,5 @@ if TYPE_CHECKING:
     # Force the type checker to verify that concrete schema classes structurally satisfy
     # `Specification`. If the Protocol changes (or a method is renamed/removed on a schema
     # class) without updating both sides, mypy fails here.
-    def _check_protocol_conformance(
-        openapi: OpenApiSchema, graphql: GraphQLSchema
-    ) -> tuple[Specification, Specification]:
+    def _check_protocol_conformance(openapi: OpenApiSchema, graphql: GraphQLSchema) -> tuple[ApiSchema, ApiSchema]:
         return openapi, graphql
