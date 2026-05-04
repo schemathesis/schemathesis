@@ -37,6 +37,7 @@ def make_flask_app_from_schema(schema: dict[str, Any]) -> Flask:
             query=dict(request.args),
             headers=dict(request.headers),
             body=request.get_data(),
+            raw_query=request.query_string.decode("utf-8", errors="replace"),
         )
         if request.path == "/openapi.json":
             schema_fetches.append(snapshot)

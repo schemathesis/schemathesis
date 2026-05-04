@@ -22,6 +22,7 @@ from test.apps.catalog.openapi import laravel as openapi_laravel
 from test.apps.catalog.openapi import rails as openapi_rails
 from test.apps.catalog.openapi import stateful as openapi_stateful
 from test.apps.catalog.openapi import supervisor as openapi_supervisor
+from test.apps.catalog.openapi import swagger_v2 as openapi_swagger_v2
 from test.apps.catalog.openapi import symfony as openapi_symfony
 from test.apps.catalog.openapi import under_declared_security as openapi_under_declared_security
 from test.apps.catalog.openapi import users as openapi_users
@@ -285,6 +286,72 @@ class OpenAPIApps:
 
     def symfony_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_symfony.planted_bug())
+
+    def swagger_v2_baseline(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.baseline())
+
+    def swagger_v2_formdata(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.formdata())
+
+    def swagger_v2_collection_format(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.collection_format())
+
+    def swagger_v2_security(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.security())
+
+    def swagger_v2_nullable(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.nullable())
+
+    def swagger_v2_examples(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.examples())
+
+    def swagger_v2_response_headers(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.response_headers())
+
+    def swagger_v2_default_response(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.default_response())
+
+    def swagger_v2_array_path_parameter(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.array_path_parameter())
+
+    def swagger_v2_injected_path_parameter(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.injected_path_parameter())
+
+    def swagger_v2_all_locations(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.all_locations())
+
+    def swagger_v2_oauth2_security(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.oauth2_security())
+
+    def swagger_v2_no_response_body(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.no_response_body())
+
+    def swagger_v2_native_response_examples(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.native_response_examples())
+
+    def swagger_v2_parameter_ref(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.parameter_ref())
+
+    def swagger_v2_path_level_parameters(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.path_level_parameters())
+
+    def swagger_v2_form_urlencoded(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.form_urlencoded())
+
+    def swagger_v2_multi_path_parameter(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.multi_path_parameter())
+
+    def swagger_v2_diverse_response_headers(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.diverse_response_headers())
+
+    def swagger_v2_array_response_header(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.array_response_header())
+
+    def swagger_v2_and_security(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.and_security())
+
+    def swagger_v2_kitchen_sink(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_swagger_v2.kitchen_sink())
 
 
 @dataclass(slots=True)

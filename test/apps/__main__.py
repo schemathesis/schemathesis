@@ -26,6 +26,7 @@ from test.apps.catalog.openapi import (
     rails,
     stateful,
     supervisor,
+    swagger_v2,
     under_declared_security,
     users,
     zod,
@@ -43,6 +44,7 @@ _OPENAPI_MODULES = {
     "laravel": laravel,
     "zod": zod,
     "error_feedback": error_feedback,
+    "swagger_v2": swagger_v2,
     "under_declared_security": under_declared_security,
 }
 
