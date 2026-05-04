@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from werkzeug.test import TestResponse
 
     from schemathesis.auths import AuthContext
-    from schemathesis.core import SpecificationMetadata
+    from schemathesis.core import Specification
     from schemathesis.core.error_feedback import ErrorFeedbackStore
     from schemathesis.core.schema_analysis import SchemaWarning
     from schemathesis.engine.context import EngineContext
@@ -89,7 +89,7 @@ class BaseSchema(Mapping):
         self._inferred_security: dict[str, list[Mapping[str, list[str]]]] = {}
 
     @property
-    def specification(self) -> SpecificationMetadata:
+    def specification(self) -> Specification:
         raise NotImplementedError
 
     @property

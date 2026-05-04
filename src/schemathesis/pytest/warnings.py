@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 from schemathesis.specs.openapi.warnings import UnusedOpenAPIAuthWarning
 
 if TYPE_CHECKING:
-    from schemathesis.core.spec import Specification
+    from schemathesis.core.spec import ApiSchema
 
 
-def emit_openapi_auth_warnings(schema: Specification) -> None:
+def emit_openapi_auth_warnings(schema: ApiSchema) -> None:
     """Emit Python warnings for unused OpenAPI auth configuration."""
     for warning in schema.iter_schema_warnings():
         if isinstance(warning, UnusedOpenAPIAuthWarning):

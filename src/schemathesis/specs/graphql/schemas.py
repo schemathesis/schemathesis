@@ -19,7 +19,7 @@ from requests.structures import CaseInsensitiveDict
 from typing_extensions import override
 
 from schemathesis import auths
-from schemathesis.core import NOT_SET, NotSet, SpecificationMetadata
+from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.result import Ok, Result
@@ -154,8 +154,8 @@ class GraphQLSchema(BaseSchema):
 
     @property
     @override
-    def specification(self) -> SpecificationMetadata:
-        return SpecificationMetadata.graphql(version="")
+    def specification(self) -> Specification:
+        return Specification.graphql(version="")
 
     @override
     def apply_auth(self, case: Case, context: AuthContext) -> bool:
