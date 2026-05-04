@@ -189,7 +189,6 @@ def test_extra_data_sources_enables_bug_discovery(cli, app_runner, snapshot_cli,
         cli.run(
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
-            "--max-examples=100",
             "-c response_schema_conformance",
             "--mode=positive",
             config=config,
@@ -319,7 +318,6 @@ def test_extra_data_sources_with_body_parameters(cli, app_runner, snapshot_cli, 
         cli.run(
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
-            "--max-examples=100",
             "-c response_schema_conformance",
             "--mode=positive",
             config=config,
@@ -815,7 +813,6 @@ def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runn
             "--phases=fuzzing",
             "--max-examples=30",
             "--mode=positive",
-            "--seed=42",
         )
         == snapshot_cli
     )
@@ -920,9 +917,7 @@ def test_parent_aware_pool_correlates_path_params(cli, app_runner, snapshot_cli,
         cli.run(
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing",
-            "--max-examples=100",
             "--mode=positive",
-            "--seed=42",
         )
         == snapshot_cli
     )
@@ -1013,9 +1008,7 @@ def test_post_delete_pool_does_not_re_feed_deleted_ids(cli, app_runner, ctx):
     cli.run(
         f"http://127.0.0.1:{port}/openapi.json",
         "--phases=fuzzing",
-        "--max-examples=100",
         "--mode=positive",
-        "--seed=42",
     )
 
     # Tombstone+eviction must keep stale-id GETs near zero
@@ -1109,7 +1102,6 @@ def test_stateful_reaches_every_list_producer_element(
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
             "--mode=positive",
-            "--seed=42",
         )
         == snapshot_cli
     )
@@ -1247,7 +1239,6 @@ def test_pool_captures_subresources_from_every_parent(
             "--phases=fuzzing",
             "--max-examples=30",
             "--mode=positive",
-            "--seed=42",
         )
         == snapshot_cli
     )
@@ -1339,7 +1330,6 @@ def test_extra_data_sources_overlays_nested_body_foreign_key(cli, app_runner, sn
             "--phases=coverage,fuzzing",
             "--max-examples=30",
             "--mode=positive",
-            "--seed=42",
             "-c not_a_server_error",
             config=config,
         )
@@ -1409,7 +1399,6 @@ def test_extra_data_sources_handles_boolean_body_schema(cli, app_runner, snapsho
             f"http://127.0.0.1:{port}/openapi.json",
             "--max-examples=5",
             "--mode=positive",
-            "--seed=42",
         )
         == snapshot_cli
     )

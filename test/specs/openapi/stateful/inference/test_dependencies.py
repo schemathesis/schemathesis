@@ -3956,7 +3956,6 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=stateful",
-            "--seed=42",
         )
         == snapshot_cli
     )
@@ -5196,7 +5195,6 @@ def test_stateful_discovers_bug_with_custom_deserializer(cli, app_runner, snapsh
             f"http://127.0.0.1:{port}/openapi.json",
             "--mode=positive",
             "--phases=stateful",
-            "--seed=42",
         )
         == snapshot_cli
     )

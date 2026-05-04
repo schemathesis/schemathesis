@@ -54,9 +54,7 @@ def test_fuzz_final_line_with_failure(cli, ctx, app_runner, snapshot_cli):
         return jsonify({}), 500
 
     port = app_runner.run_flask_app(app)
-    assert_cli_snapshot(
-        cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3", "--seed=42"), snapshot_cli
-    )
+    assert_cli_snapshot(cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3"), snapshot_cli)
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
@@ -70,9 +68,7 @@ def test_fuzz_final_line_with_error(cli, ctx, app_runner, snapshot_cli):
 
     port = app_runner.run_flask_app(app)
     assert_cli_snapshot(
-        cli.main(
-            "fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3", "--request-timeout=0.001", "--seed=42"
-        ),
+        cli.main("fuzz", f"http://127.0.0.1:{port}/openapi.json", "--max-time=3", "--request-timeout=0.001"),
         snapshot_cli,
     )
 
@@ -230,7 +226,7 @@ def test_fuzz_report_junit(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_junit_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_failure_app(ctx, app_runner)
     xml_path = tmp_path / "junit.xml"
-    result = cli.main("fuzz", url, "--max-time=3", "--seed=42", f"--report-junit-path={xml_path}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-junit-path={xml_path}")
     assert result.exit_code == 1, result.output
 
     tree = ElementTree.parse(xml_path)
@@ -281,7 +277,7 @@ def test_fuzz_report_allure(cli, ctx, app_runner, tmp_path):
 def test_fuzz_report_allure_uses_operation_labels_for_failures(cli, ctx, app_runner, tmp_path):
     url = _make_fuzz_failure_app(ctx, app_runner)
     allure_dir = tmp_path / "allure-results"
-    result = cli.main("fuzz", url, "--max-time=3", "--seed=42", f"--report-allure-path={allure_dir}")
+    result = cli.main("fuzz", url, "--max-time=3", f"--report-allure-path={allure_dir}")
     assert result.exit_code == 1, result.output
 
     results = [json.loads(f.read_text()) for f in allure_dir.glob("*-result.json")]
@@ -505,7 +501,6 @@ def test_fuzz_chains_post_with_get_via_link(cli, ctx, app_runner, snapshot_cli):
             "fuzz",
             f"http://127.0.0.1:{port}/openapi.json",
             "--max-time=15",
-            "--seed=42",
             "-c",
             "response_schema_conformance",
         ),
@@ -609,7 +604,6 @@ def test_fuzz_chains_via_request_body_link(cli, ctx, app_runner, snapshot_cli):
             "fuzz",
             f"http://127.0.0.1:{port}/openapi.json",
             "--max-time=5",
-            "--seed=42",
             "-c",
             "response_schema_conformance",
         ),
@@ -662,7 +656,6 @@ def test_fuzz_deadline_does_not_flake_strategy(cli, ctx, app_runner):
         "fuzz",
         f"http://127.0.0.1:{port}/openapi.json",
         "--max-time=5",
-        "--seed=42",
         "-c",
         "not_a_server_error",
     )

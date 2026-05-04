@@ -28,18 +28,6 @@ Schemathesis dev
 _______________________________ POST /hospitals ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Server error
-
-[500] Internal Server Error:
-
-    <EMPTY>
-
-Reproduce with:
-
-    <PLACEHOLDER>
-
-2. Test Case ID: <PLACEHOLDER>
-
 - API rejected schema-compliant request
 
     Valid data should have been accepted
@@ -48,6 +36,18 @@ Reproduce with:
 [400] Bad Request:
 
     `{"message":"JSON parse error: Numeric value (X) out of range of int; nested exception is com.fasterxml.jackson.databind.JsonMappingException: Numeric value (X) out of range of int (through reference chain: HospitalDTO[\"quantity\"])"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    <EMPTY>
 
 Reproduce with:
 

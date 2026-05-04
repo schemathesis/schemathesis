@@ -23,4 +23,4 @@ def _reset_feedback_pipeline():
 )
 def test_auth_inference_toggles_protected_access(ctx, cli, snapshot_cli, extra_kwargs):
     api = ctx.openapi.apps.under_declared_security()
-    assert cli.run(api.schema_url, "--max-examples=10", "--seed=42", **extra_kwargs) == snapshot_cli
+    assert cli.run(api.schema_url, "--max-examples=10", **extra_kwargs) == snapshot_cli

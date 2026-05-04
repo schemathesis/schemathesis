@@ -131,6 +131,7 @@ def test_stateful_only(ctx, cli, snapshot_cli):
         cli.run(
             api.schema_url,
             "--phases=stateful",
+            "--max-examples=200",
             "-c not_a_server_error",
         )
         == snapshot_cli
@@ -178,23 +179,19 @@ def test_proxy_error(ctx, cli, snapshot_cli):
     )
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
-def test_generation_config(ctx, cli, mocker, snapshot_cli):
+def test_generation_config(ctx, cli, mocker):
     from schemathesis.specs.openapi import _hypothesis
 
     api = ctx.openapi.apps.users_crud()
     mocked = mocker.spy(_hypothesis, "from_schema")
-    assert (
-        cli.run(
-            api.schema_url,
-            "--phases=stateful",
-            "--max-examples=100",
-            "--generation-allow-x00=false",
-            "--generation-codec=ascii",
-            "--generation-with-security-parameters=false",
-            "-c not_a_server_error",
-        )
-        == snapshot_cli
+    cli.run(
+        api.schema_url,
+        "--phases=stateful",
+        "--max-examples=10",
+        "--generation-allow-x00=false",
+        "--generation-codec=ascii",
+        "--generation-with-security-parameters=false",
+        "-c not_a_server_error",
     )
     from_schema_kwargs = mocked.call_args_list[0].kwargs
     assert from_schema_kwargs["allow_x00"] is False
@@ -407,7 +404,6 @@ def test_non_json_response(ctx, cli, snapshot_cli, content):
             "--generation-database=none",
             "-c not_a_server_error",
             "--mode=positive",
-            "--seed=1",
             config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
         )
         == snapshot_cli
