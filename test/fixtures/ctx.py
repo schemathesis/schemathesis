@@ -16,6 +16,7 @@ from test.apps import builders
 from test.apps.catalog.graphql import bookstore as graphql_bookstore
 from test.apps.catalog.openapi import ajv as openapi_ajv
 from test.apps.catalog.openapi import basic as openapi_basic
+from test.apps.catalog.openapi import confluent as openapi_confluent
 from test.apps.catalog.openapi import error_feedback as openapi_error_feedback
 from test.apps.catalog.openapi import go_validator as openapi_go_validator
 from test.apps.catalog.openapi import laravel as openapi_laravel
@@ -298,6 +299,9 @@ class OpenAPIApps:
 
     def symfony_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_symfony.planted_bug())
+
+    def confluent_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_confluent.planted_bug())
 
     def swagger_v2_baseline(self) -> OpenAPIServer:
         return _start(self.parent, openapi_swagger_v2.baseline())

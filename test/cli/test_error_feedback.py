@@ -445,3 +445,18 @@ def test_feedback_unmasks_planted_bug_via_symfony_envelope(ctx, cli, snapshot_cl
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_confluent_envelope(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.confluent_planted_bug()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=10",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
