@@ -15,7 +15,7 @@ from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run.unit._executor import validate_response
-from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
+from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode, UseAfterFree
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
     _coerce_header_value,
@@ -23,6 +23,7 @@ from schemathesis.specs.openapi.checks import (
     response_headers_conformance,
     response_schema_conformance,
     status_code_conformance,
+    use_after_free,
 )
 
 if TYPE_CHECKING:
@@ -1316,3 +1317,159 @@ def test_header_conformance_reports_multiple_errors_from_one_header(ctx, respons
     assert all(isinstance(f, JsonSchemaError) for f in failures)
     schema_paths = {"/".join(str(s) for s in f.schema_path) for f in failures}
     assert schema_paths == {"minimum", "maximum"}
+
+
+def test_use_after_free_no_false_positive_on_idempotent_delete(ctx, response_factory):
+    # RFC 7231 §4.3.5: a repeated DELETE may legitimately return 200/204 instead of 404.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"201": {"description": "Created"}},
+                },
+            },
+            "/users/{userId}": {
+                "delete": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "No Content"}, "404": {"description": "Not Found"}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    post_op = schema["/users"]["POST"]
+    delete_op = schema["/users/{userId}"]["DELETE"]
+
+    parent = post_op.Case(method="POST", body={}, media_type="application/json")
+    first_delete = delete_op.Case(method="DELETE", path_parameters={"userId": 1})
+    second_delete = delete_op.Case(method="DELETE", path_parameters={"userId": 1})
+
+    recorder = ScenarioRecorder(label="use-after-free-test")
+    recorder.record_case(parent_id=None, case=parent, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=parent.id,
+        response=Response.from_requests(response_factory.requests(status_code=201), True),
+    )
+    recorder.record_case(parent_id=parent.id, case=first_delete, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=first_delete.id,
+        response=Response.from_requests(response_factory.requests(status_code=204), True),
+    )
+    recorder.record_case(parent_id=parent.id, case=second_delete, transition=None, is_transition_applied=False)
+    second_response = Response.from_requests(response_factory.requests(status_code=200), True)
+    recorder.record_response(case_id=second_delete.id, response=second_response)
+
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+
+    assert use_after_free(check_ctx, second_response, second_delete) is None
+
+
+def test_use_after_free_failure_references_prior_delete(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"201": {"description": "Created"}},
+                },
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not Found"}},
+                },
+                "delete": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "No Content"}, "404": {"description": "Not Found"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    post_op = schema["/users"]["POST"]
+    get_op = schema["/users/{userId}"]["GET"]
+    delete_op = schema["/users/{userId}"]["DELETE"]
+
+    parent = post_op.Case(method="POST", body={}, media_type="application/json")
+    sibling_delete = delete_op.Case(method="DELETE", path_parameters={"userId": 1})
+    current_get = get_op.Case(method="GET", path_parameters={"userId": 1})
+
+    recorder = ScenarioRecorder(label="sibling-curl-test")
+    recorder.record_case(parent_id=None, case=parent, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=parent.id,
+        response=Response.from_requests(response_factory.requests(status_code=201), True),
+    )
+    recorder.record_case(parent_id=parent.id, case=sibling_delete, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=sibling_delete.id,
+        response=Response.from_requests(response_factory.requests(status_code=204), True),
+    )
+    recorder.record_case(parent_id=parent.id, case=current_get, transition=None, is_transition_applied=False)
+    get_response = Response.from_requests(response_factory.requests(status_code=200), True)
+    recorder.record_response(case_id=current_get.id, response=get_response)
+
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+
+    with pytest.raises(UseAfterFree) as exc_info:
+        use_after_free(check_ctx, get_response, current_get)
+
+    assert exc_info.value.deleted_case_id == sibling_delete.id
+
+
+def test_iter_chain_cases_includes_referenced_sibling(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"201": {"description": "Created"}},
+                },
+            },
+            "/users/{userId}": {
+                "get": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "delete": {
+                    "parameters": [{"name": "userId", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"204": {"description": "No Content"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    post_op = schema["/users"]["POST"]
+    get_op = schema["/users/{userId}"]["GET"]
+    delete_op = schema["/users/{userId}"]["DELETE"]
+
+    parent = post_op.Case(method="POST", body={}, media_type="application/json")
+    sibling_delete = delete_op.Case(method="DELETE", path_parameters={"userId": 1})
+    current_get = get_op.Case(method="GET", path_parameters={"userId": 1})
+
+    recorder = ScenarioRecorder(label="chain-helper-test")
+    for c in (parent, sibling_delete, current_get):
+        recorder.record_case(
+            parent_id=parent.id if c is not parent else None,
+            case=c,
+            transition=None,
+            is_transition_applied=False,
+        )
+
+    chain = list(recorder.iter_chain_cases(case_id=current_get.id, related_case_ids=(sibling_delete.id,)))
+    assert [c.id for c in chain] == [parent.id, sibling_delete.id, current_get.id]

@@ -872,6 +872,10 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
     if not (200 <= response.status_code < 400):
         return None
 
+    # DELETE is idempotent (RFC 7231 §4.2.2 / §4.3.5): a repeated DELETE may return 200/204, not 404.
+    if case.operation.method.lower() == "delete":
+        return None
+
     for related_case in ctx._find_related(case_id=case.id):
         parent = ctx._find_parent(case_id=related_case.id)
         if not parent:
@@ -908,6 +912,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
                     ),
                     free=free,
                     usage=usage,
+                    deleted_case_id=related_case.id,
                 )
 
     return None

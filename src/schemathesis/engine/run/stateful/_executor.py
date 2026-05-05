@@ -43,6 +43,7 @@ from schemathesis.generation.stateful.state_machine import (
     StepOutput,
 )
 from schemathesis.generation.metrics import MetricCollector
+from schemathesis.openapi.checks import UseAfterFree
 from schemathesis.specs.openapi.auth_inference import record_auth_inference
 
 
@@ -365,13 +366,16 @@ def validate_response(
             return
         failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
 
-        # Collect the whole chain of cURL commands
-        commands = []
-        parent = recorder.find_parent(case_id=failure_data.case.id)
-        while parent is not None:
-            commands.append(parent.as_curl_command(headers=failure_data.headers, verify=failure_data.verify))
-            parent = recorder.find_parent(case_id=parent.id)
-        commands.append(failure_data.case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify))
+        # Collect the chain of cURL commands needed to reproduce the failure.
+        # `use_after_free` references the prior DELETE that may live on a sibling branch;
+        # include it so the reproduce isn't missing the step that triggered the check.
+        related_case_ids: tuple[str, ...] = ()
+        if isinstance(failure, UseAfterFree) and failure.deleted_case_id is not None:
+            related_case_ids = (failure.deleted_case_id,)
+        commands = [
+            chain_case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify)
+            for chain_case in recorder.iter_chain_cases(case_id=failure_data.case.id, related_case_ids=related_case_ids)
+        ]
         recorder.record_check_failure(
             name=name,
             case_id=failure_data.case.id,

@@ -265,7 +265,7 @@ class UndefinedContentType(Failure):
 class UseAfterFree(Failure):
     """Resource was used after a successful DELETE operation on it."""
 
-    __slots__ = ("operation", "message", "free", "usage", "title", "case_id", "severity")
+    __slots__ = ("operation", "message", "free", "usage", "deleted_case_id", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -274,6 +274,7 @@ class UseAfterFree(Failure):
         message: str,
         free: str,
         usage: str,
+        deleted_case_id: str | None = None,
         title: str = "Use after free",
         case_id: str | None = None,
     ) -> None:
@@ -281,6 +282,7 @@ class UseAfterFree(Failure):
         self.message = message
         self.free = free
         self.usage = usage
+        self.deleted_case_id = deleted_case_id
         self.title = title
         self.case_id = case_id
         self.severity = Severity.CRITICAL
