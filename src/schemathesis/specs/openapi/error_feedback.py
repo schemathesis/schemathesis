@@ -597,5 +597,10 @@ class UnexpectedPropertyAdjustment:
                     assert isinstance(required, list)
                     if name in required:
                         required.remove(name)
+                        if not required:
+                            # `required` must contain at least one item per JSON Schema;
+                            # leaving `[]` makes downstream Hypothesis draws against the
+                            # OpenAPI meta-schema raise `"has less than 1 item"`.
+                            target.pop("required", None)
 
         return schema
