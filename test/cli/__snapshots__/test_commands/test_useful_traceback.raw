@@ -35,9 +35,9 @@ Runtime Error
 division by zero
 
     Traceback (most recent call last):
-      File "/package-root/engine/run/unit/_executor.py", line XXX, in wrapped
-        f(
-      File "/package-root/engine/run/unit/_executor.py", line XXX, in test_func
+      File "/package-root/engine/run/unit/_case.py", line XXX, in run_one_case
+        _do_call_and_validate(
+      File "/package-root/engine/run/unit/_case.py", line XXX, in _do_call_and_validate
         validate_response(
       File "/package-root/engine/_validate.py", line XXX, in validate_response
         failures = run_checks(
