@@ -29,29 +29,18 @@ Schemathesis dev
      ✅ 1 passed
 
 =================================== FAILURES ===================================
-__________________________________ TRACE /foo __________________________________
-1. Test Case ID: <PLACEHOLDER>
-
-- Unsupported methods
-
-    Unsupported method TRACE returned 404, expected 405 Method Not Allowed
-
-    Return 405 for methods not listed in the OpenAPI spec
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with:
-
-    curl -X TRACE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
 _________________________________ DELETE /foo __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Custom check failed: `failed`
 
     Should be Unspecified HTTP method: DELETE
+
+- Unsupported methods
+
+    Unsupported method DELETE returned 404, expected 405 Method Not Allowed
+
+    Return 405 for methods not listed in the OpenAPI spec
 
 [404] Not Found:
 

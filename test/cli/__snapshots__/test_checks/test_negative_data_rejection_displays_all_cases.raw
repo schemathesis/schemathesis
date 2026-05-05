@@ -25,22 +25,6 @@ Schemathesis dev
 __________________________________ GET /test ___________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API accepted schema-violating request
-
-    Invalid data should have been rejected
-    Expected: 400, 401, 403, 404, 422, 428, 5xx
-    Invalid component: Missing `Accept-Language` at header
-
-[406] Not Acceptable:
-
-    `{"message":"negative"}`
-
-Reproduce with:
-
-    <PLACEHOLDER>
-
-2. Test Case ID: <PLACEHOLDER>
-
 - Response violates schema
 
     "message" is a required property
@@ -65,11 +49,37 @@ Reproduce with:
             "incorrect": "positive"
         }
 
+[200] OK:
+
+    `{"incorrect":"positive"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
 - API accepted schema-violating request
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 422, 428, 5xx
-    Invalid component: parameter `$lang` in query - incorrect type
+    Invalid component: parameter `Accept-Language` in header - invalid enum value
+
+[406] Not Acceptable:
+
+    `{"message":"negative"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+3. Test Case ID: <PLACEHOLDER>
+
+- API accepted schema-violating request
+
+    Invalid data should have been rejected
+    Expected: 400, 401, 403, 404, 422, 428, 5xx
+    Invalid component: parameter `$lang` in query - invalid enum value
 
 [200] OK:
 

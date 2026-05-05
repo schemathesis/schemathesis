@@ -101,7 +101,11 @@ class MetricCollector:
 
 def maximize(metrics: Sequence[MetricFunction], case: Case, response: Response) -> None:
     import hypothesis
+    from hypothesis.control import currently_in_test_context
 
+    if not currently_in_test_context():
+        # Coverage runs outside Hypothesis; `target()` is a no-op there.
+        return
     ctx = MetricContext(case=case, response=response)
     # Always target 2xx responses per operation
     hypothesis.target(success_rate(ctx), label=f"{case.operation.label}:{success_rate.__name__}")

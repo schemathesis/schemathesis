@@ -50,7 +50,8 @@ def add_single_example(
 
     example_generating_inner_function._hypothesis_internal_database_key = b""
 
-    if SCHEMATHESIS_BENCHMARK_SEED is not None:
-        example_generating_inner_function = seed(SCHEMATHESIS_BENCHMARK_SEED)(example_generating_inner_function)
+    # Seed strategy draws so `generate_one(strategy)` is deterministic across processes.
+    seed_value = int(SCHEMATHESIS_BENCHMARK_SEED) if SCHEMATHESIS_BENCHMARK_SEED is not None else 0
+    example_generating_inner_function = seed(seed_value)(example_generating_inner_function)
 
     example_generating_inner_function()

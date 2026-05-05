@@ -46,7 +46,8 @@ Need more help?
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Errored: 1
 
 Test Phases:
   ⏭  Examples
@@ -58,7 +59,7 @@ Errors:
   🚫 Network Error: 1
 
 Test cases:
-  N generated, N passed
+  N generated
 
 Seed: 42
 
