@@ -65,7 +65,7 @@ Example = ParameterExample | BodyExample
 
 
 def merge_kwargs(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
-    mergeable_keys = {"path_parameters", "headers", "cookies", "query"}
+    mergeable_keys = {"path_parameters", "headers", "cookies", "query", "body"}
 
     for key, value in right.items():
         if key in mergeable_keys and key in left:
@@ -120,7 +120,10 @@ def _get_pool_combos(
             schema=body_schema,
         )
         if variants:
-            per_location.append([{"body": variant, "media_type": body.media_type} for variant in variants])
+            required_fields = set(body_schema.get("required", []))
+            complete_variants = [v for v in variants if all(f in v for f in required_fields)]
+            if complete_variants:
+                per_location.append([{"body": variant, "media_type": body.media_type} for variant in complete_variants])
 
     if not per_location:
         return []
