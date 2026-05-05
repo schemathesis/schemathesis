@@ -6,7 +6,7 @@ import yaml
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.config._checks import ChecksConfig
-from schemathesis.core.failures import Failure, MalformedJson
+from schemathesis.core.failures import AcceptedNegativeData, Failure, MalformedJson
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -230,6 +230,40 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     )
     # Should not raise - the validator should handle patterns with large quantifiers
     assert has_only_additional_properties_in_non_body_parameters(case) is True
+
+
+@pytest.mark.parametrize(
+    ("status_code", "should_raise"),
+    [
+        pytest.param(405, False, id="405-method-not-allowed-passes"),
+        pytest.param(200, True, id="200-still-flagged"),
+    ],
+)
+def test_negative_data_rejection_status_code_405(response_factory, sample_schema, status_code, should_raise):
+    # 405 is routing-level rejection, not a data-validation outcome — supervisor
+    # warns separately when it dominates an operation.
+    response = response_factory.requests(status_code=status_code)
+    schema = schemathesis.openapi.from_dict(sample_schema)
+    operation = schema["/test"]["POST"]
+    case = operation.Case(
+        _meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+        ),
+        query={"key": 1},
+    )
+    ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+    )
+    if should_raise:
+        with pytest.raises(AcceptedNegativeData):
+            negative_data_rejection(ctx, response, case)
+    else:
+        assert negative_data_rejection(ctx, response, case) is None
 
 
 def test_negative_data_rejection_on_additional_properties(response_factory, sample_schema):
