@@ -807,10 +807,7 @@ def _has_serialization_sensitive_types(schema: dict, container: OpenApiParameter
 
     Validation of string against array schema fails incorrectly.
     A better approach would be to apply serialization later on in the process.
-
     """
-    from schemathesis.core.jsonschema import get_type
-
     properties = schema.get("properties", {})
     for prop_name, prop_schema in properties.items():
         if prop_name in container:

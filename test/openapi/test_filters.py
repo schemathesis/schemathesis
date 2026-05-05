@@ -81,6 +81,14 @@ def test_invalid_query_fails_with_requests(invalid_params):
         "abc%00def",
         "abc\x00def",
         "prefix%00suffix",
+        # Dot path-segments collapse during URL normalization (RFC 3986),
+        # routing the request to a different operation than declared.
+        ".",
+        "..",
+        "%2E",
+        "%2e",
+        "%2E%2E",
+        "%2e%2e",
     ],
 )
 def test_filter_path_parameters(value):

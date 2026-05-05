@@ -33,7 +33,9 @@ def is_valid_path(parameters: dict[str, object], allow_encoded_slash_for: Collec
 
 
 def is_invalid_path_parameter(value: Any, *, allow_encoded_slash: bool = False) -> bool:
-    if value in ("/", ""):
+    # `.` and `..` collapse during URL normalization the same way `/` does,
+    # routing the request to a different operation than the one declared.
+    if value in ("/", "", ".", ".."):
         return True
     if contains_unicode_surrogate_pair(value):
         return True
@@ -54,6 +56,9 @@ def is_invalid_path_parameter(value: Any, *, allow_encoded_slash: bool = False) 
         # Curly braces are structural characters in path templates.
         # Reject their quoted forms (e.g. `%7B` / `%7D`) as well.
         if "}" in decoded_value or "{" in decoded_value:
+            return True
+        # `%2E` / `%2E%2E` decode to `.` / `..` and collapse during URL normalization.
+        if decoded_value in (".", ".."):
             return True
 
         # Avoid NULL bytes in path parameters — many webservers strip or reject them,
