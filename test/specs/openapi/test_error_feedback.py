@@ -6532,6 +6532,25 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
         ),
         (
             {"type": "object", "properties": {}},
+            [("address", "city", "zip")],
+            {
+                "type": "object",
+                "properties": {
+                    "address": {
+                        "type": "object",
+                        "properties": {
+                            "city": {
+                                "type": "object",
+                                "properties": {"zip": {"type": "string", "minLength": 1}},
+                                "required": ["zip"],
+                            }
+                        },
+                    }
+                },
+            },
+        ),
+        (
+            {"type": "object", "properties": {}},
             [()],
             {"type": "object", "properties": {}},
         ),
@@ -6562,6 +6581,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
         "oneof-with-no-object-branches-no-targets-passthrough",
         "nested-path-tightens-and-marks-required",
         "nested-path-creates-missing-intermediate-object",
+        "deep-path-synthesises-only-leaf-required",
         "empty-path-observation-skipped",
         "non-string-step-in-prefix-skipped",
         "non-string-leaf-skipped",
@@ -6585,12 +6605,14 @@ def test_required_field_adjustment_idempotent(case_factory):
     obs = _build_observations(("email",))
     operation = case_factory().operation
 
+    original = {**schema}
     RequiredFieldAdjustment().apply(
         operation=operation,
         location=ParameterLocation.BODY,
         schema=schema,
         observations=obs,
     )
+    _assert_valid_schema_object(original, schema)
     snapshot = {**schema, "properties": {**schema["properties"]}, "required": [*schema["required"]]}
     RequiredFieldAdjustment().apply(
         operation=operation,
@@ -6598,6 +6620,7 @@ def test_required_field_adjustment_idempotent(case_factory):
         schema=schema,
         observations=obs,
     )
+    _assert_valid_schema_object(snapshot, schema)
     assert schema == snapshot
 
 
@@ -6610,6 +6633,7 @@ def test_apply_adjustments_returns_input_when_no_observations(case_factory):
         schema=schema,
         store=store,
     )
+    _assert_valid_schema_object(schema, out)
     assert out is schema
 
 
@@ -7540,6 +7564,7 @@ def test_type_mismatch_adjustment_handles_drf_and_java_payloads(input_schema, it
         schema=input_schema,
         observations=_build_type_mismatch_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
@@ -7677,6 +7702,7 @@ def test_size_bound_adjustment_preserves_stricter_existing_bound(case_factory):
         schema=schema,
         observations=_build_size_bound_observations((("username",), 0, 15)),
     )
+    _assert_valid_schema_object(schema, out)
     assert out == {
         "type": "object",
         "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 10}},
@@ -7701,6 +7727,7 @@ def test_size_bound_adjustment_min_only_payload(case_factory):
         schema=schema,
         observations=obs,
     )
+    _assert_valid_schema_object(schema, out)
     assert out == {
         "type": "object",
         "properties": {"name": {"type": "string", "minLength": 3}},
@@ -7725,6 +7752,7 @@ def test_size_bound_adjustment_max_only_payload(case_factory):
         schema=schema,
         observations=obs,
     )
+    _assert_valid_schema_object(schema, out)
     assert out == {
         "type": "object",
         "properties": {"name": {"type": "string", "maxLength": 20}},
@@ -7766,6 +7794,7 @@ def test_apply_adjustments_does_not_mutate_caller_schema(case_factory):
         schema=original,
         store=store,
     )
+    _assert_valid_schema_object(original, out)
     assert original == snapshot
     assert out is not original
     assert out["properties"]["username"] == {"type": "string", "minLength": 3, "maxLength": 8}
@@ -8556,9 +8585,7 @@ def test_unexpected_property_adjustment_applies_correctly(input_schema, paths, e
 
 
 def test_unexpected_property_adjustment_drops_empty_required(case_factory):
-    # The OpenAPI meta-schema requires `required` (when present) to have minItems=1;
-    # emptying it must drop the key entirely or downstream Hypothesis draws crash with
-    # "[] has less than 1 item" against `definitions/stringArray`.
+    # Empty `required` violates the OpenAPI meta-schema and crashes Hypothesis draws.
     input_schema = {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]}
     out = UnexpectedPropertyAdjustment().apply(
         operation=case_factory().operation,

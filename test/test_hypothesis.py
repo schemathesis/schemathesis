@@ -1097,3 +1097,39 @@ def test_hypothesis_observability_serialization(ctx):
 
     with with_observability_callback(lambda _: None):
         test()
+
+
+@pytest.mark.parametrize("location", [ParameterLocation.QUERY, ParameterLocation.HEADER])
+def test_apply_exclusions_drops_empty_required_when_all_filtered(location):
+    # Empty `required` violates the OpenAPI meta-schema and crashes Hypothesis draws.
+    pset = OpenApiParameterSet(location, items=[], adapter=v2)
+    pset._schema = {
+        "type": "object",
+        "properties": {"key": {"type": "string"}},
+        "required": ["key"],
+        "additionalProperties": False,
+    }
+    out = pset.get_schema_with_exclusions(exclude=["key"])
+    assert "required" not in out
+
+
+def test_apply_exclusions_reachable_via_auth_supplied_required_header():
+    pset = OpenApiParameterSet(
+        ParameterLocation.HEADER,
+        [
+            OpenApiParameter.from_definition(
+                definition={
+                    "in": "header",
+                    "name": "Authorization",
+                    "required": True,
+                    "type": "string",
+                },
+                name_to_uri={},
+                adapter=v2,
+            )
+        ],
+        adapter=v2,
+    )
+    out = pset.get_schema_with_exclusions(exclude=["Authorization"])
+    assert "required" not in out
+    assert out["properties"] == {}
