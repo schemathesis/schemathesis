@@ -29,11 +29,9 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.jsonschema import BundleError
-from schemathesis.core.result import Ok
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -522,19 +520,14 @@ def test_coverage_phase(corpus, filename, mode):
     if filename in SLOW_COVERAGE:
         pytest.skip("Data generation is extremely slow for this schema")
     schema = _load_schema(corpus, filename)
-    for operation in schema.get_all_operations():
-        if isinstance(operation, Ok):
-            try:
-                for _ in _iter_coverage_cases(
-                    operation=operation.ok(),
-                    generation_modes=[mode],
-                    generate_duplicate_query_parameters=False,
-                    unexpected_methods=set(),
-                    generation_config=schema.config.generation,
-                ):
-                    pass
-            except InvalidSchema:
-                pass
+    schema.config.update(suppress_health_check=list(HealthCheck))
+    schema.config.phases.update(phases=["coverage"])
+    schema.config.generation.update(modes=[mode])
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
+    for event in from_schema(schema).execute():
+        if isinstance(event, events.Interrupted):
+            pytest.exit("Keyboard Interrupt")
+        assert_event(filename, event)
 
 
 def test_stateful(corpus, filename):
@@ -596,7 +589,13 @@ def assert_event(schema_id: str, event: events.EngineEvent) -> None:
         failures = [
             check for checks in event.recorder.checks.values() for check in checks if check.status == Status.FAILURE
         ]
-        assert not failures
+        if failures:
+            details = "\n\n".join(
+                f"[{check.name}] {check.failure_info.failure}\n{check.failure_info.code_sample}"
+                for check in failures
+                if check.failure_info is not None
+            )
+            raise AssertionError(f"{event.label}: {len(failures)} check failure(s)\n\n{details}")
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
     if isinstance(event, events.FatalError):
