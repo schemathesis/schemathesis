@@ -1468,6 +1468,53 @@ def test_response_schema_conformance_reports_all_errors_in_cli(ctx, app_runner, 
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_response_schema_conformance_groups_multiple_violations(ctx, app_runner, cli, snapshot_cli):
+    # 4 violations on one response should render under a single header with a violation count,
+    # not 4 separate `- Response violates schema` blocks.
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/api/user": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "email": {"type": "string", "format": "email"},
+                                            "age": {"type": "integer", "minimum": 0},
+                                            "status": {"type": "string", "enum": ["active", "inactive"]},
+                                            "name": {"type": "string", "minLength": 1},
+                                        },
+                                        "required": ["email", "age", "status", "name"],
+                                    }
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    )
+
+    @app.route("/api/user")
+    def user():
+        return jsonify({"email": "abc", "age": -1, "status": "pending", "name": ""})
+
+    port = app_runner.run_flask_app(app)
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--checks=response_schema_conformance",
+            "--max-examples=1",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_negative_data_rejection_nested_body_description(ctx, app_runner, cli, snapshot_cli):
     # Schema with no type at root/intermediate levels so coverage only generates
     # property constraint violations, surfacing the nested path in the description
