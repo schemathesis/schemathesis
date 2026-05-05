@@ -131,6 +131,21 @@ def test_feedback_unmasks_planted_bug_via_unrecognized_property(ctx, cli, snapsh
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapshot_cli):
+    api = ctx.openapi.apps.missing_request_body_planted_bug()
+    assert (
+        cli.run(
+            api.schema_url,
+            "--max-examples=30",
+            "--phases=coverage,fuzzing",
+            "--mode=positive",
+            "--continue-on-failure",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_feedback_unmasks_planted_bug_via_pattern(ctx, cli, snapshot_cli):
     api = ctx.openapi.apps.pattern_planted_bug()
     assert (

@@ -14,7 +14,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, media_types
 from schemathesis.core.control import SkipTest
-from schemathesis.core.error_feedback import ErrorFeedbackStore
+from schemathesis.core.error_feedback import ErrorFeedbackStore, ObservationKind
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
     InvalidSchema,
@@ -422,12 +422,26 @@ class FormBodyWithContentTypes:
     content_types: dict[str, str]  # property_name -> selected content type
 
 
+def _body_required_per_feedback(operation: APIOperation, error_feedback: ErrorFeedbackStore | None) -> bool:
+    """Return True when the server reported the body itself as missing for this operation."""
+    if error_feedback is None:
+        return False
+    for observation in error_feedback.observations(operation_label=operation.label, location=ParameterLocation.BODY):
+        if observation.kind == ObservationKind.MUST_NOT_BE_BLANK and not observation.parameter_path:
+            return True
+    return False
+
+
 def _maybe_set_optional_body(
     strategy: st.SearchStrategy,
     parameter: OpenApiBody,
+    operation: APIOperation,
     draw: st.DrawFn,
+    error_feedback: ErrorFeedbackStore | None,
 ) -> st.SearchStrategy:
     """Add NOT_SET option to strategy for optional body parameters."""
+    if _body_required_per_feedback(operation, error_feedback):
+        return strategy
     if (
         not parameter.is_required
         and draw(st.floats(min_value=0.0, max_value=1.0, allow_infinity=False, allow_nan=False, allow_subnormal=False))
@@ -600,7 +614,7 @@ def _get_body_strategy(
         error_feedback=error_feedback,
         mix_examples=mix_examples,
     )
-    return _maybe_set_optional_body(strategy, parameter, draw)
+    return _maybe_set_optional_body(strategy, parameter, operation, draw, error_feedback)
 
 
 def get_parameters_value(

@@ -57,6 +57,7 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
+from schemathesis.specs.openapi._hypothesis import _body_required_per_feedback
 from schemathesis.specs.openapi.error_feedback import (
     EnumAdjustment,
     FormatAdjustment,
@@ -632,6 +633,39 @@ def test_spring_parser_extracts_unexpected_query_parameter(body, expected_name, 
     obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
     actual = [(o.parameter_path, o.location, o.kind) for o in obs if o.kind == ObservationKind.UNEXPECTED_PROPERTY]
     assert actual == [((expected_name,), ParameterLocation.QUERY, ObservationKind.UNEXPECTED_PROPERTY)]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        pytest.param(
+            {
+                "message": (
+                    "Required request body is missing: public com.example.demo.common.model.dto.response."
+                    "CustomResponse<java.lang.String> com.example.demo.flight.controller.AirportController."
+                    "createAirport(com.example.demo.flight.model.dto.request.airport.CreateAirportRequest)"
+                ),
+            },
+            id="message-with-method-signature",
+        ),
+        pytest.param(
+            {"message": "Required request body is missing"},
+            id="bare-message",
+        ),
+        pytest.param(
+            {"detail": "Required request body is missing for handler method"},
+            id="rfc7807-detail",
+        ),
+    ],
+)
+def test_spring_parser_extracts_missing_request_body(body, make_operation, case_factory):
+    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    blank_body_obs = [
+        (o.parameter_path, o.location, o.kind)
+        for o in obs
+        if o.kind == ObservationKind.MUST_NOT_BE_BLANK and o.location == ParameterLocation.BODY
+    ]
+    assert blank_body_obs == [((), ParameterLocation.BODY, ObservationKind.MUST_NOT_BE_BLANK)]
 
 
 @pytest.mark.parametrize(
@@ -8255,3 +8289,35 @@ def test_unexpected_property_adjustment_applies_correctly(input_schema, paths, e
         observations=_build_unexpected_property_observations(*paths),
     )
     assert out == expected
+
+
+def _record_body_observation(store, operation, *, kind, parameter_path):
+    for _ in range(MAX_ENTRIES_PER_BUCKET):
+        store.record(
+            Observation(
+                operation_label=operation.label,
+                location=ParameterLocation.BODY,
+                parameter_path=parameter_path,
+                kind=kind,
+                raw_message="must not be blank",
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "kind, parameter_path, expected",
+    [
+        pytest.param(ObservationKind.MUST_NOT_BE_BLANK, (), True, id="empty-path-must-not-be-blank"),
+        pytest.param(ObservationKind.MUST_NOT_BE_BLANK, ("email",), False, id="field-path-must-not-be-blank"),
+        pytest.param(ObservationKind.UNEXPECTED_PROPERTY, (), False, id="empty-path-unexpected-property"),
+    ],
+)
+def test_body_required_per_feedback_with_store(make_operation, kind, parameter_path, expected):
+    operation = make_operation()
+    store = ErrorFeedbackStore()
+    _record_body_observation(store, operation, kind=kind, parameter_path=parameter_path)
+    assert _body_required_per_feedback(operation, store) is expected
+
+
+def test_body_required_per_feedback_returns_false_with_no_store(make_operation):
+    assert _body_required_per_feedback(make_operation(), None) is False

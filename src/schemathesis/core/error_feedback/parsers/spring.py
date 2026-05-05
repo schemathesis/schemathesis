@@ -92,6 +92,11 @@ _MISSING_PARAMETER = re.compile(
     re.IGNORECASE,
 )
 
+# `HttpMessageNotReadableException` with no body — Spring emits this when an
+# `@RequestBody`-annotated controller receives an empty body. Refers to the
+# body itself, not a sub-field.
+_MISSING_BODY = re.compile(r"\bRequired\s+request\s+body\s+is\s+missing\b", re.IGNORECASE)
+
 # `MethodArgumentTypeMismatchException` — request-param coercion failure (path
 # / query / header). The `Method parameter '<X>':` prefix only appears when
 # Spring 6 / Spring Boot 3+ wraps it in RFC 7807 ProblemDetail; the older
@@ -237,6 +242,7 @@ class SpringParser:
             text = body.get(key)
             if isinstance(text, str) and (
                 _MISSING_PARAMETER.search(text)
+                or _MISSING_BODY.search(text)
                 or _TYPE_COERCION.search(text)
                 or _UNRECOGNIZED_FIELD.search(text)
                 or _UNEXPECTED_PARAMETER.search(text)
@@ -371,6 +377,15 @@ class SpringParser:
                     operation_label=operation.label,
                     location=ParameterLocation.QUERY,
                     parameter_path=(missing_match.group("field"),),
+                    kind=ObservationKind.MUST_NOT_BE_BLANK,
+                    raw_message=message,
+                )
+            if _MISSING_BODY.search(message):
+                # Empty `parameter_path` means the body itself is required, not a sub-field.
+                yield Observation(
+                    operation_label=operation.label,
+                    location=ParameterLocation.BODY,
+                    parameter_path=(),
                     kind=ObservationKind.MUST_NOT_BE_BLANK,
                     raw_message=message,
                 )
