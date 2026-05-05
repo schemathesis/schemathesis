@@ -66,7 +66,7 @@ jobs:
           cache-dependency-glob: |
             **/pyproject.toml
             **/uv.lock
-          cache-suffix: ${{ matrix.python }}
+          cache-suffix: ${{ matrix.python }}-v2
 
       - if: ${{ matrix.tox_env }}
         run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox -e ${{ matrix.tox_env }}
