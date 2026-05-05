@@ -1,6 +1,7 @@
 import pytest
 
 from schemathesis.core.shell import (
+    MAX_SHELL_SCAN_BYTES,
     ShellType,
     _escape_with_ansi_c,
     _escape_with_hex,
@@ -220,3 +221,24 @@ def test_detect_shell_from_environment(monkeypatch, shell_env, expected, delete_
     else:
         monkeypatch.setenv("SHELL", shell_env)
     assert detect_shell() == expected
+
+
+def test_has_non_printable_short_circuits_above_scan_cap():
+    huge = "x" * (MAX_SHELL_SCAN_BYTES + 1)
+    assert has_non_printable(huge) is True
+
+
+def test_escape_for_shell_truncates_above_cap():
+    huge = "x" * (MAX_SHELL_SCAN_BYTES * 4)
+    result = escape_for_shell(huge, ShellType.BASH)
+    assert result.needs_warning is True
+    assert "<...truncated" in result.escaped_value
+    assert str(len(huge)) in result.escaped_value
+    assert len(result.escaped_value) < MAX_SHELL_SCAN_BYTES + 100
+
+
+def test_escape_for_shell_below_cap_unchanged():
+    value = "hello world"
+    result = escape_for_shell(value, ShellType.BASH)
+    assert result.needs_warning is False
+    assert "<...truncated" not in result.escaped_value

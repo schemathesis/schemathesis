@@ -29,8 +29,11 @@ def _escape_and_quote(value: str, warnings: list[str], ctx: str) -> str:
     """Escape value for shell, adding warnings if needed."""
     if has_non_printable(value):
         escape_result = escape_for_shell(value)
-        if escape_result.needs_warning:
+        if escape_result.original_bytes is not None:
+            # Unknown-shell path is the only one that surfaces raw bytes.
             warnings.append(f"{ctx} contains non-printable characters. Actual value: {escape_result.original_bytes!r}")
+        elif escape_result.needs_warning:
+            warnings.append(f"{ctx} was truncated for shell display.")
         return escape_result.escaped_value
     return quote(value)
 
