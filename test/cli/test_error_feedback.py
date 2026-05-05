@@ -136,7 +136,7 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
     assert (
         cli.run(
             api.schema_url,
-            "--max-examples=30",
+            "--max-examples=80",
             "--phases=coverage,fuzzing",
             "--mode=positive",
             "--continue-on-failure",

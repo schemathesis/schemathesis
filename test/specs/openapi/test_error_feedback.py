@@ -747,6 +747,48 @@ def test_jackson_parser_extracts_type_mismatch_for_object_or_array_source(source
     ]
 
 
+_DATE_TIME_FORMAT_OBS = [
+    (("departureTime",), ParameterLocation.BODY, ObservationKind.FORMAT, FormatPayload(name="date-time")),
+]
+
+
+@pytest.mark.parametrize(
+    "rejected_value, body, expected",
+    [
+        pytest.param(
+            "2000-01-01T00:00:00Z",
+            {"departureTime": "2000-01-01T00:00:00Z"},
+            _DATE_TIME_FORMAT_OBS,
+            id="value-not-mutated-by-spring",
+        ),
+        pytest.param(
+            "2000-01-01T00:00:00ZT00:00:00",
+            {"departureTime": "2000-01-01T00:00:00Z"},
+            _DATE_TIME_FORMAT_OBS,
+            id="instant-with-z-coerced-to-localdatetime",
+        ),
+        pytest.param(
+            "2000-01-01T00:00:00",
+            {"departureTime": "2000-01-01"},
+            _DATE_TIME_FORMAT_OBS,
+            id="date-only-coerced-to-localdatetime",
+        ),
+        pytest.param(
+            "9999-12-31",
+            {"departureTime": "2000-01-01T00:00:00Z"},
+            [],
+            id="rejected-value-not-in-body-no-suffix",
+        ),
+    ],
+)
+def test_jackson_parser_extracts_date_parse_format(rejected_value, body, expected, make_operation, case_factory):
+    response_body = {"message": f"JSON parse error: Text '{rejected_value}' could not be parsed"}
+    operation = make_operation(method="post", path="/api/v1/flights/search")
+    case = case_factory(operation=operation, body=body)
+    obs = JacksonParser().parse(operation=operation, body=response_body, case=case)
+    assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == expected
+
+
 def test_pipeline_falls_through_to_jackson_for_empty_field_errors_envelope(make_operation, case_factory):
     # Spring envelope with empty fieldErrors + Jackson-shaped top-level `message`:
     # Spring returns nothing, pipeline falls through, Jackson picks it up.

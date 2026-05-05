@@ -8,6 +8,7 @@ from schemathesis.core.error_feedback.parsers import PARSERS
 from schemathesis.core.error_feedback.store import (
     BoundDirection,
     EnumPayload,
+    FormatPayload,
     NumericBoundPayload,
     Observation,
     ObservationKind,
@@ -62,6 +63,13 @@ _JACKSON_NUMERIC_OVERFLOW = re.compile(
     r"Numeric value \([^)]+\) out of range of (?P<size>int|long|short|byte)\b",
 )
 
+# Jackson `LocalDateTime`/`LocalDate` parse failure: `Text 'X' could not be parsed`.
+# When a `LocalDateTime` field receives an `Instant`-shaped value (e.g. trailing `Z`),
+# Spring appends `T00:00:00` before parsing and the appended chars leak into the
+# error message — strip that suffix before walking the request to find the field.
+_JACKSON_DATE_PARSE = re.compile(r"Text '(?P<value>[^']+)' could not be parsed")
+_DATE_PARSE_APPENDED_SUFFIX = re.compile(r"T\d{2}:\d{2}:\d{2}$")
+
 # Inclusive bounds per Java primitive integer type.
 _JAVA_INT_BOUNDS: dict[str, tuple[int, int]] = {
     "byte": (-128, 127),
@@ -113,6 +121,19 @@ def _match_type(message: str) -> str | None:
     return None
 
 
+def _resolve_date_parse_slot(case: Case, rejected_value: str) -> tuple[ParameterLocation, tuple[str | int, ...]] | None:
+    slot = infer_path_from_request(case=case, rejected_value=rejected_value)
+    if slot is not None:
+        return slot
+    # Spring's `LocalDateTime` coercion appends `T00:00:00` to the user value
+    # before parsing; that suffix leaks into the error message, so the wire-form
+    # value won't be present in the request as-is. Strip and retry.
+    stripped = _DATE_PARSE_APPENDED_SUFFIX.sub("", rejected_value)
+    if stripped == rejected_value:
+        return None
+    return infer_path_from_request(case=case, rejected_value=stripped)
+
+
 def _match_enum_values(message: str) -> tuple[str, ...] | None:
     match = _JACKSON_ENUM.search(message)
     if match is None:
@@ -142,6 +163,7 @@ class JacksonParser:
             or "Can not deserialize instance of" in s
             or "Enum class:" in s
             or "out of range of" in s
+            or "could not be parsed" in s
             for s in _carrier_strings(body)
         )
 
@@ -157,6 +179,22 @@ class JacksonParser:
         operation_label = operation.label
         observations: list[Observation] = []
         for message in _carrier_strings(body):
+            date_parse_match = _JACKSON_DATE_PARSE.search(message)
+            if date_parse_match is not None:
+                slot = _resolve_date_parse_slot(case, date_parse_match.group("value"))
+                if slot is not None:
+                    location, slot_path = slot
+                    observations.append(
+                        Observation(
+                            operation_label=operation_label,
+                            location=location,
+                            parameter_path=slot_path,
+                            kind=ObservationKind.FORMAT,
+                            raw_message=message,
+                            payload=FormatPayload(name="date-time"),
+                        )
+                    )
+                continue
             path = _extract_path(message)
             type_match = _match_type(message)
             enum_values = _match_enum_values(message)
