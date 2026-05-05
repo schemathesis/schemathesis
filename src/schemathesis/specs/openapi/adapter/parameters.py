@@ -1151,12 +1151,21 @@ class OpenApiParameterSet(ParameterSet):
                 key: value for key, value in schema["properties"].items() if key.lower() not in exclude_lower
             }
             if "required" in schema:
-                schema["required"] = [key for key in schema["required"] if key.lower() not in exclude_lower]
+                kept = [key for key in schema["required"] if key.lower() not in exclude_lower]
+                if kept:
+                    schema["required"] = kept
+                else:
+                    # `required` must contain at least one item per JSON Schema; drop the key.
+                    del schema["required"]
         else:
             # Non-header locations: remove by exact name
             schema["properties"] = {key: value for key, value in schema["properties"].items() if key not in exclude_key}
             if "required" in schema:
-                schema["required"] = [key for key in schema["required"] if key not in exclude_key]
+                kept = [key for key in schema["required"] if key not in exclude_key]
+                if kept:
+                    schema["required"] = kept
+                else:
+                    del schema["required"]
         return schema
 
     def get_strategy(

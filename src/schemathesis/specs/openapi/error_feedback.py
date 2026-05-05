@@ -144,7 +144,7 @@ def _walk_and_apply(schema: dict[str, Any], path: tuple[str | int, ...]) -> None
         properties = current.setdefault("properties", {})
         nested = properties.get(step)
         if not isinstance(nested, dict):
-            nested = {"type": "object", "properties": {}, "required": []}
+            nested = {"type": "object", "properties": {}}
             properties[step] = nested
         current = nested
     _ensure_required_in_object(current, leaf)
@@ -598,9 +598,7 @@ class UnexpectedPropertyAdjustment:
                     if name in required:
                         required.remove(name)
                         if not required:
-                            # `required` must contain at least one item per JSON Schema;
-                            # leaving `[]` makes downstream Hypothesis draws against the
-                            # OpenAPI meta-schema raise `"has less than 1 item"`.
+                            # `required` must contain at least one item per JSON Schema.
                             target.pop("required", None)
 
         return schema

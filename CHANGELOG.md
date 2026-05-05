@@ -25,6 +25,7 @@
 - False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
 - JUnit and Allure reports marked all test cases as skipped when a schema had no inline examples, even though Coverage or Fuzzing phases ran successfully afterwards. [#3738](https://github.com/schemathesis/schemathesis/issues/3738)
 - False positive `negative_data_rejection` on 405 responses from routing-level rejection.
+- `Runtime Error` from invalid Schema Object when every required parameter of a set is excluded from generation.
 - False positive `response_headers_conformance` for Swagger 2.0 array headers serialised via `collectionFormat`.
 - False positive `use_after_free` on a second DELETE - DELETE is idempotent (RFC 7231 §4.3.5).
 - False positive `use_after_free` after a DELETE on a collection path with no path parameters.
