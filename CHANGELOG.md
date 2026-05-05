@@ -30,6 +30,7 @@
 - Include the prior DELETE in `use_after_free` reproduce when it is a sibling step.
 - False positive `positive_data_acceptance` when a runtime pool body variant was missing required fields. [#3949](https://github.com/schemathesis/schemathesis/issues/3949)
 - Set `filename` on binary `multipart/form-data` parts; use `encoding.headers.Content-Disposition` if present, field name otherwise. [#3951](https://github.com/schemathesis/schemathesis/issues/3951)
+- Reject `.` and `..` path-parameter values; URL normalisation routes the request to a different operation.
 
 ### :wrench: Changed
 

@@ -3936,6 +3936,9 @@ def test_stateful_discovers_requestbody_dependency_bug(cli, app_runner, snapshot
         order_id = str(next_order_id)
         next_order_id += 1
 
+        if not isinstance(customer_id, (str, int)):
+            return jsonify({"detail": "Invalid customer_id"}), 400
+
         # Bug: When customer_id is exists, we return total as string instead of number
         if customer_id in customers:
             return jsonify(
