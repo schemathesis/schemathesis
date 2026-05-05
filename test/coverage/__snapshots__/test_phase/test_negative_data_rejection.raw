@@ -27,7 +27,7 @@ _________________________________ GET /success _________________________________
 - API accepted schema-violating request
 
     Invalid data should have been rejected
-    Expected: 400, 401, 403, 404, 406, 422, 428, 5xx
+    Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
     Invalid component: parameter `page_num` in query - value greater than maximum
 
 [200] OK:

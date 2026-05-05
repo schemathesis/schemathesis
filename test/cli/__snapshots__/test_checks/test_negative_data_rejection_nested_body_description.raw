@@ -27,7 +27,7 @@ ________________________________ POST /payment _________________________________
 - API accepted schema-violating request
 
     Invalid data should have been rejected
-    Expected: 400, 401, 403, 404, 406, 422, 428, 5xx
+    Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
     Invalid component: in body - request -> payment -> SupplierAccount: Value smaller than minimum
 
 [200] OK:

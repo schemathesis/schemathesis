@@ -27,7 +27,7 @@ ___________________________ POST /items/{kind}/{id} ____________________________
 - API accepted schema-violating request
 
     Invalid data should have been rejected
-    Expected: 400, 401, 403, 404, 406, 422, 428, 5xx
+    Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
     Invalid component: parameter `id` in path - violates `format` (int64), `minimum` (0)
 
 [200] OK:

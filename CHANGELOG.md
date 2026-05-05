@@ -23,6 +23,7 @@
 - Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
 - Drop spec examples invalidated by inferred constraints from the example mixer.
 - False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
+- False positive `negative_data_rejection` on 405 responses from routing-level rejection.
 - False positive `response_headers_conformance` for Swagger 2.0 array headers serialised via `collectionFormat`.
 - False positive `use_after_free` on a second DELETE — DELETE is idempotent (RFC 7231 §4.3.5).
 - Include the prior DELETE in `use_after_free` reproduce when it is a sibling step.
