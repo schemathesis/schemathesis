@@ -481,6 +481,7 @@ class TestingState:
     _unrecoverable_network_errors: dict[int, UnrecoverableNetworkError]
 
     __slots__ = ("_unrecoverable_network_errors",)
+    __test__ = False  # opt out of pytest's class-collection heuristic
 
     def __init__(self) -> None:
         self._unrecoverable_network_errors = {}

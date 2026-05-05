@@ -32,6 +32,10 @@ from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName, PhaseSkipReason
 from schemathesis.engine.run.unit._layered_scheduler import LayeredScheduler
 from schemathesis.engine.run.unit._pool import DefaultScheduler, WorkerPool
+from schemathesis.engine.run.unit._progressive_executor import (
+    build_coverage_generator,
+    run_progressive,
+)
 from schemathesis.engine.supervisor import SchedulingDirective
 from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
@@ -150,7 +154,8 @@ def worker_task(
 ) -> None:
     from hypothesis.errors import HypothesisWarning
 
-    from schemathesis.engine.run.unit._executor import run_test, test_func
+    from schemathesis.engine.run.unit._case import run_one_case
+    from schemathesis.engine.run.unit._executor import run_test
     from schemathesis.generation.hypothesis.builder import create_test
 
     def on_error(error: Exception, *, method: str | None = None, path: str | None = None) -> None:
@@ -224,40 +229,51 @@ def worker_task(
                         continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation, phase=phase)
                     scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
-                    events_queue.put(scenario_started)
-                    try:
-                        test_function = create_test(
-                            operation=operation,
-                            test_func=test_func,
-                            config=HypothesisTestConfig(
-                                modes=[mode],
-                                settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.name),
-                                seed=ctx.config.seed,
-                                project=ctx.config,
-                                as_strategy_kwargs=as_strategy_kwargs,
-                                unexpected_methods_seen=(
-                                    ctx.schema.coverage_unexpected_methods_seen if phase == PhaseName.COVERAGE else None
-                                ),
-                            ),
-                        )
-                    except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:
-                        if is_regex_validation_error(exc):
-                            exc = InvalidRegexPattern.from_jsonschema_rs_error(exc)
-                        on_error(exc, method=operation.method, path=operation.path)
-                        continue
 
-                    # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue
-                    # executing. However, as we set a stop event, it will be checked before the next network request.
-                    # However, this is still suboptimal, as there could be slow requests and they will block for longer
-                    for event in run_test(
-                        operation=operation,
-                        test_function=test_function,
-                        ctx=ctx,
-                        phase=phase,
-                        suite_id=suite_id,
-                        scenario_id=scenario_started.id,
-                    ):
-                        events_queue.put(event)
+                    if phase == PhaseName.COVERAGE:
+                        generator = build_coverage_generator(operation, ctx, as_strategy_kwargs)
+                        events_queue.put(scenario_started)
+                        for event in run_progressive(
+                            generator=generator,
+                            ctx=ctx,
+                            phase=phase,
+                            suite_id=suite_id,
+                            scenario_id=scenario_started.id,
+                        ):
+                            events_queue.put(event)
+                    else:
+                        try:
+                            test_function = create_test(
+                                operation=operation,
+                                test_func=run_one_case,
+                                config=HypothesisTestConfig(
+                                    modes=[mode],
+                                    settings=ctx.config.get_hypothesis_settings(operation=operation, phase=phase.name),
+                                    seed=ctx.config.seed,
+                                    project=ctx.config,
+                                    as_strategy_kwargs=as_strategy_kwargs,
+                                    unexpected_methods_seen=None,
+                                ),
+                            )
+                        except (InvalidSchema, InvalidArgument, AuthenticationError, ValidationError) as exc:
+                            if is_regex_validation_error(exc):
+                                exc = InvalidRegexPattern.from_jsonschema_rs_error(exc)
+                            on_error(exc, method=operation.method, path=operation.path)
+                            continue
+                        events_queue.put(scenario_started)
+                        # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will
+                        # continue executing. However, as we set a stop event, it will be checked before the next
+                        # network request. However, this is still suboptimal, as there could be slow requests and they
+                        # will block for longer
+                        for event in run_test(
+                            operation=operation,
+                            test_function=test_function,
+                            ctx=ctx,
+                            phase=phase,
+                            suite_id=suite_id,
+                            scenario_id=scenario_started.id,
+                        ):
+                            events_queue.put(event)
                 else:
                     error = result.err()
                     on_error(error, method=error.method, path=error.path)

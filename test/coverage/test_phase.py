@@ -30,9 +30,9 @@ from schemathesis.generation.hypothesis.builder import (
     HypothesisTestMode,
     _iter_coverage_cases,
     create_test,
-    generate_coverage_cases,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.generation.progressive import CoverageGenerator
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from test.utils import assert_requests_call
 
@@ -306,7 +306,7 @@ def _generate_cases(operation, generation_mode, *, project_config=None, generati
         unexpected_methods = set()
         generation_config = generation_config or operation.schema.config.generation
     return list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[generation_mode],
             auth_storage=None,

@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.18.0...HEAD) - TBD
 
+### :wrench: Changed
+
+- Seed strategy draws in `add_single_example` unconditionally so example generation is deterministic.
+
 ## [4.18.0](https://github.com/schemathesis/schemathesis/compare/v4.17.0...v4.18.0) - 2026-05-08
 
 ### :rocket: Added
