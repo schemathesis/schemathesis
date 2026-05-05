@@ -887,7 +887,11 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
             related_case.operation.method.lower() == "delete"
             and parent_response is not None
             and 200 <= parent_response.status_code < 300
+            and related_case.path_parameters
         ):
+            # A DELETE without path parameters targets a collection, not a specific
+            # resource — a follow-up read on the same path is a list read, not
+            # use-after-free.
             delete_path = ResourcePath(related_case.path, related_case.path_parameters or {})
             if _is_prefix_operation(
                 delete_path,
