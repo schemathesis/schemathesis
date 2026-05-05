@@ -37,6 +37,9 @@ _JACKSON_TYPE_PATTERNS: tuple[re.Pattern[str], ...] = (
     # instance of \`X\` out of <token>`. Different verb form ("instance of" vs
     # "value of type") because Jackson distinguishes the input shape internally.
     re.compile(r"Cannot deserialize instance of `(?P<type>[^`]+)` out of \w+\s+token"),
+    # 2.10+ — Object/Array source on the `value of type` verb form. No quoted
+    # source string, so attribution requires the reference chain.
+    re.compile(r"Cannot deserialize value of type `(?P<type>[^`]+)` from (?:Object|Array) value"),
     # pre-2.10 (Spring Boot 2.1 and older Jakarta EE deployments) — bare type,
     # different word order. No String value in this form.
     re.compile(r"Can not deserialize instance of (?P<type>[\w.$<>]+)"),
