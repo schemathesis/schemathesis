@@ -1432,6 +1432,57 @@ def test_use_after_free_failure_references_prior_delete(ctx, response_factory):
     assert exc_info.value.deleted_case_id == sibling_delete.id
 
 
+def test_use_after_free_no_false_positive_on_collection_delete(ctx, response_factory):
+    # DELETE on a bare collection (no path parameters) does not free a specific resource;
+    # a follow-up GET on the same collection returning 200 is a list read, not a use-after-free.
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/locations": {
+                "post": {
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                    "responses": {"201": {"description": "Created"}},
+                },
+                "get": {"responses": {"200": {"description": "OK"}}},
+                "delete": {"responses": {"200": {"description": "OK"}, "204": {"description": "No Content"}}},
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    post_op = schema["/locations"]["POST"]
+    get_op = schema["/locations"]["GET"]
+    delete_op = schema["/locations"]["DELETE"]
+
+    parent = post_op.Case(method="POST", body={}, media_type="application/json")
+    collection_delete = delete_op.Case(method="DELETE")
+    current_get = get_op.Case(method="GET")
+
+    recorder = ScenarioRecorder(label="collection-delete-test")
+    recorder.record_case(parent_id=None, case=parent, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=parent.id,
+        response=Response.from_requests(response_factory.requests(status_code=201), True),
+    )
+    recorder.record_case(parent_id=parent.id, case=collection_delete, transition=None, is_transition_applied=False)
+    recorder.record_response(
+        case_id=collection_delete.id,
+        response=Response.from_requests(response_factory.requests(status_code=204), True),
+    )
+    recorder.record_case(parent_id=parent.id, case=current_get, transition=None, is_transition_applied=False)
+    get_response = Response.from_requests(response_factory.requests(status_code=200), True)
+    recorder.record_response(case_id=current_get.id, response=get_response)
+
+    check_ctx = CheckContext(
+        override=None,
+        auth=None,
+        headers=None,
+        config=ChecksConfig(),
+        transport_kwargs=None,
+        recorder=recorder,
+    )
+
+    assert use_after_free(check_ctx, get_response, current_get) is None
+
+
 def test_iter_chain_cases_includes_referenced_sibling(ctx, response_factory):
     raw_schema = ctx.openapi.build_schema(
         {
