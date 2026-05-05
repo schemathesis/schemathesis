@@ -19,7 +19,7 @@ from schemathesis.core.transforms import Unresolvable
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import events
-from schemathesis.engine.recorder import Request as RecorderRequest
+from schemathesis.engine.recorder import Request, ScenarioRecorder
 
 if TYPE_CHECKING:
     from typing_extensions import Self
@@ -60,6 +60,11 @@ SKIP_RESPONSE_HEADERS: frozenset[str] = frozenset(
         "date",  # Server timestamp, not useful
     }
 )
+
+# Streaming-write field schemas — frozen at the dataclass class, so we don't pay
+# `fields()` reflection per `ScenarioFinished` event written.
+_SCENARIO_FINISHED_OUTER_FIELDS = tuple(f for f in fields(events.ScenarioFinished) if f.name != "recorder")
+_SCENARIO_RECORDER_FIELDS = fields(ScenarioRecorder)
 
 
 def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> Any:
@@ -111,7 +116,7 @@ def serialize(obj: Any, *, sanitization: SanitizationConfig | None = None) -> An
         }
     if isinstance(obj, Exception):
         return {"type": type(obj).__name__, "message": str(obj)}
-    if isinstance(obj, RecorderRequest):
+    if isinstance(obj, Request):
         # Filter out standard headers that are not useful for analysis
         headers = {k: v for k, v in obj.headers.items() if k not in SKIP_REQUEST_HEADERS}
         if sanitization is not None:
@@ -175,11 +180,73 @@ class NdjsonWriter:
         """Serialize and write one engine event as a NDJSON line."""
         stream = self._stream
         assert stream is not None
+        if isinstance(event, events.ScenarioFinished):
+            self._write_scenario_finished(event)
+            return
         event_name = type(event).__name__
         data = {event_name: serialize(event, sanitization=self._sanitization)}
         stream.write(json.dumps(data, separators=(",", ":")))
         stream.write("\n")
         stream.flush()
+
+    def _write_scenario_finished(self, event: events.ScenarioFinished) -> None:
+        # `ScenarioFinished` is the only event whose payload scales with case count
+        # (its recorder holds one entry per generated case across three dicts). Stream
+        # the recorder body one entry at a time so peak memory tracks the largest
+        # single case rather than the whole scenario.
+        stream = self._stream
+        assert stream is not None
+        sanitization = self._sanitization
+
+        # `ScenarioFinished` always has populated scalar fields (`id`, `timestamp`,
+        # `phase`, `is_final`, ...), so the outer object is never empty — we can
+        # always trail a `,` after the scalars and append `"recorder":...`.
+        stream.write('{"ScenarioFinished":{')
+        for field in _SCENARIO_FINISHED_OUTER_FIELDS:
+            value = serialize(getattr(event, field.name), sanitization=sanitization)
+            if value is None or value == {} or value == []:
+                continue
+            stream.write(json.dumps(field.name))
+            stream.write(":")
+            stream.write(json.dumps(value, separators=(",", ":")))
+            stream.write(",")
+        stream.write('"recorder":')
+        self._write_recorder(event.recorder)
+        stream.write("}}\n")
+        stream.flush()
+
+    def _write_recorder(self, recorder: ScenarioRecorder) -> None:
+        # Emit the recorder as JSON, streaming each `dict` field's entries one at a
+        # time instead of materializing the whole map first.
+        stream = self._stream
+        assert stream is not None
+        sanitization = self._sanitization
+        stream.write("{")
+        sep = ""
+        for field in _SCENARIO_RECORDER_FIELDS:
+            value = getattr(recorder, field.name)
+            if isinstance(value, dict):
+                if not value:
+                    continue
+                stream.write(sep)
+                stream.write(json.dumps(field.name))
+                stream.write(":{")
+                item_sep = ""
+                for key, item in value.items():
+                    stream.write(item_sep)
+                    stream.write(json.dumps(key))
+                    stream.write(":")
+                    stream.write(json.dumps(serialize(item, sanitization=sanitization), separators=(",", ":")))
+                    item_sep = ","
+                stream.write("}")
+                sep = ","
+            else:
+                stream.write(sep)
+                stream.write(json.dumps(field.name))
+                stream.write(":")
+                stream.write(json.dumps(serialize(value, sanitization=sanitization), separators=(",", ":")))
+                sep = ","
+        stream.write("}")
 
     def close(self) -> None:
         """Close the output file."""

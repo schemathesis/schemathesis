@@ -214,6 +214,10 @@ class Response:
             self._deserialized = json.loads(self.text)
         return self._deserialized
 
+    def clear_cache(self) -> None:
+        """Drop the parsed-JSON cache so it doesn't pin memory after checks finish."""
+        self._deserialized = NOT_SET
+
     @property
     def body_size(self) -> int | None:
         """Size of response body in bytes, or None if no content."""
