@@ -84,6 +84,11 @@ def _parse_shell_name(name: str) -> ShellType:
     return ShellType.UNKNOWN
 
 
+# Above this, the curl is unrunnable anyway; bounding the per-char scans
+# keeps reproduce-build O(1) on multi-MB inputs.
+MAX_SHELL_SCAN_BYTES = 64 * 1024
+
+
 def has_non_printable(value: str | bytes) -> bool:
     """Check if value contains ASCII control characters."""
     if isinstance(value, bytes):
@@ -93,8 +98,16 @@ def has_non_printable(value: str | bytes) -> bool:
             # Binary data that can't be decoded - treat as non-printable
             return True
 
+    # Above the cap, skip the scan and force the escape path; truncation marker comes from `escape_for_shell`.
+    if len(value) > MAX_SHELL_SCAN_BYTES:
+        return True
+
     # Check for ASCII control characters: 0-31 and 127 (DEL)
     return any(ord(c) < 32 or ord(c) == 127 for c in value)
+
+
+def _truncated_marker(total_bytes: int) -> str:
+    return f" <...truncated, {total_bytes} bytes total>"
 
 
 def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult:
@@ -102,8 +115,23 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
     if shell is None:
         shell = detect_shell()
 
+    # Truncate before the per-char escape: `_escape_with_ansi_c` builds a
+    # ~10x list-of-chars; an MB input would explode without this guard.
+    truncated = False
+    full_size = len(value)
+    if full_size > MAX_SHELL_SCAN_BYTES:
+        value = value[:MAX_SHELL_SCAN_BYTES]
+        truncated = True
+
     # Fast path: no non-printable characters
     if not has_non_printable(value):
+        if truncated:
+            return EscapeResult(
+                escaped_value=value + _truncated_marker(full_size),
+                needs_warning=True,
+                original_bytes=None,
+                shell_used=shell,
+            )
         return EscapeResult(
             escaped_value=value,
             needs_warning=False,
@@ -112,13 +140,14 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
         )
 
     original_bytes = value.encode("utf-8")
+    suffix = _truncated_marker(full_size) if truncated else ""
 
     # Bash/Zsh: Use ANSI-C quoting $'...\xHH'
     if shell.supports_ansi_c_quoting:
         escaped = _escape_with_ansi_c(value)
         return EscapeResult(
-            escaped_value=f"$'{escaped}'",
-            needs_warning=False,
+            escaped_value=f"$'{escaped}'{suffix}",
+            needs_warning=truncated,
             original_bytes=None,
             shell_used=shell,
         )
@@ -127,8 +156,8 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
     if shell.supports_hex_in_quotes:
         escaped = _escape_with_hex(value)
         return EscapeResult(
-            escaped_value=f"'{escaped}'",
-            needs_warning=False,
+            escaped_value=f"'{escaped}'{suffix}",
+            needs_warning=truncated,
             original_bytes=None,
             shell_used=shell,
         )
@@ -136,7 +165,7 @@ def escape_for_shell(value: str, shell: ShellType | None = None) -> EscapeResult
     # Unknown shell: Show bash-style with warning
     escaped = _escape_with_ansi_c(value)
     return EscapeResult(
-        escaped_value=f"$'{escaped}'",
+        escaped_value=f"$'{escaped}'{suffix}",
         needs_warning=True,
         original_bytes=original_bytes,
         shell_used=ShellType.BASH,

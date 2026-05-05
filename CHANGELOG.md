@@ -25,7 +25,7 @@
 - False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
 - False positive `negative_data_rejection` on 405 responses from routing-level rejection.
 - False positive `response_headers_conformance` for Swagger 2.0 array headers serialised via `collectionFormat`.
-- False positive `use_after_free` on a second DELETE — DELETE is idempotent (RFC 7231 §4.3.5).
+- False positive `use_after_free` on a second DELETE - DELETE is idempotent (RFC 7231 §4.3.5).
 - False positive `use_after_free` after a DELETE on a collection path with no path parameters.
 - Include the prior DELETE in `use_after_free` reproduce when it is a sibling step.
 - False positive `positive_data_acceptance` when a runtime pool body variant was missing required fields. [#3949](https://github.com/schemathesis/schemathesis/issues/3949)
@@ -41,6 +41,7 @@
 
 - Up to 2x faster schema processing on large specs (Stripe, VMware, OSIsoft) and ~40% faster CLI startup.
 - ~75% lower peak memory for large scenarios when writing NDJSON reports.
+- Cap shell-escaped values in reproduce-curl commands at 64 KB with an inline truncation marker.
 
 ## [4.17.0](https://github.com/schemathesis/schemathesis/compare/v4.16.1...v4.17.0) - 2026-04-30
 
