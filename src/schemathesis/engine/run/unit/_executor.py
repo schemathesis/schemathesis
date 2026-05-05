@@ -359,6 +359,7 @@ def run_test(
             # Record request data so identifiers from path/body land in the same pool.
             if extra_data_source.should_record_request(operation=operation.label) and _targets_declared_method(case):
                 extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
+            response.clear_cache()
 
     yield scenario_finished(status)
 
@@ -537,3 +538,4 @@ def test_func(
         continue_on_failure=continue_on_failure,
         recorder=recorder,
     )
+    response.clear_cache()
