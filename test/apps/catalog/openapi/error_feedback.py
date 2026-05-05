@@ -766,6 +766,56 @@ def jackson_enum_planted_bug() -> OpenAPIApp:
 MISSING_QUERY_PARAMS: tuple[str, ...] = ("lat", "lon", "raioMaximo")
 
 
+def missing_request_body_planted_bug() -> OpenAPIApp:
+    # Spec marks the body optional; the server requires it and rejects empty bodies
+    # with Spring's `Required request body is missing` exception. The planted 500
+    # only surfaces when generation always sends a body.
+    spec = build_schema(
+        {
+            "/api/v1/airports": {
+                "post": {
+                    "requestBody": {
+                        "required": False,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "400": {"description": "Bad"},
+                        "500": {"description": "Server Error"},
+                    },
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/api/v1/airports", methods=["POST"])
+    def create_airport() -> Any:
+        if not request.data:
+            return jsonify(
+                {
+                    "time": "2026-05-05T10:00:00Z",
+                    "httpStatus": "NOT_FOUND",
+                    "header": "API ERROR",
+                    "message": (
+                        "Required request body is missing: public com.example.demo.common.model.dto.response."
+                        "CustomResponse<java.lang.String> com.example.demo.flight.controller.AirportController."
+                        "createAirport(com.example.demo.flight.model.dto.request.airport.CreateAirportRequest)"
+                    ),
+                    "isSuccess": False,
+                }
+            ), 400
+        return "", 500
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 def missing_query_param_planted_bug() -> OpenAPIApp:
     spec = build_schema(
         {

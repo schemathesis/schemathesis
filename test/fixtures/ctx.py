@@ -269,6 +269,9 @@ class OpenAPIApps:
     def missing_query_param_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.missing_query_param_planted_bug())
 
+    def missing_request_body_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.missing_request_body_planted_bug())
+
     def pydantic_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.pydantic_planted_bug())
 
