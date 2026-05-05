@@ -91,6 +91,28 @@ def test_allure_stateful_phase_produces_result(ctx, cli, tmp_path):
         assert not any(lbl["name"] == "feature" for lbl in data["labels"])
 
 
+def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
+    # When the Examples phase skips an operation (schema has no inline examples)
+    # but the Coverage phase subsequently runs and produces real results,
+    # the Allure report must NOT mark the result as skipped and must not
+    # populate statusDetails with the skip reason.
+    api = ctx.openapi.apps.success()
+    allure_dir = tmp_path / "allure-results"
+    cli.run_and_assert(
+        api.schema_url,
+        f"--report-allure-path={allure_dir}",
+        "--phases=examples,coverage",
+        "--checks=all",
+    )
+    result_files = list(allure_dir.glob("*-result.json"))
+    assert result_files
+    for data in (json.loads(f.read_text()) for f in result_files):
+        # Coverage ran real requests — status must not be skipped
+        assert data["status"] != "skipped"
+        # And the skip reason must not leak into statusDetails
+        assert data.get("statusDetails", {}).get("message") != "No examples in schema"
+
+
 def test_allure_layer_label(ctx, cli, tmp_path):
     api = ctx.openapi.apps.success()
     allure_dir = tmp_path / "allure-results"

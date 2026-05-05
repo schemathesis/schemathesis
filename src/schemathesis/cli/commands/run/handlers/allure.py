@@ -62,6 +62,10 @@ class AllureHandler(EventHandler):
             self.writer.record_error(label=event.label, message=event.info.format())
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
+        for label in ctx.statistic.tested_operations:
+            result = self.writer._results.get(label)
+            if result is not None and result.status == "passed":
+                self.writer._skip_reasons.pop(label, None)
         self.writer.close()
 
 
