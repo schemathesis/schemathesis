@@ -65,6 +65,7 @@ from schemathesis.specs.openapi.error_feedback import (
     RequiredFieldAdjustment,
     SizeBoundAdjustment,
     TypeMismatchAdjustment,
+    UnexpectedPropertyAdjustment,
     apply_adjustments,
 )
 from schemathesis.specs.openapi.patterns import normalize_regex
@@ -529,6 +530,234 @@ def test_spring_parser_recognizes_numeric_bound_message_variants(
             ("score",),
             ObservationKind.NUMERIC_BOUND,
             NumericBoundPayload(bound=expected_bound, direction=expected_direction, exclusive=expected_exclusive),
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "message, expected_bound, expected_direction, expected_exclusive",
+    [
+        ("Value shall be a positive number", 0.0, BoundDirection.MIN, True),
+        ("Value shall be a non-negative number", 0.0, BoundDirection.MIN, False),
+        ("Value shall be a non negative number", 0.0, BoundDirection.MIN, False),
+        ("Value shall be a negative number", 0.0, BoundDirection.MAX, True),
+        ("Value shall be a non-positive number", 0.0, BoundDirection.MAX, False),
+        ("must be a positive value", 0.0, BoundDirection.MIN, True),
+        ("VALUE SHALL BE A POSITIVE NUMBER", 0.0, BoundDirection.MIN, True),
+    ],
+    ids=[
+        "positive",
+        "non-negative-hyphen",
+        "non-negative-space",
+        "negative",
+        "non-positive",
+        "must-be-positive-value",
+        "case-insensitive",
+    ],
+)
+def test_spring_parser_recognizes_positive_negative_keyword_variants(
+    message, expected_bound, expected_direction, expected_exclusive, make_operation, case_factory
+):
+    body = {"subErrors": [{"field": "score", "message": message}]}
+    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("score",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=expected_bound, direction=expected_direction, exclusive=expected_exclusive),
+        ),
+    ]
+
+
+@pytest.mark.parametrize(
+    "body, expected",
+    [
+        pytest.param(
+            {"message": "Unrecognized field: 'extraField'"},
+            [(("extraField",), ParameterLocation.BODY)],
+            id="top-level-message-double-quotes",
+        ),
+        pytest.param(
+            {"error": 'Unrecognized field: "manager"'},
+            [(("manager",), ParameterLocation.BODY)],
+            id="top-level-error-double-quotes",
+        ),
+        pytest.param(
+            {"fieldErrors": [{"field": "x", "message": "Unrecognized field: 'shadow'"}]},
+            [(("shadow",), ParameterLocation.BODY)],
+            id="inside-fieldErrors-message",
+        ),
+        pytest.param(
+            {"errors": [{"defaultMessage": "Unrecognized field: 'note'"}]},
+            [(("note",), ParameterLocation.BODY)],
+            id="inside-errors-defaultMessage",
+        ),
+        pytest.param(
+            {"message": "Unrecognized field: 'a' Unrecognized field: 'b'"},
+            [(("a",), ParameterLocation.BODY), (("b",), ParameterLocation.BODY)],
+            id="multiple-matches-in-one-string",
+        ),
+    ],
+)
+def test_spring_parser_extracts_unrecognized_field(body, expected, make_operation, case_factory):
+    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    actual = [(o.parameter_path, o.location) for o in obs if o.kind == ObservationKind.UNEXPECTED_PROPERTY]
+    assert actual == expected
+    for observation in obs:
+        if observation.kind == ObservationKind.UNEXPECTED_PROPERTY:
+            assert observation.payload is None
+
+
+@pytest.mark.parametrize(
+    "body, expected_name",
+    [
+        pytest.param(
+            {"message": 'parameter name "page_size" is not allowed'},
+            "page_size",
+            id="double-quoted",
+        ),
+        pytest.param(
+            {"message": "parameter name 'sort' is not allowed"},
+            "sort",
+            id="single-quoted",
+        ),
+        pytest.param(
+            {"detail": 'parameter name "limit" is not allowed'},
+            "limit",
+            id="rfc7807-detail",
+        ),
+    ],
+)
+def test_spring_parser_extracts_unexpected_query_parameter(body, expected_name, make_operation, case_factory):
+    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    actual = [(o.parameter_path, o.location, o.kind) for o in obs if o.kind == ObservationKind.UNEXPECTED_PROPERTY]
+    assert actual == [((expected_name,), ParameterLocation.QUERY, ObservationKind.UNEXPECTED_PROPERTY)]
+
+
+@pytest.mark.parametrize(
+    "type_name, expected_bound",
+    [
+        pytest.param("Integer", 2147483647, id="integer-int32-max"),
+        pytest.param("Long", 9223372036854775807, id="long-int64-max"),
+    ],
+)
+def test_spring_parser_extracts_pagination_type_hint(type_name, expected_bound, make_operation, case_factory):
+    body = {
+        "error": "Bad Request",
+        "status": 400,
+        "messages": [f"Parameter 'page' must be '{type_name}'"],
+        "timestamp": "2026-05-02T21:47:10.769780Z",
+    }
+    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
+        (
+            ("page",),
+            ParameterLocation.QUERY,
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=float(expected_bound), direction=BoundDirection.MAX, exclusive=False),
+        ),
+    ]
+
+
+def test_spring_parser_emits_path_location_when_field_is_a_path_parameter(make_operation, case_factory):
+    # `subErrors[].field = "id"` for a path parameter `id` — the Spring parser
+    # historically hardcoded `location=BODY`, leaving the observation orphaned.
+    body = {
+        "message": "Constraint violation",
+        "subErrors": [{"field": "id", "message": "must be a valid UUID", "value": "0", "type": "String"}],
+    }
+    operation = make_operation(method="get", path="/airports/{id}")
+    obs = SpringParser().parse(operation=operation, body=body, case=case_factory())
+    assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
+        (("id",), ParameterLocation.PATH, ObservationKind.FORMAT, FormatPayload(name="uuid")),
+    ]
+
+
+def test_spring_parser_scans_msg_carrier_for_existing_patterns(make_operation, case_factory):
+    # Custom Spring envelopes use `msg` instead of `message` for the user-facing
+    # text. Existing patterns (`MissingServletRequestParameterException`, etc.)
+    # should fire when their phrasing appears under `msg`.
+    body = {
+        "msg": "Required Integer parameter 'page' is not present",
+        "throwable": None,
+        "status": "BAD_REQUEST",
+    }
+    operation = make_operation(method="get", path="/items")
+    obs = SpringParser().parse(operation=operation, body=body, case=case_factory())
+    assert [(o.parameter_path, o.location, o.kind) for o in obs] == [
+        (("page",), ParameterLocation.QUERY, ObservationKind.MUST_NOT_BE_BLANK),
+    ]
+
+
+@pytest.mark.parametrize(
+    "source",
+    ["Object", "Array"],
+    ids=["object-source", "array-source"],
+)
+def test_jackson_parser_extracts_type_mismatch_for_object_or_array_source(source, make_operation, case_factory):
+    body = {
+        "message": (
+            f"JSON parse error: Cannot deserialize value of type `java.lang.String` "
+            f"from {source} value (token `JsonToken.START_{source.upper()}`) "
+            f'(through reference chain: AirportRequest["cityName"])'
+        ),
+    }
+    obs = JacksonParser().parse(operation=make_operation(), body=body, case=case_factory())
+    assert [(o.parameter_path, o.location, o.kind, o.payload) for o in obs] == [
+        (
+            ("cityName",),
+            ParameterLocation.BODY,
+            ObservationKind.TYPE_MISMATCH,
+            TypeMismatchPayload(type_name="java.lang.String"),
+        ),
+    ]
+
+
+def test_pipeline_falls_through_to_jackson_for_empty_field_errors_envelope(make_operation, case_factory):
+    # Spring envelope with empty fieldErrors + Jackson-shaped top-level `message`:
+    # Spring returns nothing, pipeline falls through, Jackson picks it up.
+    body = {
+        "message": (
+            "JSON parse error: Cannot deserialize instance of `java.lang.String` "
+            'out of START_OBJECT token; (through reference chain: market.dto.CreditCardDTO["ccNumber"])'
+        ),
+        "description": "uri=/customer/cart/pay",
+        "entityName": None,
+        "fieldErrors": [],
+    }
+    operation = make_operation()
+    case = case_factory()
+    spring_obs = SpringParser().parse(operation=operation, body=body, case=case)
+    jackson_obs = JacksonParser().parse(operation=operation, body=body, case=case)
+    assert spring_obs == ()
+    assert [(o.parameter_path, o.kind, o.payload) for o in jackson_obs] == [
+        (("ccNumber",), ObservationKind.TYPE_MISMATCH, TypeMismatchPayload(type_name="java.lang.String")),
+    ]
+
+
+def test_spring_parser_extracts_positive_gate_from_market_cart_body(make_operation, case_factory):
+    # Verbatim wire sample: two `Value shall be a positive number` fieldErrors must
+    # surface as exclusive lower bounds at 0.
+    body = {
+        "message": "Argument validation error",
+        "description": "uri=/customer/cart",
+        "entityName": "cartItemDTO",
+        "fieldErrors": [
+            {"field": "quantity", "message": "Value shall be a positive number"},
+            {"field": "productId", "message": "Value shall be a positive number"},
+        ],
+    }
+    obs = SpringParser().parse(operation=make_operation(), body=body, case=case_factory())
+    assert [(o.parameter_path, o.kind, o.payload) for o in obs] == [
+        (
+            ("quantity",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=True),
+        ),
+        (
+            ("productId",),
+            ObservationKind.NUMERIC_BOUND,
+            NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=True),
         ),
     ]
 
@@ -7890,3 +8119,139 @@ def test_field_inference_jackson_envelopes_without_reference_chain(
             payload=payload["expected_payload"],
         ),
     )
+
+
+def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...]:
+    return tuple(
+        Observation(
+            operation_label="POST /api/users",
+            location=ParameterLocation.BODY,
+            parameter_path=p,
+            kind=ObservationKind.UNEXPECTED_PROPERTY,
+            raw_message="unrecognized field",
+        )
+        for p in paths
+    )
+
+
+@pytest.mark.parametrize(
+    "input_schema, paths, expected",
+    [
+        pytest.param(
+            {"type": "object", "properties": {"shadow": {}, "ok": {}}, "required": ["shadow"]},
+            [("shadow",)],
+            {"type": "object", "properties": {"ok": {}}, "required": []},
+            id="properties-and-required-both-cleared",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"shadow": {}}, "required": []},
+            [("shadow",)],
+            {"type": "object", "properties": {}, "required": []},
+            id="properties-only-cleared-when-not-required",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"ok": {}}, "required": ["shadow"]},
+            [("shadow",)],
+            {"type": "object", "properties": {"ok": {}}, "required": []},
+            id="required-only-cleared-when-absent-from-properties",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"a": {}}, "required": ["b"]},
+            [("shadow",)],
+            {"type": "object", "properties": {"a": {}}, "required": ["b"]},
+            id="absent-from-both-noop",
+        ),
+        pytest.param(
+            {"required": ["shadow"]},
+            [("shadow",)],
+            {"required": []},
+            id="properties-key-absent",
+        ),
+        pytest.param(
+            {"properties": {"shadow": {}}},
+            [("shadow",)],
+            {"properties": {}},
+            id="required-key-absent",
+        ),
+        pytest.param(
+            True,
+            [("shadow",)],
+            True,
+            id="bool-schema-passthrough",
+        ),
+        pytest.param(
+            {"type": "integer"},
+            [("shadow",)],
+            {"type": "integer"},
+            id="non-object-root-no-targets-passthrough",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"shadow": {"properties": {"deep": {}}}}, "required": ["shadow"]},
+            [("shadow", "deep")],
+            {"type": "object", "properties": {}, "required": []},
+            id="only-first-segment-applied",
+        ),
+        pytest.param(
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]},
+                    {"type": "object", "properties": {"keep": {}}, "required": []},
+                ]
+            },
+            [("shadow",)],
+            {
+                "oneOf": [
+                    {"type": "object", "properties": {}, "required": []},
+                    {"type": "object", "properties": {"keep": {}}, "required": []},
+                ]
+            },
+            id="oneof-branches-cascaded",
+        ),
+        pytest.param(
+            {
+                "anyOf": [
+                    {"type": "object", "properties": {"shadow": {}}, "required": []},
+                    {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]},
+                ]
+            },
+            [("shadow",)],
+            {
+                "anyOf": [
+                    {"type": "object", "properties": {}, "required": []},
+                    {"type": "object", "properties": {}, "required": []},
+                ]
+            },
+            id="anyof-branches-cascaded",
+        ),
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]},
+                    {"type": "object", "properties": {"other": {}}},
+                ]
+            },
+            [("shadow",)],
+            {
+                "allOf": [
+                    {"type": "object", "properties": {}, "required": []},
+                    {"type": "object", "properties": {"other": {}}},
+                ]
+            },
+            id="allof-branches-cascaded",
+        ),
+        pytest.param(
+            {"type": "object", "properties": {"a": {}, "b": {}, "ok": {}}, "required": ["a", "b"]},
+            [("a",), ("b",)],
+            {"type": "object", "properties": {"ok": {}}, "required": []},
+            id="multiple-observations",
+        ),
+    ],
+)
+def test_unexpected_property_adjustment_applies_correctly(input_schema, paths, expected, case_factory):
+    out = UnexpectedPropertyAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_unexpected_property_observations(*paths),
+    )
+    assert out == expected

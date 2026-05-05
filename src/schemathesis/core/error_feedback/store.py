@@ -23,6 +23,7 @@ class ObservationKind(str, Enum):
     TYPE_MISMATCH = "type_mismatch"
     ENUM = "enum"
     REQUIRES_AUTHENTICATION = "requires_authentication"
+    UNEXPECTED_PROPERTY = "unexpected_property"
 
 
 @dataclass(frozen=True, slots=True)

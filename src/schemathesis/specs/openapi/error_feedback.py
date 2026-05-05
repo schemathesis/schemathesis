@@ -554,3 +554,48 @@ class RequiredFieldAdjustment:
                 _walk_and_apply(target, observation.parameter_path)
 
         return schema
+
+
+@ADJUSTMENTS.register
+class UnexpectedPropertyAdjustment:
+    """Drop properties the server reported as unrecognized.
+
+    Body and merged query schemas both carry `additionalProperties: false`, so
+    removing the name from `properties` and `required` is enough.
+    """
+
+    handles = frozenset({ObservationKind.UNEXPECTED_PROPERTY})
+
+    def apply(
+        self,
+        *,
+        operation: APIOperation,
+        location: ParameterLocation,
+        schema: JsonSchema,
+        observations: tuple[Observation, ...],
+    ) -> JsonSchema:
+        if not isinstance(schema, dict):
+            return schema
+
+        targets = _collect_object_targets(schema)
+        if not targets:
+            return schema
+
+        for observation in observations:
+            # Spring is the only emitter of UNEXPECTED_PROPERTY and always
+            # produces a single-string path naming the rejected field.
+            assert observation.parameter_path
+            name = observation.parameter_path[0]
+            assert isinstance(name, str)
+            for target in targets:
+                properties = target.get("properties")
+                if properties is not None:
+                    assert isinstance(properties, dict)
+                    properties.pop(name, None)
+                required = target.get("required")
+                if required is not None:
+                    assert isinstance(required, list)
+                    if name in required:
+                        required.remove(name)
+
+        return schema

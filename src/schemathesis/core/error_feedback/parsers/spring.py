@@ -64,6 +64,21 @@ _NUMERIC_BOUND = re.compile(
     re.IGNORECASE,
 )
 
+# `Value shall be a positive number` and friends — wraps `@Positive` /
+# `@PositiveOrZero` (and the negative mirrors) at bound=0.
+_NUMERIC_KEYWORD = re.compile(
+    r"\b(?:must|shall)\s+be\s+(?:a\s+)?"
+    r"(?P<kind>positive|non[-\s]?negative|negative|non[-\s]?positive)"
+    r"(?:\s+number|\s+value)?\b",
+    re.IGNORECASE,
+)
+_NUMERIC_KEYWORD_PAYLOADS: dict[str, NumericBoundPayload] = {
+    "positive": NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=True),
+    "nonnegative": NumericBoundPayload(bound=0.0, direction=BoundDirection.MIN, exclusive=False),
+    "negative": NumericBoundPayload(bound=0.0, direction=BoundDirection.MAX, exclusive=True),
+    "nonpositive": NumericBoundPayload(bound=0.0, direction=BoundDirection.MAX, exclusive=False),
+}
+
 # Bean-validation `@Pattern(regexp = "...")` — Hibernate emits the regex
 # verbatim between double quotes. Java regex syntax is a superset of ECMA-262;
 # the consumer normalizes Java-only constructs before writing it to the schema.
@@ -87,14 +102,26 @@ _TYPE_COERCION = re.compile(
     r"Failed to convert value of type '[\w.$<>]+' to required type '(?P<to>[\w.$<>]+)'",
 )
 
+# Jackson's `UnrecognizedPropertyException` (body) and Spring's strict-binding
+# rejection (query). Custom envelopes occasionally use single quotes.
+_UNRECOGNIZED_FIELD = re.compile(r"Unrecognized field:\s*['\"](?P<name>[^'\"]+)['\"]")
+_UNEXPECTED_PARAMETER = re.compile(r"parameter name [\"'](?P<name>[^\"']+)[\"'] is not allowed")
+
 
 # Custom `@ControllerAdvice` shape: each entry of `messages: [...]` is a string
 # of the form `<field> - <message>` (e.g. blog API).
 _MESSAGE_LINE = re.compile(r"^\s*([\w.]+)\s*-\s*(.+?)\s*$")
 
-# Top-level keys that carry standalone Spring exception messages (envelope
-# shapes from `DefaultErrorAttributes` / RFC 7807 ProblemDetail).
-_TOP_LEVEL_KEYS = ("message", "detail", "error")
+# Pagination-style type hint: `Parameter 'page' must be 'Integer'` (or 'Long').
+# Spring emits this when a `@RequestParam` int/long fails coercion. The hint
+# alone gives us the language-level upper bound for the field.
+_PARAMETER_TYPE_HINT = re.compile(r"Parameter '(?P<param>\w+)' must be '(?P<type>Integer|Long)'")
+_JAVA_TYPE_MAX = {"Integer": 2_147_483_647, "Long": 9_223_372_036_854_775_807}
+
+# Top-level keys that carry standalone Spring exception messages: standard
+# `message`/`detail`/`error` shapes plus `msg` used by custom @ControllerAdvice
+# envelopes (e.g. `{"msg": ..., "throwable": ..., "status": "BAD_REQUEST"}`).
+_TOP_LEVEL_KEYS = ("message", "detail", "error", "msg")
 
 # RFC 7807 ProblemDetail shape: field/message pairs are embedded inside
 # `detail`, e.g. `... [Field error in object 'X' on field 'Y': ...; default message [must not be null]]`.
@@ -102,6 +129,30 @@ _PROBLEM_DETAIL = re.compile(
     r"on field '([^']+)':.*?default message \[([^\]]+)\]",
     re.DOTALL,
 )
+
+
+# Spring carriers a user-facing message in top-level scalars and inside the
+# entries of common error arrays.
+_CARRIER_ARRAY_KEYS = ("fieldErrors", "errors", "subErrors")
+_CARRIER_ITEM_KEYS = ("message", "defaultMessage")
+
+
+def _iter_carrier_strings(body: dict) -> Iterable[str]:
+    for key in _TOP_LEVEL_KEYS:
+        value = body.get(key)
+        if isinstance(value, str):
+            yield value
+    for array_key in _CARRIER_ARRAY_KEYS:
+        items = body.get(array_key)
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            for key in _CARRIER_ITEM_KEYS:
+                value = item.get(key)
+                if isinstance(value, str):
+                    yield value
 
 
 def _split_path(field: str) -> tuple[str | int, ...]:
@@ -126,6 +177,11 @@ def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None
             direction=direction,
             exclusive=numeric_match.group("inclusive") is None,
         )
+    keyword_match = _NUMERIC_KEYWORD.search(message)
+    if keyword_match:
+        # Normalise `non-negative` / `non negative` to a single key.
+        kind = re.sub(r"[-\s]+", "", keyword_match.group("kind").lower())
+        return ObservationKind.NUMERIC_BOUND, _NUMERIC_KEYWORD_PAYLOADS[kind]
     pattern_match = _PATTERN.search(message)
     if pattern_match:
         return ObservationKind.PATTERN, PatternPayload(regex=pattern_match.group("regex"))
@@ -135,14 +191,17 @@ def _classify(message: str) -> tuple[ObservationKind, ObservationPayload] | None
     return None
 
 
-def _emit(operation_label: str, field: str, message: str) -> Observation | None:
+def _emit(operation: APIOperation, field: str, message: str) -> Observation | None:
     classification = _classify(message)
     if classification is None or not field:
         return None
     kind, payload = classification
+    # Spring envelopes don't carry a location tag; treat the field as a path
+    # parameter when the operation declares one with that name, otherwise body.
+    location = ParameterLocation.PATH if field in operation.path_parameters else ParameterLocation.BODY
     return Observation(
-        operation_label=operation_label,
-        location=ParameterLocation.BODY,
+        operation_label=operation.label,
+        location=location,
         parameter_path=_split_path(field),
         kind=kind,
         raw_message=message,
@@ -176,7 +235,12 @@ class SpringParser:
         # ProblemDetail (`{detail, ...}`) without the field-list shapes above.
         for key in _TOP_LEVEL_KEYS:
             text = body.get(key)
-            if isinstance(text, str) and (_MISSING_PARAMETER.search(text) or _TYPE_COERCION.search(text)):
+            if isinstance(text, str) and (
+                _MISSING_PARAMETER.search(text)
+                or _TYPE_COERCION.search(text)
+                or _UNRECOGNIZED_FIELD.search(text)
+                or _UNEXPECTED_PARAMETER.search(text)
+            ):
                 return True
         return False
 
@@ -189,18 +253,18 @@ class SpringParser:
     ) -> tuple[Observation, ...]:
         if not isinstance(body, dict):
             return ()
-        operation_label = operation.label
         observations: list[Observation] = []
-        observations.extend(self._extract_messages(operation_label, body))
-        observations.extend(self._extract_sub_errors(operation_label, body))
-        observations.extend(self._extract_problem_detail(operation_label, body))
-        observations.extend(self._extract_errors(operation_label, body))
-        observations.extend(self._extract_field_errors(operation_label, body))
-        observations.extend(self._extract_top_level_message(operation_label, body))
+        observations.extend(self._extract_messages(operation, body))
+        observations.extend(self._extract_sub_errors(operation, body))
+        observations.extend(self._extract_problem_detail(operation, body))
+        observations.extend(self._extract_errors(operation, body))
+        observations.extend(self._extract_field_errors(operation, body))
+        observations.extend(self._extract_top_level_message(operation, body))
+        observations.extend(self._extract_unexpected_properties(operation, body))
         return tuple(observations)
 
     @staticmethod
-    def _extract_messages(operation_label: str, body: dict) -> Iterable[Observation]:
+    def _extract_messages(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # `{"messages": ["<field> - <message>", ...]}` — custom @ControllerAdvice.
         messages = body.get("messages")
         if not isinstance(messages, list):
@@ -208,15 +272,30 @@ class SpringParser:
         for line in messages:
             if not isinstance(line, str):
                 continue
+            type_hint = _PARAMETER_TYPE_HINT.search(line)
+            if type_hint is not None:
+                yield Observation(
+                    operation_label=operation.label,
+                    location=ParameterLocation.QUERY,
+                    parameter_path=(type_hint.group("param"),),
+                    kind=ObservationKind.NUMERIC_BOUND,
+                    raw_message=line,
+                    payload=NumericBoundPayload(
+                        bound=float(_JAVA_TYPE_MAX[type_hint.group("type")]),
+                        direction=BoundDirection.MAX,
+                        exclusive=False,
+                    ),
+                )
+                continue
             match = _MESSAGE_LINE.match(line)
             if match is None:
                 continue
-            obsservation = _emit(operation_label, match.group(1), match.group(2))
-            if obsservation is not None:
-                yield obsservation
+            observation = _emit(operation, match.group(1), match.group(2))
+            if observation is not None:
+                yield observation
 
     @staticmethod
-    def _extract_sub_errors(operation_label: str, body: dict) -> Iterable[Observation]:
+    def _extract_sub_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # `{"subErrors": [{"field": "...", "message": "..."}, ...]}` — common
         # validation-error wrapper.
         sub_errors = body.get("subErrors")
@@ -228,23 +307,23 @@ class SpringParser:
             field = item.get("field") or ""
             message = item.get("message") or ""
             if isinstance(field, str) and isinstance(message, str):
-                observations = _emit(operation_label, field, message)
+                observations = _emit(operation, field, message)
                 if observations is not None:
                     yield observations
 
     @staticmethod
-    def _extract_problem_detail(operation_label: str, body: dict) -> Iterable[Observation]:
+    def _extract_problem_detail(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # RFC 7807 ProblemDetail — field/message pairs are embedded in `detail`.
         detail = body.get("detail")
         if not isinstance(detail, str):
             return
         for match in _PROBLEM_DETAIL.finditer(detail):
-            observations = _emit(operation_label, match.group(1), match.group(2))
+            observations = _emit(operation, match.group(1), match.group(2))
             if observations is not None:
                 yield observations
 
     @staticmethod
-    def _extract_errors(operation_label: str, body: dict) -> Iterable[Observation]:
+    def _extract_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # `{"errors": [{"field": "...", "defaultMessage": "..."}, ...]}` —
         # default Spring Boot Bean Validation shape.
         errors = body.get("errors")
@@ -256,12 +335,12 @@ class SpringParser:
             field = item.get("field") or ""
             message = item.get("defaultMessage") or item.get("message") or ""
             if isinstance(field, str) and isinstance(message, str):
-                observations = _emit(operation_label, field, message)
+                observations = _emit(operation, field, message)
                 if observations is not None:
                     yield observations
 
     @staticmethod
-    def _extract_field_errors(operation_label: str, body: dict) -> Iterable[Observation]:
+    def _extract_field_errors(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # `{"fieldErrors": [{"property": "...", "message": "..."}, ...]}` —
         # wimdeblauwe error-handling-spring-boot-starter shape.
         field_errors = body.get("fieldErrors")
@@ -273,12 +352,12 @@ class SpringParser:
             field = item.get("property") or item.get("field") or item.get("path") or ""
             message = item.get("message") or item.get("defaultMessage") or ""
             if isinstance(field, str) and isinstance(message, str):
-                observations = _emit(operation_label, field, message)
+                observations = _emit(operation, field, message)
                 if observations is not None:
                     yield observations
 
     @staticmethod
-    def _extract_top_level_message(operation_label: str, body: dict) -> Iterable[Observation]:
+    def _extract_top_level_message(operation: APIOperation, body: dict) -> Iterable[Observation]:
         # Spring stdlib / ProblemDetail envelopes carry exception messages directly
         # in `message`/`detail`/`error`. We pull two non-body Spring exceptions
         # out of these strings: a missing query parameter and a request-param
@@ -289,7 +368,7 @@ class SpringParser:
                 continue
             for missing_match in _MISSING_PARAMETER.finditer(message):
                 yield Observation(
-                    operation_label=operation_label,
+                    operation_label=operation.label,
                     location=ParameterLocation.QUERY,
                     parameter_path=(missing_match.group("field"),),
                     kind=ObservationKind.MUST_NOT_BE_BLANK,
@@ -303,10 +382,32 @@ class SpringParser:
                 payload = TypeMismatchPayload(type_name=coercion_match.group("to"))
                 for location in (ParameterLocation.PATH, ParameterLocation.QUERY):
                     yield Observation(
-                        operation_label=operation_label,
+                        operation_label=operation.label,
                         location=location,
                         parameter_path=(coercion_match.group("field"),),
                         kind=ObservationKind.TYPE_MISMATCH,
                         raw_message=message,
                         payload=payload,
                     )
+
+    @staticmethod
+    def _extract_unexpected_properties(operation: APIOperation, body: dict) -> Iterable[Observation]:
+        # Body-side `Unrecognized field` and query-side `parameter name "X" is not
+        # allowed` — both name a property the schema must drop.
+        for message in _iter_carrier_strings(body):
+            for match in _UNRECOGNIZED_FIELD.finditer(message):
+                yield Observation(
+                    operation_label=operation.label,
+                    location=ParameterLocation.BODY,
+                    parameter_path=(match.group("name"),),
+                    kind=ObservationKind.UNEXPECTED_PROPERTY,
+                    raw_message=message,
+                )
+            for match in _UNEXPECTED_PARAMETER.finditer(message):
+                yield Observation(
+                    operation_label=operation.label,
+                    location=ParameterLocation.QUERY,
+                    parameter_path=(match.group("name"),),
+                    kind=ObservationKind.UNEXPECTED_PROPERTY,
+                    raw_message=message,
+                )

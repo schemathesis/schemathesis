@@ -245,6 +245,12 @@ class OpenAPIApps:
     def numeric_bound_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.numeric_bound_planted_bug())
 
+    def positive_numeric_gate_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.positive_numeric_gate_planted_bug())
+
+    def unrecognized_property_planted_bug(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_error_feedback.unrecognized_property_planted_bug())
+
     def pattern_planted_bug(self) -> OpenAPIServer:
         return _start(self.parent, openapi_error_feedback.pattern_planted_bug())
 

@@ -367,6 +367,132 @@ def numeric_bound_planted_bug() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def positive_numeric_gate_planted_bug() -> OpenAPIApp:
+    # Three positive-integer gates so observations cross the threshold during coverage.
+    spec = build_schema(
+        {
+            "/cart": {
+                "put": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "productId": {"type": "integer"},
+                                        "quantity": {"type": "integer"},
+                                        "warehouseId": {"type": "integer"},
+                                        "tags": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                    "required": ["productId", "quantity", "warehouseId"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "400": {"description": "Bad"},
+                        "500": {"description": "Server Error"},
+                    },
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/cart", methods=["PUT"])
+    def update_cart() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"message": "Argument validation error", "fieldErrors": []}), 400
+        field_errors = []
+        for name in ("productId", "quantity", "warehouseId"):
+            value = body.get(name)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                field_errors.append({"field": name, "message": "Value shall be a positive number"})
+        if field_errors:
+            return jsonify(
+                {
+                    "message": "Argument validation error",
+                    "description": "uri=/cart",
+                    "entityName": "cartItemDTO",
+                    "fieldErrors": field_errors,
+                }
+            ), 400
+        return "", 500
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
+def unrecognized_property_planted_bug() -> OpenAPIApp:
+    # Body and query each carry one extra schema-declared name the server rejects;
+    # three positive-integer gates layer on top so the planted 500 needs property
+    # removal plus numeric-bound adjustments to surface.
+    spec = build_schema(
+        {
+            "/cart": {
+                "put": {
+                    "parameters": [
+                        {"in": "query", "name": "filter", "required": False, "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "productId": {"type": "integer"},
+                                        "quantity": {"type": "integer"},
+                                        "warehouseId": {"type": "integer"},
+                                        "tags": {"type": "array", "items": {"type": "string"}},
+                                    },
+                                    "required": ["productId", "quantity", "warehouseId"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "400": {"description": "Bad"},
+                        "500": {"description": "Server Error"},
+                    },
+                }
+            }
+        }
+    )
+    app = make_flask_app_from_schema(spec)
+
+    @app.route("/cart", methods=["PUT"])
+    def update_cart() -> Any:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({"message": "Argument validation error", "fieldErrors": []}), 400
+
+        top_messages: list[str] = []
+        field_errors: list[dict[str, str]] = []
+        if "filter" in request.args:
+            top_messages.append('parameter name "filter" is not allowed')
+        if "tags" in body:
+            top_messages.append("Unrecognized field: 'tags'")
+        for name in ("productId", "quantity", "warehouseId"):
+            value = body.get(name)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                field_errors.append({"field": name, "message": "Value shall be a positive number"})
+
+        if top_messages or field_errors:
+            return jsonify(
+                {
+                    "message": "; ".join(top_messages) if top_messages else "Argument validation error",
+                    "description": "uri=/cart",
+                    "entityName": "cartItemDTO",
+                    "fieldErrors": field_errors,
+                }
+            ), 400
+        return "", 500
+
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 PATTERN_FIELDS: tuple[tuple[str, str], ...] = (
     ("code", "[A-Z]{2,5}"),
     ("ticker", "[A-Z]{3,4}"),
