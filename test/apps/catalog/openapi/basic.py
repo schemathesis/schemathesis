@@ -376,6 +376,13 @@ def success_and_basic() -> OpenAPIApp:
     return OpenAPIApp(spec=spec, server=app, kind="flask")
 
 
+def sessions_and_log_event() -> OpenAPIApp:
+    spec = build_schema(schemas.sessions_and_log_event())
+    app = make_flask_app_from_schema(spec)
+    handlers.register_sessions_and_log_event(app)
+    return OpenAPIApp(spec=spec, server=app, kind="flask")
+
+
 # Every fragment in `test/apps/fragments/schemas.py`, including deliberately-broken ones.
 # Used by the local launcher (`python -m test.apps`) to expose everything for manual debugging.
 _KITCHEN_SINK_FRAGMENTS = (

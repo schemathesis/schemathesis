@@ -296,3 +296,22 @@ def register_basic(app: Flask) -> None:
         if request.headers.get("Authorization") == _BASIC_AUTH_TOKEN:
             return jsonify({"secret": 42})
         return {"detail": "Unauthorized"}, 401
+
+
+def register_sessions_and_log_event(app: Flask) -> None:
+    @app.route("/api/sessions", methods=["POST"])
+    def sessions_endpoint() -> Any:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return "", 400
+        session_id = data.get("sessionId")
+        if not isinstance(session_id, str):
+            return "", 400
+        return jsonify({"sessionId": session_id}), 201
+
+    @app.route("/api/log_event", methods=["POST"])
+    def log_event_endpoint() -> Any:
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict) or "message" not in data:
+            return "", 400
+        return "", 200

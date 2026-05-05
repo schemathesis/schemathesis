@@ -189,6 +189,9 @@ class OpenAPIApps:
     def success_and_basic(self) -> OpenAPIServer:
         return _start(self.parent, openapi_basic.success_and_basic())
 
+    def sessions_and_log_event(self) -> OpenAPIServer:
+        return _start(self.parent, openapi_basic.sessions_and_log_event())
+
     def rails_planted_bug(self, *, envelope: openapi_rails.Envelope) -> OpenAPIServer:
         return _start(self.parent, openapi_rails.planted_bug(envelope))
 

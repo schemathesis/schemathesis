@@ -628,3 +628,54 @@ def basic() -> dict[str, Any]:
             }
         }
     }
+
+
+_SESSION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["sessionId"],
+    "properties": {"sessionId": {"type": "string", "format": "uuid"}},
+}
+
+_LOG_EVENT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["sessionId", "message"],
+    "properties": {
+        "sessionId": {"type": "string", "format": "uuid"},
+        "message": {"type": "string"},
+    },
+}
+
+
+def sessions_and_log_event() -> dict[str, Any]:
+    return {
+        "/api/sessions": {
+            "post": {
+                "operationId": "createSession",
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": _SESSION_SCHEMA,
+                            "examples": {"valid": {"value": {"sessionId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"}}},
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {"application/json": {"schema": _SESSION_SCHEMA}},
+                    }
+                },
+            }
+        },
+        "/api/log_event": {
+            "post": {
+                "operationId": "logEvent",
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": _LOG_EVENT_SCHEMA}},
+                },
+                "responses": {"200": {"description": "OK"}, "400": {"description": "Bad Request"}},
+            }
+        },
+    }

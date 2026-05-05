@@ -733,6 +733,24 @@ def test_examples_phase_uses_pool_for_body_fields(cli, app_runner, snapshot_cli,
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
+def test_no_false_positive_when_pool_body_missing_required_fields(cli, snapshot_cli, ctx):
+    # Pool-seeded body with only a subset of required fields must not trigger positive_data_acceptance.
+    api = ctx.openapi.apps.sessions_and_log_event()
+    config = {"phases": {"examples": {"fill-missing": True}}}
+
+    assert (
+        cli.run(
+            api.schema_url,
+            "--phases=examples",
+            "-c positive_data_acceptance",
+            "--mode=positive",
+            config=config,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_pool_captures_ids_from_multi_array_root_get_list_response(cli, app_runner, snapshot_cli, ctx):
     # Docker Engine /volumes shape: `{Volumes: [...], Warnings: [...]}`. Server-seeded names;
     # no POST creator. UUIDs make blind generation practically incapable of guessing.
