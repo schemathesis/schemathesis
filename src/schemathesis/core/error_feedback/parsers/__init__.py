@@ -37,6 +37,7 @@ PARSERS: Registry[type[ResponseParser]] = Registry()
 from schemathesis.core.error_feedback.parsers import (  # noqa: F401, E402
     ajv,
     aspnet,
+    confluent,
     drf,
     go_validator,
     jackson,
