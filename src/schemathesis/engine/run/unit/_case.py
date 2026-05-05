@@ -165,7 +165,7 @@ def _do_call_and_validate(
     # Record DELETE attempts immediately to influence subsequent strategy draws.
     # Include both successful (2xx) and 404 responses - each attempt increases decay
     # to avoid hammering the same resource repeatedly.
-    if ctx.extra_data_source is not None:
+    if ctx.extra_data_source is not None and case.method.upper() == "DELETE":
         status = response.status_code
         if 200 <= status < 300 or status == 404:
             ctx.extra_data_source.record_successful_delete(operation=case.operation, case=case)

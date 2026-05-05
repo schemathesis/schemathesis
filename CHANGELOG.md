@@ -36,6 +36,7 @@
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - Iteration order of cases in the Coverage phase.
+- Seed strategy draws in `add_single_example` unconditionally so example generation is deterministic across processes.
 
 ### :racing_car: Performance
 

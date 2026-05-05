@@ -108,6 +108,9 @@ def run_progressive(
     status: Status | None = None
     any_case_ran = False
     try:
+        # `_iter_coverage_cases` draws from hypothesis-jsonschema strategies internally, which may
+        # emit UserWarning about invalid regex patterns; suppress those here and translate them below.
+        # `ignore_hypothesis_output` silences Hypothesis's own stderr chatter for the same reason.
         with catch_warnings(record=True) as warnings_list, ignore_hypothesis_output():
             for case in generator:
                 if ctx.has_to_stop or generator.controller.is_stopped:
@@ -128,7 +131,7 @@ def run_progressive(
                 status = Status.SUCCESS
             else:
                 status = Status.SKIP
-                skip_reason = "No examples in schema"
+                skip_reason = "No coverage cases generated"
     except (SkipTest, unittest.case.SkipTest) as exc:
         status = Status.SKIP
         skip_reason = str(exc)

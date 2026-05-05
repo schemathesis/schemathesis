@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -39,11 +39,6 @@ class Controller:
         return self._stop
 
 
-@dataclass
-class CoverageController(Controller):
-    """Controller for the Coverage-phase generator."""
-
-
 class CaseGenerator(Protocol):
     """Common protocol for progressive case generators."""
 
@@ -70,7 +65,6 @@ class CoverageGenerator:
         auth_storage: AuthStorage | None,
         as_strategy_kwargs: dict[str, Any],
         unexpected_methods_seen: set[tuple[str, str]] | None = None,
-        test: Callable | None = None,
     ) -> None:
         self._operation = operation
         self._generation_modes = generation_modes
@@ -80,8 +74,7 @@ class CoverageGenerator:
         self._auth_storage = auth_storage
         self._as_strategy_kwargs = as_strategy_kwargs
         self._unexpected_methods_seen = unexpected_methods_seen
-        self._test = test
-        self._controller = CoverageController()
+        self._controller = Controller()
         self._capture_missing_path_parameters()
 
     def _capture_missing_path_parameters(self) -> None:
@@ -103,7 +96,7 @@ class CoverageGenerator:
         return self._operation
 
     @property
-    def controller(self) -> CoverageController:
+    def controller(self) -> Controller:
         return self._controller
 
     def __iter__(self) -> Iterator[Case]:

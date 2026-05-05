@@ -411,7 +411,6 @@ def add_coverage(
         auth_storage=auth_storage,
         as_strategy_kwargs=as_strategy_kwargs,
         unexpected_methods_seen=unexpected_methods_seen,
-        test=test,
     )
     for case in generator:
         test = hypothesis.example(case=case)(test)
