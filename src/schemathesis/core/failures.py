@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import http.client
+import itertools
 import textwrap
 import traceback
 from collections.abc import Callable, Sequence
@@ -323,14 +324,17 @@ def format_failures(
     else:
         output = ""
 
-    # Failures
-    for idx, failure in enumerate(failures):
-        output += formatter(MessageBlock.FAILURE, f"\n- {failure.title}")
-        if failure.message:
-            output += "\n\n"
-            output += textwrap.indent(failure.message, "    ")
-        if idx != len(failures):
-            output += "\n"
+    # Failures — collapse the title for runs of same-title same-class failures
+    # (e.g. multiple `JsonSchemaError`s on one response) into one header.
+    for (_, title), group_iter in itertools.groupby(failures, key=lambda f: (type(f), f.title)):
+        group = list(group_iter)
+        suffix = f" ({len(group)} violations)" if len(group) > 1 else ""
+        output += formatter(MessageBlock.FAILURE, f"\n- {title}{suffix}")
+        for failure in group:
+            if failure.message:
+                output += "\n\n"
+                output += textwrap.indent(failure.message, "    ")
+        output += "\n"
 
     # Response status
     if isinstance(response, Response):

@@ -29,38 +29,69 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-__________________________________ GET /data ___________________________________
+________________________________ GET /api/user _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Response violates schema (2 violations)
+- Response violates schema (4 violations)
 
-    "not-an-int" is not of type "integer"
-
-    Schema at /properties/id:
-
-        {
-            "type": "integer"
-        }
-
-    Value:
-
-        "not-an-int"
-
-    42 is not of type "string"
+    "" is shorter than 1 character
 
     Schema at /properties/name:
 
         {
+            "minLength": 1,
             "type": "string"
         }
 
     Value:
 
-        42
+        ""
+
+    "abc" is not a "email"
+
+    Schema at /properties/email:
+
+        {
+            "format": "email",
+            "type": "string"
+        }
+
+    Value:
+
+        "abc"
+
+    "pending" is not one of "active" or "inactive"
+
+    Schema at /properties/status:
+
+        {
+            "enum": [
+                "active",
+                "inactive"
+            ],
+            "type": "string"
+        }
+
+    Value:
+
+        "pending"
+
+    -1 is less than the minimum of 0
+
+    Schema at /properties/age:
+
+        {
+            "minimum": 0,
+            "type": "integer"
+        }
+
+    Value:
+
+        -1
 
 [200] OK:
 
-    `{"id":"not-an-int","name":42}`
+    `{"age":-1,"email":"abc","name":"","status":"pending"}`
 
 Reproduce with:
 
@@ -79,11 +110,11 @@ Test Phases:
   ⏭  Stateful (not applicable)
 
 Failures:
-  ❌ Response violates schema: 2
+  ❌ Response violates schema: 4
 
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-============================= 2 failures in 1.00s ==============================
+============================= 4 failures in 1.00s ==============================

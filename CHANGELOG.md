@@ -37,6 +37,7 @@
 - Recognize more path parameters as resource identifiers.
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
+- Group consecutive same-title failures (e.g. multiple schema violations on one response) under a single header with a violation count.
 
 ### :racing_car: Performance
 
