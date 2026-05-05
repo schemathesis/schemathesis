@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
+import jsonschema_rs
 import pytest
 from pydantic import AnyUrl, BaseModel, Field, ValidationError
 
@@ -47,6 +48,7 @@ from schemathesis.core.error_feedback.parsers.spring import SpringParser
 from schemathesis.core.error_feedback.parsers.symfony import SymfonyParser
 from schemathesis.core.error_feedback.parsers.zod import ZodParser
 from schemathesis.core.error_feedback.pipeline import FeedbackPipeline, _reset_pipeline_for_tests
+from schemathesis.core.jsonschema import make_validator
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -59,6 +61,7 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.specs.openapi._hypothesis import _body_required_per_feedback
+from schemathesis.specs.openapi.definitions import OPENAPI_30, OPENAPI_31, SWAGGER_20
 from schemathesis.specs.openapi.error_feedback import (
     EnumAdjustment,
     FormatAdjustment,
@@ -71,6 +74,57 @@ from schemathesis.specs.openapi.error_feedback import (
     apply_adjustments,
 )
 from schemathesis.specs.openapi.patterns import normalize_regex
+
+# Schema Object meta-validators for each supported spec version. Adjustments must
+# produce schemas that satisfy these so downstream Hypothesis draws against the
+# spec meta-schema do not blow up — e.g. `required: []` violates the `minItems: 1`
+# constraint on `required` in Swagger 2.0 and OpenAPI 3.0.
+_SCHEMA_OBJECT_VALIDATORS: dict[str, jsonschema_rs.Validator] = {
+    "2.0": make_validator(
+        {"$ref": "#/definitions/schema", "definitions": SWAGGER_20["definitions"]},
+        jsonschema_rs.Draft4Validator,
+    ),
+    "3.0": make_validator(
+        {"$ref": "#/definitions/Schema", "definitions": OPENAPI_30["definitions"]},
+        jsonschema_rs.Draft4Validator,
+    ),
+    "3.1": make_validator(
+        {"$ref": "#/$defs/schema", "$defs": OPENAPI_31["$defs"]},
+        jsonschema_rs.Draft202012Validator,
+    ),
+}
+
+
+def _has_type_union(value: object) -> bool:
+    """Detect OpenAPI 3.1 / JSON Schema 2020-12 type-union syntax (`type: [..., null]`)."""
+    if isinstance(value, dict):
+        if isinstance(value.get("type"), list):
+            return True
+        return any(_has_type_union(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_has_type_union(v) for v in value)
+    return False
+
+
+def _assert_valid_schema_object(input_schema: object, out: object, *, draft: str = "3.0") -> None:
+    """An adjustment must not turn a valid Schema Object into an invalid one.
+
+    The validator is auto-selected: schemas using `type: [..., null]` syntax are
+    OpenAPI 3.1; anything else is checked against `draft` (default 3.0, stricter —
+    catches `required: []` that 3.1 silently allows). Skipped when the input is not
+    itself a valid Schema Object: a few cases deliberately feed malformed input to
+    verify the adjustment is resilient, and the adjustment only owns its own changes.
+    """
+    if not isinstance(out, dict) or not isinstance(input_schema, dict):
+        return
+    effective_draft = "3.1" if _has_type_union(out) or _has_type_union(input_schema) else draft
+    validator = _SCHEMA_OBJECT_VALIDATORS[effective_draft]
+    if not validator.is_valid(input_schema):
+        return
+    try:
+        validator.validate(out)
+    except jsonschema_rs.ValidationError as exc:
+        raise AssertionError(f"Adjustment output is not a valid Schema Object: {exc}") from exc
 
 
 @pytest.fixture
@@ -6325,7 +6379,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
     "input_schema, paths, expected",
     [
         (
-            {"type": "object", "properties": {"email": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"email": {"type": "string"}}},
             [("email",)],
             {
                 "type": "object",
@@ -6334,7 +6388,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [("email",)],
             {
                 "type": "object",
@@ -6343,7 +6397,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             },
         ),
         (
-            {"type": "object", "properties": {"email": {"type": "string", "minLength": 5}}, "required": []},
+            {"type": "object", "properties": {"email": {"type": "string", "minLength": 5}}},
             [("email",)],
             {
                 "type": "object",
@@ -6352,7 +6406,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             },
         ),
         (
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
             [("age",)],
             {
                 "type": "object",
@@ -6363,7 +6417,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
         (
             {
                 "oneOf": [
-                    {"type": "object", "properties": {}, "required": []},
+                    {"type": "object", "properties": {}},
                     {"type": "string"},
                 ]
             },
@@ -6384,7 +6438,6 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             {
                 "type": ["object", "null"],
                 "properties": {"email": {"type": ["string", "null"]}},
-                "required": [],
             },
             [("email",)],
             {
@@ -6397,7 +6450,6 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             {
                 "type": ["object", "null"],
                 "properties": {"age": {"type": ["integer", "null"]}},
-                "required": [],
             },
             [("age",)],
             {
@@ -6415,7 +6467,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             },
         ),
         (
-            {"type": "object", "properties": {"email": True}, "required": []},
+            {"type": "object", "properties": {"email": True}},
             [("email",)],
             {
                 "type": "object",
@@ -6424,7 +6476,7 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
             },
         ),
         (
-            {"type": "object", "properties": {"email": False}, "required": []},
+            {"type": "object", "properties": {"email": False}},
             [("email",)],
             {
                 "type": "object",
@@ -6449,10 +6501,8 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
                     "contact": {
                         "type": "object",
                         "properties": {"email": {"type": "string"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
             [("contact", "email")],
             {
@@ -6464,11 +6514,10 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
                         "required": ["email"],
                     }
                 },
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [("address", "street")],
             {
                 "type": "object",
@@ -6479,23 +6528,22 @@ def _build_observations(*paths: tuple[str | int, ...]) -> tuple[Observation, ...
                         "required": ["street"],
                     }
                 },
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [()],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [("foo", 0, "bar")],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [("foo", 0)],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
     ],
     ids=[
@@ -6526,13 +6574,14 @@ def test_required_field_adjustment_applies_correctly(input_schema, paths, expect
         schema=input_schema,
         observations=_build_observations(*paths),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
 def test_required_field_adjustment_idempotent(case_factory):
     # `apply` mutates in place, so feed it the same dict twice and check
     # the second pass doesn't drift from the first.
-    schema = {"type": "object", "properties": {}, "required": []}
+    schema = {"type": "object", "properties": {}}
     obs = _build_observations(("email",))
     operation = case_factory().operation
 
@@ -6553,7 +6602,7 @@ def test_required_field_adjustment_idempotent(case_factory):
 
 
 def test_apply_adjustments_returns_input_when_no_observations(case_factory):
-    schema = {"type": "object", "properties": {}, "required": []}
+    schema = {"type": "object", "properties": {}}
     store = ErrorFeedbackStore()
     out = apply_adjustments(
         operation=case_factory().operation,
@@ -6584,65 +6633,59 @@ def _build_size_bound_observations(
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"username": {"type": "string"}}},
             [(("username",), 0, 15)],
             {
                 "type": "object",
                 "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 15}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"tags": {"type": "array", "items": {"type": "string"}}}, "required": []},
+            {"type": "object", "properties": {"tags": {"type": "array", "items": {"type": "string"}}}},
             [(("tags",), 1, 5)],
             {
                 "type": "object",
                 "properties": {
                     "tags": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 5},
                 },
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"meta": {"type": "object"}}, "required": []},
+            {"type": "object", "properties": {"meta": {"type": "object"}}},
             [(("meta",), 1, 10)],
             {
                 "type": "object",
                 "properties": {"meta": {"type": "object", "minProperties": 1, "maxProperties": 10}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
             [(("age",), 0, 100)],
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
         ),
         (
             {
                 "type": "object",
                 "properties": {"username": {"type": "string", "minLength": 5, "maxLength": 50}},
-                "required": [],
             },
             [(("username",), 0, 15)],
             {
                 "type": "object",
                 "properties": {"username": {"type": "string", "minLength": 5, "maxLength": 15}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"username": {"type": ["string", "null"]}}, "required": []},
+            {"type": "object", "properties": {"username": {"type": ["string", "null"]}}},
             [(("username",), 0, 15)],
             {
                 "type": "object",
                 "properties": {"username": {"type": ["string", "null"], "minLength": 0, "maxLength": 15}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [(("username",), 0, 15)],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (
             {"type": "string"},
@@ -6652,7 +6695,7 @@ def _build_size_bound_observations(
         (
             {
                 "oneOf": [
-                    {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+                    {"type": "object", "properties": {"username": {"type": "string"}}},
                     {"type": "string"},
                 ]
             },
@@ -6662,7 +6705,6 @@ def _build_size_bound_observations(
                     {
                         "type": "object",
                         "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 15}},
-                        "required": [],
                     },
                     {"type": "string"},
                 ]
@@ -6675,10 +6717,8 @@ def _build_size_bound_observations(
                     "contact": {
                         "type": "object",
                         "properties": {"email": {"type": "string"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
             [(("contact", "email"), 5, 64)],
             {
@@ -6687,22 +6727,20 @@ def _build_size_bound_observations(
                     "contact": {
                         "type": "object",
                         "properties": {"email": {"type": "string", "minLength": 5, "maxLength": 64}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
         ),
         (True, [(("username",), 0, 15)], True),
         (
-            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"username": {"type": "string"}}},
             [((), 0, 15)],
-            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"username": {"type": "string"}}},
         ),
         (
-            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"username": {"type": "string"}}},
             [((0,), 0, 15)],
-            {"type": "object", "properties": {"username": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"username": {"type": "string"}}},
         ),
         (
             {
@@ -6710,7 +6748,6 @@ def _build_size_bound_observations(
                 "properties": {
                     "contact": {"type": "object", "properties": "broken"},
                 },
-                "required": [],
             },
             [(("contact", "email"), 5, 64)],
             {
@@ -6718,7 +6755,6 @@ def _build_size_bound_observations(
                 "properties": {
                     "contact": {"type": "object", "properties": "broken"},
                 },
-                "required": [],
             },
         ),
     ],
@@ -6746,6 +6782,7 @@ def test_size_bound_adjustment_applies_correctly(input_schema, items, expected, 
         schema=input_schema,
         observations=_build_size_bound_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
@@ -6767,52 +6804,48 @@ def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tup
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"email": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"email": {"type": "string"}}},
             [(("email",), "email")],
             {
                 "type": "object",
                 "properties": {"email": {"type": "string", "format": "email"}},
-                "required": [],
             },
         ),
         (
             {
                 "type": "object",
                 "properties": {"email": {"type": "string", "format": "uri"}},
-                "required": [],
             },
             [(("email",), "email")],
             {
                 "type": "object",
                 "properties": {"email": {"type": "string", "format": "uri"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
             [(("age",), "email")],
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
         ),
         (
-            {"type": "object", "properties": {"email": {"type": ["string", "null"]}}, "required": []},
+            {"type": "object", "properties": {"email": {"type": ["string", "null"]}}},
             [(("email",), "email")],
             {
                 "type": "object",
                 "properties": {"email": {"type": ["string", "null"], "format": "email"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [(("email",), "email")],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (True, [(("email",), "email")], True),
         ({"type": "string"}, [(("email",), "email")], {"type": "string"}),
         (
             {
                 "oneOf": [
-                    {"type": "object", "properties": {"email": {"type": "string"}}, "required": []},
+                    {"type": "object", "properties": {"email": {"type": "string"}}},
                     {"type": "string"},
                 ]
             },
@@ -6822,7 +6855,6 @@ def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tup
                     {
                         "type": "object",
                         "properties": {"email": {"type": "string", "format": "email"}},
-                        "required": [],
                     },
                     {"type": "string"},
                 ]
@@ -6835,10 +6867,8 @@ def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tup
                     "contact": {
                         "type": "object",
                         "properties": {"email": {"type": "string"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
             [(("contact", "email"), "email")],
             {
@@ -6847,21 +6877,19 @@ def _build_format_observations(*items: tuple[tuple[str | int, ...], str]) -> tup
                     "contact": {
                         "type": "object",
                         "properties": {"email": {"type": "string", "format": "email"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
             [((), "email")],
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
         ),
         (
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
             [((0,), "email")],
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
         ),
     ],
     ids=[
@@ -6885,6 +6913,7 @@ def test_format_adjustment_applies_correctly(input_schema, items, expected, case
         schema=input_schema,
         observations=_build_format_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
@@ -6916,76 +6945,71 @@ def openapi_31_case_factory(openapi_31):
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer"}}},
             [(("score",), 0.0, BoundDirection.MIN, False)],
-            {"type": "object", "properties": {"score": {"type": "integer", "minimum": 0}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer", "minimum": 0}}},
         ),
         (
-            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer"}}},
             [(("score",), 100.0, BoundDirection.MAX, True)],
             {
                 "type": "object",
                 "properties": {"score": {"type": "integer", "maximum": 100, "exclusiveMaximum": True}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"price": {"type": "number"}}, "required": []},
+            {"type": "object", "properties": {"price": {"type": "number"}}},
             [(("price",), 0.5, BoundDirection.MIN, True)],
             {
                 "type": "object",
                 "properties": {"price": {"type": "number", "minimum": 0.5, "exclusiveMinimum": True}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"score": {"type": "integer", "minimum": -10}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer", "minimum": -10}}},
             [(("score",), 0.0, BoundDirection.MIN, False)],
             {
                 "type": "object",
                 "properties": {"score": {"type": "integer", "minimum": -10}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"score": {"type": "integer", "maximum": 999}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer", "maximum": 999}}},
             [(("score",), 100.0, BoundDirection.MAX, True)],
             {
                 "type": "object",
                 "properties": {"score": {"type": "integer", "maximum": 999}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer"}}},
             [(("score",), 100.0, BoundDirection.MAX, False)],
-            {"type": "object", "properties": {"score": {"type": "integer", "maximum": 100}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer", "maximum": 100}}},
         ),
         (
-            {"type": "object", "properties": {"name": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"name": {"type": "string"}}},
             [(("name",), 0.0, BoundDirection.MIN, False)],
-            {"type": "object", "properties": {"name": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"name": {"type": "string"}}},
         ),
         (
-            {"type": "object", "properties": {"score": {"type": ["integer", "null"]}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": ["integer", "null"]}}},
             [(("score",), 0.0, BoundDirection.MIN, False)],
             {
                 "type": "object",
                 "properties": {"score": {"type": ["integer", "null"], "minimum": 0}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [(("score",), 0.0, BoundDirection.MIN, False)],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (True, [(("score",), 0.0, BoundDirection.MIN, False)], True),
         ({"type": "string"}, [(("score",), 0.0, BoundDirection.MIN, False)], {"type": "string"}),
         (
             {
                 "oneOf": [
-                    {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+                    {"type": "object", "properties": {"score": {"type": "integer"}}},
                     {"type": "string"},
                 ]
             },
@@ -6995,16 +7019,15 @@ def openapi_31_case_factory(openapi_31):
                     {
                         "type": "object",
                         "properties": {"score": {"type": "integer", "minimum": 0}},
-                        "required": [],
                     },
                     {"type": "string"},
                 ]
             },
         ),
         (
-            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "integer"}}},
             [((), 0.0, BoundDirection.MIN, False)],
-            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "integer"}}},
         ),
     ],
     ids=[
@@ -7030,6 +7053,7 @@ def test_numeric_bound_adjustment_applies_correctly_draft4(input_schema, items, 
         schema=input_schema,
         observations=_build_numeric_bound_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
@@ -7037,35 +7061,32 @@ def test_numeric_bound_adjustment_applies_correctly_draft4(input_schema, items, 
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer"}}},
             [(("score",), 0.0, BoundDirection.MIN, False)],
-            {"type": "object", "properties": {"score": {"type": "integer", "minimum": 0}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer", "minimum": 0}}},
         ),
         (
-            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer"}}},
             [(("score",), 0.0, BoundDirection.MIN, True)],
             {
                 "type": "object",
                 "properties": {"score": {"type": "integer", "exclusiveMinimum": 0}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"score": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"score": {"type": "integer"}}},
             [(("score",), 100.0, BoundDirection.MAX, True)],
             {
                 "type": "object",
                 "properties": {"score": {"type": "integer", "exclusiveMaximum": 100}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"price": {"type": "number"}}, "required": []},
+            {"type": "object", "properties": {"price": {"type": "number"}}},
             [(("price",), 0.5, BoundDirection.MIN, True)],
             {
                 "type": "object",
                 "properties": {"price": {"type": "number", "exclusiveMinimum": 0.5}},
-                "required": [],
             },
         ),
     ],
@@ -7083,6 +7104,7 @@ def test_numeric_bound_adjustment_applies_correctly_draft2020(input_schema, item
         schema=input_schema,
         observations=_build_numeric_bound_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out, draft="3.1")
     assert out == expected
 
 
@@ -7104,48 +7126,45 @@ def _build_pattern_observations(*items: tuple[tuple[str | int, ...], str]) -> tu
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
             [(("code",), "[A-Z]{2,4}")],
             {
                 "type": "object",
                 "properties": {"code": {"type": "string", "pattern": "[A-Z]{2,4}"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"code": {"type": "string", "pattern": "[a-z]+"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string", "pattern": "[a-z]+"}}},
             [(("code",), "[A-Z]+")],
             {
                 "type": "object",
                 "properties": {"code": {"type": "string", "pattern": "[a-z]+"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
             [(("age",), "[0-9]+")],
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
         ),
         (
-            {"type": "object", "properties": {"code": {"type": ["string", "null"]}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": ["string", "null"]}}},
             [(("code",), "[A-Z]+")],
             {
                 "type": "object",
                 "properties": {"code": {"type": ["string", "null"], "pattern": "[A-Z]+"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [(("code",), "[A-Z]+")],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (True, [(("code",), "[A-Z]+")], True),
         ({"type": "string"}, [(("code",), "[A-Z]+")], {"type": "string"}),
         (
             {
                 "oneOf": [
-                    {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+                    {"type": "object", "properties": {"code": {"type": "string"}}},
                     {"type": "string"},
                 ]
             },
@@ -7155,7 +7174,6 @@ def _build_pattern_observations(*items: tuple[tuple[str | int, ...], str]) -> tu
                     {
                         "type": "object",
                         "properties": {"code": {"type": "string", "pattern": "[A-Z]+"}},
-                        "required": [],
                     },
                     {"type": "string"},
                 ]
@@ -7168,10 +7186,8 @@ def _build_pattern_observations(*items: tuple[tuple[str | int, ...], str]) -> tu
                     "contact": {
                         "type": "object",
                         "properties": {"phone": {"type": "string"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
             [(("contact", "phone"), "\\+?\\d{3,15}")],
             {
@@ -7180,39 +7196,35 @@ def _build_pattern_observations(*items: tuple[tuple[str | int, ...], str]) -> tu
                     "contact": {
                         "type": "object",
                         "properties": {"phone": {"type": "string", "pattern": "\\+?\\d{3,15}"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
             [(("code",), "\\p{L}+")],
             {
                 "type": "object",
                 "properties": {"code": {"type": "string", "pattern": normalize_regex("\\p{L}+")}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
             [(("code",), "\\A[A-Z]+\\Z")],
             {
                 "type": "object",
                 "properties": {"code": {"type": "string", "pattern": "^[A-Z]+$"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
             [(("code",), "[A-Z(unbalanced")],
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
         ),
         (
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
             [((), "[A-Z]+")],
-            {"type": "object", "properties": {"code": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"code": {"type": "string"}}},
         ),
     ],
     ids=[
@@ -7238,6 +7250,7 @@ def test_pattern_adjustment_applies_correctly(input_schema, items, expected, cas
         schema=input_schema,
         observations=_build_pattern_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
@@ -7261,82 +7274,75 @@ def _build_type_mismatch_observations(
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"hire_date": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"hire_date": {"type": "string"}}},
             [(("hire_date",), "java.time.LocalDate")],
             {
                 "type": "object",
                 "properties": {"hire_date": {"type": "string", "format": "date"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"started_at": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"started_at": {"type": "string"}}},
             [(("started_at",), "java.time.LocalDateTime")],
             {
                 "type": "object",
                 "properties": {"started_at": {"type": "string", "format": "date-time"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"created_at": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"created_at": {"type": "string"}}},
             [(("created_at",), "java.time.Instant")],
             {
                 "type": "object",
                 "properties": {"created_at": {"type": "string", "format": "date-time"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"token": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"token": {"type": "string"}}},
             [(("token",), "java.util.UUID")],
             {
                 "type": "object",
                 "properties": {"token": {"type": "string", "format": "uuid"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"website": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"website": {"type": "string"}}},
             [(("website",), "java.net.URL")],
             {
                 "type": "object",
                 "properties": {"website": {"type": "string", "format": "uri"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"hire_date": {"type": "string", "format": "date"}}, "required": []},
+            {"type": "object", "properties": {"hire_date": {"type": "string", "format": "date"}}},
             [(("hire_date",), "java.time.LocalDate")],
             {
                 "type": "object",
                 "properties": {"hire_date": {"type": "string", "format": "date"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
             [(("x",), "com.example.Custom")],
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
         ),
         (
-            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "integer"}}},
             [(("x",), "java.time.LocalDate")],
-            {"type": "object", "properties": {"x": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "integer"}}},
         ),
         (
-            {"type": "object", "properties": {"hire_date": {"type": ["string", "null"]}}, "required": []},
+            {"type": "object", "properties": {"hire_date": {"type": ["string", "null"]}}},
             [(("hire_date",), "java.time.LocalDate")],
             {
                 "type": "object",
                 "properties": {"hire_date": {"type": ["string", "null"], "format": "date"}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [(("hire_date",), "java.time.LocalDate")],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (True, [(("hire_date",), "java.time.LocalDate")], True),
         ({"type": "string"}, [(("hire_date",), "java.time.LocalDate")], {"type": "string"}),
@@ -7347,10 +7353,8 @@ def _build_type_mismatch_observations(
                     "owner": {
                         "type": "object",
                         "properties": {"hire_date": {"type": "string"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
             [(("owner", "hire_date"), "java.time.LocalDate")],
             {
@@ -7359,10 +7363,8 @@ def _build_type_mismatch_observations(
                     "owner": {
                         "type": "object",
                         "properties": {"hire_date": {"type": "string", "format": "date"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
         ),
         (
@@ -7374,11 +7376,9 @@ def _build_type_mismatch_observations(
                         "items": {
                             "type": "object",
                             "properties": {"created_on": {"type": "string"}},
-                            "required": [],
                         },
                     }
                 },
-                "required": [],
             },
             [(("addresses", 0, "created_on"), "java.time.LocalDate")],
             {
@@ -7389,24 +7389,20 @@ def _build_type_mismatch_observations(
                         "items": {
                             "type": "object",
                             "properties": {"created_on": {"type": "string", "format": "date"}},
-                            "required": [],
                         },
                     }
                 },
-                "required": [],
             },
         ),
         (
             {
                 "type": "object",
                 "properties": {"addresses": {"type": "array"}},
-                "required": [],
             },
             [(("addresses", 0, "created_on"), "java.time.LocalDate")],
             {
                 "type": "object",
                 "properties": {"addresses": {"type": "array"}},
-                "required": [],
             },
         ),
     ],
@@ -7435,6 +7431,7 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
         schema=input_schema,
         observations=_build_type_mismatch_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
@@ -7442,66 +7439,59 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"age": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "string"}}},
             [(("age",), "integer")],
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
         ),
         (
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
             [(("age",), "integer")],
-            {"type": "object", "properties": {"age": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"age": {"type": "integer"}}},
         ),
         (
             {
                 "type": "object",
                 "properties": {"age": {"anyOf": [{"type": "string"}, {"type": "integer"}]}},
-                "required": [],
             },
             [(("age",), "integer")],
             {
                 "type": "object",
                 "properties": {"age": {"anyOf": [{"type": "string"}, {"type": "integer"}]}},
-                "required": [],
             },
         ),
         (
             {
                 "type": "object",
                 "properties": {"age": {"oneOf": [{"type": "string"}, {"type": "integer"}]}},
-                "required": [],
             },
             [(("age",), "integer")],
             {
                 "type": "object",
                 "properties": {"age": {"oneOf": [{"type": "string"}, {"type": "integer"}]}},
-                "required": [],
             },
         ),
         (
             {
                 "type": "object",
                 "properties": {"age": {"type": ["string", "integer"]}},
-                "required": [],
             },
             [(("age",), "integer")],
             {
                 "type": "object",
                 "properties": {"age": {"type": ["string", "integer"]}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"x": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "string"}}},
             [(("x",), "boolean")],
-            {"type": "object", "properties": {"x": {"type": "boolean"}}, "required": []},
+            {"type": "object", "properties": {"x": {"type": "boolean"}}},
         ),
         (
-            {"type": "object", "properties": {"hire_date": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"hire_date": {"type": "string"}}},
             [(("hire_date",), "java.time.LocalDate")],
             {
                 "type": "object",
                 "properties": {"hire_date": {"type": "string", "format": "date"}},
-                "required": [],
             },
         ),
         (
@@ -7510,13 +7500,11 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
             {
                 "type": "object",
                 "properties": {"profile": {"type": "object", "properties": {"name": {"type": "string"}}}},
-                "required": [],
             },
             [(("profile",), "integer")],
             {
                 "type": "object",
                 "properties": {"profile": {"type": "object", "properties": {"name": {"type": "string"}}}},
-                "required": [],
             },
         ),
         (
@@ -7525,13 +7513,11 @@ def test_type_mismatch_adjustment_applies_correctly(input_schema, items, expecte
             {
                 "type": "object",
                 "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
-                "required": [],
             },
             [(("tags",), "integer")],
             {
                 "type": "object",
                 "properties": {"tags": {"type": "array", "items": {"type": "string"}}},
-                "required": [],
             },
         ),
     ],
@@ -7575,52 +7561,48 @@ def _build_enum_observations(*items: tuple[tuple[str | int, ...], tuple[str, ...
     "input_schema, items, expected",
     [
         (
-            {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"role": {"type": "string"}}},
             [(("role",), ("USER", "ADMIN"))],
             {
                 "type": "object",
                 "properties": {"role": {"type": "string", "enum": ["USER", "ADMIN"]}},
-                "required": [],
             },
         ),
         (
             {
                 "type": "object",
                 "properties": {"role": {"type": "string", "enum": ["GUEST"]}},
-                "required": [],
             },
             [(("role",), ("USER", "ADMIN"))],
             {
                 "type": "object",
                 "properties": {"role": {"type": "string", "enum": ["GUEST"]}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"role": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"role": {"type": "integer"}}},
             [(("role",), ("USER", "ADMIN"))],
-            {"type": "object", "properties": {"role": {"type": "integer"}}, "required": []},
+            {"type": "object", "properties": {"role": {"type": "integer"}}},
         ),
         (
-            {"type": "object", "properties": {"role": {"type": ["string", "null"]}}, "required": []},
+            {"type": "object", "properties": {"role": {"type": ["string", "null"]}}},
             [(("role",), ("USER", "ADMIN"))],
             {
                 "type": "object",
                 "properties": {"role": {"type": ["string", "null"], "enum": ["USER", "ADMIN"]}},
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             [(("role",), ("USER", "ADMIN"))],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
         ),
         (True, [(("role",), ("USER", "ADMIN"))], True),
         ({"type": "string"}, [(("role",), ("USER", "ADMIN"))], {"type": "string"}),
         (
             {
                 "oneOf": [
-                    {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+                    {"type": "object", "properties": {"role": {"type": "string"}}},
                     {"type": "string"},
                 ]
             },
@@ -7630,7 +7612,6 @@ def _build_enum_observations(*items: tuple[tuple[str | int, ...], tuple[str, ...
                     {
                         "type": "object",
                         "properties": {"role": {"type": "string", "enum": ["USER", "ADMIN"]}},
-                        "required": [],
                     },
                     {"type": "string"},
                 ]
@@ -7643,10 +7624,8 @@ def _build_enum_observations(*items: tuple[tuple[str | int, ...], tuple[str, ...
                     "account": {
                         "type": "object",
                         "properties": {"status": {"type": "string"}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
             [(("account", "status"), ("ACTIVE", "ARCHIVED"))],
             {
@@ -7655,16 +7634,14 @@ def _build_enum_observations(*items: tuple[tuple[str | int, ...], tuple[str, ...
                     "account": {
                         "type": "object",
                         "properties": {"status": {"type": "string", "enum": ["ACTIVE", "ARCHIVED"]}},
-                        "required": [],
                     }
                 },
-                "required": [],
             },
         ),
         (
-            {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"role": {"type": "string"}}},
             [((), ("USER",))],
-            {"type": "object", "properties": {"role": {"type": "string"}}, "required": []},
+            {"type": "object", "properties": {"role": {"type": "string"}}},
         ),
     ],
     ids=[
@@ -7687,12 +7664,13 @@ def test_enum_adjustment_applies_correctly(input_schema, items, expected, case_f
         schema=input_schema,
         observations=_build_enum_observations(*items),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
 
 
 def test_size_bound_adjustment_preserves_stricter_existing_bound(case_factory):
     # Schema's `maxLength: 10` is tighter than server's `max: 15` — keep the schema's.
-    schema = {"type": "object", "properties": {"username": {"type": "string", "maxLength": 10}}, "required": []}
+    schema = {"type": "object", "properties": {"username": {"type": "string", "maxLength": 10}}}
     out = SizeBoundAdjustment().apply(
         operation=case_factory().operation,
         location=ParameterLocation.BODY,
@@ -7702,12 +7680,11 @@ def test_size_bound_adjustment_preserves_stricter_existing_bound(case_factory):
     assert out == {
         "type": "object",
         "properties": {"username": {"type": "string", "minLength": 0, "maxLength": 10}},
-        "required": [],
     }
 
 
 def test_size_bound_adjustment_min_only_payload(case_factory):
-    schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": []}
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
     obs = (
         Observation(
             operation_label="POST /api/users",
@@ -7727,12 +7704,11 @@ def test_size_bound_adjustment_min_only_payload(case_factory):
     assert out == {
         "type": "object",
         "properties": {"name": {"type": "string", "minLength": 3}},
-        "required": [],
     }
 
 
 def test_size_bound_adjustment_max_only_payload(case_factory):
-    schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": []}
+    schema = {"type": "object", "properties": {"name": {"type": "string"}}}
     obs = (
         Observation(
             operation_label="POST /api/users",
@@ -7752,7 +7728,6 @@ def test_size_bound_adjustment_max_only_payload(case_factory):
     assert out == {
         "type": "object",
         "properties": {"name": {"type": "string", "maxLength": 20}},
-        "required": [],
     }
 
 
@@ -7762,7 +7737,6 @@ def test_apply_adjustments_does_not_mutate_caller_schema(case_factory):
     original = {
         "type": "object",
         "properties": {"username": {"type": "string"}},
-        "required": [],
     }
     snapshot = json.loads(json.dumps(original))
 
@@ -8463,19 +8437,19 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
         pytest.param(
             {"type": "object", "properties": {"shadow": {}, "ok": {}}, "required": ["shadow"]},
             [("shadow",)],
-            {"type": "object", "properties": {"ok": {}}, "required": []},
+            {"type": "object", "properties": {"ok": {}}},
             id="properties-and-required-both-cleared",
         ),
         pytest.param(
-            {"type": "object", "properties": {"shadow": {}}, "required": []},
+            {"type": "object", "properties": {"shadow": {}}},
             [("shadow",)],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             id="properties-only-cleared-when-not-required",
         ),
         pytest.param(
             {"type": "object", "properties": {"ok": {}}, "required": ["shadow"]},
             [("shadow",)],
-            {"type": "object", "properties": {"ok": {}}, "required": []},
+            {"type": "object", "properties": {"ok": {}}},
             id="required-only-cleared-when-absent-from-properties",
         ),
         pytest.param(
@@ -8487,7 +8461,7 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
         pytest.param(
             {"required": ["shadow"]},
             [("shadow",)],
-            {"required": []},
+            {},
             id="properties-key-absent",
         ),
         pytest.param(
@@ -8511,21 +8485,21 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
         pytest.param(
             {"type": "object", "properties": {"shadow": {"properties": {"deep": {}}}}, "required": ["shadow"]},
             [("shadow", "deep")],
-            {"type": "object", "properties": {}, "required": []},
+            {"type": "object", "properties": {}},
             id="only-first-segment-applied",
         ),
         pytest.param(
             {
                 "oneOf": [
                     {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]},
-                    {"type": "object", "properties": {"keep": {}}, "required": []},
+                    {"type": "object", "properties": {"keep": {}}},
                 ]
             },
             [("shadow",)],
             {
                 "oneOf": [
-                    {"type": "object", "properties": {}, "required": []},
-                    {"type": "object", "properties": {"keep": {}}, "required": []},
+                    {"type": "object", "properties": {}},
+                    {"type": "object", "properties": {"keep": {}}},
                 ]
             },
             id="oneof-branches-cascaded",
@@ -8533,15 +8507,15 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
         pytest.param(
             {
                 "anyOf": [
-                    {"type": "object", "properties": {"shadow": {}}, "required": []},
+                    {"type": "object", "properties": {"shadow": {}}},
                     {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]},
                 ]
             },
             [("shadow",)],
             {
                 "anyOf": [
-                    {"type": "object", "properties": {}, "required": []},
-                    {"type": "object", "properties": {}, "required": []},
+                    {"type": "object", "properties": {}},
+                    {"type": "object", "properties": {}},
                 ]
             },
             id="anyof-branches-cascaded",
@@ -8556,7 +8530,7 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
             [("shadow",)],
             {
                 "allOf": [
-                    {"type": "object", "properties": {}, "required": []},
+                    {"type": "object", "properties": {}},
                     {"type": "object", "properties": {"other": {}}},
                 ]
             },
@@ -8565,7 +8539,7 @@ def _build_unexpected_property_observations(*paths: tuple[str | int, ...]) -> tu
         pytest.param(
             {"type": "object", "properties": {"a": {}, "b": {}, "ok": {}}, "required": ["a", "b"]},
             [("a",), ("b",)],
-            {"type": "object", "properties": {"ok": {}}, "required": []},
+            {"type": "object", "properties": {"ok": {}}},
             id="multiple-observations",
         ),
     ],
@@ -8577,7 +8551,23 @@ def test_unexpected_property_adjustment_applies_correctly(input_schema, paths, e
         schema=input_schema,
         observations=_build_unexpected_property_observations(*paths),
     )
+    _assert_valid_schema_object(input_schema, out)
     assert out == expected
+
+
+def test_unexpected_property_adjustment_drops_empty_required(case_factory):
+    # The OpenAPI meta-schema requires `required` (when present) to have minItems=1;
+    # emptying it must drop the key entirely or downstream Hypothesis draws crash with
+    # "[] has less than 1 item" against `definitions/stringArray`.
+    input_schema = {"type": "object", "properties": {"shadow": {}}, "required": ["shadow"]}
+    out = UnexpectedPropertyAdjustment().apply(
+        operation=case_factory().operation,
+        location=ParameterLocation.BODY,
+        schema=input_schema,
+        observations=_build_unexpected_property_observations(("shadow",)),
+    )
+    _assert_valid_schema_object(input_schema, out)
+    assert "required" not in out
 
 
 def _record_body_observation(store, operation, *, kind, parameter_path):
