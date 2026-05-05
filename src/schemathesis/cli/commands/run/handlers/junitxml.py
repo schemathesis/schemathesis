@@ -69,6 +69,9 @@ class JunitXMLHandler(EventHandler):
             self.writer.record_error(label=event.label, message=event.info.format())
 
     def shutdown(self, ctx: BaseExecutionContext) -> None:
+        for label, test_case in self.writer._test_cases.items():
+            if label in ctx.statistic.tested_operations:
+                test_case.skipped = []
         self.writer.close()
 
 

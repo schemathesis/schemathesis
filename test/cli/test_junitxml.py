@@ -223,6 +223,27 @@ def test_skipped(ctx, cli, tmp_path):
     assert extract_message(testcases[0][0], f"127.0.0.1:{api.port}") == "No examples in schema"
 
 
+def test_examples_phase_skip_cleared_when_coverage_runs(ctx, cli, tmp_path):
+    # When the Examples phase skips an operation (schema has no inline examples)
+    # but the Coverage phase subsequently runs and produces real results,
+    # the JUnit report must NOT mark the test case as skipped.
+    api = ctx.openapi.apps.success()
+    xml_path = tmp_path / "junit.xml"
+    cli.run(
+        api.schema_url,
+        f"--report-junit-path={xml_path}",
+        "--phases=examples,coverage",
+        "--checks=all",
+    )
+    tree = ElementTree.parse(xml_path)
+    testsuite = tree.getroot()[0]
+    testcases = list(testsuite)
+    assert testcases[0].tag == "testcase"
+    assert testcases[0].attrib["name"] == "GET /api/success"
+    # Coverage ran real requests — the earlier skip must have been cleared
+    assert not testcases[0].findall("skipped")
+
+
 @pytest.mark.parametrize("path", ["junit.xml", "does-not-exist/junit.xml"])
 @pytest.mark.skipif(platform.system() == "Windows", reason="Unclear how to trigger the permission error on Windows")
 def test_permission_denied(ctx, cli, tmp_path, path):
