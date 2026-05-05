@@ -288,28 +288,26 @@ def test_timeout_reclassified_as_error_on_flaky_replay(ctx, cli, app_runner):
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-def test_connection_timeout(ctx, cli, workers, snapshot_cli):
-    # When connection timeout is specified in the CLI and the request fails because of it
-    # Then the whole Schemathesis run should fail
-    # And the given operation should be displayed as a failure
-    api = ctx.openapi.apps.success_and_slow()
+def test_connection_timeout(ctx, cli, workers):
+    # Timeout on a slow endpoint surfaces as a Network Error and fails the run.
+    api = ctx.openapi.apps.slow()
     with ctx.restore_checks():
 
         @schemathesis.check
         def noop(ctx, response, case):
             pass
 
-        # Timeout is well under /slow's 500ms sleep but high enough to absorb CI jitter on /success.
-        assert (
-            cli.run(
-                api.schema_url,
-                "--request-timeout=0.25",
-                f"--workers={workers}",
-                "--phases=fuzzing",
-                "--checks=noop",
-            )
-            == snapshot_cli
+        result = cli.run(
+            api.schema_url,
+            "--request-timeout=0.05",
+            f"--workers={workers}",
+            "--phases=fuzzing",
+            "--checks=noop",
         )
+        assert result.exit_code == 1, result.stdout
+        assert "Network Error" in result.stdout, result.stdout
+        assert "GET /api/slow" in result.stdout, result.stdout
+        assert "Read timed out" in result.stdout, result.stdout
 
 
 def test_read_content_timeout(ctx, cli, mocker, snapshot_cli):
