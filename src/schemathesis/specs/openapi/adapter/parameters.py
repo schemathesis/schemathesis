@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
@@ -619,6 +620,17 @@ class OpenApiBody(OpenApiComponent):
         encoding = self.definition.get("encoding", {})
         property_encoding = encoding.get(property_name, {})
         return property_encoding.get("contentType")
+
+    def get_property_filename(self, property_name: str) -> str | None:
+        """Get filename from encoding.headers.Content-Disposition for a form property."""
+        encoding = self.definition.get("encoding", {})
+        headers = encoding.get(property_name, {}).get("headers", {})
+        cd = headers.get("Content-Disposition", {})
+        value = cd.get("example") or (cd.get("schema") or {}).get("example")
+        if not value:
+            return None
+        match = re.search(r'filename="([^"]*)"', value) or re.search(r"filename=(\S+)", value)
+        return match.group(1) if match else None
 
     def get_strategy(
         self,

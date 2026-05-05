@@ -64,15 +64,23 @@ def prepare_multipart_v3(
 
         if property_schema:
             if isinstance(value, list):
-                if content_type:
+                items_format = (property_schema.get("items") or {}).get("format")
+                if items_format in ("binary", "base64"):
+                    filename = (body_param.get_property_filename(name) if body_param else None) or name
+                    if content_type:
+                        files.extend((name, (filename, item, content_type)) for item in value)
+                    else:
+                        files.extend((name, (filename, item)) for item in value)
+                elif content_type:
                     files.extend((name, (None, item, content_type)) for item in value)
                 else:
                     files.extend((name, item) for item in value)
             elif property_schema.get("format") in ("binary", "base64"):
+                filename = (body_param.get_property_filename(name) if body_param else None) or name
                 if content_type:
-                    files.append((name, (None, value, content_type)))
+                    files.append((name, (filename, value, content_type)))
                 else:
-                    files.append((name, value))
+                    files.append((name, (filename, value)))
             elif content_type:
                 files.append((name, (None, value, content_type)))
             else:

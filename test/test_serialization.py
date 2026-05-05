@@ -254,9 +254,142 @@ def test_unknown_multipart_fields_openapi3(ctx):
     )
     serialized = REQUESTS_TRANSPORT.serialize_case(case)
     assert serialized["files"] == [
-        ("data", b"\x92B"),
+        ("data", ("data", b"\x92B")),
         ("note", (None, "foo")),
         ("unknown", (None, "seen")),
+    ]
+
+
+@pytest.mark.parametrize(
+    "encoding,expected_filename",
+    [
+        # No encoding: field name is used as filename for binary parts
+        (None, "attachment"),
+        # encoding.headers.Content-Disposition.schema.example provides filename
+        (
+            {
+                "attachment": {
+                    "headers": {
+                        "Content-Disposition": {
+                            "schema": {
+                                "type": "string",
+                                "example": 'form-data; name="attachment"; filename="test.pdf"',
+                            }
+                        }
+                    }
+                }
+            },
+            "test.pdf",
+        ),
+        # encoding.headers.Content-Disposition.example (no schema wrapping)
+        (
+            {
+                "attachment": {
+                    "headers": {
+                        "Content-Disposition": {
+                            "example": 'form-data; name="attachment"; filename="doc.pdf"',
+                        }
+                    }
+                }
+            },
+            "doc.pdf",
+        ),
+    ],
+    ids=["field-name-fallback", "schema-example", "header-example"],
+)
+def test_multipart_binary_field_filename(ctx, encoding, expected_filename):
+    content: dict = {
+        "schema": {
+            "type": "object",
+            "properties": {"attachment": {"type": "string", "format": "binary"}},
+        }
+    }
+    if encoding is not None:
+        content["encoding"] = encoding
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"multipart/form-data": content},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body={"attachment": b"\x92\x42"}, media_type="multipart/form-data")
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized["files"] == [("attachment", (expected_filename, b"\x92B"))]
+
+
+@pytest.mark.parametrize(
+    "encoding,expected_filename",
+    [
+        # No encoding: field name is used as filename for binary list items
+        (None, "files"),
+        # encoding.headers.Content-Disposition.schema.example provides filename
+        (
+            {
+                "files": {
+                    "headers": {
+                        "Content-Disposition": {
+                            "schema": {
+                                "type": "string",
+                                "example": 'form-data; name="files"; filename="upload.bin"',
+                            }
+                        }
+                    }
+                }
+            },
+            "upload.bin",
+        ),
+        # encoding.headers.Content-Disposition.example (no schema wrapping)
+        (
+            {
+                "files": {
+                    "headers": {
+                        "Content-Disposition": {
+                            "example": 'form-data; name="files"; filename="data.bin"',
+                        }
+                    }
+                }
+            },
+            "data.bin",
+        ),
+    ],
+    ids=["field-name-fallback", "schema-example", "header-example"],
+)
+def test_multipart_binary_list_filename(ctx, encoding, expected_filename):
+    content: dict = {
+        "schema": {
+            "type": "object",
+            "properties": {"files": {"type": "array", "items": {"type": "string", "format": "binary"}}},
+        }
+    }
+    if encoding is not None:
+        content["encoding"] = encoding
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"multipart/form-data": content},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body={"files": [b"\x01", b"\x02"]}, media_type="multipart/form-data")
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized["files"] == [
+        ("files", (expected_filename, b"\x01")),
+        ("files", (expected_filename, b"\x02")),
     ]
 
 
