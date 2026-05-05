@@ -28,14 +28,11 @@ Schemathesis dev
 ________________________ GET /v1/hospitais/maisProximo _________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- API rejected schema-compliant request
+- Server error
 
-    Valid data should have been accepted
-    Expected: 2xx, 401, 403, 404, 409, 5xx
+[500] Internal Server Error:
 
-[400] Bad Request:
-
-    `{"error":"Bad Request","message":"Required Double parameter 'raioMaximo' is not present","path":"/v1/hospitais/maisProximo","status":400,"timestamp":"2026-05-01T01:00:40.560+0000"}`
+    <EMPTY>
 
 Reproduce with:
 
@@ -43,11 +40,14 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- Server error
+- API rejected schema-compliant request
 
-[500] Internal Server Error:
+    Valid data should have been accepted
+    Expected: 2xx, 401, 403, 404, 409, 5xx
 
-    <EMPTY>
+[400] Bad Request:
+
+    `{"error":"Bad Request","message":"Required Double parameter 'lon' is not present; Required Double parameter 'raioMaximo' is not present","path":"/v1/hospitais/maisProximo","status":400,"timestamp":"2026-05-01T01:00:40.560+0000"}`
 
 Reproduce with:
 

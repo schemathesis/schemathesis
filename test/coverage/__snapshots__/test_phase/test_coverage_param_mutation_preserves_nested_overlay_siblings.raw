@@ -28,11 +28,7 @@ ______________________________ POST /departments _______________________________
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
-    Invalid component: Missing `X-Required-Header` at header
-
-- Missing header not rejected
-
-    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406
+    Invalid component: in body - shipping -> location_id: Incorrect type
 
 [201] Created:
 
@@ -50,6 +46,20 @@ Reproduce with:
     Documented: 201
 
 [422] Unprocessable Content:
+
+    <EMPTY>
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+3. Test Case ID: <PLACEHOLDER>
+
+- Missing header not rejected
+
+    Got 201 when missing required 'X-Required-Header' header, expected 422, 400, 401, 403, 406
+
+[201] Created:
 
     <EMPTY>
 

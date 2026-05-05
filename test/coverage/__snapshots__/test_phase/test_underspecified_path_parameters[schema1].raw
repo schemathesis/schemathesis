@@ -21,12 +21,12 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-____________________ PUT /organizations/{organization_id}/ _____________________
+___________________ DELETE /organizations/{organization_id}/ ___________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Unsupported methods
 
-    Unsupported method PUT returned 200, expected 405 Method Not Allowed
+    Unsupported method DELETE returned 200, expected 405 Method Not Allowed
 
     Return 405 for methods not listed in the OpenAPI spec
 
@@ -36,7 +36,7 @@ ____________________ PUT /organizations/{organization_id}/ _____________________
 
 Reproduce with:
 
-    curl -X PUT http://127.0.0.1/api/organizations/42/
+    curl -X DELETE http://127.0.0.1/api/organizations/42/
 
 =================================== SUMMARY ====================================
 

@@ -28,7 +28,7 @@ _________________________________ GET /success _________________________________
 
     Invalid data should have been rejected
     Expected: 400, 401, 403, 404, 405, 406, 422, 428, 5xx
-    Invalid component: parameter `page_num` in query - value greater than maximum
+    Invalid component: parameter `page_num` in query - incorrect type
 
 [200] OK:
 
@@ -36,7 +36,7 @@ _________________________________ GET /success _________________________________
 
 Reproduce with:
 
-    curl -X GET 'http://127.0.0.1/api/success?page_num=1000'
+    curl -X GET 'http://127.0.0.1/api/success?page_num=2.5890419884777833e-42'
 
 =================================== SUMMARY ====================================
 

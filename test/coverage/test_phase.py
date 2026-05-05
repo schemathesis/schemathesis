@@ -30,9 +30,9 @@ from schemathesis.generation.hypothesis.builder import (
     HypothesisTestMode,
     _iter_coverage_cases,
     create_test,
-    generate_coverage_cases,
 )
 from schemathesis.generation.meta import CoverageScenario, TestPhase
+from schemathesis.generation.progressive import CoverageGenerator
 from schemathesis.specs.openapi.checks import negative_data_rejection
 from test.utils import assert_requests_call
 
@@ -3492,7 +3492,7 @@ def test_filter_case_hook_applied_in_coverage_phase(ctx):
     # Verify some cases are produced without hook
     config = ProjectConfig()
     base_cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -3509,7 +3509,7 @@ def test_filter_case_hook_applied_in_coverage_phase(ctx):
         return False  # reject everything
 
     filtered_cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -3539,7 +3539,7 @@ def test_map_case_hook_applied_in_coverage_phase(ctx):
     config = ProjectConfig()
     operation = loaded["/foo"]["get"]
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -3578,7 +3578,7 @@ def test_content_json_query_params_single_encoding_in_coverage(ctx):
     operation = loaded["/foo"]["post"]
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -3859,7 +3859,7 @@ def test_coverage_form_urlencoded_binary_format_negative(ctx):
     operation = schema["/upload"]["POST"]
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -3909,7 +3909,7 @@ def test_coverage_negative_empty_dict_additional_properties_not_treated_as_false
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -3961,7 +3961,7 @@ def test_coverage_negative_pattern_with_control_chars_uses_schema_validator(ctx)
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -4016,7 +4016,7 @@ def test_coverage_positive_body_uuid_format_with_uppercase_pattern(ctx):
     validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -4072,7 +4072,7 @@ def test_coverage_positive_body_skips_properties_with_no_valid_enum_values(ctx):
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -4772,7 +4772,7 @@ def test_coverage_form_urlencoded_primitive_body_negative_no_crash(ctx):
     operation = schema["/convert"]["POST"]
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -4824,7 +4824,7 @@ def test_coverage_negative_string_above_max_length_invalid_when_pattern_quantifi
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -4882,7 +4882,7 @@ def test_coverage_negative_max_length_preserved_when_pattern_has_inner_quantifie
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -4933,7 +4933,7 @@ def test_coverage_negative_max_length_preserved_when_outer_optional_group_has_va
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -4980,7 +4980,7 @@ def test_coverage_negative_missing_required_with_additional_properties_schema(ct
     validator = jsonschema_rs.validator_for(body_schema)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -5043,7 +5043,7 @@ def test_coverage_positive_pattern_with_branch_group_not_corrupted(ctx):
     validator = jsonschema_rs.validator_for(optimized)
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.POSITIVE],
             auth_storage=None,
@@ -5104,7 +5104,7 @@ def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_f
     operation = schema["/configuration"]["GET"]
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -5164,7 +5164,7 @@ def test_negative_data_rejection_no_false_positive_for_nullable_binary_multipart
     operation = schema["/upload"]["POST"]
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,
@@ -5229,7 +5229,7 @@ def test_negative_data_rejection_no_false_positive_for_multipart_body_type_mutat
     operation = schema["/upload"]["POST"]
 
     cases = list(
-        generate_coverage_cases(
+        CoverageGenerator(
             operation=operation,
             generation_modes=[GenerationMode.NEGATIVE],
             auth_storage=None,

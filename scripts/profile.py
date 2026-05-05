@@ -417,7 +417,7 @@ def coverage(
     _get_profiler()
 
     from schemathesis.generation import hypothesis
-    from schemathesis.generation.hypothesis.builder import generate_coverage_cases
+    from schemathesis.generation.progressive import CoverageGenerator
 
     hypothesis.setup()
 
@@ -446,7 +446,7 @@ def coverage(
             t0 = time.perf_counter()
             with profiler:
                 cases = list(
-                    generate_coverage_cases(
+                    CoverageGenerator(
                         operation=operation,
                         generation_modes=[gen_mode],
                         auth_storage=None,

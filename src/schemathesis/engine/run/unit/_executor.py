@@ -4,67 +4,50 @@ import time
 import unittest
 import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
-from warnings import WarningMessage, catch_warnings
+from typing import TYPE_CHECKING
+from warnings import catch_warnings
 
-import requests
 from hypothesis.errors import InvalidArgument
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema_rs import ValidationError
-from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext
-from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
-from schemathesis.core.error_feedback.collector import record_response
 from schemathesis.core.errors import (
     SERIALIZERS_SUGGESTION_MESSAGE,
     AuthenticationError,
     InternalError,
-    InvalidHeadersExample,
     InvalidRegexPattern,
     InvalidRegexType,
     InvalidSchema,
-    MalformedMediaType,
     SchemaLocation,
-    SerializationNotPossible,
     is_regex_validation_error,
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.engine import Status, events
-from schemathesis.engine._validate import validate_response
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import (
     DeadlineExceeded,
     TestingState,
     UnexpectedError,
-    UnrecoverableNetworkError,
     clear_hypothesis_notes,
     deduplicate_errors,
-    is_unrecoverable_network_error,
 )
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import PhaseName
-from schemathesis.engine.supervisor import SchedulingDirective
-from schemathesis.generation import metrics, overrides
-from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis.builder import (
-    InfiniteRecursiveReferenceMark,
-    InvalidHeadersExampleMark,
-    InvalidRegexMark,
-    MissingPathParameters,
-    NonSerializableMark,
-    UnresolvableReferenceMark,
-    UnsatisfiableExampleMark,
+from schemathesis.engine.run.unit._case import record_extra_data_from_recorder
+from schemathesis.engine.run.unit._errors import (
+    get_invalid_regular_expression_message,
+    iter_mark_error_events,
 )
+from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.reporting import (
     build_health_check_error,
     build_unsatisfiable_error,
     ignore_hypothesis_output,
 )
-from schemathesis.specs.openapi.auth_inference import record_auth_inference
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
@@ -284,93 +267,21 @@ def run_test(
     ):
         status = Status.FAILURE
 
-    # Check for various errors during generation (tests may still have been generated)
-
-    if UnsatisfiableExampleMark.is_set(test_function):
+    for event in iter_mark_error_events(
+        test_function=test_function,
+        non_fatal_error=non_fatal_error,
+        current_status=status,
+        serializers_suggestion=SERIALIZERS_SUGGESTION_MESSAGE,
+    ):
         status = Status.ERROR
-        yield non_fatal_error(
-            hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
-        )
-
-    non_serializable = NonSerializableMark.get(test_function)
-    if non_serializable is not None and status != Status.ERROR:
-        status = Status.ERROR
-        media_types = ", ".join(non_serializable.media_types)
-        yield non_fatal_error(
-            SerializationNotPossible(
-                "Failed to generate test cases from examples for this API operation because of"
-                f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
-                media_types=non_serializable.media_types,
-            )
-        )
-
-    invalid_regex = InvalidRegexMark.get(test_function)
-    if invalid_regex is not None and status != Status.ERROR:
-        status = Status.ERROR
-        if isinstance(invalid_regex, ValidationError):
-            yield non_fatal_error(InvalidRegexPattern.from_jsonschema_rs_error(invalid_regex))
-        else:
-            yield non_fatal_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
-
-    invalid_headers = InvalidHeadersExampleMark.get(test_function)
-    if invalid_headers:
-        status = Status.ERROR
-        yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
-
-    missing_path_parameters = MissingPathParameters.get(test_function)
-    if missing_path_parameters:
-        status = Status.ERROR
-        yield non_fatal_error(missing_path_parameters)
-
-    infinite_recursive_reference = InfiniteRecursiveReferenceMark.get(test_function)
-    if infinite_recursive_reference:
-        status = Status.ERROR
-        yield non_fatal_error(infinite_recursive_reference)
-
-    unresolvable_reference = UnresolvableReferenceMark.get(test_function)
-    if unresolvable_reference:
-        status = Status.ERROR
-        yield non_fatal_error(unresolvable_reference)
+        yield event
 
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
 
-    # Collect successful responses to use in subsequent test generation
-    # In the future, collecting unsuccessful responses also could be useful
-    # to understand if some generated data is always rejected
-    phases_config = ctx.config.phases_for(operation=operation)
-    fuzzing_config = phases_config.fuzzing
-    # Active when fuzzing requests it, or when examples/coverage can feed values forward.
-    should_record = (
-        (fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled)
-        or (phases_config.examples.enabled and ctx.extra_data_source is not None)
-        or (phases_config.coverage.enabled and ctx.extra_data_source is not None)
-    )
-    extra_data_source = ctx.extra_data_source if should_record else None
-    if extra_data_source is not None:
-        for case_id, interaction in recorder.interactions.items():
-            response = interaction.response
-            if response is None:
-                continue
-            case = recorder.cases[case_id].value
-            # Record response data for operations that produce resources
-            if extra_data_source.should_record(operation=operation.label):
-                extra_data_source.record_response(operation=operation, response=response, case=case)
-            # Record request data so identifiers from path/body land in the same pool.
-            if extra_data_source.should_record_request(operation=operation.label) and _targets_declared_method(case):
-                extra_data_source.record_request(operation=operation, case=case, status_code=response.status_code)
+    record_extra_data_from_recorder(ctx, operation, recorder)
 
     yield scenario_finished(status)
-
-
-def _targets_declared_method(case: Case) -> bool:
-    """True when `case` exercises the operation's declared HTTP method.
-
-    Method-mutated cases (e.g. coverage's `METHOD` scenario sending POST to a GET-only route)
-    yield 2xx/4xx that describe the mutated method's path, not the operation under test —
-    response-driven signal must be filtered through this check before being attributed to it.
-    """
-    return case.method.lower() == case.operation.method.lower()
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:
@@ -379,161 +290,3 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
     It increases the effectiveness of the Hypothesis database in the CLI.
     """
     test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore[attr-defined]
-
-
-def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> str | None:
-    for warning in warnings:
-        message = str(warning.message)
-        if "is not valid syntax for a Python regular expression" in message:
-            return message
-    return None
-
-
-def cached_test_func(f: Callable) -> Callable:
-    def wrapped(
-        *,
-        ctx: EngineContext,
-        state: TestingState,
-        case: Case,
-        errors: list[Exception],
-        check_ctx: CheckContext,
-        recorder: ScenarioRecorder,
-        generation: GenerationConfig,
-        transport_kwargs: dict[str, Any],
-        continue_on_failure: bool,
-    ) -> None:
-        try:
-            if ctx.has_to_stop:
-                raise KeyboardInterrupt
-            # Short-circuit baked cases for operations the supervisor flagged
-            # mid-scenario. Examples + Coverage materialize their cases as
-            # `@example`-decorators before any response exists, so a verdict that
-            # flips during the scenario would otherwise still let every remaining
-            # baked case hit the server.
-            if (
-                _targets_declared_method(case)
-                and ctx.supervisor.verdict(case.operation.label).directive is SchedulingDirective.SKIP
-            ):
-                return None
-            if generation.unique_inputs:
-                cached = ctx.get_cached_outcome(case)
-                if isinstance(cached, BaseException):
-                    raise cached
-                elif cached is None:
-                    return None
-                try:
-                    f(
-                        ctx=ctx,
-                        case=case,
-                        check_ctx=check_ctx,
-                        recorder=recorder,
-                        generation=generation,
-                        transport_kwargs=transport_kwargs,
-                        continue_on_failure=continue_on_failure,
-                    )
-                except BaseException as exc:
-                    ctx.cache_outcome(case, exc)
-                    raise
-                else:
-                    ctx.cache_outcome(case, None)
-            else:
-                f(
-                    ctx=ctx,
-                    case=case,
-                    check_ctx=check_ctx,
-                    recorder=recorder,
-                    generation=generation,
-                    transport_kwargs=transport_kwargs,
-                    continue_on_failure=continue_on_failure,
-                )
-        except (KeyboardInterrupt, Failure):
-            raise
-        except Exception as exc:
-            if isinstance(exc, MalformedMediaType) and case.media_type is not None:
-                exc = InvalidSchema.from_malformed_media_type(
-                    exc, case.media_type, path=case.operation.path, method=case.operation.method
-                )
-            if isinstance(
-                exc, requests.ConnectionError | ChunkedEncodingError | requests.Timeout
-            ) and is_unrecoverable_network_error(exc):
-                # Server likely has crashed and does not accept any connections at all
-                # Don't report these error - only the original crash should be reported
-                if exc.request is not None:
-                    headers = dict(exc.request.headers)
-                else:
-                    headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
-                verify = transport_kwargs.get("verify", True)
-                code_sample = case.as_curl_command(headers=headers, verify=verify)
-                state.store_unrecoverable_network_error(
-                    UnrecoverableNetworkError(
-                        error=exc,
-                        code_sample=code_sample,
-                    )
-                )
-                raise
-            errors.append(exc)
-            raise UnexpectedError from None
-
-    wrapped.__name__ = f.__name__
-
-    return wrapped
-
-
-@cached_test_func
-def test_func(
-    *,
-    ctx: EngineContext,
-    case: Case,
-    check_ctx: CheckContext,
-    recorder: ScenarioRecorder,
-    generation: GenerationConfig,
-    transport_kwargs: dict[str, Any],
-    continue_on_failure: bool,
-) -> None:
-    recorder.record_case(parent_id=None, case=case, transition=None, is_transition_applied=False)
-    try:
-        response = case.call(**transport_kwargs)
-    except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
-        if isinstance(error.request, requests.Request):
-            recorder.record_request(case_id=case.id, request=error.request.prepare())
-        elif isinstance(error.request, requests.PreparedRequest):
-            recorder.record_request(case_id=case.id, request=error.request)
-        raise
-    recorder.record_response(case_id=case.id, response=response)
-    if ctx.error_feedback is not None:
-        record_response(
-            store=ctx.error_feedback,
-            operation=case.operation,
-            case=case,
-            response=response,
-        )
-        record_auth_inference(
-            store=ctx.error_feedback,
-            recorder=recorder,
-            operation=case.operation,
-            case=case,
-            response=response,
-            transport_kwargs=transport_kwargs,
-        )
-    if _targets_declared_method(case):
-        is_documented_status = case.operation.responses.find_by_status_code(response.status_code) is not None
-        ctx.supervisor.record_response(
-            operation_label=case.operation.label,
-            status_code=response.status_code,
-            is_documented_status=is_documented_status,
-        )
-    # Record DELETE attempts immediately to influence subsequent strategy draws.
-    # Include both successful (2xx) and 404 responses - each attempt increases decay
-    # to avoid hammering the same resource repeatedly.
-    if ctx.extra_data_source is not None:
-        status = response.status_code
-        if 200 <= status < 300 or status == 404:
-            ctx.extra_data_source.record_successful_delete(operation=case.operation, case=case)
-    metrics.maximize(generation.maximize, case=case, response=response)
-    validate_response(
-        case=case,
-        ctx=check_ctx,
-        response=response,
-        continue_on_failure=continue_on_failure,
-        recorder=recorder,
-    )
