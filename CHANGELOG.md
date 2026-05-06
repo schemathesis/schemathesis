@@ -47,6 +47,7 @@
 - Treat `_name`-suffixed body fields as attributes when no path or schema backs the inferred resource (`first_name`, `last_name`).
 - Rebind body and query self-FK slots to the path-derived parent when the parent has the same field.
 - Prefer same-module variants for spec-suffixed duplicates (`Group` / `Group1`, `Member` / `Member1`).
+- Steer path slots to the same-module resource the operation actually returns when the suffix matcher would pick a cross-module candidate.
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - Group consecutive same-title failures (e.g. multiple schema violations on one response) under a single header with a violation count.
 

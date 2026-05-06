@@ -631,6 +631,73 @@ def disambiguate_module_variants(operations: OperationMap, resources: ResourceMa
             input_slot.resource_field = new_field
 
 
+def disambiguate_path_suffix_matches(operations: OperationMap, resources: ResourceMap) -> None:
+    """Swap a path slot to a same-module resource that also matches the path-derived name.
+
+    When `_resolve_parameter_dependency` falls back to suffix-matching, it picks the
+    first registered candidate — leaving `/bookings/resources/{id}` bound to
+    `KeyDateResource` instead of `ResourceItem`. This pass corrects only when the
+    consumer's path-derived name picks both the current and a same-module sibling.
+    """
+    producer_modules: dict[str, set[str]] = {}
+    for operation in operations.values():
+        module = _module_of(operation.path)
+        if not module:
+            continue
+        for output in operation.outputs:
+            producer_modules.setdefault(output.resource.name, set()).add(module)
+
+    for operation in operations.values():
+        consumer_module = _module_of(operation.path)
+        if not consumer_module:
+            continue
+        own_output_names = {output.resource.name for output in operation.outputs}
+        # Limit to operations where the rebinding parameter is the leaf — otherwise
+        # `/images/{imageId}/regionproposals` would rebind {imageId} to the response
+        # type instead of Image.
+        segments = [segment for segment in operation.path.split("/") if segment]
+        leaf_param = (
+            segments[-1][1:-1] if segments and segments[-1].startswith("{") and segments[-1].endswith("}") else None
+        )
+        for input_slot in operation.inputs:
+            if input_slot.parameter_location != ParameterLocation.PATH:
+                continue
+            if not isinstance(input_slot.parameter_name, str):
+                continue
+            if input_slot.parameter_name != leaf_param:
+                continue
+            modules = producer_modules.get(input_slot.resource.name)
+            if not modules or consumer_module in modules:
+                continue
+            # Anchor the lookup on the segment that actually owns this path parameter.
+            path_name = naming.from_path(operation.path, parameter_name=input_slot.parameter_name)
+            if not path_name:
+                continue
+            path_name_lower = path_name.lower()
+            current_lower = input_slot.resource.name.lower()
+            if not (current_lower.endswith(path_name_lower) or current_lower.startswith(path_name_lower)):
+                continue
+            # Prefer a sibling that the operation's own response describes — that's the
+            # resource the path actually identifies.
+            siblings = [
+                name
+                for name in producer_modules
+                if name != input_slot.resource.name
+                and consumer_module in producer_modules[name]
+                and name in own_output_names
+                and (name.lower().endswith(path_name_lower) or name.lower().startswith(path_name_lower))
+            ]
+            if len(siblings) != 1:
+                continue
+            new_resource = resources[siblings[0]]
+            # Require an exact field-name match; loose synonym matches (`applicationId` -> `id`)
+            # would happily rebind cross-references like `ApplicationInfo` -> `ApplicationEvent`.
+            if input_slot.parameter_name not in new_resource.fields:
+                continue
+            input_slot.resource = new_resource
+            input_slot.resource_field = input_slot.parameter_name
+
+
 def _module_of(path: str) -> str:
     stripped = naming.strip_version_prefix(path).lstrip("/")
     head, _, _ = stripped.partition("/")

@@ -17,6 +17,7 @@ from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_res
 from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     disambiguate_module_variants,
+    disambiguate_path_suffix_matches,
     extract_inputs,
     merge_related_resources,
     rebind_orphan_synthetics,
@@ -141,6 +142,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Prefer same-module variants for spec-suffixed duplicates (`Group` / `Group1`).
     disambiguate_module_variants(operations, resources)
+
+    # Steer path slots away from cross-module suffix-match hits (`KeyDateResource` -> `ResourceItem`).
+    disambiguate_path_suffix_matches(operations, resources)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)
