@@ -14,6 +14,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.specs.openapi.adapter.parameters import ParameterLocation
 from schemathesis.specs.openapi.adapter.references import maybe_resolve_with_resolver
+from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     extract_inputs,
     merge_related_resources,
@@ -65,6 +66,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
     # was scanned. Keyed by operation label so we can land the slot in the right OperationNode.
     deferred_nested_fks: dict[str, list[tuple[str, str, str]]] = {}
 
+    # Backs the body-FK gate so `<word>_name` fields without a real target don't spawn ghosts.
+    candidate_resource_names = naming.collect_candidate_resource_names(schema.raw_schema)
+
     for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
@@ -78,6 +82,7 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
                         resolver=schema.root_resolver,
                         canonicalization_cache=canonicalization_cache,
                         deferred_nested_fks=pending,
+                        candidate_resource_names=candidate_resource_names,
                     )
                 )
                 outputs = extract_outputs(

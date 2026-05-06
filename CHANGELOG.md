@@ -44,6 +44,7 @@
 - Recognize more path parameters as resource identifiers.
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Recognize plural foreign-key array fields (`site_ids`, `userUuids`, `session_guids`).
+- Treat `_name`-suffixed body fields as attributes when no path or schema backs the inferred resource (`first_name`, `last_name`).
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - Group consecutive same-title failures (e.g. multiple schema violations on one response) under a single header with a violation count.
 

@@ -3446,6 +3446,141 @@ def test_camelcase_nested_fk_produces_input_slot(ctx):
     assert (nested_slot.resource.name, nested_slot.resource_field) == ("Location", "id")
 
 
+def test_body_name_suffix_without_path_or_schema_backing_is_dropped(ctx):
+    # `_name` body fields are attributes, not FKs, when nothing in the spec backs the name.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/people": {
+                "post": {
+                    "operationId": "createPerson",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "first_name": {"type": "string"},
+                                        "last_name": {"type": "string"},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        },
+    )
+
+    assert "First" not in graph.resources, sorted(graph.resources)
+    assert "Last" not in graph.resources, sorted(graph.resources)
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["POST /people"].inputs
+    }
+    assert ("body", "first_name") not in bindings, bindings
+    assert ("body", "last_name") not in bindings, bindings
+
+
+def test_body_name_suffix_with_matching_path_keeps_slot(ctx):
+    # `_name` gate must let a `file_name` body field through when `/files` exists.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/files": {
+                "post": {
+                    "operationId": "createFile",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/backups": {
+                "post": {
+                    "operationId": "createBackup",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file_name": {"type": "string"}},
+                                    "required": ["file_name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): slot.resource.name
+        for slot in graph.operations["POST /backups"].inputs
+    }
+    assert bindings.get(("body", "file_name")) == "File", bindings
+
+
+def test_body_id_suffix_without_backing_still_creates_slot(ctx):
+    # The gate is `_name`-only — strong FK suffixes like `_id` keep current behavior.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"customer_id": {"type": "integer"}},
+                                    "required": ["customer_id"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): slot.resource.name
+        for slot in graph.operations["POST /orders"].inputs
+    }
+    assert bindings.get(("body", "customer_id")) == "Customer", bindings
+
+
 def test_body_fk_inside_all_of_with_one_of_branches(ctx):
     # FK fields hidden behind allOf siblings or oneOf branches must still be discovered.
     _, graph = analyze_dependencies(

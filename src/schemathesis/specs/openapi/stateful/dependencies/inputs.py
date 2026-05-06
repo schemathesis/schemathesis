@@ -36,6 +36,7 @@ def extract_inputs(
     resolver: Resolver,
     canonicalization_cache: CanonicalizationCache,
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
+    candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     """Extract resource dependencies for an API operation from its input parameters.
 
@@ -45,6 +46,10 @@ def extract_inputs(
     `deferred_nested_fks` collects nested-body FK lookups whose target resource
     isn't yet registered. The caller replays them after every operation has been
     scanned so the slot lands once the producer has been seen.
+
+    `candidate_resource_names` gates `<word>_name` body-field synthetics: only
+    creates a placeholder when the inferred name is backed by a path segment or
+    component schema.
     """
     known_dependencies = set()
     for param in operation.iter_parameters():
@@ -71,6 +76,7 @@ def extract_inputs(
                     resources=resources,
                     known_dependencies=known_dependencies,
                     deferred_nested_fks=deferred_nested_fks,
+                    candidate_resource_names=candidate_resource_names,
                 )
         except MalformedMediaType:
             continue
@@ -294,6 +300,7 @@ def _resolve_body_dependencies(
     resources: ResourceMap,
     known_dependencies: set[str],
     deferred_nested_fks: list[tuple[str, str, str]] | None = None,
+    candidate_resource_names: frozenset[str] = frozenset(),
 ) -> Iterator[InputSlot]:
     schema = body.raw_schema
     if not isinstance(schema, dict):
@@ -333,7 +340,16 @@ def _resolve_body_dependencies(
     path = operation.path
     for property_name, subschema in properties.items():
         resource_name = naming.from_parameter(property_name, path, body_field=True)
-        if resource_name is not None:
+        # `_name` body fields are usually attributes; only invent a resource when its
+        # name is backed by a path segment or component schema. Otherwise fall through
+        # to the known-dependencies path so the field can still bind to a parent resource.
+        gated = (
+            resource_name is not None
+            and resource_name not in resources
+            and property_name.lower().endswith("_name")
+            and resource_name not in candidate_resource_names
+        )
+        if resource_name is not None and not gated:
             resource = resources.get(resource_name)
             if resource is None:
                 resource = ResourceDefinition.inferred_from_parameter(
