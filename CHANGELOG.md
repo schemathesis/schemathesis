@@ -22,6 +22,7 @@
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
 - Mismatched parent/child path parameters in pool draws for hierarchical operations.
 - Recognize nested foreign-key body fields independently of the spec's `paths` ordering.
+- Recognize body foreign-key fields nested behind `allOf` / `oneOf` / `anyOf` composition.
 - Drop spec examples invalidated by inferred constraints from the example mixer.
 - False positive `negative_data_rejection` for integer/number query parameters when an array element is a numeric string. [#3931](https://github.com/schemathesis/schemathesis/issues/3931)
 - JUnit and Allure reports marked all test cases as skipped when a schema had no inline examples, even though Coverage or Fuzzing phases ran successfully afterwards. [#3738](https://github.com/schemathesis/schemathesis/issues/3738)

@@ -196,6 +196,13 @@
           "parameter_name": "containerGroupName",
           "resource": "ContainerGroup",
           "resource_field": "name"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "properties",
+          "resource": "ContainerGroup",
+          "resource_field": "properties"
         }
       ],
       "outputs": [
