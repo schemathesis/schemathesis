@@ -4,6 +4,7 @@ from io import StringIO
 from typing import NoReturn
 from unittest.mock import patch
 
+import jsonschema_rs
 import pytest
 import requests
 
@@ -27,10 +28,12 @@ from schemathesis.core.errors import (
     format_exception,
 )
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.jsonschema import BundleError
+from schemathesis.core.jsonschema import BundleError, make_validator
+from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.stateful import dependencies
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -474,6 +477,44 @@ KNOWN_ISSUES = {
 }
 
 
+def _check_coverage_body_compliance(case):
+    if case.meta.phase.name != TestPhase.COVERAGE or case.body is None or not case.operation.body:
+        return
+    alternative = next(
+        (alt for alt in case.operation.body if alt.media_type == case.media_type and "json" in alt.media_type),
+        None,
+    )
+    if alternative is None:
+        return
+    validator_cls = case.operation.schema.adapter.jsonschema_validator_cls
+    try:
+        validator = make_validator(alternative.optimized_schema, validator_cls)
+    except (jsonschema_rs.ValidationError, jsonschema_rs.ReferencingError):
+        return
+    try:
+        is_valid = validator.is_valid(case.body)
+    except ValueError:
+        return
+    body_is_target = case.meta.phase.data.parameter_location == ParameterLocation.BODY
+    body_component = case.meta.components.get(ParameterLocation.BODY)
+    is_negative_body = body_is_target and body_component is not None and body_component.mode == GenerationMode.NEGATIVE
+    if not is_negative_body and not is_valid:
+        errors = [e.message for e in validator.iter_errors(case.body)]
+        raise AssertionError(
+            f"Positive case produced invalid body.\n"
+            f"Media type: {alternative.media_type}\n"
+            f"Body: {case.body!r}\n"
+            f"Errors: {errors[:5]}"
+        )
+    if is_negative_body and is_valid:
+        raise AssertionError(
+            f"Negative case produced valid body (should be invalid).\n"
+            f"Media type: {alternative.media_type}\n"
+            f"Body: {case.body!r}\n"
+            f"Scenario: {case.meta.phase.data.scenario}"
+        )
+
+
 @schemathesis.check
 def combined_check(ctx, response, case):
     case.as_curl_command()
@@ -484,6 +525,7 @@ def combined_check(ctx, response, case):
             check(ctx, response, case)
         except (Failure, FailureGroup):
             pass
+    _check_coverage_body_compliance(case)
 
 
 def test_default(corpus, filename):
