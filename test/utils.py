@@ -204,11 +204,15 @@ class EventStream:
         )
         phases = phases or [PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
         schema.config.phases.update(phases=[phase.value.lower() for phase in phases])
+        database = schema.config.generation.database
+        if database is None and not deterministic:
+            database = "none"
         schema.config.generation.update(
             max_examples=max_examples,
             deterministic=deterministic,
             with_security_parameters=with_security_parameters,
             modes=modes,
+            database=database,
         )
         schema.config.update(headers=headers, workers=workers, request_timeout=request_timeout, tls_verify=tls_verify)
         if auth is not None:

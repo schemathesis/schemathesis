@@ -129,7 +129,7 @@ def run_test(
         ctx.error_feedback.checkpoint()
 
     try:
-        setup_hypothesis_database_key(test_function, operation)
+        setup_hypothesis_database_key(test_function, operation, generation=generation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
             test_function(
                 ctx=ctx,
@@ -375,11 +375,14 @@ def _targets_declared_method(case: Case) -> bool:
     return case.method.lower() == case.operation.method.lower()
 
 
-def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:
+def setup_hypothesis_database_key(test: Callable, operation: APIOperation, generation: GenerationConfig) -> None:
     """Make Hypothesis use separate database entries for every API operation.
 
     It increases the effectiveness of the Hypothesis database in the CLI.
     """
+    if generation.database is not None and generation.database.lower() == "none":
+        test._hypothesis_internal_database_key = None  # type: ignore[attr-defined]
+        return
     test.hypothesis.inner_test._hypothesis_internal_add_digest = operation.label.encode("utf8")  # type: ignore[attr-defined]
 
 

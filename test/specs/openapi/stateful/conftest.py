@@ -50,6 +50,7 @@ def engine_factory(ctx, app_runner, stop_event):
             unique_inputs=unique_inputs,
             max_examples=max_examples,
             maximize=maximize,
+            database="none",
         )
         config.projects.override.update(headers=headers)
         schema = schemathesis.openapi.from_url(api.schema_url, config=config)
