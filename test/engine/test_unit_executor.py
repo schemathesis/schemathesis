@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import queue
 import threading
 import uuid
 from queue import Queue
@@ -11,11 +10,10 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.engine.run import Phase, PhaseName, unit
+from test.engine._late_put import attach_late_put
 
 
 class _RacyPool:
-    # Reproduces the timing window where a worker puts its final events and exits between
-    # the consumer's `get(timeout=...)` raising `Empty` and the consumer checking liveness.
     def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, **_: Any) -> None:
         self.events_queue: Queue = Queue()
         exited = threading.Thread(target=lambda: None, daemon=True)
@@ -36,22 +34,7 @@ class _RacyPool:
             is_final=False,
         )
         self.events_queue.put(started)
-
-        original_get = self.events_queue.get
-        late_put_done = False
-
-        def get(*args: Any, **kwargs: Any) -> events.EngineEvent:
-            nonlocal late_put_done
-            try:
-                return original_get(*args, **kwargs)
-            except queue.Empty:
-                if not late_put_done:
-                    late_put_done = True
-                    # Worker's final event arrives after `Empty` was raised — the race window.
-                    self.events_queue.put(finished)
-                raise
-
-        self.events_queue.get = get  # type: ignore[method-assign]
+        attach_late_put(self.events_queue, finished)
 
     def __enter__(self) -> _RacyPool:
         return self

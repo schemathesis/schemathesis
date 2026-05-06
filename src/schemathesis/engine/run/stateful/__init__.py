@@ -50,7 +50,10 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                     status = event.status
                 yield event
             except queue.Empty:
-                if not thread.is_alive():
+                # The producer may put its final events and exit between this thread's
+                # get(timeout=...) raising Empty and the liveness check below.
+                # Stop only when the producer exited AND there is nothing left to drain.
+                if not thread.is_alive() and event_queue.empty():
                     break
     except KeyboardInterrupt:
         # Immediately notify the engine thread to stop, even though that the event will be set below in `finally`
