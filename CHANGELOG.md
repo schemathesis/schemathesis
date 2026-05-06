@@ -39,6 +39,7 @@
 - Reject `.` and `..` path-parameter values; URL normalisation routes the request to a different operation.
 - Preserve trailing test events when producer threads exit at a phase boundary.
 - Honor `minimum: 0` / `maximum: 0` and Draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` in coverage-phase number generation.
+- Pick up in-place mutations of bundled `$ref` targets when generating from cached schemas.
 
 ### :wrench: Changed
 

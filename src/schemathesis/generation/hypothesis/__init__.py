@@ -28,6 +28,7 @@ def setup() -> None:
     )
     from schemathesis.core.jsonschema.types import _get_type
     from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer
+    from schemathesis.generation._cache import schema_cache_key
 
     if getattr(setup, "_is_patched", False):
         return
@@ -63,21 +64,16 @@ def setup() -> None:
         will have the same validator.
         """
 
-        __slots__ = ("schema", "encoded", "serialized")
+        __slots__ = ("schema", "encoded", "serialized", "cache_key")
 
         def __init__(self, schema: dict[str, Any]) -> None:
             self.schema = schema
-            bundle = schema.get(BUNDLE_STORAGE_KEY)
-            if bundle is not None:
-                _for_hash = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
-                self.serialized = jsonschema_rs.canonical.json.to_string(_for_hash)
-                self.encoded = hash((self.serialized, id(bundle)))
-            else:
-                self.serialized = jsonschema_rs.canonical.json.to_string(schema)
-                self.encoded = hash(self.serialized)
+            self.cache_key = schema_cache_key(schema)
+            self.serialized = self.cache_key[1]
+            self.encoded = hash(self.cache_key)
 
         def __eq__(self, other: CacheableSchema) -> bool:  # type: ignore[override]
-            return self.encoded == other.encoded
+            return self.cache_key == other.cache_key
 
         def __hash__(self) -> int:
             return self.encoded
@@ -85,9 +81,9 @@ def setup() -> None:
     SCHEMA_KEYS = frozenset(SCHEMA_KEYS)
     SCHEMA_OBJECT_KEYS = frozenset(SCHEMA_OBJECT_KEYS)
 
-    # Cache for fully-resolved schema output, keyed by schema hash.
+    # Cache for fully-resolved schema output, keyed by canonical schema content.
     # Avoids re-traversing schemas with the same JSON content.
-    _resolve_result_cache: dict[int, dict[str, Any]] = {}
+    _resolve_result_cache: dict[tuple[Any, ...], dict[str, Any]] = {}
     _merged_result_cache: OrderedDict[tuple[tuple[Any, ...], tuple[Any, ...]], dict[str, Any] | None] = OrderedDict()
     _merged_result_cache_maxsize = 4096
     _canonicalish_result_cache: OrderedDict[tuple[Any, ...], dict[str, Any]] = OrderedDict()
@@ -96,16 +92,6 @@ def setup() -> None:
     _from_schema_result_cache_maxsize = 4096
     _merged_as_strategies_result_cache: OrderedDict[tuple[tuple[tuple[Any, ...], ...], int, int], Any] = OrderedDict()
     _merged_as_strategies_result_cache_maxsize = 2048
-
-    def _schema_cache_key(schema: Any) -> tuple[Any, ...]:
-        if isinstance(schema, dict):
-            bundle = schema.get(BUNDLE_STORAGE_KEY)
-            if bundle is not None:
-                without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
-                serialized = jsonschema_rs.canonical.json.to_string(without_bundle)
-                return ("dict_with_bundle", serialized, id(bundle))
-            return ("dict", jsonschema_rs.canonical.json.to_string(schema))
-        return ("json", jsonschema_rs.canonical.json.to_string(schema))
 
     def _merge_cache_get(key: tuple[tuple[Any, ...], tuple[Any, ...]]) -> dict[str, Any] | None | Literal[False]:
         if key in _merged_result_cache:
@@ -200,7 +186,7 @@ def setup() -> None:
 
         if len(schemas) == 2:
             try:
-                cache_key = (_schema_cache_key(schemas[0]), _schema_cache_key(schemas[1]))
+                cache_key = (schema_cache_key(schemas[0]), schema_cache_key(schemas[1]))
             except (TypeError, ValueError):
                 cache_key = None
             if cache_key is not None:
@@ -245,7 +231,7 @@ def setup() -> None:
     def _cached_from_schema(schema: Any, *, alphabet: Any, custom_formats: Any) -> Any:
         _ensure_canonical_constants()
         try:
-            key = (_schema_cache_key(schema), id(alphabet), id(custom_formats))
+            key = (schema_cache_key(schema), id(alphabet), id(custom_formats))
         except (TypeError, ValueError):
             key = None
 
@@ -270,7 +256,7 @@ def setup() -> None:
 
     def _cached_merged_as_strategies(schemas: Any, *, alphabet: Any, custom_formats: Any) -> Any:
         try:
-            schema_keys = tuple(_schema_cache_key(schema) for schema in schemas)
+            schema_keys = tuple(schema_cache_key(schema) for schema in schemas)
             key = (schema_keys, id(alphabet), id(custom_formats))
         except (TypeError, ValueError):
             key = None
@@ -301,16 +287,16 @@ def setup() -> None:
 
         _resolve_all_refs = resolve_all_refs
         top_level = root_schema is None
-        schema_hash: int | None = None
+        cache_key: tuple[Any, ...] | None = None
 
         if top_level:
-            cache_key = CacheableSchema(schema)
+            cacheable_schema = CacheableSchema(schema)
             # No need to traverse if there are no references
-            if '"$ref"' not in cache_key.serialized:
+            if '"$ref"' not in cacheable_schema.serialized:
                 return schema
-            schema_hash = cache_key.encoded
-            if schema_hash in _resolve_result_cache:
-                return deepclone(_resolve_result_cache[schema_hash])
+            cache_key = cacheable_schema.cache_key
+            if cache_key in _resolve_result_cache:
+                return deepclone(_resolve_result_cache[cache_key])
             root_schema = schema
 
         assert root_schema is not None
@@ -328,8 +314,8 @@ def setup() -> None:
             if result is None:
                 msg = f"$ref:{ref!r} had incompatible base schema {s!r}"
                 raise _canonicalise.HypothesisRefResolutionError(msg)
-            if schema_hash is not None:
-                _resolve_result_cache[schema_hash] = deepclone(result)
+            if cache_key is not None:
+                _resolve_result_cache[cache_key] = deepclone(result)
             return result
 
         for key, value in schema.items():
@@ -345,8 +331,8 @@ def setup() -> None:
                     k: _resolve_all_refs(v, root_schema=root_schema) if isinstance(v, dict) else v
                     for k, v in value.items()
                 }
-        if schema_hash is not None:
-            _resolve_result_cache[schema_hash] = deepclone(schema)
+        if cache_key is not None:
+            _resolve_result_cache[cache_key] = deepclone(schema)
         return schema
 
     root_core.RepresentationPrinter = RepresentationPrinter
@@ -375,7 +361,7 @@ def setup() -> None:
 
     def _fast_canonicalish(schema: Any) -> dict[str, Any]:
         try:
-            cache_key = _schema_cache_key(schema)
+            cache_key = schema_cache_key(schema)
         except (TypeError, ValueError):
             cache_key = None
 
