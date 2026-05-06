@@ -552,12 +552,12 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap) ->
 
 
 def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -> None:
-    """Rebind body slots from producer-less synthetics to a same-operation parent.
+    """Rebind body and query slots from producer-less synthetics to a same-operation parent.
 
-    `<word>_id` body fields produce a synthetic `<Word>` resource; when nothing else
-    in the spec backs that name (no path, no schema, no producer) but the operation's
+    `<word>_id` fields produce a synthetic `<Word>` resource; when nothing else in
+    the spec backs that name (no path, no schema, no producer) but the operation's
     own response describes a parent resource carrying the same field, the slot is
-    really a self-FK (`spouse_id` on `POST /contacts` references another `Contact`).
+    really a self-FK (`spouse_id` on `POST /contacts`, `?sequence_id=` on `GET /events`).
     """
     producer_resources = {output.resource.name for operation in operations.values() for output in operation.outputs}
     for operation in operations.values():
@@ -568,7 +568,7 @@ def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -
         if parent is None or parent.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
             continue
         for input_slot in operation.inputs:
-            if input_slot.parameter_location != ParameterLocation.BODY:
+            if input_slot.parameter_location not in (ParameterLocation.BODY, ParameterLocation.QUERY):
                 continue
             if input_slot.resource.source != DefinitionSource.PARAMETER_INFERENCE:
                 continue
@@ -582,6 +582,66 @@ def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -
             if input_slot.parameter_name in parent.fields:
                 input_slot.resource = parent
                 input_slot.resource_field = input_slot.parameter_name
+
+
+def disambiguate_module_variants(operations: OperationMap, resources: ResourceMap) -> None:
+    """Swap to a same-module sibling for spec-suffixed duplicates (`Group` / `Group1`).
+
+    Without this, every consumer in the second module binds to the first module's
+    variant via the path-derived lookup.
+    """
+    producer_modules: dict[str, set[str]] = {}
+    for operation in operations.values():
+        module = _module_of(operation.path)
+        if not module:
+            continue
+        for output in operation.outputs:
+            producer_modules.setdefault(output.resource.name, set()).add(module)
+
+    by_stem: dict[str, set[str]] = {}
+    for resource_name in producer_modules:
+        by_stem.setdefault(_strip_trailing_digits(resource_name), set()).add(resource_name)
+
+    for operation in operations.values():
+        consumer_module = _module_of(operation.path)
+        if not consumer_module:
+            continue
+        for input_slot in operation.inputs:
+            modules = producer_modules.get(input_slot.resource.name)
+            if not modules or consumer_module in modules:
+                continue
+            family = by_stem.get(_strip_trailing_digits(input_slot.resource.name), set())
+            siblings = [
+                name
+                for name in family
+                if name != input_slot.resource.name and consumer_module in producer_modules[name]
+            ]
+            if len(siblings) != 1:
+                continue
+            new_resource = resources[siblings[0]]
+            new_field = (
+                naming.find_matching_field(
+                    parameter=input_slot.parameter_name if isinstance(input_slot.parameter_name, str) else "",
+                    resource=new_resource.name,
+                    fields=new_resource.fields,
+                )
+                or input_slot.resource_field
+            )
+            input_slot.resource = new_resource
+            input_slot.resource_field = new_field
+
+
+def _module_of(path: str) -> str:
+    stripped = naming.strip_version_prefix(path).lstrip("/")
+    head, _, _ = stripped.partition("/")
+    return head
+
+
+def _strip_trailing_digits(name: str) -> str:
+    end = len(name)
+    while end > 0 and name[end - 1].isdigit():
+        end -= 1
+    return name[:end] or name
 
 
 def try_merge_input_resource(
