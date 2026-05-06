@@ -41,6 +41,7 @@ from schemathesis.core.parameters import ParameterLocation
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
+from schemathesis.generation._cache import schema_cache_key
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CoverageScenario
 from schemathesis.openapi.generation.filters import is_invalid_path_parameter
@@ -493,7 +494,7 @@ class CoverageContext:
             schema = dict(schema)
             schema[BUNDLE_STORAGE_KEY] = self.root_schema[BUNDLE_STORAGE_KEY]
 
-        cache_key = _schema_generation_cache_key(schema)
+        cache_key = schema_cache_key(schema)
         cached = self._schema_generation_cache.get(cache_key, NOT_SET)
         if cached is not NOT_SET:
             return deepclone(cached) if isinstance(cached, (dict, list)) else cached
@@ -543,16 +544,6 @@ def _apply_pattern_optimizations(obj: Any, update_pattern: Callable[[str, int | 
     elif isinstance(obj, list):
         for item in obj:
             _apply_pattern_optimizations(item, update_pattern)
-
-
-def _schema_generation_cache_key(schema: JsonSchema) -> tuple[Any, ...]:
-    if isinstance(schema, dict):
-        bundle = schema.get(BUNDLE_STORAGE_KEY)
-        if bundle is not None:
-            without_bundle = {k: v for k, v in schema.items() if k != BUNDLE_STORAGE_KEY}
-            return ("dict_with_bundle", jsonschema_rs.canonical.json.to_string(without_bundle), id(bundle))
-        return ("dict", jsonschema_rs.canonical.json.to_string(schema))
-    return ("json", jsonschema_rs.canonical.json.to_string(schema))
 
 
 T = TypeVar("T")

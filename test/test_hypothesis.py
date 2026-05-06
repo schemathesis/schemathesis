@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 from hypothesis.database import InMemoryExampleDatabase
 from hypothesis.internal.observability import with_observability_callback
 from hypothesis_jsonschema import _canonicalise as canonicalise
+from hypothesis_jsonschema import from_schema
 
 import schemathesis
 from schemathesis.core import NOT_SET
@@ -53,6 +54,20 @@ def test_canonicalish_keeps_bundle_when_bundled_ref_present():
     }
 
     assert canonicalise.canonicalish(schema) == {"const": 1, BUNDLE_STORAGE_KEY: schema[BUNDLE_STORAGE_KEY]}
+
+
+def test_from_schema_reflects_bundle_mutations():
+    setup()
+    schema = {
+        "$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1",
+        BUNDLE_STORAGE_KEY: {"schema1": {"type": "integer"}},
+    }
+
+    assert isinstance(find(from_schema(schema), lambda _: True), int)
+
+    schema[BUNDLE_STORAGE_KEY]["schema1"] = {"type": "string"}
+
+    assert isinstance(find(from_schema(schema), lambda _: True), str)
 
 
 @pytest.mark.parametrize(

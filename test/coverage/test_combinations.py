@@ -6,6 +6,7 @@ from unittest.mock import ANY
 import jsonschema_rs
 import pytest
 
+from schemathesis.core.jsonschema import BUNDLE_STORAGE_KEY
 from schemathesis.core.parameters import ParameterLocation
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.coverage import (
@@ -2034,6 +2035,32 @@ def test_generate_from_schema_uses_cache_and_returns_fresh_copy(ctx_factory, mon
 
     assert calls == 1
     assert second == {"cached": True}
+
+
+def test_generate_from_schema_reflects_bundle_mutations():
+    schema = {
+        "oneOf": [{"$ref": f"#/{BUNDLE_STORAGE_KEY}/schema1"}],
+        BUNDLE_STORAGE_KEY: {"schema1": {"type": "integer"}},
+    }
+    shared_cache: dict = {}
+
+    def make_ctx() -> CoverageContext:
+        return CoverageContext(
+            root_schema=schema,
+            location=ParameterLocation.QUERY,
+            media_type=None,
+            generation_modes=[GenerationMode.POSITIVE],
+            is_required=True,
+            custom_formats=get_default_format_strategies(),
+            validator_cls=jsonschema_rs.Draft4Validator,
+            _schema_generation_cache=shared_cache,
+        )
+
+    assert isinstance(make_ctx().generate_from_schema(schema), int)
+
+    schema[BUNDLE_STORAGE_KEY]["schema1"] = {"type": "string"}
+
+    assert isinstance(make_ctx().generate_from_schema(schema), str)
 
 
 def test_items_false_with_prefix_items(pctx):
