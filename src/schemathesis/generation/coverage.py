@@ -695,6 +695,17 @@ def _cover_positive_for_type(
                     )
                 else:
                     one_of_validators = None
+                # A branch may generate values that satisfy the branch schema but violate
+                # a root-level `type` constraint (e.g. type:array root while branch type:object).
+                # Only gate body schemas: header/query/cookie/path adapters inject type:string
+                # for serialization, which would incorrectly filter null values from nullable
+                # anyOf branches.
+                parent_validator: jsonschema_rs.Validator | None = None
+                if "type" in schema and ctx.location == ParameterLocation.BODY:
+                    try:
+                        parent_validator = make_validator_for(schema)
+                    except Exception:
+                        pass
                 for idx, sub_schema in enumerate(sub_schemas):
                     effective = _resolve_sub_schema(ctx, sub_schema)
                     if isinstance(effective, dict) and "properties" in effective:
@@ -732,9 +743,16 @@ def _cover_positive_for_type(
                         # Only yield values valid for exactly this one branch
                         for v in gen:
                             if not is_valid_for_others(v.value, idx, one_of_validators):
-                                yield v
+                                if parent_validator is None or (
+                                    not contains_binary(v.value) and parent_validator.is_valid(v.value)
+                                ):
+                                    yield v
                     else:
-                        yield from gen
+                        for v in gen:
+                            if parent_validator is None or (
+                                not contains_binary(v.value) and parent_validator.is_valid(v.value)
+                            ):
+                                yield v
         all_of = schema.get("allOf")
         # Set when canonicalish is used for allOf: the canonical schema covers the full merged
         # constraints, so the outer schema's type/properties generation must be skipped to avoid
