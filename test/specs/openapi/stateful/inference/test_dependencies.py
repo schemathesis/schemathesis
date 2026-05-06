@@ -3446,6 +3446,218 @@ def test_camelcase_nested_fk_produces_input_slot(ctx):
     assert (nested_slot.resource.name, nested_slot.resource_field) == ("Location", "id")
 
 
+def test_body_fk_inside_all_of_with_one_of_branches(ctx):
+    # FK fields hidden behind allOf siblings or oneOf branches must still be discovered.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/categories": {
+                "post": {
+                    "operationId": "createCategory",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/brands": {
+                "post": {
+                    "operationId": "createBrand",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/events": {
+                "post": {
+                    "operationId": "createEvent",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "name": {"type": "string"},
+                                                "category_id": {"type": "integer"},
+                                            },
+                                            "required": ["name", "category_id"],
+                                        },
+                                        {
+                                            "oneOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {"all_sites": {"type": "boolean"}},
+                                                    "required": ["all_sites"],
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {"brand_id": {"type": "integer"}},
+                                                    "required": ["brand_id"],
+                                                },
+                                            ]
+                                        },
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["POST /events"].inputs
+    }
+    assert bindings.get(("body", "category_id")) == ("Category", "id"), bindings
+    assert bindings.get(("body", "brand_id")) == ("Brand", "id"), bindings
+
+
+def test_body_composition_with_boolean_branch_does_not_crash(ctx):
+    # Boolean schemas (`true`/`false`) inside allOf are spec-legal and must not break traversal.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/categories": {
+                "post": {
+                    "operationId": "createCategory",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/events": {
+                "post": {
+                    "operationId": "createEvent",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        True,
+                                        {
+                                            "type": "object",
+                                            "properties": {"category_id": {"type": "integer"}},
+                                            "required": ["category_id"],
+                                        },
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["POST /events"].inputs
+    }
+    assert bindings.get(("body", "category_id")) == ("Category", "id"), bindings
+
+
+def test_nested_body_fk_inside_composition_branch(ctx):
+    # Composition keywords inside nested objects must still be traversed for FK fields.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/warehouses": {
+                "post": {
+                    "operationId": "createWarehouse",
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "integer"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+            "/orders": {
+                "post": {
+                    "operationId": "createOrder",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "shipping": {
+                                            "allOf": [
+                                                {
+                                                    "type": "object",
+                                                    "properties": {"warehouse_id": {"type": "integer"}},
+                                                }
+                                            ]
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                }
+            },
+        },
+    )
+
+    nested_slot = next(
+        (
+            slot
+            for operation in graph.operations.values()
+            for slot in operation.inputs
+            if slot.parameter_name == "shipping/warehouse_id"
+        ),
+        None,
+    )
+    assert nested_slot is not None, "nested warehouse_id behind allOf was not discovered"
+    assert (nested_slot.resource.name, nested_slot.resource_field) == ("Warehouse", "id")
+
+
 @pytest.mark.parametrize(
     ["paths", "kwargs", "version"],
     [

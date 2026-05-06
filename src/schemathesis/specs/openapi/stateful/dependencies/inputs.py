@@ -260,6 +260,33 @@ GENERIC_FIELD_NAMES = frozenset(
 )
 
 
+def _flatten_composition(schema: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """Merge ``properties`` and ``required`` across ``allOf``/``oneOf``/``anyOf`` branches.
+
+    First-seen property definition wins; required is a union across branches.
+    """
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+
+    def merge(node: dict[str, Any]) -> None:
+        node_properties = node.get("properties")
+        if isinstance(node_properties, dict):
+            for name, subschema in node_properties.items():
+                properties.setdefault(name, subschema)
+        node_required = node.get("required")
+        if isinstance(node_required, list):
+            required.extend(node_required)
+        for key in ("allOf", "oneOf", "anyOf"):
+            branches = node.get(key)
+            if isinstance(branches, list):
+                for branch in branches:
+                    if isinstance(branch, dict):
+                        merge(branch)
+
+    merge(schema)
+    return properties, required
+
+
 def _resolve_body_dependencies(
     *,
     body: OpenApiBody,
@@ -298,11 +325,11 @@ def _resolve_body_dependencies(
                 parameter_location=ParameterLocation.BODY,
             )
 
-    # Inspect each property that could be a part of some other resource
-    properties = resolved.get("properties")
-    if not isinstance(properties, dict):
+    # Inspect each property that could be a part of some other resource.
+    # Flatten composition keywords first so bodies whose top level is allOf/oneOf/anyOf still surface their fields.
+    properties, required = _flatten_composition(resolved)
+    if not properties:
         return
-    required = resolved.get("required", [])
     path = operation.path
     for property_name, subschema in properties.items():
         resource_name = naming.from_parameter(property_name, path, body_field=True)
@@ -380,8 +407,8 @@ def _extract_nested_body_fk_fields(
     if max_depth <= 0:
         return
 
-    properties = schema.get("properties")
-    if not isinstance(properties, dict):
+    properties, _ = _flatten_composition(schema)
+    if not properties:
         return
 
     for property_name, subschema in properties.items():
@@ -391,13 +418,12 @@ def _extract_nested_body_fk_fields(
         # Build the path for nested fields
         current_path = f"{path}/{property_name}" if path else property_name
 
-        # Check if this property is a nested object
+        # Composition branches may carry the actual object shape, so flatten before treating as object.
+        sub_properties, _ = _flatten_composition(subschema)
         prop_type = subschema.get("type")
 
-        if prop_type == "object" or "properties" in subschema:
-            # Recurse into nested objects
-            nested_props = subschema.get("properties", {})
-            for nested_name, nested_schema in nested_props.items():
+        if prop_type == "object" or sub_properties:
+            for nested_name, nested_schema in sub_properties.items():
                 if not isinstance(nested_schema, dict):
                     continue
 
@@ -419,8 +445,8 @@ def _extract_nested_body_fk_fields(
                         deferred.append((target_resource_name, target_field, nested_path))
                     continue
 
-                # Recurse deeper
-                if nested_schema.get("type") == "object" or "properties" in nested_schema:
+                deeper_properties, _ = _flatten_composition(nested_schema)
+                if nested_schema.get("type") == "object" or deeper_properties:
                     yield from _extract_nested_body_fk_fields(
                         nested_schema, resources, nested_path, max_depth - 1, deferred=deferred
                     )
@@ -431,8 +457,7 @@ def _extract_nested_body_fk_fields(
             if isinstance(items, dict):
                 items_path = f"{current_path}/0"
 
-                # Check if items have properties (object items)
-                items_props = items.get("properties", {})
+                items_props, _ = _flatten_composition(items)
                 for item_prop_name, item_prop_schema in items_props.items():
                     if not isinstance(item_prop_schema, dict):
                         continue
@@ -455,7 +480,7 @@ def _extract_nested_body_fk_fields(
                             deferred.append((target_resource_name, target_field, item_path))
 
                 # Recurse into array items
-                if items.get("type") == "object" or "properties" in items:
+                if items.get("type") == "object" or items_props:
                     yield from _extract_nested_body_fk_fields(
                         items, resources, items_path, max_depth - 1, deferred=deferred
                     )

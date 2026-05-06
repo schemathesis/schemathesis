@@ -477,7 +477,22 @@
       ]
     },
     "POST /push/channelSubscriptions": {
-      "inputs": [],
+      "inputs": [
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "deviceId",
+          "resource": "Device",
+          "resource_field": "deviceId"
+        },
+        {
+          "is_suffix_matched": false,
+          "parameter_location": "body",
+          "parameter_name": "clientId",
+          "resource": "Client",
+          "resource_field": "clientId"
+        }
+      ],
       "outputs": []
     },
     "POST /push/deviceRegistrations": {
