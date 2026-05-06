@@ -114,7 +114,10 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                         if engine.has_to_stop:
                             break
                     except queue.Empty:
-                        if all(not worker.is_alive() for worker in pool.workers):
+                        # A worker may put its final events and exit between this thread's
+                        # get(timeout=...) raising Empty and the liveness check below.
+                        # Stop only when no producer remains AND nothing is left to drain.
+                        if all(not worker.is_alive() for worker in pool.workers) and pool.events_queue.empty():
                             break
                         continue
             except KeyboardInterrupt:
