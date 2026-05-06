@@ -22,7 +22,7 @@ except ImportError:
 
 from collections.abc import Callable, Generator, Iterator
 from json.encoder import JSONEncoder, encode_basestring_ascii
-from typing import Any, TypeVar, cast
+from typing import Any, TypeGuard, TypeVar, cast
 from urllib.parse import quote_plus
 
 import jsonschema_rs
@@ -947,6 +947,8 @@ def cover_schema_iter(
                             location=ctx.current_path,
                         )
                 elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and seen.insert(value):
+                    if isinstance(value, bool):
+                        continue
                     verb = "greater" if key == "exclusiveMaximum" else "smaller"
                     limit = "maximum" if key == "exclusiveMaximum" else "minimum"
                     scenario = (
@@ -1538,6 +1540,10 @@ def closest_multiple_greater_than(y: int, x: int) -> int:
     return x * (quotient + 1)
 
 
+def _is_numeric_bound(value: Any) -> TypeGuard[int | float]:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
 def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generator[GeneratedValue, None, None]:
     """Generate positive integer values."""
     # Boundary and near boundary values
@@ -1546,9 +1552,15 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
     maximum = schema.get("maximum")
     exclusive_minimum = schema.get("exclusiveMinimum")
     exclusive_maximum = schema.get("exclusiveMaximum")
-    if exclusive_minimum is not None:
+    if isinstance(exclusive_minimum, bool):
+        if exclusive_minimum and _is_numeric_bound(minimum):
+            minimum += 1
+    elif exclusive_minimum is not None:
         minimum = exclusive_minimum + 1
-    if exclusive_maximum is not None:
+    if isinstance(exclusive_maximum, bool):
+        if exclusive_maximum and _is_numeric_bound(maximum):
+            maximum -= 1
+    elif exclusive_maximum is not None:
         maximum = exclusive_maximum - 1
     multiple_of = schema.get("multipleOf")
     example = schema.get("example")
@@ -1572,7 +1584,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             and seen.insert(default)
         ):
             yield PositiveValue(default, scenario=CoverageScenario.DEFAULT_VALUE, description="Default value")
-    elif not minimum and not maximum:
+    elif minimum is None and maximum is None:
         value = ctx.generate_from_schema(schema)
         seen.insert(value)
         yield PositiveValue(value, scenario=CoverageScenario.VALID_NUMBER, description="Valid number")
@@ -1591,7 +1603,7 @@ def _positive_number(ctx: CoverageContext, schema: JsonSchemaObject) -> Generato
             larger = smallest + multiple_of
         else:
             larger = minimum + 1
-        if (not maximum or larger <= maximum) and seen.insert(larger):
+        if (maximum is None or larger <= maximum) and seen.insert(larger):
             yield PositiveValue(
                 larger, scenario=CoverageScenario.NEAR_BOUNDARY_NUMBER, description="Near-boundary number"
             )
