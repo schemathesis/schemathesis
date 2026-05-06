@@ -7,106 +7,115 @@ from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 MALFORMED_REGEX = "^[A-Za-z0-9 \\\\-.'À-ÿ]+$"
 
 
-def test_malformed_regex_removed_allows_body_generation(ctx):
-    # When a body schema contains a malformed regex pattern, it is removed during conversion
-    # allowing data generation to proceed
-    schema = ctx.openapi.load_schema(
-        {
-            "/api/orders/{orderId}": {
-                "put": {
-                    "parameters": [
-                        {
-                            "name": "orderId",
-                            "in": "path",
-                            "required": True,
-                            "schema": {"type": "string", "pattern": "^[0-9A-Z]{26}$"},
-                        },
-                        {
-                            "name": "Idempotency-Key",
-                            "in": "header",
-                            "required": True,
-                            "schema": {"type": "string"},
-                        },
-                        {
-                            "name": "X-Optional",
-                            "in": "header",
-                            "required": False,
-                            "schema": {"type": "string"},
-                        },
-                    ],
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["name"],
-                                    "properties": {"name": {"type": "string", "pattern": MALFORMED_REGEX}},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-        version="3.0.2",
-    )
-    operation = schema["/api/orders/{orderId}"]["PUT"]
+def _load_json_body_operation(
+    ctx,
+    body_schema,
+    *,
+    path="/items",
+    method="post",
+    version="3.0.2",
+    body_required=True,
+    parameters=None,
+):
+    request_body = {"content": {"application/json": {"schema": body_schema}}}
+    if body_required is not None:
+        request_body["required"] = body_required
+    operation = {"requestBody": request_body, "responses": {"200": {"description": "OK"}}}
+    if parameters is not None:
+        operation["parameters"] = parameters
+    schema = ctx.openapi.load_schema({path: {method: operation}}, version=version)
+    return schema[path][method.upper()]
 
-    cases = list(
+
+def _collect_coverage_cases(operation, generation_mode):
+    return list(
         _iter_coverage_cases(
             operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
+            generation_modes=[generation_mode],
             generate_duplicate_query_parameters=False,
             unexpected_methods=set(),
-            generation_config=schema.config.generation,
+            generation_config=operation.schema.config.generation,
         )
     )
 
+
+def _assert_generated_bodies_match_schema(operation, generation_mode, *, validate_formats=False, require_bodies=True):
+    body_schema = operation.body[0].optimized_schema
+    validator_kwargs = {"validate_formats": True} if validate_formats else {}
+    validator = jsonschema_rs.validator_for(body_schema, **validator_kwargs)
+    bodies = [case.body for case in _collect_coverage_cases(operation, generation_mode) if case.body is not None]
+    if require_bodies:
+        assert bodies, f"Expected at least one {generation_mode.name} body case"
+    expect_valid = generation_mode == GenerationMode.POSITIVE
+    for body in bodies:
+        is_valid = validator.is_valid(body)
+        if expect_valid:
+            assert is_valid, f"{generation_mode.name} body is schema-invalid: {body!r}"
+        else:
+            assert not is_valid, f"{generation_mode.name} body is schema-valid (false positive): {body!r}"
+    return bodies
+
+
+def test_malformed_regex_removed_allows_body_generation(ctx):
+    # When a body schema contains a malformed regex pattern, it is removed during conversion
+    # allowing data generation to proceed
+    operation = _load_json_body_operation(
+        ctx,
+        {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string", "pattern": MALFORMED_REGEX}},
+        },
+        path="/api/orders/{orderId}",
+        method="put",
+        version="3.0.2",
+        parameters=[
+            {
+                "name": "orderId",
+                "in": "path",
+                "required": True,
+                "schema": {"type": "string", "pattern": "^[0-9A-Z]{26}$"},
+            },
+            {
+                "name": "Idempotency-Key",
+                "in": "header",
+                "required": True,
+                "schema": {"type": "string"},
+            },
+            {
+                "name": "X-Optional",
+                "in": "header",
+                "required": False,
+                "schema": {"type": "string"},
+            },
+        ],
+    )
+
     # Cases are generated because the malformed pattern is removed
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
     assert len(cases) > 0
 
 
 def test_numeric_pattern_value(ctx):
     # When a body schema contains a pattern with a numeric value instead of a string,
     # it should be handled gracefully without raising a TypeError
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/test": {
-                "patch": {
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "key": {
-                                            "pattern": 0.0  # Invalid: pattern should be a string
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "properties": {
+                "key": {
+                    "pattern": 0.0  # Invalid: pattern should be a string
                 }
             }
         },
+        path="/test",
+        method="patch",
         version="3.0.0",
-    )
-    operation = schema["/test"]["PATCH"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
+        body_required=None,
     )
 
     # Cases should be generated despite the invalid pattern value
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
     assert len(cases) > 0
 
 
@@ -114,250 +123,105 @@ def test_required_property_not_in_properties_is_generated(ctx):
     # When a schema's `required` array names a property that has no entry in
     # `properties`, coverage must still emit a value for that key so the
     # generated body satisfies the `required` constraint and is schema-valid.
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/listeners": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    # `host` is required but has no definition in properties
-                                    "required": ["name", "host"],
-                                    "properties": {
-                                        "name": {"type": "string"},
-                                        "port": {"type": "integer"},
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "type": "object",
+            # `host` is required but has no definition in properties
+            "required": ["name", "host"],
+            "properties": {
+                "name": {"type": "string"},
+                "port": {"type": "integer"},
+            },
+        },
+        path="/listeners",
     )
-    operation = schema["/listeners"]["POST"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    positive_bodies = [c.body for c in cases if c.body is not None]
-    assert positive_bodies, "Expected at least one body case"
-    for body in positive_bodies:
-        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
 
 
 def test_invalid_enum_values_excluded_from_positive_cases(ctx):
     # When a schema property has `type: string` but the enum contains a non-string value (false),
     # coverage must not emit the invalid enum value in POSITIVE mode.
     # Such values commonly arise from YAML deserialization (e.g. bare `NO` parsed as boolean false).
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "country": {
-                                            "type": "string",
-                                            # `false` is an invalid enum value for type:string
-                                            "enum": ["US", "GB", False],
-                                        }
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string",
+                    # `false` is an invalid enum value for type:string
+                    "enum": ["US", "GB", False],
                 }
-            }
-        }
+            },
+        },
     )
-    operation = schema["/items"]["POST"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    positive_bodies = [c.body for c in cases if c.body is not None]
-    assert positive_bodies, "Expected at least one body case"
-    for body in positive_bodies:
-        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
 
 
 def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
     # When an array property's items schema has `type: string` but the enum contains
     # a non-string value (false), coverage must not emit arrays with the invalid value.
     # Such values commonly arise from YAML deserialization (e.g. bare `NO` parsed as boolean false).
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/items": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "countries": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "string",
-                                                # `false` is an invalid enum value for type:string
-                                                "enum": ["US", "GB", False],
-                                            },
-                                        }
-                                    },
-                                }
-                            }
-                        },
+            "type": "object",
+            "properties": {
+                "countries": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        # `false` is an invalid enum value for type:string
+                        "enum": ["US", "GB", False],
                     },
-                    "responses": {"200": {"description": "OK"}},
                 }
-            }
-        }
+            },
+        },
     )
-    operation = schema["/items"]["POST"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    positive_bodies = [c.body for c in cases if c.body is not None]
-    assert positive_bodies, "Expected at least one body case"
-    for body in positive_bodies:
-        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
 
 
 def test_allof_with_outer_properties_includes_required_fields(ctx):
     # When a body schema combines allOf (which declares required fields) with additional outer-level properties
     # Coverage must include the required fields in every generated case
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/resources": {
-                "put": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "type": "object",
-                                            "required": ["name"],
-                                            "properties": {"name": {"type": "string"}},
-                                        }
-                                    ],
-                                    # outer properties beyond allOf - no explicit type or required
-                                    "properties": {"details": {"properties": {"key": {"type": "string"}}}},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "allOf": [
+                {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string"}},
                 }
-            }
-        }
+            ],
+            # outer properties beyond allOf - no explicit type or required
+            "properties": {"details": {"properties": {"key": {"type": "string"}}}},
+        },
+        path="/resources",
+        method="put",
     )
-    operation = schema["/resources"]["PUT"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    positive_bodies = [c.body for c in cases if c.body is not None]
-    assert positive_bodies, "Expected at least one body case"
-    for body in positive_bodies:
-        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
 
 
 def test_allof_with_explicit_type_object_includes_required_fields(ctx):
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/resources": {
-                "put": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "allOf": [
-                                        {
-                                            "type": "object",
-                                            "required": ["name"],
-                                            "properties": {"name": {"type": "string"}},
-                                        }
-                                    ],
-                                    "properties": {"details": {"properties": {"key": {"type": "string"}}}},
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "type": "object",
+            "allOf": [
+                {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string"}},
                 }
-            }
-        }
+            ],
+            "properties": {"details": {"properties": {"key": {"type": "string"}}}},
+        },
+        path="/resources",
+        method="put",
     )
-    operation = schema["/resources"]["PUT"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    positive_bodies = [c.body for c in cases if c.body is not None]
-    assert positive_bodies, "Expected at least one body case"
-    for body in positive_bodies:
-        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE)
 
 
 def test_format_invalid_default_not_used_as_const(ctx):
@@ -366,56 +230,28 @@ def test_format_invalid_default_not_used_as_const(ctx):
     # generator must NOT emit the invalid default as a const value.  Doing so produces
     # a body that passes is_valid() (no format validation) but is rejected by the
     # conformance validator which uses validate_formats=True.
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/jobs": {
-                "put": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "constraints": {
-                                            "type": "object",
-                                            "properties": {
-                                                "maxWallClockTime": {
-                                                    "type": "string",
-                                                    "format": "duration",
-                                                    # Azure uses "7.00:00:00" — not valid ISO 8601
-                                                    "default": "7.00:00:00",
-                                                }
-                                            },
-                                        }
-                                    },
-                                }
-                            }
-                        },
+            "type": "object",
+            "properties": {
+                "constraints": {
+                    "type": "object",
+                    "properties": {
+                        "maxWallClockTime": {
+                            "type": "string",
+                            "format": "duration",
+                            # Azure uses "7.00:00:00" - not valid ISO 8601
+                            "default": "7.00:00:00",
+                        }
                     },
-                    "responses": {"200": {"description": "OK"}},
                 }
-            }
-        }
+            },
+        },
+        path="/jobs",
+        method="put",
     )
-    operation = schema["/jobs"]["PUT"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
-    positive_bodies = [c.body for c in cases if c.body is not None]
-    assert positive_bodies, "Expected at least one body case"
-    for body in positive_bodies:
-        assert validator.is_valid(body), f"POSITIVE body is schema-invalid: {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.POSITIVE, validate_formats=True)
 
 
 def test_swagger2_array_query_param_with_top_level_enum(ctx):
@@ -448,15 +284,7 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
     )
     operation = schema["/collection/purpose"]["PUT"]
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _collect_coverage_cases(operation, GenerationMode.POSITIVE)
 
     query_cases = [c for c in cases if c.query and "purposes" in c.query]
     assert query_cases, "Expected at least one case with 'purposes' in query"
@@ -466,93 +294,36 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
 
 def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     # When a schema property has type:integer but also specifies minLength/maxLength
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/cache": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "ttl": {
-                                            "type": "integer",
-                                            # minLength/maxLength are string-only constraints;
-                                            # applying them to an integer field likely is a schema bug
-                                            "minLength": 30,
-                                            "maxLength": 3600,
-                                        }
-                                    },
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
+            "type": "object",
+            "properties": {
+                "ttl": {
+                    "type": "integer",
+                    # minLength/maxLength are string-only constraints;
+                    # applying them to an integer field likely is a schema bug
+                    "minLength": 30,
+                    "maxLength": 3600,
                 }
-            }
-        }
+            },
+        },
+        path="/cache",
     )
-    operation = schema["/cache"]["POST"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    negative_bodies = [c.body for c in cases if c.body is not None]
-    for body in negative_bodies:
-        assert not validator.is_valid(body), f"NEGATIVE body is schema-valid (false positive): {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.NEGATIVE, require_bodies=False)
 
 
 def test_required_enforced_when_properties_at_threshold(ctx):
     # When a schema has exactly 15 properties (at the jsonschema_rs SmallProperties threshold)
     # and required lists exactly 2 of them, NEGATIVE cases must still be schema-invalid.
     properties = {f"field{i}": {"type": "string"} for i in range(15)}
-    schema = ctx.openapi.load_schema(
+    operation = _load_json_body_operation(
+        ctx,
         {
-            "/things": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "required": ["field0", "field1"],
-                                    "properties": properties,
-                                }
-                            }
-                        },
-                    },
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
+            "type": "object",
+            "required": ["field0", "field1"],
+            "properties": properties,
+        },
+        path="/things",
     )
-    operation = schema["/things"]["POST"]
-
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
-
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
-    negative_bodies = [c.body for c in cases if c.body is not None]
-    assert negative_bodies, "Expected at least one negative body case"
-    for body in negative_bodies:
-        assert not validator.is_valid(body), f"NEGATIVE body is schema-valid (false positive): {body!r}"
+    _assert_generated_bodies_match_schema(operation, GenerationMode.NEGATIVE)

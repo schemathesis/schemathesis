@@ -37,6 +37,34 @@ def execute(schema, **options) -> EventStream:
     return EventStream(schema, **options).execute()
 
 
+def _api_requests(api):
+    return [request for request in api.requests if request.path.startswith("/api/")]
+
+
+def _scenario(stream, **attrs):
+    return stream.find(events.ScenarioFinished, **attrs)
+
+
+def _last_scenario(stream):
+    return stream.find_all(events.ScenarioFinished)[-1]
+
+
+def _scenario_interactions(stream, **attrs):
+    return list(_scenario(stream, **attrs).recorder.interactions.values())
+
+
+def _scenario_cases(stream, **attrs):
+    return list(_scenario(stream, **attrs).recorder.cases.values())
+
+
+def _scenario_checks(scenario):
+    return [check for checks in scenario.recorder.checks.values() for check in checks]
+
+
+def _last_scenario_checks(stream):
+    return _scenario_checks(_last_scenario(stream))
+
+
 def assert_request(
     app: web.Application, idx: int, method: str, path: str, headers: dict[str, str] | None = None
 ) -> None:
@@ -74,7 +102,7 @@ def test_execute_base_url_not_found(ctx):
     EventStream(schema).execute()
     # Then the engine should use this base
     # And they will not reach the application
-    assert [r for r in api.requests if r.path.startswith("/api/")] == []
+    assert _api_requests(api) == []
 
 
 def test_execute(ctx):
@@ -83,7 +111,7 @@ def test_execute(ctx):
     EventStream(schema).execute()
 
     # Filter out the engine's `/` capability probe; only assert against the API operations.
-    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
     for request in api_calls:
         assert request.method == "GET"
@@ -102,7 +130,7 @@ def test_interactions(ctx, workers):
         encoding = ["gzip, deflate"]
 
     # failure
-    interactions = list(stream.find(events.ScenarioFinished, status=Status.FAILURE).recorder.interactions.values())
+    interactions = _scenario_interactions(stream, status=Status.FAILURE)
     assert len(interactions) == 1
     failure = interactions[0]
     assert asdict(failure.request) == {
@@ -120,7 +148,7 @@ def test_interactions(ctx, workers):
     }
     assert failure.response.status_code == 500
     # success
-    interactions = list(stream.find(events.ScenarioFinished, status=Status.SUCCESS).recorder.interactions.values())
+    interactions = _scenario_interactions(stream, status=Status.SUCCESS)
     assert len(interactions) == 1
     success = interactions[0]
     assert asdict(success.request) == {
@@ -159,7 +187,7 @@ def test_empty_response_interaction(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When there is a GET request and a response that doesn't return content (e.g. 204)
     stream = EventStream(schema).execute()
-    interactions = list(stream.find(events.ScenarioFinished).recorder.interactions.values())
+    interactions = _scenario_interactions(stream)
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
         assert interaction.request.body is None
@@ -172,7 +200,7 @@ def test_empty_string_response_interaction(ctx):
     schema = schemathesis.openapi.from_url(api.schema_url)
     # When there is a response that returns payload of length 0
     stream = EventStream(schema).execute()
-    interactions = stream.find(events.ScenarioFinished).recorder.interactions.values()
+    interactions = _scenario_interactions(stream)
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
         assert interaction.response.content == b""
@@ -186,7 +214,7 @@ def test_auth(ctx):
     execute(schema, auth=("test", "test"))
 
     # Then each API request should contain corresponding basic auth header
-    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
     for request in api_calls:
         assert request.headers["Authorization"] == "Basic dGVzdDp0ZXN0"
@@ -202,7 +230,7 @@ def test_base_url(ctx, converter):
     execute(schema)
 
     # Then each request should reach the app in both cases
-    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
 
 
@@ -233,7 +261,7 @@ def test_execute_with_headers(ctx):
     execute(schema, headers=headers)
 
     # Then each API request should contain these headers
-    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    api_calls = _api_requests(api)
     assert sorted(r.path for r in api_calls) == ["/api/failure", "/api/success"]
     for request in api_calls:
         assert request.headers["Authorization"] == "Bearer 123"
@@ -246,7 +274,7 @@ def test_execute_filter_endpoint(ctx):
     execute(schema)
 
     # Then the engine will make calls only to the specified path
-    api_calls = [r for r in api.requests if r.path.startswith("/api/")]
+    api_calls = _api_requests(api)
     assert [(r.method, r.path) for r in api_calls] == [("GET", "/api/success")]
 
 
@@ -256,7 +284,7 @@ def test_execute_filter_method(ctx):
     # When `method` corresponds to a method that is not defined in the app schema
     execute(schema)
     # Then engine will not make any requests
-    assert [r for r in api.requests if r.path.startswith("/api/")] == []
+    assert _api_requests(api) == []
 
 
 def test_form_data(ctx):
@@ -306,7 +334,7 @@ def test_unknown_response_code(ctx):
 
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
+    check = _last_scenario_checks(stream)[0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.FAILURE
     assert check.failure_info.failure.status_code == 418
@@ -323,7 +351,7 @@ def test_unknown_response_code_with_default(ctx):
     ).execute()
     # Then there should be no failure
     stream.assert_no_failures()
-    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
+    check = _last_scenario_checks(stream)[0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.SUCCESS
 
@@ -336,7 +364,7 @@ def test_unknown_content_type(ctx):
     stream = EventStream(schema, checks=(content_type_conformance,), max_examples=1).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
+    check = _last_scenario_checks(stream)[0]
     assert check.name == "content_type_conformance"
     assert check.status == Status.FAILURE
     assert check.failure_info.failure.content_type == "text/plain"
@@ -366,7 +394,7 @@ def test_response_conformance_invalid(ctx):
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
+    check = _last_scenario_checks(stream)[-1]
     assert check.failure_info.failure.title == "Response violates schema", check
     assert (
         check.failure_info.failure.message
@@ -459,7 +487,7 @@ def test_response_conformance_malformed_json(ctx):
     assert stream.failures_count == 1
     stream.assert_no_errors()
 
-    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
+    check = _last_scenario_checks(stream)[-1]
     assert check.failure_info.failure.title == "JSON deserialization error"
     if IS_PYPY:
         expected = "Key name must be string at char"
@@ -565,7 +593,7 @@ def test_explicit_examples_from_response(ctx):
     )
     schema.config.update(base_url=f"{api.base_url}/api")
     stream = EventStream(schema, max_examples=1, phases=[PhaseName.EXAMPLES]).execute()
-    assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
+    assert [case.value.path_parameters for case in _scenario_cases(stream)] == [
         {"itemId": "456789"},
         {"itemId": "123456"},
     ]
@@ -629,7 +657,7 @@ def test_missing_path_parameter(ctx):
     stream.assert_errors()
     assert "Path parameter 'id' is not defined" in str(stream.find(events.NonFatalError).info)
     # And tests still should be executed
-    event = stream.find_all(events.ScenarioFinished)[-1]
+    event = _last_scenario(stream)
     assert len(event.recorder.cases) > 0
 
 
@@ -917,10 +945,10 @@ def test_hypothesis_errors_propagation(ctx):
         checks=[not_a_server_error],
     ).execute()
     # Then the test outcomes should not contain errors
-    after = stream.find_all(events.ScenarioFinished)[-1]
+    after = _last_scenario(stream)
     assert after.status == Status.SUCCESS
     # And there should be requested amount of test examples
-    assert sum(len(checks) for checks in after.recorder.checks.values()) == max_examples
+    assert len(_scenario_checks(after)) == max_examples
     stream.assert_no_failures()
     stream.assert_no_errors()
 
@@ -990,7 +1018,7 @@ def test_interrupted_in_test(ctx):
     interrupted = stream.find(events.Interrupted)
     # Then the `Interrupted` event should be emitted
     assert interrupted is not None
-    scenario_finished = stream.find_all(events.ScenarioFinished)[-1]
+    scenario_finished = _last_scenario(stream)
     assert scenario_finished is not None
     assert scenario_finished.recorder.cases
     assert scenario_finished.recorder.interactions
@@ -1170,7 +1198,7 @@ def test_stateful_auth(ctx):
         auth=("admin", "password"),
         **STATEFUL_KWARGS,
     ).execute()
-    interactions = list(stream.find(events.ScenarioFinished).recorder.interactions.values())
+    interactions = _scenario_interactions(stream)
     assert len(interactions) > 0
     for interaction in interactions:
         assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
@@ -1182,7 +1210,7 @@ def test_stateful_all_generation_modes(ctx):
     mode = GenerationMode.NEGATIVE
     schema.config.generation.update(modes=[mode])
     stream = EventStream(schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
-    cases = list(stream.find(events.ScenarioFinished).recorder.cases.values())
+    cases = _scenario_cases(stream)
     assert len(cases) > 0
     for case in cases:
         assert case.value.meta.generation.mode == mode
@@ -1201,8 +1229,7 @@ def test_stateful_seed(ctx):
             **STATEFUL_KWARGS,
         ).execute()
         current = []
-        interactions = stream.find(events.ScenarioFinished).recorder.interactions
-        for interaction in interactions.values():
+        for interaction in _scenario_interactions(stream):
             data = {key: getattr(interaction.request, key) for key in Request.__slots__}
             del data["headers"][SCHEMATHESIS_TEST_CASE_HEADER]
             current.append(data)
@@ -1271,13 +1298,10 @@ def test_generation_config_in_explicit_examples(ctx):
         exclude_header_characters="".join({chr(i) for i in range(256)} - {"a"}),
     )
     stream = EventStream(schema, max_examples=10).execute()
-    for event in stream.events:
-        if isinstance(event, events.ScenarioFinished):
-            for case in event.recorder.cases.values():
-                for header in case.value.headers.values():
-                    if header:
-                        assert set(header) == {"a"}
-            break
+    for case in _scenario_cases(stream):
+        for header in case.value.headers.values():
+            if header:
+                assert set(header) == {"a"}
 
 
 def test_missing_deserializer_warnings_collected(ctx):

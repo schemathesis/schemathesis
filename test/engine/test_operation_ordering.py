@@ -11,6 +11,19 @@ from schemathesis.specs.openapi._ordering import compute_operation_layers
 from schemathesis.specs.openapi.stateful.dependencies.layers import compute_dependency_layers
 
 
+def _operations(schema):
+    return [operation.ok() for operation in schema.get_all_operations()]
+
+
+def _ops_by_method(operations, method):
+    method = method.upper()
+    return [operation for operation in operations if operation.method.upper() == method]
+
+
+def _path_param(name="id", param_type="integer"):
+    return {"name": name, "in": "path", "required": True, "schema": {"type": param_type}}
+
+
 def test_restful_heuristic_ordering(ctx):
     loaded = ctx.openapi.load_schema(
         {
@@ -20,23 +33,22 @@ def test_restful_heuristic_ordering(ctx):
             },
             "/users/{id}": {
                 "get": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "patch": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
         }
     )
 
-    operations = list(loaded.get_all_operations())
-    ops = [op.ok() for op in operations]
+    ops = _operations(loaded)
 
     layers = compute_operation_layers(loaded, ops)
 
@@ -65,8 +77,7 @@ def test_layered_scheduler_single_layer(ctx):
         }
     )
 
-    operations = list(loaded.get_all_operations())
-    ops = [op.ok() for op in operations]
+    ops = _operations(loaded)
 
     scheduler = LayeredScheduler([ops])
 
@@ -88,19 +99,18 @@ def test_layered_scheduler_multiple_layers(ctx):
             "/users": {"post": {"responses": {"201": {"description": "Created"}}}},
             "/users/{id}": {
                 "get": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
         }
     )
 
-    operations = list(loaded.get_all_operations())
-    ops = [op.ok() for op in operations]
+    ops = _operations(loaded)
 
     # Manually create layers: POST first, then GET
-    post_ops = [op for op in ops if op.method.upper() == "POST"]
-    get_ops = [op for op in ops if op.method.upper() == "GET"]
+    post_ops = _ops_by_method(ops, "POST")
+    get_ops = _ops_by_method(ops, "GET")
 
     scheduler = LayeredScheduler([post_ops, get_ops])
 
@@ -124,21 +134,21 @@ def test_layered_scheduler_multi_worker_coordination(ctx):
         {
             "/users/{id}": {
                 "get": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
             "/products/{id}": {
                 "get": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"200": {"description": "OK"}},
                 },
                 "delete": {
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"204": {"description": "Deleted"}},
                 },
             },
@@ -147,12 +157,11 @@ def test_layered_scheduler_multi_worker_coordination(ctx):
         }
     )
 
-    operations = list(loaded.get_all_operations())
-    ops = [op.ok() for op in operations]
+    ops = _operations(loaded)
 
-    post_ops = [op for op in ops if op.method.upper() == "POST"]
-    get_ops = [op for op in ops if op.method.upper() == "GET"]
-    delete_ops = [op for op in ops if op.method.upper() == "DELETE"]
+    post_ops = _ops_by_method(ops, "POST")
+    get_ops = _ops_by_method(ops, "GET")
+    delete_ops = _ops_by_method(ops, "DELETE")
 
     scheduler = LayeredScheduler([post_ops, get_ops, delete_ops])
 
@@ -301,7 +310,7 @@ def test_dependency_layers_with_links(ctx):
             "/users/{id}": {
                 "get": {
                     "operationId": "getUser",
-                    "parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}}],
+                    "parameters": [_path_param()],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
