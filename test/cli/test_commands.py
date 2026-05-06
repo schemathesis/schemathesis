@@ -2534,7 +2534,6 @@ def test_app_crash(subprocess_runner, cli, snapshot_cli):
     app = """
 import os
 from flask import Flask, jsonify
-import ctypes
 
 app = Flask(__name__)
 
@@ -2550,7 +2549,7 @@ def openapi():
 
 @app.get("/crash")
 def crash():
-    ctypes.string_at(0)  # Segfault
+    os._exit(1)
 
 if __name__ == "__main__":
     port = int(os.environ["PORT"])
@@ -2559,7 +2558,10 @@ if __name__ == "__main__":
 
     port = subprocess_runner.run_app(app)
 
-    assert cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--tls-verify=false") == snapshot_cli
+    assert (
+        cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--phases=coverage", "--tls-verify=false")
+        == snapshot_cli
+    )
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
