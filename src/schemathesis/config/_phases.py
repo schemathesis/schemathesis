@@ -146,6 +146,7 @@ class ExamplesPhaseConfig(DiffBase):
     generation: GenerationConfig
     checks: ChecksConfig
     operation_ordering: OperationOrdering
+    extra_data_sources: ExtraDataSourcesConfig
 
     __slots__ = (
         "enabled",
@@ -153,6 +154,8 @@ class ExamplesPhaseConfig(DiffBase):
         "generation",
         "checks",
         "operation_ordering",
+        "extra_data_sources",
+        "_extra_data_sources_is_default",
         "_is_default",
     )
 
@@ -164,6 +167,7 @@ class ExamplesPhaseConfig(DiffBase):
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
         operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
+        extra_data_sources: ExtraDataSourcesConfig | None = None,
     ) -> None:
         self.enabled = enabled
         self.fill_missing = fill_missing
@@ -172,12 +176,15 @@ class ExamplesPhaseConfig(DiffBase):
         self.operation_ordering = (
             OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
         )
+        self.extra_data_sources = extra_data_sources or ExtraDataSourcesConfig()
+        self._extra_data_sources_is_default = extra_data_sources is None
         self._is_default = (
             enabled
             and not fill_missing
             and generation is None
             and checks is None
             and self.operation_ordering == OperationOrdering.AUTO
+            and self._extra_data_sources_is_default
         )
 
     @classmethod
@@ -188,6 +195,9 @@ class ExamplesPhaseConfig(DiffBase):
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
+            extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {}))
+            if "extra-data-sources" in data
+            else None,
         )
 
 
@@ -199,6 +209,7 @@ class CoveragePhaseConfig(DiffBase):
     checks: ChecksConfig
     unexpected_methods: set[str]
     operation_ordering: OperationOrdering
+    extra_data_sources: ExtraDataSourcesConfig
 
     __slots__ = (
         "enabled",
@@ -207,6 +218,8 @@ class CoveragePhaseConfig(DiffBase):
         "checks",
         "unexpected_methods",
         "operation_ordering",
+        "extra_data_sources",
+        "_extra_data_sources_is_default",
         "_is_default",
     )
 
@@ -219,6 +232,7 @@ class CoveragePhaseConfig(DiffBase):
         checks: ChecksConfig | None = None,
         unexpected_methods: set[str] | None = None,
         operation_ordering: OperationOrdering | str = OperationOrdering.AUTO,
+        extra_data_sources: ExtraDataSourcesConfig | None = None,
     ) -> None:
         self.enabled = enabled
         self.generate_duplicate_query_parameters = generate_duplicate_query_parameters
@@ -228,6 +242,8 @@ class CoveragePhaseConfig(DiffBase):
         self.operation_ordering = (
             OperationOrdering(operation_ordering) if isinstance(operation_ordering, str) else operation_ordering
         )
+        self.extra_data_sources = extra_data_sources or ExtraDataSourcesConfig()
+        self._extra_data_sources_is_default = extra_data_sources is None
         self._is_default = (
             enabled
             and not generate_duplicate_query_parameters
@@ -235,6 +251,7 @@ class CoveragePhaseConfig(DiffBase):
             and checks is None
             and unexpected_methods is None
             and self.operation_ordering == OperationOrdering.AUTO
+            and self._extra_data_sources_is_default
         )
 
     @classmethod
@@ -248,6 +265,9 @@ class CoveragePhaseConfig(DiffBase):
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             operation_ordering=data.get("operation-ordering", "auto"),
+            extra_data_sources=ExtraDataSourcesConfig.from_dict(data.get("extra-data-sources", {}))
+            if "extra-data-sources" in data
+            else None,
         )
 
 

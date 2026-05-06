@@ -343,8 +343,16 @@ def run_test(
     # Active when fuzzing requests it, or when examples/coverage can feed values forward.
     should_record = (
         (fuzzing_config.enabled and fuzzing_config.extra_data_sources.is_enabled)
-        or (phases_config.examples.enabled and ctx.extra_data_source is not None)
-        or (phases_config.coverage.enabled and ctx.extra_data_source is not None)
+        or (
+            phases_config.examples.enabled
+            and phases_config.examples.extra_data_sources.is_enabled
+            and ctx.extra_data_source is not None
+        )
+        or (
+            phases_config.coverage.enabled
+            and phases_config.coverage.extra_data_sources.is_enabled
+            and ctx.extra_data_source is not None
+        )
     )
     extra_data_source = ctx.extra_data_source if should_record else None
     if extra_data_source is not None:

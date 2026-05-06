@@ -481,8 +481,8 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type**: `String`
-    **Default**: `"auto"`
+    **Type**: `String`  
+    **Default**: `"auto"`  
 
     Controls the execution order of API operations during testing phases.
 
@@ -505,8 +505,8 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type**: `Object`
-    **Default**: `{ responses = true }`
+    **Type**: `Object`  
+    **Default**: `{ responses = true }`  
 
     Configure extra data sources to augment test generation. When enabled, Schemathesis uses data from previous API responses in addition to randomly generated values, producing test cases more likely to be accepted by the API.
 
@@ -516,7 +516,7 @@ These settings can only be applied at the project level.
     ```
 
 !!! info "CLI Only"
-    This option only applies when using the `schemathesis run` command for the fuzzing phase.
+    This option only applies when using the `schemathesis run` command.
 
     **Available sources:**
 

@@ -14,6 +14,7 @@
 - GraphQL fuzzing: dispatch producer mutations first and reuse captured identifiers across test cases.
 - GraphQL stateful phase: chained operation scenarios.
 - Skip operations that consistently return `405 Method Not Allowed` and surface a `method_not_allowed` warning.
+- `extra-data-sources` config for the examples and coverage phases. [#3972](https://github.com/schemathesis/schemathesis/issues/3972)
 
 ### :bug: Fixed
 

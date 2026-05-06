@@ -1395,3 +1395,82 @@ def test_extra_data_sources_handles_boolean_body_schema(cli, snapshot_cli, ctx):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_extra_data_sources_examples_phase_disabled(cli, snapshot_cli, ctx):
+    app, _ = ctx.openapi.make_flask_app(
+        {
+            "/items": {
+                "post": {
+                    "operationId": "create-item",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}},
+                                    "required": ["name"],
+                                }
+                            }
+                        }
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Created",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"id": {"type": "string", "format": "uuid"}},
+                                        "required": ["id"],
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            },
+            "/items/{item_id}": {
+                "get": {
+                    "operationId": "get-item",
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "item_id",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                            "example": "00000000-0000-0000-0000-000000000001",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                },
+                "delete": {
+                    "operationId": "delete-item",
+                    "parameters": [
+                        {
+                            "in": "path",
+                            "name": "item_id",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                            "example": "00000000-0000-0000-0000-000000000002",
+                        }
+                    ],
+                    "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found"}},
+                },
+            },
+        }
+    )
+
+    assert (
+        cli.run_openapi_app(
+            app,
+            "--phases=examples",
+            config={
+                "phases": {
+                    "examples": {"extra-data-sources": {"responses": False}},
+                }
+            },
+        )
+        == snapshot_cli
+    )

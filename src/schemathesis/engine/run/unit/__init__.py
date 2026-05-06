@@ -278,12 +278,9 @@ def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation, phase: P
 
     # If extra data sources are enabled, pass them to augment data generation
     phase_config = ctx.config.phases_for(operation=operation).get_by_name(name=phase.name)
-    if isinstance(phase_config, FuzzingPhaseConfig) and phase_config.extra_data_sources.is_enabled:
-        kwargs["extra_data_source"] = ctx.extra_data_source
-    elif isinstance(phase_config, ExamplesPhaseConfig) and ctx.extra_data_source is not None:
-        kwargs["extra_data_source"] = ctx.extra_data_source
-    elif isinstance(phase_config, CoveragePhaseConfig) and ctx.extra_data_source is not None:
-        kwargs["extra_data_source"] = ctx.extra_data_source
+    if isinstance(phase_config, (FuzzingPhaseConfig, ExamplesPhaseConfig, CoveragePhaseConfig)):
+        if phase_config.extra_data_sources.is_enabled and ctx.extra_data_source is not None:
+            kwargs["extra_data_source"] = ctx.extra_data_source
 
     if ctx.error_feedback is not None:
         kwargs["error_feedback"] = ctx.error_feedback
