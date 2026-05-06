@@ -18,6 +18,7 @@ from schemathesis.specs.openapi.stateful.dependencies import naming
 from schemathesis.specs.openapi.stateful.dependencies.inputs import (
     extract_inputs,
     merge_related_resources,
+    rebind_orphan_synthetics,
     update_input_field_bindings,
 )
 from schemathesis.specs.openapi.stateful.dependencies.models import (
@@ -133,6 +134,9 @@ def analyze(schema: OpenApiSchema) -> DependencyGraph:
 
     # Merge parameter-inferred resources with schema-defined ones
     merge_related_resources(operations, resources)
+
+    # Rebind orphan synthetics (e.g. `Spouse` from `spouse_id`) to the path-derived parent.
+    rebind_orphan_synthetics(operations, resources)
 
     # Clean up orphaned resources
     remove_unused_resources(operations, resources)

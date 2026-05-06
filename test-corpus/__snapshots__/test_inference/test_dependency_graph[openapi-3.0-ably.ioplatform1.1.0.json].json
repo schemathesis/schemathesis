@@ -426,14 +426,14 @@
           "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "clientId",
-          "resource": "Client",
+          "resource": "Message",
           "resource_field": "clientId"
         },
         {
           "is_suffix_matched": false,
           "parameter_location": "body",
           "parameter_name": "connectionId",
-          "resource": "Connection",
+          "resource": "Message",
           "resource_field": "connectionId"
         },
         {

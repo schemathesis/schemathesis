@@ -45,6 +45,7 @@
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Recognize plural foreign-key array fields (`site_ids`, `userUuids`, `session_guids`).
 - Treat `_name`-suffixed body fields as attributes when no path or schema backs the inferred resource (`first_name`, `last_name`).
+- Rebind body self-FK slots to the path-derived parent when the parent has the same field.
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
 - Group consecutive same-title failures (e.g. multiple schema violations on one response) under a single header with a violation count.
 

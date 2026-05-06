@@ -551,6 +551,39 @@ def merge_related_resources(operations: OperationMap, resources: ResourceMap) ->
                 input_slot.resource_field = new_field_name
 
 
+def rebind_orphan_synthetics(operations: OperationMap, resources: ResourceMap) -> None:
+    """Rebind body slots from producer-less synthetics to a same-operation parent.
+
+    `<word>_id` body fields produce a synthetic `<Word>` resource; when nothing else
+    in the spec backs that name (no path, no schema, no producer) but the operation's
+    own response describes a parent resource carrying the same field, the slot is
+    really a self-FK (`spouse_id` on `POST /contacts` references another `Contact`).
+    """
+    producer_resources = {output.resource.name for operation in operations.values() for output in operation.outputs}
+    for operation in operations.values():
+        parent_name = naming.from_path(operation.path)
+        if parent_name is None:
+            continue
+        parent = resources.get(parent_name)
+        if parent is None or parent.source < DefinitionSource.SCHEMA_WITH_PROPERTIES:
+            continue
+        for input_slot in operation.inputs:
+            if input_slot.parameter_location != ParameterLocation.BODY:
+                continue
+            if input_slot.resource.source != DefinitionSource.PARAMETER_INFERENCE:
+                continue
+            if input_slot.resource.name in producer_resources:
+                continue
+            if not isinstance(input_slot.parameter_name, str):
+                continue
+            # Require an exact field-name match so we only rebind genuine self-FKs
+            # (`spouse_id` on `POST /contacts` when Contact has a `spouse_id` field) and
+            # leave ambiguous cases (`clientId` on `POST /applications`) alone.
+            if input_slot.parameter_name in parent.fields:
+                input_slot.resource = parent
+                input_slot.resource_field = input_slot.parameter_name
+
+
 def try_merge_input_resource(
     input_slot: InputSlot,
     producer_outputs: list[OutputSlot],
