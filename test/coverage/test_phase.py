@@ -284,6 +284,48 @@ def collect_coverage_cases(ctx, body_schema, positive=False, version="3.0.2"):
     return cases
 
 
+def _iter_cases(operation, generation_mode, *, generation_config=None):
+    return list(
+        _iter_coverage_cases(
+            operation=operation,
+            generation_modes=[generation_mode],
+            generate_duplicate_query_parameters=False,
+            unexpected_methods=set(),
+            generation_config=generation_config or operation.schema.config.generation,
+        )
+    )
+
+
+def _generate_cases(operation, generation_mode, *, project_config=None, generation_config=None):
+    if project_config is not None:
+        generate_duplicate_query_parameters = project_config.phases.coverage.generate_duplicate_query_parameters
+        unexpected_methods = project_config.phases.coverage.unexpected_methods
+        generation_config = generation_config or project_config.generation
+    else:
+        generate_duplicate_query_parameters = False
+        unexpected_methods = set()
+        generation_config = generation_config or operation.schema.config.generation
+    return list(
+        generate_coverage_cases(
+            operation=operation,
+            generation_modes=[generation_mode],
+            auth_storage=None,
+            as_strategy_kwargs={},
+            generate_duplicate_query_parameters=generate_duplicate_query_parameters,
+            unexpected_methods=unexpected_methods,
+            generation_config=generation_config,
+        )
+    )
+
+
+def _optimized_body_schema(operation, media_type="application/json"):
+    return next(alt.optimized_schema for alt in operation.body if alt.media_type == media_type)
+
+
+def _body_validator(operation, media_type="application/json", *, validate_formats=True):
+    return jsonschema_rs.validator_for(_optimized_body_schema(operation, media_type), validate_formats=validate_formats)
+
+
 @pytest.mark.parametrize(
     ("methods", "expected"),
     [
@@ -3401,13 +3443,7 @@ def test_missing_required_header_case_uses_invalid_template_body(ctx):
 
     missing_header_cases = [
         case
-        for case in _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
+        for case in _iter_cases(operation, GenerationMode.NEGATIVE)
         if case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
         and case.meta.phase.data.parameter == "X-Required-Header"
     ]
@@ -3441,13 +3477,7 @@ def test_missing_required_header_case_respects_before_call_hook_restoring_header
 
     missing_header_case = next(
         case
-        for case in _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
+        for case in _iter_cases(operation, GenerationMode.NEGATIVE)
         if case.meta.phase.data.scenario == CoverageScenario.MISSING_PARAMETER
         and case.meta.phase.data.parameter == "X-Required-Header"
     )
@@ -3472,34 +3502,14 @@ def test_filter_case_hook_applied_in_coverage_phase(ctx):
 
     # Verify some cases are produced without hook
     config = ProjectConfig()
-    base_cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
-            unexpected_methods=config.phases.coverage.unexpected_methods,
-            generation_config=config.generation,
-        )
-    )
+    base_cases = _generate_cases(operation, GenerationMode.POSITIVE, project_config=config)
     assert base_cases, "Expected coverage cases before filtering"
 
     @loaded.hook
     def filter_case(context, case):
         return False  # reject everything
 
-    filtered_cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
-            unexpected_methods=config.phases.coverage.unexpected_methods,
-            generation_config=config.generation,
-        )
-    )
+    filtered_cases = _generate_cases(operation, GenerationMode.POSITIVE, project_config=config)
     assert filtered_cases == [], "filter_case hook should suppress all coverage cases"
 
 
@@ -3518,17 +3528,7 @@ def test_map_case_hook_applied_in_coverage_phase(ctx):
 
     config = ProjectConfig()
     operation = loaded["/foo"]["get"]
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
-            unexpected_methods=config.phases.coverage.unexpected_methods,
-            generation_config=config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.POSITIVE, project_config=config)
 
     assert cases, "Expected at least one coverage case"
     assert all(c.query is None or c.query.get("injected") == "yes" for c in cases), (
@@ -3556,17 +3556,7 @@ def test_content_json_query_params_single_encoding_in_coverage(ctx):
     config = ProjectConfig()
     operation = loaded["/foo"]["post"]
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=config.phases.coverage.generate_duplicate_query_parameters,
-            unexpected_methods=config.phases.coverage.unexpected_methods,
-            generation_config=config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.POSITIVE, project_config=config)
 
     assert len(cases) >= 2
     for case in cases:
@@ -3608,15 +3598,7 @@ def test_coverage_body_with_boolean_property_key(ctx):
     )
     operation = schema["/hooks"]["POST"]
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
     assert len(cases) > 0
 
 
@@ -3645,19 +3627,13 @@ def test_coverage_negative_max_length_preserved_in_optimized_schema(ctx):
     )
     operation = loaded["/zipcode"]["post"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
+    optimized_schema = _optimized_body_schema(operation)
     assert "maxLength" in optimized_schema, f"maxLength must be preserved in optimized_schema; got: {optimized_schema}"
 
     validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
     max_length_cases = [
         case
-        for case in _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
+        for case in _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
         if isinstance(case.body, str) and len(case.body) > 10
     ]
     assert max_length_cases, "Expected at least one NEGATIVE case with a body string longer than maxLength=10"
@@ -3687,18 +3663,9 @@ def test_coverage_positive_pattern_skipped_for_non_string_type(ctx):
     )
     operation = loaded["/pin"]["post"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    positive_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    positive_cases = _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
     for case in positive_cases:
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
 
@@ -3740,18 +3707,9 @@ def test_coverage_positive_allof_ref_property_merge(ctx):
     )
     operation = loaded["/resources/{name}"]["put"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    positive_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    positive_cases = _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
     for case in positive_cases:
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid: {case.body!r}"
 
@@ -3792,15 +3750,7 @@ def test_coverage_body_with_boolean_property_key_negative(ctx):
     )
     operation = schema["/hooks"]["POST"]
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
 
 
@@ -3831,17 +3781,7 @@ def test_coverage_form_urlencoded_binary_format_negative(ctx):
     )
     operation = schema["/upload"]["POST"]
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         assert case.meta.phase.name == TestPhase.COVERAGE
@@ -3877,20 +3817,9 @@ def test_coverage_negative_empty_dict_additional_properties_not_treated_as_false
         }
     )
     operation = schema["/search"]["POST"]
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         assert not validator.is_valid(case.body), (
@@ -3928,20 +3857,9 @@ def test_coverage_negative_pattern_with_control_chars_uses_schema_validator(ctx)
         }
     )
     operation = schema["/items"]["POST"]
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         info = case.meta.components.get(ParameterLocation.BODY)
@@ -3982,20 +3900,9 @@ def test_coverage_positive_body_uuid_format_with_uppercase_pattern(ctx):
         }
     )
     operation = schema["/docs"]["post"]
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
     assert len(cases) > 0
     for case in cases:
         if case.body is not None:
@@ -4037,20 +3944,9 @@ def test_coverage_positive_body_skips_properties_with_no_valid_enum_values(ctx):
         }
     )
     operation = schema["/users"]["POST"]
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
     assert len(cases) > 0
     for case in cases:
         if case.body is not None:
@@ -4092,18 +3988,9 @@ def test_coverage_positive_object_type_with_items(ctx):
     )
     operation = loaded["/register"]["post"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    positive_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    positive_cases = _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
     for case in positive_cases:
         assert validator.is_valid(case.body), f"POSITIVE body is schema-invalid per optimized_schema: {case.body!r}"
 
@@ -4139,18 +4026,9 @@ def test_coverage_negative_string_length_with_enum(ctx):
     )
     operation = loaded["/submit"]["post"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -4199,18 +4077,9 @@ def test_coverage_positive_template_with_enum_and_type_mismatch(ctx):
     )
     operation = loaded["/items/{id}"]["put"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -4261,18 +4130,9 @@ def test_coverage_positive_template_required_property_absent_from_properties(ctx
     )
     operation = loaded["/items/{id}"]["put"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -4311,18 +4171,9 @@ def test_coverage_positive_template_skips_false_schema_property(ctx):
     )
     operation = loaded["/items/{id}"]["patch"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -4357,18 +4208,9 @@ def test_coverage_negative_string_length_nullable(ctx):
     )
     operation = loaded["/items"]["post"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -4401,20 +4243,9 @@ def test_coverage_negative_string_property_form_urlencoded_not_wire_identical(ct
     )
     operation = loaded["/items"]["post"]
 
-    form_schema = next(
-        alt.optimized_schema for alt in operation.body if alt.media_type == "application/x-www-form-urlencoded"
-    )
-    validator = jsonschema_rs.validator_for(form_schema, validate_formats=True)
+    validator = _body_validator(operation, "application/x-www-form-urlencoded")
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in cases:
         if case.media_type != "application/x-www-form-urlencoded":
             continue
@@ -4455,18 +4286,9 @@ def test_coverage_negative_string_property_xml_not_wire_identical(ctx):
     )
     operation = loaded["/items"]["post"]
 
-    xml_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/xml")
-    validator = jsonschema_rs.validator_for(xml_schema, validate_formats=True)
+    validator = _body_validator(operation, "application/xml")
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in cases:
         if case.media_type != "application/xml":
             continue
@@ -4527,18 +4349,9 @@ def test_coverage_positive_oneof_body_valid_for_whole_schema(ctx):
         }
     )
     operation = schema["/modify"]["PATCH"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
     for case in cases:
         if case.media_type != "application/json" or not case.meta:
             continue
@@ -4580,18 +4393,9 @@ def test_coverage_positive_body_ref_with_pattern_and_length_constraints(ctx):
         },
     )
     operation = schema["/tasks"]["POST"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
     for case in cases:
         if case.media_type != "application/json" or not case.meta:
             continue
@@ -4644,18 +4448,9 @@ def test_coverage_positive_body_oneof_branch_required_field_missing_from_branch_
         }
     )
     operation = schema["/runs"]["POST"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
     for case in cases:
         if case.media_type != "application/json" or not case.meta:
             continue
@@ -4688,18 +4483,9 @@ def test_coverage_negative_format_nullable(ctx):
     )
     operation = loaded["/items"]["post"]
 
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -4727,17 +4513,7 @@ def test_coverage_form_urlencoded_primitive_body_negative_no_crash(ctx):
     )
     operation = schema["/convert"]["POST"]
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         case.as_curl_command()
@@ -4775,20 +4551,9 @@ def test_coverage_negative_string_above_max_length_invalid_when_pattern_quantifi
         }
     )
     operation = schema["/items"]["POST"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     above_max_cases = [
         case
         for case in cases
@@ -4832,20 +4597,9 @@ def test_coverage_negative_max_length_preserved_when_pattern_has_inner_quantifie
         }
     )
     operation = schema["/items"]["POST"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
@@ -4882,20 +4636,9 @@ def test_coverage_negative_max_length_preserved_when_outer_optional_group_has_va
         }
     )
     operation = schema["/items"]["POST"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
@@ -4928,20 +4671,9 @@ def test_coverage_negative_missing_required_with_additional_properties_schema(ct
         }
     )
     operation = schema["/items"]["POST"]
-    body_schema = operation.body[0].optimized_schema
-    validator = jsonschema_rs.validator_for(body_schema)
+    validator = _body_validator(operation, validate_formats=False)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
     assert len(cases) > 0
     for case in cases:
         assert not validator.is_valid(case.body), f"NEGATIVE body must be schema-invalid: {case.body!r}"
@@ -4993,17 +4725,7 @@ def test_coverage_positive_pattern_with_branch_group_not_corrupted(ctx):
     optimized = query_param.optimized_schema
     validator = jsonschema_rs.validator_for(optimized)
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.POSITIVE)
     positive_cases = [c for c in cases if c.query and "name" in c.query]
     assert len(positive_cases) > 0
     for case in positive_cases:
@@ -5053,17 +4775,7 @@ def test_negative_data_rejection_no_crash_with_large_dfa_pattern(ctx, response_f
     )
     operation = schema["/configuration"]["GET"]
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
 
     response = response_factory.requests(status_code=200)
     ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
@@ -5112,17 +4824,7 @@ def test_negative_data_rejection_no_false_positive_for_nullable_binary_multipart
     )
     operation = schema["/upload"]["POST"]
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
 
     response = response_factory.requests(status_code=200)
     ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
@@ -5176,17 +4878,7 @@ def test_negative_data_rejection_no_false_positive_for_multipart_body_type_mutat
     )
     operation = schema["/upload"]["POST"]
 
-    cases = list(
-        generate_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            auth_storage=None,
-            as_strategy_kwargs={},
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _generate_cases(operation, GenerationMode.NEGATIVE)
 
     response = response_factory.requests(status_code=200)
     ctx_check = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
@@ -5250,18 +4942,9 @@ def test_coverage_positive_body_nested_allof_inner_required_preserved(ctx):
         },
     )
     operation = schema["/reports"]["POST"]
-    body_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(body_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=schema.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE)
     for case in cases:
         if case.media_type != "application/json" or not case.meta:
             continue
@@ -5298,18 +4981,9 @@ def test_coverage_positive_body_string_type_with_empty_properties(ctx):
         }
     )
     operation = loaded["/items/{id}"]["put"]
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in cases:
         if case.body is None or not case.meta:
             continue
@@ -5351,18 +5025,9 @@ def test_coverage_positive_body_required_unsatisfiable_array_enum(ctx):
         }
     )
     operation = loaded["/clients"]["post"]
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    negative_cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    negative_cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
     for case in negative_cases:
         if case.body is None or case.meta is None:
             continue
@@ -5420,15 +5085,7 @@ def test_coverage_no_recursion_for_allof_with_unmergeable_anyof_property(ctx):
     )
     operation = loaded["/items"]["post"]
     # Must complete without RecursionError
-    list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
 
 
 def test_coverage_positive_body_anyof_const_null_excluded_by_sibling_type(ctx):
@@ -5463,18 +5120,9 @@ def test_coverage_positive_body_anyof_const_null_excluded_by_sibling_type(ctx):
         version="3.1.0",
     )
     operation = loaded["/items"]["post"]
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
     for case in cases:
         if case.body is None or case.meta is None:
             continue
@@ -5521,18 +5169,9 @@ def test_coverage_positive_body_nested_required_unsatisfiable_field(ctx):
         },
     )
     operation = loaded["/items"]["post"]
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.POSITIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
     for case in cases:
         if case.body is None or case.meta is None:
             continue
@@ -5572,15 +5211,7 @@ def test_revalidation_preserves_negative_mode_for_format_violating_body(ctx):
     )
     operation = loaded["/items"]["post"]
 
-    cases = list(
-        _iter_coverage_cases(
-            operation=operation,
-            generation_modes=[GenerationMode.NEGATIVE],
-            generate_duplicate_query_parameters=False,
-            unexpected_methods=set(),
-            generation_config=loaded.config.generation,
-        )
-    )
+    cases = _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation)
 
     target = next(
         (
@@ -5649,18 +5280,9 @@ def test_coverage_form_urlencoded_filters_primitives_with_bundled_ref(ctx):
         },
     )
     operation = loaded["/t"]["post"]
-    optimized_schema = next(
-        alt.optimized_schema for alt in operation.body if alt.media_type == "application/x-www-form-urlencoded"
-    )
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation, "application/x-www-form-urlencoded")
 
-    for case in _iter_coverage_cases(
-        operation=operation,
-        generation_modes=[GenerationMode.NEGATIVE],
-        generate_duplicate_query_parameters=False,
-        unexpected_methods=set(),
-        generation_config=loaded.config.generation,
-    ):
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation):
         if case.media_type != "application/x-www-form-urlencoded" or not isinstance(case.body, dict):
             continue
         bi = case.meta.components.get(ParameterLocation.BODY) if case.meta else None
@@ -5719,18 +5341,9 @@ def test_coverage_form_urlencoded_filters_nested_wire_identical_mutations(ctx):
         },
     )
     operation = loaded["/t"]["post"]
-    optimized_schema = next(
-        alt.optimized_schema for alt in operation.body if alt.media_type == "application/x-www-form-urlencoded"
-    )
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation, "application/x-www-form-urlencoded")
 
-    for case in _iter_coverage_cases(
-        operation=operation,
-        generation_modes=[GenerationMode.NEGATIVE],
-        generate_duplicate_query_parameters=False,
-        unexpected_methods=set(),
-        generation_config=loaded.config.generation,
-    ):
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation):
         if case.media_type != "application/x-www-form-urlencoded" or not isinstance(case.body, dict):
             continue
         bi = case.meta.components.get(ParameterLocation.BODY) if case.meta else None
@@ -5800,16 +5413,9 @@ def test_coverage_array_above_max_items_with_complex_items_schema(ctx):
         },
     )
     operation = loaded["/items"]["post"]
-    optimized_schema = next(alt.optimized_schema for alt in operation.body if alt.media_type == "application/json")
-    validator = jsonschema_rs.validator_for(optimized_schema, validate_formats=True)
+    validator = _body_validator(operation)
 
-    for case in _iter_coverage_cases(
-        operation=operation,
-        generation_modes=[GenerationMode.NEGATIVE],
-        generate_duplicate_query_parameters=False,
-        unexpected_methods=set(),
-        generation_config=loaded.config.generation,
-    ):
+    for case in _iter_cases(operation, GenerationMode.NEGATIVE, generation_config=loaded.config.generation):
         if case.body is None or case.meta is None:
             continue
         bi = case.meta.components.get(ParameterLocation.BODY)
