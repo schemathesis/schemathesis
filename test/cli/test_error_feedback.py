@@ -139,6 +139,8 @@ def test_feedback_unmasks_planted_bug_via_missing_request_body(ctx, cli, snapsho
             "--max-examples=80",
             "--phases=coverage,fuzzing",
             "--mode=positive",
+            "-c",
+            "not_a_server_error",
             "--continue-on-failure",
         )
         == snapshot_cli
