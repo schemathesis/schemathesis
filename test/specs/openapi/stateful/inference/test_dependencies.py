@@ -3581,6 +3581,60 @@ def test_body_id_suffix_without_backing_still_creates_slot(ctx):
     assert bindings.get(("body", "customer_id")) == "Customer", bindings
 
 
+def test_body_self_fk_rebinds_to_path_parent_when_parent_has_field(ctx):
+    # `spouse_id` references another Contact, not a Spouse resource — when the path-derived
+    # parent (Contact) has the same field, the slot rebinds and the ghost Spouse is dropped.
+    _, graph = analyze_dependencies(
+        ctx,
+        {
+            "/contacts": {
+                "post": {
+                    "operationId": "createContact",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "spouse_id": {"type": "integer"},
+                                    },
+                                    "required": ["name"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "201": {
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": "integer"},
+                                            "name": {"type": "string"},
+                                            "spouse_id": {"type": "integer"},
+                                        },
+                                        "required": ["id"],
+                                    }
+                                }
+                            }
+                        }
+                    },
+                }
+            },
+        },
+    )
+
+    assert "Spouse" not in graph.resources, sorted(graph.resources)
+    bindings = {
+        (slot.parameter_location.value, slot.parameter_name): (slot.resource.name, slot.resource_field)
+        for slot in graph.operations["POST /contacts"].inputs
+    }
+    assert bindings.get(("body", "spouse_id")) == ("Contact", "spouse_id"), bindings
+
+
 def test_body_fk_inside_all_of_with_one_of_branches(ctx):
     # FK fields hidden behind allOf siblings or oneOf branches must still be discovered.
     _, graph = analyze_dependencies(
