@@ -38,6 +38,7 @@
 
 ### :wrench: Changed
 
+- Remove direct dependency on `jsonschema`.
 - Recognize more path parameters as resource identifiers.
 - Recognize camelCase foreign-key field names (`locationId`, `userUuid`, `orderId`).
 - Tolerate per-operation transport failures in the stateful phase; abort only when several operations fail.
