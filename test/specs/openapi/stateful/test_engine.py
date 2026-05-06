@@ -540,7 +540,7 @@ def test_external_link(ctx):
             "parameters": {"userId": "$request.path.userId"},
         },
     }
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -626,7 +626,6 @@ def test_external_link(ctx):
         },
     )
     root_api = ctx.openapi.apps.stateful_users(IndependentInternalError())
-    schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"{root_api.base_url}/")
     schema.config.generation.update(max_examples=75, database="none", modes=[GenerationMode.POSITIVE])
     engine = stateful.execute(
@@ -933,7 +932,7 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
     #     DELETE /users/1 -> 204           [parent=A]   <- in A's subtree
     #   Root B  POST /users -> 201         [parent=None, separate root, same id reused]
     #     GET /users/1 -> 404              [parent=B]   <- 404 because the DELETE above ran after B created id=1
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -958,8 +957,6 @@ def test_no_false_positive_ensure_resource_availability_cross_subtree(ctx):
             },
         }
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
 
     post_op = schema["/users"]["POST"]
     get_op = schema["/users/{userId}"]["GET"]

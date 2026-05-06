@@ -87,7 +87,7 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, app_runner, snaps
     security = [{"bearerAuth": []}, {"basicAuth": []}]
     schema = ctx.openapi.build_schema(paths, components=components, security=security)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths, components=components, security=security)
     # Then it should be able to generate requests
     assert (
@@ -95,7 +95,7 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, app_runner, snaps
             str(schema_path),
             "-H",
             "Authorization: Bearer foo",
-            f"--url=http://127.0.0.1:{port}/api",
+            f"--url={base_url}/api",
             "--checks=not_a_server_error",
         )
         == snapshot_cli

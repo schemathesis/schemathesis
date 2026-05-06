@@ -4,7 +4,6 @@ import pytest
 import requests
 from hypothesis import given, settings
 
-import schemathesis
 from schemathesis.config import GenerationConfig
 from schemathesis.core import deserialization
 from schemathesis.core.parameters import ParameterLocation
@@ -46,8 +45,7 @@ def user_schema_builder(ctx):
         if extra_endpoints:
             paths.update(extra_endpoints)
 
-        spec = ctx.openapi.build_schema(paths)
-        return schemathesis.openapi.from_dict(spec)
+        return ctx.openapi.load_schema(paths)
 
     return build
 
@@ -335,8 +333,7 @@ def test_wildcard_pointer_unresolvable_before_wildcard_yields_no_entries():
 def test_pool_captures_individuals_from_get_list_envelope(
     ctx, paths, payload, operation_label, resource_name, id_field, expected_ids
 ):
-    spec = ctx.openapi.build_schema(paths)
-    schema = schemathesis.openapi.from_dict(spec)
+    schema = ctx.openapi.load_schema(paths)
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(operation=operation_label, status_code=200, payload=payload)
     resources = list(data_source.repository.iter_instances(resource_name))
@@ -345,7 +342,7 @@ def test_pool_captures_individuals_from_get_list_envelope(
 
 def test_pool_captures_individuals_from_map_by_id_response(ctx):
     # Map-by-id payload: keys ARE the identifiers, values are the resources.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/teams/statuses": {
                 "get": {
@@ -376,7 +373,6 @@ def test_pool_captures_individuals_from_map_by_id_response(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(
         operation="GET /teams/statuses",
@@ -389,7 +385,7 @@ def test_pool_captures_individuals_from_map_by_id_response(ctx):
 
 def test_pool_captures_individuals_from_nested_envelope_response(ctx):
     # Spring-style `{response: {content: [...], pageNumber, pageSize}, status, time}` envelope.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/flights": {
                 "get": {
@@ -439,7 +435,6 @@ def test_pool_captures_individuals_from_nested_envelope_response(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
     payload = {
         "response": {
@@ -457,7 +452,7 @@ def test_pool_captures_individuals_from_nested_envelope_response(ctx):
 
 def test_pool_map_by_id_with_single_segment_path(ctx):
     # Path has one segment; the helper falls back to `from_path(path)` directly.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/widgets": {
                 "get": {
@@ -488,7 +483,6 @@ def test_pool_map_by_id_with_single_segment_path(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
     data_source.repository.record_response(
         operation="GET /widgets",
@@ -501,7 +495,7 @@ def test_pool_map_by_id_with_single_segment_path(ctx):
 
 def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
     # Path resolves to no resource name (only path-param segments); helper returns None.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/{slug}": {
                 "get": {
@@ -526,7 +520,6 @@ def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     descriptors = [d for d in schema.analysis.resource_descriptors if d.operation == "GET /{slug}"]
     assert descriptors == []
 
@@ -534,7 +527,7 @@ def test_pool_map_by_id_unrecoverable_path_emits_no_descriptor(ctx):
 def test_orphan_resource_descriptors_are_filtered(ctx):
     # Producer creates a Widget; no operation consumes Widget. The descriptor would only ever
     # write into a bucket nothing reads, so it must not be built.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/widgets": {
                 "post": {
@@ -556,13 +549,12 @@ def test_orphan_resource_descriptors_are_filtered(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     assert [d.resource_name for d in schema.analysis.resource_descriptors] == []
 
 
 def test_descriptor_kept_when_consumer_exists(ctx):
     # Sibling regression guard: with a consumer present, the descriptor must still be built.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/widgets": {
                 "post": {
@@ -591,13 +583,12 @@ def test_descriptor_kept_when_consumer_exists(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     assert [d.resource_name for d in schema.analysis.resource_descriptors] == ["Widget"]
 
 
 def test_captured_variants_filter_values_invalid_for_destination(ctx):
     # Producer accepts `id: 0` but consumer's path requires `minimum: 1`; pool injection must filter.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -632,7 +623,6 @@ def test_captured_variants_filter_values_invalid_for_destination(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": 0})
@@ -687,7 +677,7 @@ def test_data_source_provides_captured_variants(user_schema_builder):
 
 
 def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws(ctx):
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -721,7 +711,6 @@ def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "alive"})
@@ -743,7 +732,7 @@ def test_record_successful_delete_evicts_pool_entry_and_filters_subsequent_draws
 
 
 def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -777,7 +766,6 @@ def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "doomed"})
@@ -798,7 +786,7 @@ def test_tombstoned_value_falls_through_when_pool_is_otherwise_empty(ctx):
 
 
 def test_record_successful_delete_uses_only_resource_linked_params(ctx):
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -833,7 +821,6 @@ def test_record_successful_delete_uses_only_resource_linked_params(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /items", status_code=201, payload={"id": "item-123"})
@@ -975,7 +962,7 @@ def test_custom_deserializer(ctx):
                 data[key.strip()] = value.strip()
         return data
 
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -1009,7 +996,6 @@ def test_custom_deserializer(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     operation = schema["/users"]["POST"]
@@ -1065,7 +1051,7 @@ def test_deeper_pointer(user_schema_builder):
 
 def test_prepopulate_from_response_examples(ctx):
     user_schema = {"type": "object", "properties": {"id": {"type": "string"}}, "required": ["id"]}
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -1092,7 +1078,6 @@ def test_prepopulate_from_response_examples(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     # Without calling record_response(), pool should already have the example value
@@ -1116,7 +1101,7 @@ def test_object_level_augmentation_preserves_relationships(ctx):
         "properties": {"id": {"type": "string"}, "userId": {"type": "string"}},
         "required": ["id", "userId"],
     }
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -1143,7 +1128,6 @@ def test_object_level_augmentation_preserves_relationships(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     # Record a post creation with userId in context (from path parameter)
@@ -1173,7 +1157,7 @@ def test_object_level_augmentation_preserves_relationships(ctx):
 
 def test_context_aware_eviction_maintains_diversity(ctx):
     pet_schema = {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"]}
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/owners/{ownerId}/pets": {
                 "post": {
@@ -1194,7 +1178,6 @@ def test_context_aware_eviction_maintains_diversity(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     # Record pets from multiple owners - more than would fit in a single context bucket
@@ -1223,7 +1206,7 @@ def test_context_aware_eviction_maintains_diversity(ctx):
 
 
 def test_negative_aware_strategy_with_captured_values(ctx):
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items/{id}": {
                 "get": {
@@ -1251,7 +1234,6 @@ def test_negative_aware_strategy_with_captured_values(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     for i in range(5):
@@ -1280,7 +1262,7 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
     # Body schema declares `properties` and `required` but omits `type: object`. The generator
     # may then draw non-dict values (None, scalars) and the captured-variant overlay must not
     # silently coerce those to `{}` and produce a body missing required fields.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/clients": {
                 "post": {
@@ -1327,7 +1309,6 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     for i in range(5):
@@ -1354,7 +1335,7 @@ def test_pool_overlay_keeps_required_fields_for_body_without_type_object(ctx):
 def test_nested_body_pool_overlay_lands_pool_values(ctx):
     # End-to-end via the body strategy: when a body has a nested object holding a foreign-key
     # field the pool can satisfy, the pool value must reach the wire under the right path.
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/locations": {
                 "post": {
@@ -1407,7 +1388,6 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     pooled_ids = {1, 2, 3}
@@ -1448,7 +1428,7 @@ def test_nested_body_pool_overlay_lands_pool_values(ctx):
 
 
 def test_negative_aware_strategy_with_captured_values_body(ctx):
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/projects": {
                 "post": {
@@ -1490,7 +1470,6 @@ def test_negative_aware_strategy_with_captured_values_body(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     for i in range(5):
@@ -1522,7 +1501,7 @@ def test_primitive_identifier_extraction(ctx):
         "properties": {"slug": {"type": "string"}, "name": {"type": "string"}},
         "required": ["slug"],
     }
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/recipes": {
                 "post": {
@@ -1539,7 +1518,6 @@ def test_primitive_identifier_extraction(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /recipes", status_code=201, payload="my-recipe-slug")
@@ -1558,7 +1536,7 @@ def test_primitive_identifier_extraction(ctx):
 
 def test_primitive_identifier_adds_field_to_empty_resource(ctx):
     # GET with empty object schema creates Item with no fields, POST adds "id"
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "get": {"responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}}},
@@ -1572,7 +1550,6 @@ def test_primitive_identifier_adds_field_to_empty_resource(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
 
     # Verify resource has "id" field added by POST
     graph = schema.analysis.dependency_graph
@@ -1589,10 +1566,9 @@ def test_primitive_identifier_adds_field_to_empty_resource(ctx):
 
 def test_primitive_response_ignored_for_root_path(ctx):
     # POST at "/" can't derive resource name, should produce no outputs
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {"/": {"post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}}}
     )
-    schema = schemathesis.openapi.from_dict(spec)
 
     # Verify no outputs for POST / in dependency graph
     graph = schema.analysis.dependency_graph
@@ -1602,7 +1578,7 @@ def test_primitive_response_ignored_for_root_path(ctx):
 
 def test_identifier_field_fallback_when_paths_differ(ctx):
     # Producer at /recipes, consumer at /admin/recipes/{slug} - different base paths
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/recipes": {
                 "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "string"}}}}}}
@@ -1623,7 +1599,6 @@ def test_identifier_field_fallback_when_paths_differ(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /recipes", status_code=201, payload="my-recipe")
@@ -1636,7 +1611,7 @@ def test_identifier_field_fallback_when_paths_differ(ctx):
 
 def test_primitive_integer_identifier(ctx):
     # POST returning integer ID
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {"responses": {"201": {"content": {"application/json": {"schema": {"type": "integer"}}}}}}
@@ -1657,7 +1632,6 @@ def test_primitive_integer_identifier(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(spec)
     data_source = schema.create_extra_data_source()
 
     data_source.repository.record_response(operation="POST /users", status_code=201, payload=12345)

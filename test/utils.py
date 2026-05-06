@@ -22,6 +22,7 @@ from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalErro
 from schemathesis.engine.recorder import Interaction
 from schemathesis.engine.run import PhaseName
 from schemathesis.schemas import BaseSchema
+from test.apps import builders
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,6 +37,12 @@ SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseSchema:
     schema = make_schema(schema_name, **kwargs)
     return schemathesis.openapi.from_dict(schema)
+
+
+def make_openapi_schema(
+    paths: dict[str, Any] | None = None, *, version: str = "3.0.2", **kwargs: Any
+) -> dict[str, Any]:
+    return builders.build_schema(paths, version=version, **kwargs)
 
 
 def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:

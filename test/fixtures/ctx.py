@@ -4,12 +4,13 @@ import json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Any, Literal, overload
+from typing import TYPE_CHECKING, Any, Literal, overload
 
 import pytest
 import yaml
 from flask import Flask
 
+import schemathesis
 from schemathesis.checks import CHECKS
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER
 from test.apps import builders
@@ -29,6 +30,11 @@ from test.apps.catalog.openapi import under_declared_security as openapi_under_d
 from test.apps.catalog.openapi import users as openapi_users
 from test.apps.catalog.openapi import zod as openapi_zod
 from test.apps.runtime import GraphQLApp, GraphQLServer, Modifier, OpenAPIApp, OpenAPIServer
+
+if TYPE_CHECKING:
+    from schemathesis.config import SchemathesisConfig
+    from schemathesis.openapi.loaders import OpenApiSchema
+    from schemathesis.specs.graphql.schemas import GraphQLSchema
 
 
 @overload
@@ -415,6 +421,14 @@ class GraphQLContext:
     def apps(self) -> GraphQLApps:
         return GraphQLApps(parent=self.parent)
 
+    def load_sdl(self, sdl: str, *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
+        return schemathesis.graphql.from_file(sdl, config=config)
+
+    def load_introspection(
+        self, raw_schema: dict[str, Any], *, config: SchemathesisConfig | None = None
+    ) -> GraphQLSchema:
+        return schemathesis.graphql.from_dict(raw_schema, config=config)
+
 
 @dataclass
 class OpenApiContext:
@@ -425,9 +439,20 @@ class OpenApiContext:
         return OpenAPIApps(parent=self.parent)
 
     def build_schema(
-        self, paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: dict[str, Any]
+        self, paths: dict[str, Any] | None, *, version: str = "3.0.2", **kwargs: dict[str, Any]
     ) -> dict[str, Any]:
         return builders.build_schema(paths, version=version, **kwargs)
+
+    def load_schema(
+        self, paths: dict[str, Any] | None, *, version: str = "3.0.2", **kwargs: dict[str, Any]
+    ) -> OpenApiSchema:
+        schema = self.build_schema(paths, version=version, **kwargs)
+        return schemathesis.openapi.from_dict(schema)
+
+    def from_full_schema(self, raw_schema: dict[str, Any]) -> OpenApiSchema:
+        version = raw_schema.get("openapi") or raw_schema["swagger"]
+        kwargs = {key: value for key, value in raw_schema.items() if key not in ("openapi", "swagger", "paths")}
+        return self.load_schema(raw_schema["paths"], version=version, **kwargs)
 
     def write_schema(
         self,

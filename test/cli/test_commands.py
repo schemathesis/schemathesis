@@ -260,7 +260,7 @@ def test_execute_missing_schema(ctx, cli, url, message, workers):
     assert message in result.stdout
 
 
-def test_timeout_reclassified_as_error_on_flaky_replay(ctx, cli, app_runner):
+def test_timeout_reclassified_as_error_on_flaky_replay(ctx, cli):
     # A timed-out request must be reported as a network error, never as a check failure.
     counter = [0]
     counter_lock = threading.Lock()
@@ -276,9 +276,8 @@ def test_timeout_reclassified_as_error_on_flaky_replay(ctx, cli, app_runner):
             time.sleep(0.2)
         return jsonify({"ok": True})
 
-    port = app_runner.run_flask_app(app)
-    result = cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+    result = cli.run_openapi_app(
+        app,
         "--request-timeout=0.08",
         "--workers=1",
         "--phases=fuzzing",
@@ -999,7 +998,7 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, cli, media_typ
     ],
     ids=["binary", "string", "array"],
 )
-def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, field_name, field_schema, content_type):
+def test_multipart_encoding_content_type(ctx, cli, snapshot_cli, field_name, field_schema, content_type):
     schema_def = {
         "type": "object",
         "properties": {field_name: field_schema},
@@ -1034,11 +1033,9 @@ def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, fie
         # Accept any request as long as content type is correct when field is present
         return jsonify({"status": "ok"}), 200
 
-    port = app_runner.run_flask_app(app)
-    schema_url = f"http://127.0.0.1:{port}/openapi.json"
     assert (
-        cli.run(
-            schema_url,
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "--max-examples=5",
             "--mode=positive",
@@ -1048,7 +1045,7 @@ def test_multipart_encoding_content_type(ctx, cli, app_runner, snapshot_cli, fie
     )
 
 
-def test_no_schema_in_media_type(ctx, cli, app_runner, snapshot_cli):
+def test_no_schema_in_media_type(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/property": {
@@ -1067,11 +1064,7 @@ def test_no_schema_in_media_type(ctx, cli, app_runner, snapshot_cli):
     def property_handler():
         return jsonify({}), 200
 
-    port = app_runner.run_flask_app(app)
-    assert (
-        cli.run(f"http://127.0.0.1:{port}/openapi.json", "--max-examples=1", "--checks=not_a_server_error")
-        == snapshot_cli
-    )
+    assert cli.run_openapi_app(app, "--max-examples=1", "--checks=not_a_server_error") == snapshot_cli
 
 
 @pytest.mark.filterwarnings("error")
@@ -1117,11 +1110,10 @@ def test_nested_binary_in_yaml(ctx, cli, app_runner, snapshot_cli):
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths)
     assert (
-        cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}/api", "--max-examples=10", "-c not_a_server_error")
-        == snapshot_cli
+        cli.run(str(schema_path), f"--url={base_url}/api", "--max-examples=10", "-c not_a_server_error") == snapshot_cli
     )
 
 
@@ -1214,7 +1206,7 @@ def test_colon_in_headers(ctx, cli):
     assert api.requests[0].headers["X-Foo"] == value
 
 
-def test_headers_passed_to_schema_loading(cli, ctx, app_runner):
+def test_headers_passed_to_schema_loading(cli, app_runner, ctx):
     # GH-3440: Headers should be passed to schema loading request
     schema = ctx.openapi.build_schema({"/users": {"get": {"responses": {"200": {"description": "OK"}}}}})
 
@@ -1233,10 +1225,8 @@ def test_headers_passed_to_schema_loading(cli, ctx, app_runner):
     def users():
         return jsonify([])
 
-    port = app_runner.run_flask_app(app)
-
     cli.run_and_assert(
-        f"http://127.0.0.1:{port}/openapi.json",
+        app_runner.openapi_url(app),
         "-H",
         "Authorization: Bearer secret-token",
         "--max-examples=1",
@@ -1324,13 +1314,13 @@ def test_long_operation_output(ctx, cli, app_runner, snapshot_cli):
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths)
     # Then this operation name should be truncated
-    assert cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}/api", "-c not_a_server_error") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={base_url}/api", "-c not_a_server_error") == snapshot_cli
 
 
-def test_reserved_characters_in_operation_name(ctx, cli, app_runner, snapshot_cli):
+def test_reserved_characters_in_operation_name(ctx, cli, snapshot_cli):
     # See GH-992
     # When an API operation name contains `:`
     app, _ = ctx.openapi.make_flask_app(
@@ -1347,9 +1337,8 @@ def test_reserved_characters_in_operation_name(ctx, cli, app_runner, snapshot_cl
     def foo_bar():
         return jsonify({}), 200
 
-    port = app_runner.run_flask_app(app)
     # Then this operation name should be displayed with the leading `/`
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json") == snapshot_cli
+    assert cli.run_openapi_app(app) == snapshot_cli
 
 
 def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
@@ -1383,7 +1372,7 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
     }
     schema = ctx.openapi.build_schema(paths)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths)
     # Then if it is possible it should generate at least something
     # And if it is not then there should be an error with a descriptive error message
@@ -1391,7 +1380,7 @@ def test_unsupported_regex(ctx, cli, app_runner, snapshot_cli):
         cli.run(
             str(schema_path),
             "--max-examples=1",
-            f"--url=http://127.0.0.1:{port}/api",
+            f"--url={base_url}/api",
             "-c not_a_server_error",
             "--mode=positive",
         )
@@ -1684,7 +1673,7 @@ def test_multiple_generation_modes(ctx, cli, data_generation_check):
         ]
     ),
 )
-def test_wait_for_schema(cli, schema_path, make_app, app_runner):
+def test_wait_for_schema(cli, app_runner, schema_path, make_app):
     # When Schemathesis is asked to wait for API schema to become available
     app = make_app()
     original_run = app.run
@@ -1694,13 +1683,12 @@ def test_wait_for_schema(cli, schema_path, make_app, app_runner):
         return original_run(*args, **kwargs)
 
     app.run = run_with_delay
-    port = app_runner.run_flask_app(app)
-    schema_url = f"http://127.0.0.1:{port}/{schema_path}"
+    schema_url = app_runner.openapi_url(app, path=f"/{schema_path}")
     cli.run_and_assert(schema_url, "--wait-for-schema=1", "--max-examples=1", "--mode=positive")
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
+def test_wait_for_schema_not_enough(cli, app_runner, snapshot_cli):
     app = openapi_basic.success().server
     original_run = app.run
 
@@ -1709,13 +1697,10 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
         return original_run(*args, **kwargs)
 
     app.run = run_with_delay
-    port = app_runner.run_flask_app(app)
-    schema_url = f"http://127.0.0.1:{port}/openapi.json"
-
-    assert cli.run(schema_url, "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
+    assert cli.run(app_runner.openapi_url(app), "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 
 
-def test_wait_for_schema_retries_503(cli, ctx, app_runner):
+def test_wait_for_schema_retries_503(cli, app_runner, ctx):
     # When the schema endpoint returns 503 initially, then succeeds
     schema = ctx.openapi.build_schema({"/success": {"get": {"responses": {"200": {"description": "OK"}}}}})
     app = Flask(__name__)
@@ -1732,14 +1717,11 @@ def test_wait_for_schema_retries_503(cli, ctx, app_runner):
     def success():
         return jsonify({})
 
-    port = app_runner.run_flask_app(app)
-    cli.run_and_assert(
-        f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=5", "--max-examples=1", "--mode=positive"
-    )
+    cli.run_and_assert(app_runner.openapi_url(app), "--wait-for-schema=5", "--max-examples=1", "--mode=positive")
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_wait_for_schema_503_exhausted(cli, snapshot_cli, app_runner):
+def test_wait_for_schema_503_exhausted(cli, app_runner, snapshot_cli):
     # When the schema endpoint always returns 503 until the wait timeout expires
     app = Flask(__name__)
 
@@ -1747,8 +1729,7 @@ def test_wait_for_schema_503_exhausted(cli, snapshot_cli, app_runner):
     def always_503():
         return jsonify({"error": "service unavailable"}), 503
 
-    port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--wait-for-schema=1") == snapshot_cli
+    assert cli.run(app_runner.openapi_url(app), "--wait-for-schema=1") == snapshot_cli
 
 
 def test_rate_limit(ctx, cli):
@@ -1864,7 +1845,7 @@ def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, s
 
 
 @flaky(max_runs=5, min_passes=1)
-def test_binary_payload(ctx, cli, app_runner, snapshot_cli):
+def test_binary_payload(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/binary": {
@@ -1888,10 +1869,9 @@ def test_binary_payload(ctx, cli, app_runner, snapshot_cli):
             content_type="application/octet-stream",
         )
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--exclude-checks=positive_data_acceptance",
         )
         == snapshot_cli
@@ -1899,7 +1879,7 @@ def test_binary_payload(ctx, cli, app_runner, snapshot_cli):
 
 
 @flaky(max_runs=5, min_passes=1)
-def test_long_payload(ctx, cli, app_runner, snapshot_cli):
+def test_long_payload(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/long": {
@@ -1923,10 +1903,9 @@ def test_long_payload(ctx, cli, app_runner, snapshot_cli):
             content_type="application/json",
         )
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--exclude-checks=positive_data_acceptance",
         )
         == snapshot_cli
@@ -2144,7 +2123,7 @@ def test_parameter_overrides(ctx, cli, verify_overrides):
         ),
     ),
 )
-def test_max_redirects(cli, ctx, app_runner, snapshot_cli, args, config):
+def test_max_redirects(cli, app_runner, ctx, snapshot_cli, args, config):
     raw_schema = {
         "openapi": "3.0.0",
         "info": {"title": "Redirect Test", "version": "1.0.0"},
@@ -2169,14 +2148,12 @@ def test_max_redirects(cli, ctx, app_runner, snapshot_cli, args, config):
         # Infinite loop
         return redirect(url_for("redirect_endpoint"), code=302)
 
-    port = app_runner.run_flask_app(app)
-
     assert (
         cli.main(
             "run",
             "--phases=fuzzing",
             "--max-examples=1",
-            f"http://127.0.0.1:{port}/openapi.json",
+            app_runner.openapi_url(app),
             *args,
             config=config,
         )
@@ -2297,12 +2274,9 @@ def test_nullable_reference(ctx, cli, app_runner, snapshot_cli):
     components = {"schemas": {"MessageStatus": {}}}
     schema = ctx.openapi.build_schema(paths, components=components)
     app = ctx.openapi.make_permissive_flask_app(schema)
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     schema_path = ctx.openapi.write_schema(paths, components=components)
-    assert (
-        cli.run(str(schema_path), f"--url=http://127.0.0.1:{port}/api", "--mode=positive", "--phases=fuzzing")
-        == snapshot_cli
-    )
+    assert cli.run(str(schema_path), f"--url={base_url}/api", "--mode=positive", "--phases=fuzzing") == snapshot_cli
 
 
 def test_reference_in_examples(ctx, cli, snapshot_cli):
@@ -2485,8 +2459,6 @@ def test_operation_ordering(ctx, cli, app_runner, ordering_mode, expected):
     def users():
         return jsonify({"success": True}), 200 if request.method == "GET" else 201
 
-    port = app_runner.run_flask_app(app)
-
     module = ctx.write_pymodule(
         """
 from schemathesis import cli, engine
@@ -2505,7 +2477,7 @@ class OperationOrderTracker(cli.EventHandler):
     )
 
     result = cli.run(
-        f"http://127.0.0.1:{port}/openapi.json",
+        app_runner.openapi_url(app),
         "--max-examples=1",
         "--workers=1",
         "--continue-on-failure",
@@ -2790,12 +2762,14 @@ def test_request_retries_option(cli, ctx, snapshot_cli):
     port = server.server_address[1]
     threading.Thread(target=server.serve_forever, daemon=True).start()
     try:
-        result = cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
-            "--request-retries=2",
-            "--max-examples=1",
-            "--checks=response_schema_conformance",
+        assert (
+            cli.run(
+                f"http://127.0.0.1:{port}/openapi.json",
+                "--request-retries=2",
+                "--max-examples=1",
+                "--checks=response_schema_conformance",
+            )
+            == snapshot_cli
         )
-        assert result == snapshot_cli
     finally:
         server.shutdown()

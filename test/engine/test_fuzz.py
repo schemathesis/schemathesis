@@ -99,7 +99,7 @@ def test_fuzz_scenario_events_are_paired(ctx):
 
 def test_fuzz_no_operations_emits_no_scenarios(ctx):
     # When the schema has no operations, the fuzz thread returns immediately
-    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema({}))
+    schema = ctx.openapi.load_schema({})
     collected = list(from_schema(schema).fuzz())
     assert isinstance(collected[0], events.EngineStarted)
     assert isinstance(collected[-1], events.EngineFinished)
@@ -234,7 +234,7 @@ def test_fuzz_scenario_id_pairs_correlate(ctx):
 
 
 def test_fuzz_operation_weights_producer_higher_than_consumer(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "post": {
@@ -264,9 +264,8 @@ def test_fuzz_operation_weights_producer_higher_than_consumer(ctx):
             },
         }
     )
-    loaded = schemathesis.openapi.from_dict(schema)
-    operations = [op.ok() for op in loaded.get_all_operations() if isinstance(op, Ok)]
-    weights = loaded.compute_fuzz_operation_weights(operations)
+    operations = [op.ok() for op in schema.get_all_operations() if isinstance(op, Ok)]
+    weights = schema.compute_fuzz_operation_weights(operations)
 
     # Producer (POST /users, layer 0 with outputs) must outweigh consumer (GET, deeper layer)
     assert weights["POST /users"] > weights["GET /users/{user_id}"]
@@ -579,11 +578,9 @@ def test_fuzz_interrupted_by_keyboard_interrupt(ctx):
         pass
 
 
-def _build_schema_with_link():
-    spec = {
-        "openapi": "3.0.2",
-        "info": {"title": "X", "version": "1"},
-        "paths": {
+def _build_schema_with_link(ctx):
+    return ctx.openapi.load_schema(
+        {
             "/products": {
                 "post": {
                     "operationId": "createProduct",
@@ -615,9 +612,8 @@ def _build_schema_with_link():
                     "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
                 }
             },
-        },
-    }
-    return schemathesis.openapi.from_dict(spec)
+        }
+    )
 
 
 @pytest.mark.parametrize(
@@ -635,8 +631,8 @@ def _build_schema_with_link():
         pytest.param(("post", "get"), False, {"otherField": "x"}, None, id="expression-unresolvable"),
     ],
 )
-def test_collect_link_candidates(active, exclude_get, body, expected_overrides, case_factory, response_factory):
-    schema = _build_schema_with_link()
+def test_collect_link_candidates(ctx, active, exclude_get, body, expected_overrides, case_factory, response_factory):
+    schema = _build_schema_with_link(ctx)
     post_op = schema["/products"]["POST"]
     get_op = schema["/products/{productId}"]["GET"]
     by_alias = {"post": post_op, "get": get_op}

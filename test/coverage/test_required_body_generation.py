@@ -1,6 +1,5 @@
 import jsonschema_rs
 
-import schemathesis
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 
@@ -11,7 +10,7 @@ MALFORMED_REGEX = "^[A-Za-z0-9 \\\\-.'À-ÿ]+$"
 def test_malformed_regex_removed_allows_body_generation(ctx):
     # When a body schema contains a malformed regex pattern, it is removed during conversion
     # allowing data generation to proceed
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/orders/{orderId}": {
                 "put": {
@@ -53,7 +52,6 @@ def test_malformed_regex_removed_allows_body_generation(ctx):
         },
         version="3.0.2",
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/api/orders/{orderId}"]["PUT"]
 
     cases = list(
@@ -73,7 +71,7 @@ def test_malformed_regex_removed_allows_body_generation(ctx):
 def test_numeric_pattern_value(ctx):
     # When a body schema contains a pattern with a numeric value instead of a string,
     # it should be handled gracefully without raising a TypeError
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "patch": {
@@ -96,7 +94,6 @@ def test_numeric_pattern_value(ctx):
         },
         version="3.0.0",
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/test"]["PATCH"]
 
     cases = list(
@@ -117,7 +114,7 @@ def test_required_property_not_in_properties_is_generated(ctx):
     # When a schema's `required` array names a property that has no entry in
     # `properties`, coverage must still emit a value for that key so the
     # generated body satisfies the `required` constraint and is schema-valid.
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/listeners": {
                 "post": {
@@ -142,7 +139,6 @@ def test_required_property_not_in_properties_is_generated(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/listeners"]["POST"]
 
     cases = list(
@@ -167,7 +163,7 @@ def test_invalid_enum_values_excluded_from_positive_cases(ctx):
     # When a schema property has `type: string` but the enum contains a non-string value (false),
     # coverage must not emit the invalid enum value in POSITIVE mode.
     # Such values commonly arise from YAML deserialization (e.g. bare `NO` parsed as boolean false).
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -193,7 +189,6 @@ def test_invalid_enum_values_excluded_from_positive_cases(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/items"]["POST"]
 
     cases = list(
@@ -218,7 +213,7 @@ def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
     # When an array property's items schema has `type: string` but the enum contains
     # a non-string value (false), coverage must not emit arrays with the invalid value.
     # Such values commonly arise from YAML deserialization (e.g. bare `NO` parsed as boolean false).
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/items": {
                 "post": {
@@ -247,7 +242,6 @@ def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/items"]["POST"]
 
     cases = list(
@@ -271,7 +265,7 @@ def test_invalid_enum_items_excluded_from_positive_array_cases(ctx):
 def test_allof_with_outer_properties_includes_required_fields(ctx):
     # When a body schema combines allOf (which declares required fields) with additional outer-level properties
     # Coverage must include the required fields in every generated case
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/resources": {
                 "put": {
@@ -298,7 +292,6 @@ def test_allof_with_outer_properties_includes_required_fields(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/resources"]["PUT"]
 
     cases = list(
@@ -320,7 +313,7 @@ def test_allof_with_outer_properties_includes_required_fields(ctx):
 
 
 def test_allof_with_explicit_type_object_includes_required_fields(ctx):
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/resources": {
                 "put": {
@@ -347,7 +340,6 @@ def test_allof_with_explicit_type_object_includes_required_fields(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/resources"]["PUT"]
 
     cases = list(
@@ -374,7 +366,7 @@ def test_format_invalid_default_not_used_as_const(ctx):
     # generator must NOT emit the invalid default as a const value.  Doing so produces
     # a body that passes is_valid() (no format validation) but is rejected by the
     # conformance validator which uses validate_formats=True.
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/jobs": {
                 "put": {
@@ -406,7 +398,6 @@ def test_format_invalid_default_not_used_as_const(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/jobs"]["PUT"]
 
     cases = list(
@@ -430,7 +421,7 @@ def test_format_invalid_default_not_used_as_const(ctx):
 def test_swagger2_array_query_param_with_top_level_enum(ctx):
     # When a Swagger 2.0 array parameter has both top-level `enum` and `items` (a contradictory
     # codegen artifact), coverage must still emit the required parameter with a valid array value.
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/collection/purpose": {
                 "put": {
@@ -455,7 +446,6 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
         },
         version="2.0",
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/collection/purpose"]["PUT"]
 
     cases = list(
@@ -476,7 +466,7 @@ def test_swagger2_array_query_param_with_top_level_enum(ctx):
 
 def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
     # When a schema property has type:integer but also specifies minLength/maxLength
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/cache": {
                 "post": {
@@ -504,7 +494,6 @@ def test_minlength_maxlength_negative_skipped_for_integer_type(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/cache"]["POST"]
 
     cases = list(
@@ -528,7 +517,7 @@ def test_required_enforced_when_properties_at_threshold(ctx):
     # When a schema has exactly 15 properties (at the jsonschema_rs SmallProperties threshold)
     # and required lists exactly 2 of them, NEGATIVE cases must still be schema-invalid.
     properties = {f"field{i}": {"type": "string"} for i in range(15)}
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/things": {
                 "post": {
@@ -549,7 +538,6 @@ def test_required_enforced_when_properties_at_threshold(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     operation = schema["/things"]["POST"]
 
     cases = list(

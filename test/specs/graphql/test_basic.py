@@ -217,7 +217,7 @@ def test_no_query(ctx):
     raw_schema = decoded["data"]
     raw_schema["__schema"]["queryType"] = None
     raw_schema["__schema"]["mutationType"] = None
-    schema = schemathesis.graphql.from_dict(raw_schema)
+    schema = ctx.graphql.load_introspection(raw_schema)
     # Then no operations should be collected
     assert list(schema.get_all_operations()) == []
     assert schema.statistic.operations.total == 0
@@ -230,7 +230,7 @@ def test_data_key(ctx, with_data_key):
     decoded = response.json()
     if not with_data_key:
         decoded = decoded["data"]
-    schema = schemathesis.graphql.from_dict(decoded)
+    schema = ctx.graphql.load_introspection(decoded)
     assert schema.statistic.operations.total == 4
 
 
@@ -247,7 +247,7 @@ def test_operations_count(ctx):
     response = requests.post(api.schema_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
     raw_schema = decoded["data"]
-    schema = schemathesis.graphql.from_dict(raw_schema)
+    schema = ctx.graphql.load_introspection(raw_schema)
     assert schema.statistic.operations.total == 4
 
 
@@ -256,7 +256,7 @@ CUSTOM_MUTATION_NAME = "MyMutation"
 
 
 @pytest.mark.parametrize("name", [CUSTOM_QUERY_NAME, CUSTOM_MUTATION_NAME])
-def test_type_names(name):
+def test_type_names(ctx, name):
     # When the user gives custom names to query types
     raw_schema = f"""
     schema {{
@@ -272,7 +272,7 @@ def test_type_names(name):
     }}
     """
     # Then the schema should be loaded without errors
-    schema = schemathesis.graphql.from_file(raw_schema)
+    schema = ctx.graphql.load_sdl(raw_schema)
     # And requests should be properly generated
 
     @given(case=schema[name]["v"].as_strategy())

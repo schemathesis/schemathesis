@@ -486,7 +486,7 @@ def test_(case):
 
 def test_nullable_body_behind_a_reference(ctx):
     # When a body parameter is nullable and is behind a reference
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/payload": {
                 "post": {
@@ -506,7 +506,6 @@ def test_nullable_body_behind_a_reference(ctx):
         },
     )
     # Then it should be properly collected
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/payload"]["POST"]
     # And its definition is not transformed to JSON Schema
     assert operation.body[0].definition == {
@@ -522,7 +521,7 @@ def test_nullable_body_behind_a_reference(ctx):
 def test_null_body(ctx):
     api = ctx.openapi.apps.payload()
     # When API operation expects `null` as payload
-    schema_dict = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/payload": {
                 "post": {
@@ -535,7 +534,6 @@ def test_null_body(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema_dict)
     schema.config.update(base_url=api.base_url)
 
     @given(case=schema["/api/payload"]["POST"].as_strategy())
@@ -588,10 +586,9 @@ def test_write_only(ctx):
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, location):
     # When an Open API 3 parameter is missing `schema` & `content`
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
     )
-    schema = schemathesis.openapi.from_dict(schema)
 
     @given(schema["/foo"]["GET"].as_strategy())
     @settings(max_examples=1)
@@ -658,9 +655,7 @@ def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
             }
         }
     }
-    raw_schema = ctx.openapi.build_schema(paths, version="3.1.0")
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = ctx.openapi.load_schema(paths, version="3.1.0")
     operation = schema["/success"]["GET"]
 
     # Then the optimized schema should handle boolean true correctly
@@ -695,7 +690,7 @@ def test_parameter_with_boolean_true_schema(ctx, cli, snapshot_cli):
 
 def test_parameter_with_boolean_false_schema(ctx):
     # When a parameter has a boolean false schema (accepts nothing - unusual but valid)
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "get": {
@@ -713,14 +708,13 @@ def test_parameter_with_boolean_false_schema(ctx):
         version="3.1.0",
     )
     # Then it should load without crashing
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/test"]["GET"]
     parameter = operation.query[0]
     # The optimized schema should be preserved or handled
     assert parameter.optimized_schema is False
 
 
-def test_request_body_with_boolean_true_schema(ctx, cli, app_runner, snapshot_cli):
+def test_request_body_with_boolean_true_schema(ctx, cli, snapshot_cli):
     # When a request body has a boolean true schema
     paths = {
         "/payload": {
@@ -737,9 +731,7 @@ def test_request_body_with_boolean_true_schema(ctx, cli, app_runner, snapshot_cl
             }
         }
     }
-    raw_schema = ctx.openapi.build_schema(paths, version="3.1.0")
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = ctx.openapi.load_schema(paths, version="3.1.0")
     operation = schema["/payload"]["POST"]
 
     # Then the optimized schema should handle boolean true correctly
@@ -767,11 +759,7 @@ def test_request_body_with_boolean_true_schema(ctx, cli, app_runner, snapshot_cl
     def payload():
         return jsonify({}), 200
 
-    port = app_runner.run_flask_app(app)
-    assert (
-        cli.run(f"http://127.0.0.1:{port}/openapi.json", "--max-examples=1", "--checks=not_a_server_error")
-        == snapshot_cli
-    )
+    assert cli.run_openapi_app(app, "--max-examples=1", "--checks=not_a_server_error") == snapshot_cli
 
 
 def test_parameter_type_detection(ctx, cli, snapshot_cli):

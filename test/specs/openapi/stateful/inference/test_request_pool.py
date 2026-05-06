@@ -5,7 +5,7 @@ from flask import abort, jsonify, request
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_request_pool_captures_path_parameters(cli, app_runner, snapshot_cli, ctx):
+def test_request_pool_captures_path_parameters(cli, snapshot_cli, ctx):
     paths = {
         "/products/{productName}": {
             "post": {
@@ -64,10 +64,9 @@ def test_request_pool_captures_path_parameters(cli, app_runner, snapshot_cli, ct
         # Planted bug: required `name` is null for products that exist
         return jsonify({"name": None}), 200
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "-c response_schema_conformance",
             "--max-examples=10",
@@ -77,7 +76,7 @@ def test_request_pool_captures_path_parameters(cli, app_runner, snapshot_cli, ct
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_coverage_phase_capture_feeds_fuzzing_pool(cli, app_runner, snapshot_cli, ctx):
+def test_coverage_phase_capture_feeds_fuzzing_pool(cli, snapshot_cli, ctx):
     # Fuzzing GET can hit an existing productId only if coverage's POST captures
     # the schema `examples` ids into the pool — the path schema has none of its own.
     paths = {
@@ -159,10 +158,9 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, app_runner, snapshot_cli
         # Planted bug: required `name` is null for products that exist.
         return jsonify({"name": None}), 200
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=coverage,fuzzing",
             "-c response_schema_conformance",
             "--max-examples=10",
@@ -184,7 +182,7 @@ def test_coverage_phase_capture_feeds_fuzzing_pool(cli, app_runner, snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_request_pool_captures_body_fields(cli, app_runner, snapshot_cli, ctx):
+def test_request_pool_captures_body_fields(cli, snapshot_cli, ctx):
     paths = {
         "/sessions": {
             "post": {
@@ -255,10 +253,9 @@ def test_request_pool_captures_body_fields(cli, app_runner, snapshot_cli, ctx):
         # Planted bug: required `name` is null for sessions that exist
         return jsonify({"name": None}), 200
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "-c response_schema_conformance",
         )
@@ -267,7 +264,7 @@ def test_request_pool_captures_body_fields(cli, app_runner, snapshot_cli, ctx):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_pool_works_when_no_response_descriptors_exist(cli, app_runner, snapshot_cli, ctx):
+def test_pool_works_when_no_response_descriptors_exist(cli, snapshot_cli, ctx):
     # POST UUIDs and GET's fresh 36-char strings cannot overlap; only pool can bridge them.
     paths = {
         "/products": {
@@ -324,10 +321,9 @@ def test_pool_works_when_no_response_descriptors_exist(cli, app_runner, snapshot
             return "", 404
         abort(500)  # reachable only when GET path uses a captured productName
 
-    port = app_runner.run_flask_app(app)
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--phases=fuzzing",
             "-c not_a_server_error",
             "--max-examples=20",

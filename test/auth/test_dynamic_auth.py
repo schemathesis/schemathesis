@@ -20,7 +20,7 @@ from schemathesis.specs.openapi.auths import (
 
 
 @pytest.fixture
-def auth_operation(ctx, app_runner):
+def auth_operation(ctx, cli, app_runner):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/data": {
@@ -60,8 +60,7 @@ def auth_operation(ctx, app_runner):
     def wrong_type():
         return jsonify({"token": 42})
 
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     return schema["/data"]["GET"]
 
 
@@ -110,10 +109,9 @@ def test_get_raises_on_error(auth_operation, path, extract_from, extract_selecto
         provider.get(auth_operation.Case(), ctx)
 
 
-def test_get_raises_on_connection_error(ctx, app_runner):
+def test_get_raises_on_connection_error(ctx, cli, app_runner):
     app, _ = ctx.openapi.make_flask_app({"/data": {"get": {"responses": {"200": {"description": "OK"}}}}})
-    port = app_runner.run_flask_app(app)
-    schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json")
+    schema = schemathesis.openapi.from_url(app_runner.openapi_url(app))
     operation = schema["/data"]["GET"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -226,15 +224,15 @@ def test_unused_dynamic_auth_warning(ctx, cli, app_runner, snapshot_cli):
             }
         },
     )
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     assert (
         cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+            f"{base_url}/openapi.json",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 1",
             config={
-                "base-url": f"http://127.0.0.1:{port}",
+                "base-url": base_url,
                 "auth": {
                     "dynamic": {
                         "openapi": {
@@ -280,16 +278,16 @@ def test_dynamic_auth_integration(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
 
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     assert (
         cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+            f"{base_url}/openapi.json",
             "--include-path=/protected",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 3",
             config={
-                "base-url": f"http://127.0.0.1:{port}",
+                "base-url": base_url,
                 "auth": {
                     "dynamic": {
                         "openapi": {
@@ -537,16 +535,16 @@ def test_dynamic_auth_integration_api_key(ctx, cli, app_runner, snapshot_cli):
             return jsonify({"error": "unauthorized"}), 401
         return jsonify({"result": "ok"})
 
-    port = app_runner.run_flask_app(app)
+    base_url = app_runner.openapi_url(app, path="")
     assert (
         cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+            f"{base_url}/openapi.json",
             "--include-path=/protected",
             "--phases=fuzzing",
             "--mode=positive",
             "-n 3",
             config={
-                "base-url": f"http://127.0.0.1:{port}",
+                "base-url": base_url,
                 "auth": {
                     "dynamic": {
                         "openapi": {

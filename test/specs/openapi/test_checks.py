@@ -131,28 +131,35 @@ def build_metadata(
     )
 
 
-@pytest.fixture
-def sample_schema(ctx):
-    return ctx.openapi.build_schema(
-        {
-            "/test": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "query",
-                            "name": "key",
-                            "schema": {"type": "integer", "minimum": 5},
-                        },
-                        {
-                            "in": "header",
-                            "name": "X-Key",
-                            "schema": {"type": "integer", "minimum": 5},
-                        },
-                    ]
-                }
+def sample_paths():
+    return {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "key",
+                        "schema": {"type": "integer", "minimum": 5},
+                    },
+                    {
+                        "in": "header",
+                        "name": "X-Key",
+                        "schema": {"type": "integer", "minimum": 5},
+                    },
+                ]
             }
         }
-    )
+    }
+
+
+@pytest.fixture
+def sample_raw_schema(ctx):
+    return ctx.openapi.build_schema(sample_paths())
+
+
+@pytest.fixture
+def sample_schema(ctx):
+    return ctx.openapi.load_schema(sample_paths())
 
 
 @pytest.mark.parametrize(
@@ -196,15 +203,14 @@ def sample_schema(ctx):
     ],
 )
 def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kwargs, expected):
-    schema = schemathesis.openapi.from_dict(sample_schema)
-    operation = schema["/test"]["POST"]
+    operation = sample_schema["/test"]["POST"]
     case = operation.Case(**kwargs)
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
 
 
 def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
     # Patterns with large quantifiers require pattern_options with sufficient size_limit
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "post": {
@@ -222,7 +228,6 @@ def test_has_only_additional_properties_with_large_quantifier_pattern(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/test"]["POST"]
     case = operation.Case(
         _meta=build_metadata(query=GenerationMode.NEGATIVE),
@@ -243,8 +248,7 @@ def test_negative_data_rejection_status_code_405(response_factory, sample_schema
     # 405 is routing-level rejection, not a data-validation outcome — supervisor
     # warns separately when it dominates an operation.
     response = response_factory.requests(status_code=status_code)
-    schema = schemathesis.openapi.from_dict(sample_schema)
-    operation = schema["/test"]["POST"]
+    operation = sample_schema["/test"]["POST"]
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
@@ -269,8 +273,7 @@ def test_negative_data_rejection_status_code_405(response_factory, sample_schema
 def test_negative_data_rejection_on_additional_properties(response_factory, sample_schema):
     # See GH-2312
     response = response_factory.requests()
-    schema = schemathesis.openapi.from_dict(sample_schema)
-    operation = schema["/test"]["POST"]
+    operation = sample_schema["/test"]["POST"]
     case = operation.Case(
         _meta=build_metadata(
             query=GenerationMode.NEGATIVE,
@@ -307,7 +310,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     ],
 )
 def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_mode, query_mode, header_mode, expected):
-    text_plain_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/endpoint": {
                 "put": {
@@ -324,7 +327,6 @@ def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_m
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(text_plain_schema)
     operation = schema["/endpoint"]["PUT"]
     case = operation.Case(
         _meta=build_metadata(
@@ -339,10 +341,10 @@ def test_body_negation_becomes_valid_after_serialization(ctx, media_type, body_m
     assert _body_negation_becomes_valid_after_serialization(case) is expected
 
 
-def test_response_schema_conformance_with_unspecified_method(response_factory, sample_schema):
+def test_response_schema_conformance_with_unspecified_method(response_factory, sample_raw_schema):
     response = response_factory.requests()
     response = Response.from_requests(response, True)
-    sample_schema["paths"]["/test"]["post"]["responses"] = {
+    sample_raw_schema["paths"]["/test"]["post"]["responses"] = {
         "200": {
             "description": "Successful response",
             "content": {
@@ -356,7 +358,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
             },
         }
     }
-    schema = schemathesis.openapi.from_dict(sample_schema)
+    schema = schemathesis.openapi.from_dict(sample_raw_schema)
     operation = schema["/test"]["POST"]
     case = operation.Case(
         _meta=CaseMetadata(
@@ -420,8 +422,7 @@ def test_positive_data_acceptance(
     is_positive,
     should_raise,
 ):
-    schema = schemathesis.openapi.from_dict(sample_schema)
-    operation = schema["/test"]["POST"]
+    operation = sample_schema["/test"]["POST"]
     response = response_factory.requests(status_code=status_code)
     case = operation.Case(
         _meta=build_metadata(
@@ -617,7 +618,7 @@ def test_missing_required_authorization_if_provided_explicitly(ctx, cli, tmp_pat
     ],
 )
 def test_missing_required_header_default_statuses(ctx, response_factory, status_code, should_raise):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "get": {
@@ -629,7 +630,6 @@ def test_missing_required_header_default_statuses(ctx, response_factory, status_
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/test"]["GET"]
     response = response_factory.requests(status_code=status_code)
     case = operation.Case(
@@ -690,7 +690,7 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
     # it serializes to the same query string as a single integer (page=67).
     # The API correctly accepts this as valid, so negative_data_rejection should not fail.
 
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/job_info/scroll": {
                 "get": {
@@ -711,7 +711,6 @@ def test_negative_data_rejection_single_element_array_serialization(ctx, respons
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/job_info/scroll"]["GET"]
 
     # Simulate negative testing where a single-element array [67] is generated
@@ -752,7 +751,7 @@ def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, res
     # Multi-element arrays in query parameters serialize as repeated keys: [True, 1] -> ?page_size=True&page_size=1
     # Some frameworks (e.g. Django/DRF) pick one value from repeated keys. If that value is a valid integer (1),
     # the request is accepted and should NOT trigger negative_data_rejection.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/model-fk/user/": {
                 "get": {
@@ -773,7 +772,6 @@ def test_negative_data_rejection_multi_element_array_with_valid_element(ctx, res
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/api/model-fk/user/"]["GET"]
 
     case = operation.Case(
@@ -808,7 +806,7 @@ def test_negative_data_rejection_multi_element_array_string_numeric_element(ctx,
     # GH-3931: a string element like "44" inside the array serializes to the wire form
     # `?page_size=44`, which Django parses as integer 44. The strict JSON Schema validator
     # treats "44" as a string (not integer), but the server accepts it.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/model-fk/user/": {
                 "get": {
@@ -829,7 +827,6 @@ def test_negative_data_rejection_multi_element_array_string_numeric_element(ctx,
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/api/model-fk/user/"]["GET"]
 
     case = operation.Case(
@@ -872,7 +869,7 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
     # Negative type mutation can turn an integer query into an object. urlencode(doseq=True)
     # iterates dict keys, so {"5": "x"} produces ?id=5 — the server parses 5 as integer
     # and the request becomes effectively valid.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/items": {
                 "get": {
@@ -883,7 +880,6 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/api/items"]["GET"]
 
     case = operation.Case(
@@ -915,7 +911,7 @@ def test_negative_data_rejection_query_object_mutation_with_numeric_key(ctx, res
 
 
 def test_negative_data_rejection_path_string_numeric_serialization(ctx, response_factory):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/run/{id}": {
                 "post": {
@@ -926,7 +922,6 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/api/run/{id}"]["POST"]
 
     case = operation.Case(
@@ -959,7 +954,7 @@ def test_negative_data_rejection_path_string_numeric_serialization(ctx, response
 
 
 def test_negative_data_rejection_path_string_numeric_serialization_with_other_negation(ctx, response_factory):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/api/run/{id}": {
                 "post": {
@@ -973,7 +968,6 @@ def test_negative_data_rejection_path_string_numeric_serialization_with_other_ne
         }
     )
 
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/api/run/{id}"]["POST"]
 
     case = operation.Case(
@@ -1008,7 +1002,7 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
     # The JSON escape \uDCF3 is a lone low surrogate; Python's json.loads accepts it and
     # produces a Python str containing the lone surrogate '\udcf3'. jsonschema_rs then
     # raises ValueError  when it tries to UTF-8-encode that string.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "get": {
@@ -1022,7 +1016,6 @@ def test_response_schema_conformance_with_surrogate_chars_in_response(response_f
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/test"]["GET"]
     case = operation.Case()
     response = response_factory.requests(content=b'"\\udcf3"')
@@ -1047,7 +1040,7 @@ _CHECK_CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksC
 
 
 def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
-    return ctx.openapi.build_schema(
+    return ctx.openapi.load_schema(
         {
             "/pets": {
                 "get": {
@@ -1131,8 +1124,7 @@ def _discriminator_schema(ctx, *, discriminator, version="3.0.2"):
     ],
 )
 def test_response_schema_conformance_discriminator(ctx, response_factory, body, discriminator, should_fail):
-    raw_schema = _discriminator_schema(ctx, discriminator=discriminator)
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = _discriminator_schema(ctx, discriminator=discriminator)
     operation = schema["/pets"]["GET"]
     case = operation.Case()
     response = response_factory.requests(content=json.dumps(body).encode())
@@ -1149,7 +1141,7 @@ def test_response_schema_conformance_discriminator(ctx, response_factory, body, 
 def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_factory):
     # Boolean schemas (true/false) in anyOf/oneOf are valid in OpenAPI 3.1.
     # The boolean item is skipped during implicit mapping extraction; only $ref items contribute.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/pets": {
                 "get": {
@@ -1179,7 +1171,6 @@ def test_response_schema_conformance_discriminator_boolean_schema(ctx, response_
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/pets"]["GET"]
     case = operation.Case()
 

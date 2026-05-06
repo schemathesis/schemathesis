@@ -19,7 +19,7 @@ ALIAS = "application/x-pdf"
 
 
 def test_pdf_generation(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/pdf": {
                 "post": {
@@ -36,7 +36,6 @@ def test_pdf_generation(ctx):
         }
     )
     schemathesis.openapi.media_type(MEDIA_TYPE, PDFS, aliases=[ALIAS])
-    schema = schemathesis.openapi.from_dict(schema)
 
     strategy = schema["/pdf"]["post"].as_strategy()
 
@@ -50,7 +49,7 @@ def test_pdf_generation(ctx):
     test()
 
 
-def test_explicit_example_with_custom_media_type(ctx, cli, app_runner, snapshot_cli):
+def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/csv": {
@@ -75,8 +74,7 @@ def test_explicit_example_with_custom_media_type(ctx, cli, app_runner, snapshot_
         return jsonify({}), 200
 
     schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
-    port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--mode=positive") == snapshot_cli
+    assert cli.run_openapi_app(app, "--mode=positive") == snapshot_cli
 
 
 def test_malformed_registered_media_type_is_skipped(ctx):
@@ -84,7 +82,7 @@ def test_malformed_registered_media_type_is_skipped(ctx):
     MEDIA_TYPE_STRATEGIES["invalid"] = st.binary()
 
     # Create schema with valid content type that would trigger wildcard search
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/data": {
                 "post": {
@@ -99,7 +97,6 @@ def test_malformed_registered_media_type_is_skipped(ctx):
             },
         }
     )
-    schema = schemathesis.openapi.from_dict(schema)
 
     # Should not crash when encountering the malformed registered type
     strategy = schema["/data"]["post"].as_strategy()
@@ -189,7 +186,7 @@ def test_multipart_encoding_multiple_content_types(ctx):
     schemathesis.openapi.media_type("image/png", st.just(PNG_DATA))
     schemathesis.openapi.media_type("image/jpeg", st.just(JPEG_DATA))
 
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/upload": {
                 "post": {
@@ -212,7 +209,6 @@ def test_multipart_encoding_multiple_content_types(ctx):
         }
     )
 
-    schema = schemathesis.openapi.from_dict(spec)
     operation = schema["/upload"]["POST"]
     strategy = operation.as_strategy()
 
@@ -247,7 +243,7 @@ def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
     pdf_data = b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\n"
     schemathesis.openapi.media_type("application/pdf", st.just(pdf_data))
 
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/upload": {
                 "post": {
@@ -270,7 +266,6 @@ def test_multipart_encoding_array_content_type_with_custom_strategy(ctx):
         }
     )
 
-    schema = schemathesis.openapi.from_dict(spec)
     operation = schema["/upload"]["POST"]
     strategy = operation.as_strategy()
 
@@ -320,7 +315,7 @@ def test(case):
 def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
     schemathesis.openapi.media_type("application/pdf", st.just(b"%PDF-1.4"))
 
-    spec = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/upload": {
                 "post": {
@@ -343,7 +338,6 @@ def test_multipart_encoding_with_custom_strategy_fuzzing_phase(ctx):
         }
     )
 
-    schema = schemathesis.openapi.from_dict(spec)
     operation = schema["/upload"]["POST"]
     strategy = operation.as_strategy()
 

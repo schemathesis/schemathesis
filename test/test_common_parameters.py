@@ -1,4 +1,3 @@
-import schemathesis
 from schemathesis.generation.modes import GenerationMode
 
 from .utils import integer
@@ -93,7 +92,7 @@ def test_common_parameters_with_references_stateful(ctx):
     # When common parameter that is shared on an API operation level contains a reference
     # And used in stateful tests
     responses = {"responses": {"200": {"description": "OK"}}}
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/foo": {
                 "parameters": [
@@ -126,7 +125,6 @@ def test_common_parameters_with_references_stateful(ctx):
         basePath="/v1",
         version="2.0",
     )
-    schema = schemathesis.openapi.from_dict(schema)
     # Then state machine should be successfully generated
     state_machine = schema.as_state_machine()
     assert len(state_machine.bundles) == 1

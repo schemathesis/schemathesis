@@ -1,7 +1,6 @@
 import pytest
 from hypothesis import HealthCheck, given, settings
 
-import schemathesis
 from schemathesis.core.jsonschema.resolver import make_root_resolver
 from schemathesis.specs.openapi.adapter.security import extract_security_definitions_v3
 
@@ -69,10 +68,14 @@ SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME = {
         ({"headers": {"TestApiKey": "EXPLICIT"}}, "EXPLICIT"),
     ],
 )
-def test_name_clash(kwargs, expected):
+def test_name_clash(ctx, kwargs, expected):
     # Operation definition should take precedence over security schemes
     # Explicit headers should take precedence over everything else
-    schema = schemathesis.openapi.from_dict(SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME)
+    schema = ctx.openapi.load_schema(
+        SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME["paths"],
+        components=SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME["components"],
+        security=SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME["security"],
+    )
 
     @given(case=schema["/test"]["GET"].as_strategy(**kwargs))
     def test(case):
@@ -82,18 +85,16 @@ def test_name_clash(kwargs, expected):
 
 
 @pytest.mark.parametrize("with_security_parameters", [True, False])
-def test_without_security_parameters(with_security_parameters):
-    schema = {
-        "openapi": "3.0.0",
-        "info": {"title": "Blank API", "version": "1.0"},
-        "servers": [{"url": "http://localhost/api"}],
-        "paths": {"/test": {"get": {"responses": {"200": {"description": "OK"}}}}},
-        "components": {
+def test_without_security_parameters(ctx, with_security_parameters):
+    schema = ctx.openapi.load_schema(
+        {"/test": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="3.0.0",
+        servers=[{"url": "http://localhost/api"}],
+        components={
             "securitySchemes": {"basic_auth": {"type": "http", "scheme": "basic"}},
         },
-        "security": [{"basic_auth": []}],
-    }
-    schema = schemathesis.openapi.from_dict(schema)
+        security=[{"basic_auth": []}],
+    )
     schema.config.generation.update(with_security_parameters=with_security_parameters)
 
     @given(case=schema["/test"]["GET"].as_strategy())
@@ -110,7 +111,7 @@ def test_without_security_parameters(with_security_parameters):
 @pytest.mark.parametrize("version", ["2.0", "3.0.2"])
 def test_undefined_security_scheme_is_ignored(ctx, version):
     # When a security requirement references a scheme that is NOT defined in securitySchemes/securityDefinitions
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -121,7 +122,6 @@ def test_undefined_security_scheme_is_ignored(ctx, version):
         },
         version=version,
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["get"]
     # Then it should be ignored
     assert not list(operation.security.iter_parameters())
@@ -129,7 +129,7 @@ def test_undefined_security_scheme_is_ignored(ctx, version):
 
 def test_invalid_security_requirement_types_are_ignored(ctx):
     # When security requirements contain non-dict elements
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/test": {
                 "get": {
@@ -151,8 +151,6 @@ def test_invalid_security_requirement_types_are_ignored(ctx):
             }
         },
     )
-
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/test"]["GET"]
 
     # Should not crash and should extract parameters from the valid requirement

@@ -52,15 +52,9 @@ def test_open_api_specification(openapi_30):
     assert openapi_30.specification.version == "3.0.0"
 
 
-def test_resolving_multiple_files():
-    raw_schema = {
-        "swagger": "2.0",
-        "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
-        "host": "127.0.0.1:8888",
-        "basePath": "/api",
-        "schemes": ["http"],
-        "produces": ["application/json"],
-        "paths": {
+def test_resolving_multiple_files(ctx):
+    schema = ctx.openapi.load_schema(
+        {
             "/teapot": {
                 "post": {
                     "parameters": [
@@ -75,8 +69,11 @@ def test_resolving_multiple_files():
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+        version="2.0",
+        host="127.0.0.1:8888",
+        schemes=["http"],
+        produces=["application/json"],
+    )
     assert len(schema["/teapot"]["post"].body) == 1
     body = schema["/teapot"]["post"].body[0]
     assert body.media_type == "application/json"
@@ -122,7 +119,7 @@ def test_in_memory_schemas_have_isolated_resolver_caches():
 def test_in_memory_schema_with_relative_external_ref(ctx):
     # In-memory schemas with broken external refs (Azure-style `./other.json#/...` from
     # nested definitions) load successfully; resolution is deferred to schema use.
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {"/users": {"get": {"responses": {"200": {"schema": {"$ref": "#/definitions/Container"}}}}}},
         version="2.0",
         definitions={
@@ -132,18 +129,24 @@ def test_in_memory_schema_with_relative_external_ref(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operations = list(schema.get_all_operations())
     assert len(operations) == 1
     assert isinstance(operations[0], Ok)
 
 
-def test_schema_parsing_error(simple_schema):
+def test_schema_parsing_error(ctx, simple_schema):
     # When API operation contains unresolvable reference on its parameter level
     simple_schema["paths"]["/users"]["get"]["parameters"] = [{"$ref": "#/definitions/SimpleIntRef"}]
     simple_schema["paths"]["/foo"] = {"post": RESPONSES}
     # Then it is not detectable during the schema validation
-    schema = schemathesis.openapi.from_dict(simple_schema)
+    schema = ctx.openapi.load_schema(
+        simple_schema["paths"],
+        version=simple_schema["swagger"],
+        info=simple_schema["info"],
+        host=simple_schema["host"],
+        basePath=simple_schema["basePath"],
+        schemes=simple_schema["schemes"],
+    )
     # And is represented as an `Err` instance during operations parsing
     operations = list(schema.get_all_operations())
     assert len(operations) == 2
@@ -159,18 +162,25 @@ def test_schema_parsing_error(simple_schema):
     assert oks[0].method == "post"
 
 
-def test_not_recoverable_schema_error(simple_schema):
+def test_not_recoverable_schema_error(ctx, simple_schema):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]
     # Then it is an explicit exception during processing API operations
-    schema = schemathesis.openapi.from_dict(simple_schema)
+    schema = ctx.openapi.load_schema(
+        simple_schema.get("paths"),
+        version=simple_schema["swagger"],
+        info=simple_schema["info"],
+        host=simple_schema["host"],
+        basePath=simple_schema["basePath"],
+        schemes=simple_schema["schemes"],
+    )
     with pytest.raises(InvalidSchema):
         list(schema.get_all_operations())
 
 
 def test_invalid_parameter_schema_type(ctx):
     # When a parameter's schema is not a dict or bool (e.g., a list)
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users": {
                 "get": {
@@ -180,28 +190,23 @@ def test_invalid_parameter_schema_type(ctx):
             }
         },
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["get"]
     # Then getting this parameter's schema should raise InvalidSchema
     with pytest.raises(InvalidSchema, match="Can not generate data for query parameter"):
         _ = operation.query[0].optimized_schema
 
 
-def test_no_paths_on_openapi_3_1():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "0.1.0"},
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+def test_no_paths_on_openapi_3_1(ctx):
+    schema = ctx.openapi.load_schema(None, version="3.1.0")
     assert list(schema.get_all_operations()) == []
 
 
-def test_operation_lookup_without_paths_on_openapi_3_1():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "0.1.0"},
-        # No `paths`, but webhook-only schemas are valid in 3.1+
-        "webhooks": {
+def test_operation_lookup_without_paths_on_openapi_3_1(ctx):
+    schema = ctx.openapi.load_schema(
+        None,
+        version="3.1.0",
+        # No path operations, but webhook-only schemas are valid in 3.1+
+        webhooks={
             "UserCreated": {
                 "post": {
                     "requestBody": {
@@ -215,46 +220,34 @@ def test_operation_lookup_without_paths_on_openapi_3_1():
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
     with pytest.raises(OperationNotFound, match="/users"):
         schema["/users"]
 
 
-def test_openapi_3_2():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "0.1.0"},
-        "paths": {},
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+def test_openapi_3_2(ctx):
+    schema = ctx.openapi.load_schema({}, version="3.2.0")
     assert schema.adapter is adapter.v3_2
     assert schema.specification.name == "Open API 3.2.0"
     assert schema.specification.version == "3.2.0"
 
 
-def test_no_paths_on_openapi_3_2():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "0.1.0"},
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+def test_no_paths_on_openapi_3_2(ctx):
+    schema = ctx.openapi.load_schema(None, version="3.2.0")
     assert list(schema.get_all_operations()) == []
 
 
-def test_openapi_3_2_smoke():
-    raw_schema = {
-        "openapi": "3.2.0",
-        "info": {"title": "Test", "version": "0.1.0"},
-        "paths": {
+def test_openapi_3_2_smoke(ctx):
+    schema = ctx.openapi.load_schema(
+        {
             "/users": {
                 "get": {
                     "responses": {"200": {"description": "OK"}},
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+        version="3.2.0",
+    )
     operations = list(schema.get_all_operations())
     assert len(operations) == 1
     assert operations[0].ok().path == "/users"
@@ -262,7 +255,7 @@ def test_openapi_3_2_smoke():
 
 
 def test_openapi_3_2_querystring_parameter_is_collected(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/search": {
                 "get": {
@@ -288,7 +281,6 @@ def test_openapi_3_2_querystring_parameter_is_collected(ctx):
         },
         version="3.2.0",
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/search"]["GET"]
     assert len(operation.query.items) == 1
     assert operation.query.items[0].definition["in"] == "querystring"
@@ -318,7 +310,7 @@ def test_openapi_3_2_querystring_parameter_is_collected(ctx):
     ids=["query-and-querystring", "multiple-querystring"],
 )
 def test_openapi_3_2_querystring_parameter_constraints(ctx, parameters):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/search": {
                 "get": {
@@ -329,7 +321,6 @@ def test_openapi_3_2_querystring_parameter_constraints(ctx, parameters):
         },
         version="3.2.0",
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     with pytest.raises(InvalidSchema, match="Invalid `parameters` definition"):
         schema["/search"]["GET"]
 
@@ -363,11 +354,18 @@ def test_validate_v3_accepts_valid_schema(version):
     validators.validate_v3(raw_schema)
 
 
-def test_schema_error_on_path(simple_schema):
+def test_schema_error_on_path(ctx, simple_schema):
     # When there is an error that affects only a subset of paths
     simple_schema["paths"] = {None: "", "/foo": {"post": RESPONSES}}
     # Then it should produce an `Err` instance on operation parsing
-    schema = schemathesis.openapi.from_dict(simple_schema)
+    schema = ctx.openapi.load_schema(
+        simple_schema["paths"],
+        version=simple_schema["swagger"],
+        info=simple_schema["info"],
+        host=simple_schema["host"],
+        basePath=simple_schema["basePath"],
+        schemes=simple_schema["schemes"],
+    )
     operations = list(schema.get_all_operations())
     assert len(operations) == 2
     errors = [op for op in operations if isinstance(op, Err)]
@@ -382,7 +380,7 @@ def test_schema_error_on_path(simple_schema):
 
 
 def test_response_validation_selects_media_type(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/value": {
                 "get": {
@@ -411,7 +409,6 @@ def test_response_validation_selects_media_type(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/value"]["GET"]
     request = requests.Request("GET", "http://example.com/value").prepare()
 
@@ -460,7 +457,7 @@ def test_response_validation_selects_media_type(ctx):
 )
 def test_response_validation_media_type_edge_cases(ctx, content_type, payload, expect_error):
     # Schema with multiple media types and different validation rules
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/value": {
                 "get": {
@@ -496,7 +493,6 @@ def test_response_validation_media_type_edge_cases(ctx, content_type, payload, e
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/value"]["GET"]
     request = requests.Request("GET", "http://example.com/value").prepare()
 
@@ -535,16 +531,16 @@ SCHEMA = {
         ("postBar", "#/paths/~1bar/post", "/bar", "POST"),
     ],
 )
-def test_get_operation(operation_id, reference, path, method):
-    schema = schemathesis.openapi.from_dict(SCHEMA)
+def test_get_operation(ctx, operation_id, reference, path, method):
+    schema = ctx.openapi.load_schema(SCHEMA["paths"])
     for getter, key in ((schema.find_operation_by_id, operation_id), (schema.find_operation_by_reference, reference)):
         operation = getter(key)
         assert operation.path == path
         assert operation.method.upper() == method
 
 
-def test_operation_lookup_cache_built_once(monkeypatch):
-    schema = schemathesis.openapi.from_dict(SCHEMA)
+def test_operation_lookup_cache_built_once(ctx, monkeypatch):
+    schema = ctx.openapi.load_schema(SCHEMA["paths"])
     calls = 0
     original = OperationLookup._build_tables
 
@@ -564,7 +560,7 @@ def test_operation_lookup_cache_built_once(monkeypatch):
 def test_find_operation_by_id_in_referenced_path(ctx):
     # When a path entry is behind a reference
     # it should be resolved correctly
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {"/foo": {"$ref": "#/components/x-paths/Path"}},
         components={
             "x-paths": {
@@ -572,7 +568,6 @@ def test_find_operation_by_id_in_referenced_path(ctx):
             },
         },
     )
-    schema = schemathesis.openapi.from_dict(schema)
     operation = schema.find_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
@@ -584,7 +579,7 @@ def test_find_operation_by_id_in_referenced_path_shared_parameters(ctx):
     # it should be resolved correctly
     # and the parameters should be merged
     parameter = {"name": "foo", "in": "query", "schema": {"type": "string"}}
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {"/foo": {"$ref": "#/components/x-paths/Path"}},
         components={
             "x-paths": {
@@ -595,18 +590,13 @@ def test_find_operation_by_id_in_referenced_path_shared_parameters(ctx):
             },
         },
     )
-    schema = schemathesis.openapi.from_dict(schema)
     operation = schema.find_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
 
 
-def test_find_operation_by_id_no_paths_on_openapi_3_1():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test", "version": "0.1.0"},
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+def test_find_operation_by_id_no_paths_on_openapi_3_1(ctx):
+    schema = ctx.openapi.load_schema(None, version="3.1.0")
     with pytest.raises(OperationNotFound):
         schema.find_operation_by_id("getFoo")
 

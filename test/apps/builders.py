@@ -7,11 +7,12 @@ from flask import Flask, jsonify, request
 from test.apps.runtime import CapturedRequest
 
 
-def build_schema(paths: dict[str, Any], *, version: str = "3.0.2", **kwargs: Any) -> dict[str, Any]:
+def build_schema(paths: dict[str, Any] | None, *, version: str = "3.0.2", **kwargs: Any) -> dict[str, Any]:
     template: dict[str, Any] = {
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": paths,
     }
+    if paths is not None:
+        template["paths"] = paths
     if version.startswith("3"):
         template["openapi"] = version
     elif version.startswith("2"):

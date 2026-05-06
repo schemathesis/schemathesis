@@ -33,21 +33,18 @@ def test_get_operation_via_remote_reference(ctx):
         ("GET", "/users/42/posts/123", "/users/{user_id}/posts/{post_id}", "get", "get_post"),
     ],
 )
-def test_find_operation_by_path_match(method, path, expected_path, expected_method, expected_operation_id):
-    schema = schemathesis.openapi.from_dict(
+def test_find_operation_by_path_match(ctx, method, path, expected_path, expected_method, expected_operation_id):
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/users/{user_id}": {
-                    "get": {"operationId": "get_user", "responses": {"200": {"description": "OK"}}},
-                    "patch": {"operationId": "update_user", "responses": {"200": {"description": "OK"}}},
-                },
-                "/users/{user_id}/posts/{post_id}": {
-                    "get": {"operationId": "get_post", "responses": {"200": {"description": "OK"}}}
-                },
+            "/users/{user_id}": {
+                "get": {"operationId": "get_user", "responses": {"200": {"description": "OK"}}},
+                "patch": {"operationId": "update_user", "responses": {"200": {"description": "OK"}}},
             },
-        }
+            "/users/{user_id}/posts/{post_id}": {
+                "get": {"operationId": "get_post", "responses": {"200": {"description": "OK"}}}
+            },
+        },
+        version="3.0.0",
     )
 
     operation = schema.find_operation_by_path(method, path)
@@ -66,18 +63,15 @@ def test_find_operation_by_path_match(method, path, expected_path, expected_meth
         ("GET", "/nonexistent"),
     ],
 )
-def test_find_operation_by_path_no_match(method, path):
-    schema = schemathesis.openapi.from_dict(
+def test_find_operation_by_path_no_match(ctx, method, path):
+    schema = ctx.openapi.load_schema(
         {
-            "openapi": "3.0.0",
-            "info": {"title": "Test", "version": "1.0"},
-            "paths": {
-                "/users/{user_id}": {
-                    "get": {"operationId": "get_user", "responses": {"200": {"description": "OK"}}},
-                    "patch": {"operationId": "update_user", "responses": {"200": {"description": "OK"}}},
-                },
+            "/users/{user_id}": {
+                "get": {"operationId": "get_user", "responses": {"200": {"description": "OK"}}},
+                "patch": {"operationId": "update_user", "responses": {"200": {"description": "OK"}}},
             },
-        }
+        },
+        version="3.0.0",
     )
 
     operation = schema.find_operation_by_path(method, path)
@@ -113,7 +107,7 @@ def test_find_operation_by_path_no_match(method, path):
     ],
 )
 def test_operation_lookup_ignores_invalid_entries(ctx, paths, reference, expected):
-    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(paths))
+    schema = ctx.openapi.load_schema(paths)
     schema.as_state_machine()
     assert schema.find_operation_by_reference(reference).path == expected
 
@@ -133,13 +127,13 @@ def test_operation_lookup_ignores_invalid_entries(ctx, paths, reference, expecte
     ],
 )
 def test_operation_lookup_non_mapping_shared_params(ctx, paths):
-    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(paths))
+    schema = ctx.openapi.load_schema(paths)
     with pytest.raises(OperationNotFound):
         schema.find_operation_by_reference("#/paths/~1alias/get")
 
 
 def test_query_method_operation_is_discovered(ctx):
-    raw_schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/search": {
                 "query": {
@@ -149,19 +143,16 @@ def test_query_method_operation_is_discovered(ctx):
         },
         version="3.2.0",
     )
-    schema = schemathesis.openapi.from_dict(raw_schema)
     operations = list(schema.get_all_operations())
     assert len(operations) == 1
     assert operations[0].ok().method == "query"
 
 
-def test_non_string_parameter_location():
+def test_non_string_parameter_location(ctx):
     # When a parameter has an invalid non-string `in` value (e.g., empty dict),
     # schema loading should skip the invalid parameter without crashing
-    raw_schema = {
-        "openapi": "3.0.0",
-        "info": {"title": "Test", "version": "1.0.0"},
-        "paths": {
+    schema = ctx.openapi.load_schema(
+        {
             "/test": {
                 "put": {
                     "parameters": [{"$ref": "#/components/parameters/idOrUUID"}],
@@ -169,13 +160,13 @@ def test_non_string_parameter_location():
                 }
             }
         },
-        "components": {
+        version="3.0.0",
+        components={
             "parameters": {
                 "idOrUUID": {"in": {}}  # Invalid: should be string like "path", "query", etc.
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
     operation = schema["/test"]["PUT"]
     # Should not raise TypeError: unhashable type: 'dict'
     assert list(operation.iter_parameters()) == []

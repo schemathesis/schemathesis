@@ -6,7 +6,7 @@ from flask import jsonify, request
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
+def test_format_password_false_positive(ctx, cli, snapshot_cli):
     # GH-3480: Schemathesis incorrectly reports data as invalid for format: password
     # In OpenAPI 3.0, `format` is an annotation and does NOT impose validation constraints by itself.
     # With only `type: string, format: password`, any string is valid.
@@ -48,12 +48,10 @@ def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
             return jsonify({"error": "invalid json"}), 422
         return jsonify({"result": "ok"}), 200
 
-    port = app_runner.run_flask_app(app)
-
     # No failure should be reported since any string is valid for format: password in OpenAPI 3.0
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--checks=negative_data_rejection",
             "--phases=coverage",
             "--continue-on-failure",
@@ -62,7 +60,7 @@ def test_format_password_false_positive(ctx, app_runner, cli, snapshot_cli):
     )
 
 
-def test_negative_metadata_required_property(ctx, app_runner, cli):
+def test_negative_metadata_required_property(ctx, cli, app_runner):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/items": {
@@ -92,10 +90,8 @@ def test_negative_metadata_required_property(ctx, app_runner, cli):
     def create_item():
         return jsonify({"result": "ok"}), 200
 
-    port = app_runner.run_flask_app(app)
-
     result = cli.run_and_assert(
-        f"http://127.0.0.1:{port}/openapi.json",
+        app_runner.openapi_url(app),
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",
@@ -108,7 +104,7 @@ def test_negative_metadata_required_property(ctx, app_runner, cli):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, cli, snapshot_cli):
+def test_text_plain_negative_becomes_valid_after_serialization(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/some-string-endpoint": {
@@ -127,11 +123,9 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, 
     def string_endpoint():
         return "", 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--checks=negative_data_rejection",
             "--mode=negative",
             "--phases=fuzzing",
@@ -143,7 +137,7 @@ def test_text_plain_negative_becomes_valid_after_serialization(ctx, app_runner, 
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapshot_cli):
+def test_text_plain_with_query_negative_still_fails(ctx, cli, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/endpoint": {
@@ -165,11 +159,9 @@ def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapsh
     def endpoint():
         return "", 200
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--checks=negative_data_rejection",
             "--mode=negative",
             "--phases=fuzzing",
@@ -190,7 +182,7 @@ def test_text_plain_with_query_negative_still_fails(ctx, app_runner, cli, snapsh
     ids=["openapi-auth", "basic-auth", "no-auth"],
 )
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_removed_auth_parameter_not_reapplied(ctx, app_runner, cli, snapshot_cli, auth_config):
+def test_removed_auth_parameter_not_reapplied(ctx, cli, app_runner, snapshot_cli, auth_config):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/ping": {
@@ -217,10 +209,8 @@ def test_removed_auth_parameter_not_reapplied(ctx, app_runner, cli, snapshot_cli
             return "", 401
         return "", 204
 
-    port = app_runner.run_flask_app(app)
-
     args = [
-        f"http://127.0.0.1:{port}/openapi.json",
+        app_runner.openapi_url(app),
         "--checks=negative_data_rejection",
         "--mode=negative",
         "--phases=fuzzing",

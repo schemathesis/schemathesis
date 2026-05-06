@@ -145,6 +145,12 @@ def run_flask_app(app: Flask, port: int | None = None, timeout: float = 0.05) ->
     return run(app.run, port=port, timeout=timeout)
 
 
+def openapi_url(app: Flask, *, path: str = "/openapi.json") -> str:
+    """Start `app` on a free port and return the URL where the OpenAPI schema is served."""
+    port = run_flask_app(app)
+    return f"http://127.0.0.1:{port}{path}"
+
+
 def run_asgi_app(app: FastAPI, port: int | None = None, timeout: float = 0.05) -> int:
     """Start a daemon thread running uvicorn against the given ASGI application."""
     if port is None:
@@ -170,4 +176,5 @@ def app_runner():
         run_aiohttp_app=run_aiohttp_app,
         run_asgi_app=run_asgi_app,
         unused_port=unused_port,
+        openapi_url=openapi_url,
     )

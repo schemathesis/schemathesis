@@ -1305,9 +1305,8 @@ def test(case, mocker):
 def test_config_using_headers(testdir):
     testdir.make_test(
         """
-raw_schema = {
-    "openapi": "3.1.0",
-    "paths": {
+raw_schema = make_openapi_schema(
+    {
         "/bookings": {
             "post": {
                 "parameters": [
@@ -1321,7 +1320,8 @@ raw_schema = {
             }
         },
     },
-}
+    version="3.1.0",
+)
 schema = schemathesis.openapi.from_dict(raw_schema)
 HEADERS = {"Authorization": "Bearer secret-token"}
 schema.config.update(headers=HEADERS)
@@ -1338,9 +1338,8 @@ def test(case):
 def test_config_using_auth(testdir):
     testdir.make_test(
         """
-raw_schema = {
-    "openapi": "3.1.0",
-    "paths": {
+raw_schema = make_openapi_schema(
+    {
         "/bookings": {
             "post": {
                 "parameters": [
@@ -1354,7 +1353,8 @@ raw_schema = {
             }
         },
     },
-}
+    version="3.1.0",
+)
 schema = schemathesis.openapi.from_dict(raw_schema)
 schema.config.update(basic_auth=("test", "test"))
 
@@ -1372,9 +1372,8 @@ def test_config_generation(testdir):
     MAX_EXAMPLES_B = 42
     testdir.make_test(
         f"""
-raw_schema = {{
-    "openapi": "3.1.0",
-    "paths": {{
+raw_schema = make_openapi_schema(
+    {{
         "/bookings": {{
             "post": {{
                 "parameters": [
@@ -1388,7 +1387,8 @@ raw_schema = {{
             }}
         }},
     }},
-}}
+    version="3.1.0",
+)
 schema = schemathesis.openapi.from_dict(raw_schema)
 schema.config.generation.update(
     modes=[GenerationMode.POSITIVE],
@@ -1581,11 +1581,10 @@ def test_urlencoded_type_mutations_should_not_cause_false_positives(testdir):
         test_case="""
 import schemathesis
 from hypothesis import settings
+from test.utils import make_openapi_schema
 
-raw_schema = {
-    "openapi": "3.0.2",
-    "info": {"title": "Test", "version": "1.0.0"},
-    "paths": {
+raw_schema = make_openapi_schema(
+    {
         "/success": {
             "post": {
                 "requestBody": {
@@ -1606,8 +1605,9 @@ raw_schema = {
                 }
             }
         }
-    }
-}
+    },
+    info={"title": "Test", "version": "1.0.0"},
+)
 
 schema_obj = schemathesis.openapi.from_dict(raw_schema)
 
@@ -1705,16 +1705,20 @@ def test_pytest_parametrize_multiple_schemas(testdir):
         """
 import asyncio
 
-users_schema = schemathesis.openapi.from_dict({
-    "openapi": "3.0.0",
-    "info": {"title": "Users", "description": "", "version": "0.1.0"},
-    "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
-})
-orders_schema = schemathesis.openapi.from_dict({
-    "openapi": "3.0.0",
-    "info": {"title": "Orders", "description": "", "version": "0.1.0"},
-    "paths": {"/orders": {"get": {"responses": {"200": {"description": "OK"}}}}}
-})
+users_schema = schemathesis.openapi.from_dict(
+    make_openapi_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="3.0.0",
+        info={"title": "Users", "description": "", "version": "0.1.0"},
+    )
+)
+orders_schema = schemathesis.openapi.from_dict(
+    make_openapi_schema(
+        {"/orders": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        version="3.0.0",
+        info={"title": "Orders", "description": "", "version": "0.1.0"},
+    )
+)
 
 @schemathesis.pytest.parametrize(users=users_schema, orders=orders_schema)
 def test_sync(case):

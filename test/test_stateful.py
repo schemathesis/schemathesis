@@ -1,7 +1,6 @@
 import pytest
 from flask import Flask, jsonify, request
 
-import schemathesis
 from schemathesis.core.errors import InvalidStateMachine
 from schemathesis.core.result import Ok
 
@@ -82,7 +81,7 @@ def customer_order_schema():
 
 
 def test_missing_operation(ctx):
-    schema = ctx.openapi.build_schema(
+    schema = ctx.openapi.load_schema(
         {
             "/users/": {
                 "post": {
@@ -105,8 +104,6 @@ def test_missing_operation(ctx):
         }
     )
 
-    schema = schemathesis.openapi.from_dict(schema)
-
     with pytest.raises(InvalidStateMachine) as exc:
         schema.as_state_machine()
     assert "Operation 'unknown' not found" in str(exc.value)
@@ -124,7 +121,7 @@ def count_links(schema):
 
 @pytest.mark.parametrize("enable_inference", [True, False])
 def test_inference_respects_config(ctx, customer_order_schema, enable_inference):
-    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema(customer_order_schema))
+    schema = ctx.openapi.load_schema(customer_order_schema)
 
     if not enable_inference:
         schema.config.phases.stateful.inference.algorithms = []

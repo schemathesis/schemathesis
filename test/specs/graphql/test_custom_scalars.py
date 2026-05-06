@@ -15,7 +15,7 @@ def clear_custom_scalars():
     CUSTOM_SCALARS.clear()
 
 
-def test_custom_scalar_graphql():
+def test_custom_scalar_graphql(ctx):
     # When a custom scalar strategy is registered
     expected = "2022-04-27"
     schemathesis.graphql.scalar("Date", st.just(expected).map(nodes.String))
@@ -26,7 +26,7 @@ type Query {
   getByDate(value: Date!): Int!
 }
 """
-    schema = schemathesis.graphql.from_file(raw_schema)
+    schema = ctx.graphql.load_sdl(raw_schema)
 
     @given(schema["Query"]["getByDate"].as_strategy())
     def test(case):

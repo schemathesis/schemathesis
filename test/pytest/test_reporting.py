@@ -4,14 +4,10 @@ from xml.etree import ElementTree
 from test.utils import load_json_or_fail, load_yaml_or_fail
 
 
-def _make_xdist_test(testdir, content, base_url, paths=None):
+def _make_xdist_test(ctx, testdir, content, base_url, paths=None):
     if paths is None:
         paths = {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}
-    schema_dict = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": paths,
-    }
+    schema_dict = ctx.openapi.build_schema(paths)
     testdir.makepyfile(
         f"""
 import schemathesis
@@ -168,6 +164,7 @@ def test_vcr_report_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(vcr_path=r"{cassette_path}")
@@ -195,6 +192,7 @@ def test_har_report_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
     cassette_path = str(testdir.tmpdir.join("cassette.har"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(har_path=r"{cassette_path}")
@@ -218,6 +216,7 @@ def test_junit_report_written_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
     report_path = str(testdir.tmpdir.join("report.xml"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(junit_path=r"{report_path}")
@@ -242,6 +241,7 @@ def test_junit_report_records_check_failures_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.failure()
     report_path = str(testdir.tmpdir.join("report.xml"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(junit_path=r"{report_path}")
@@ -266,6 +266,7 @@ def test_vcr_report_records_check_failures_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.failure()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(vcr_path=r"{cassette_path}")
@@ -313,6 +314,7 @@ def test_vcr_report_examples_phase_via_xdist(testdir, ctx):
         }
     }
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(vcr_path=r"{cassette_path}")
@@ -343,6 +345,7 @@ def test_vcr_report_via_directory_via_xdist(testdir, ctx):
     # falls through to the directory-based filename branch
     report_dir = str(testdir.tmpdir.mkdir("reports"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 from schemathesis.config._report import ReportFormat
@@ -371,6 +374,7 @@ def test_xdist_no_report_configured(testdir, ctx):
     # the controller must silently skip processing when no writers are opened
     api = ctx.openapi.apps.success()
     _make_xdist_test(
+        ctx,
         testdir,
         """
 @schema.parametrize()
@@ -390,6 +394,7 @@ def test_vcr_report_multiple_operations_via_xdist(testdir, ctx):
     api = ctx.openapi.apps.success()
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(vcr_path=r"{cassette_path}")
@@ -412,9 +417,10 @@ def test_api(case):
     assert len(cassette["http_interactions"]) >= 2
 
 
-def test_vcr_report_network_error_via_xdist(testdir):
+def test_vcr_report_network_error_via_xdist(testdir, ctx):
     cassette_path = str(testdir.tmpdir.join("cassette.yaml"))
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 import requests
@@ -447,16 +453,14 @@ def test_two_schemas_same_vcr_path_via_xdist(testdir, ctx):
     # overwrite each other.
     api = ctx.openapi.apps.success()
     report_dir = str(testdir.tmpdir.mkdir("reports"))
-    schema_a = {
-        "openapi": "3.0.2",
-        "info": {"title": "A", "description": "", "version": "0.1.0"},
-        "paths": {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
-    }
-    schema_b = {
-        "openapi": "3.0.2",
-        "info": {"title": "B", "description": "", "version": "0.1.0"},
-        "paths": {"/health": {"get": {"responses": {"200": {"description": "OK"}}}}},
-    }
+    schema_a = ctx.openapi.build_schema(
+        {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        info={"title": "A", "description": "", "version": "0.1.0"},
+    )
+    schema_b = ctx.openapi.build_schema(
+        {"/health": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        info={"title": "B", "description": "", "version": "0.1.0"},
+    )
     testdir.makepyfile(
         f"""
 import schemathesis
@@ -502,6 +506,7 @@ def test_xdist_writer_open_failure(testdir, ctx):
     har_path = str(testdir.tmpdir.join("cassette.har"))
     testdir.tmpdir.mkdir("cassette.har")
     _make_xdist_test(
+        ctx,
         testdir,
         f"""
 schema.config.reports.update(vcr_path=r"{vcr_path}", har_path=r"{har_path}")

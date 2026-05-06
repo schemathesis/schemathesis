@@ -607,26 +607,21 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET /users\]"])
 
 
-def test_empty_content():
+def test_empty_content(ctx):
     # When the "content" value is empty in "requestBody"
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {"/body": {"post": {"requestBody": {"content": {}}, "responses": {"200": {"description": "OK"}}}}},
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = ctx.openapi.load_schema(
+        {"/body": {"post": {"requestBody": {"content": {}}, "responses": {"200": {"description": "OK"}}}}}
+    )
     # Then the body processing should be no-op
     operation = schema["/body"]["POST"]
     assert operation.body == PayloadAlternatives([])
 
 
 @pytest.mark.hypothesis_nested
-def test_loose_multipart_definition():
+def test_loose_multipart_definition(ctx):
     # When the schema of "multipart/form-data" content does not define "object" type
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+    schema = ctx.openapi.load_schema(
+        {
             "/body": {
                 "post": {
                     "requestBody": {
@@ -637,8 +632,7 @@ def test_loose_multipart_definition():
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
     # Then non-object data should be excluded during generation
 
     @given(case=schema["/body"]["POST"].as_strategy())
@@ -651,12 +645,10 @@ def test_loose_multipart_definition():
 
 
 @pytest.mark.hypothesis_nested
-def test_multipart_behind_a_reference():
+def test_multipart_behind_a_reference(ctx):
     # When the schema of "multipart/form-data" is behind a reference
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+    schema = ctx.openapi.load_schema(
+        {
             "/body": {
                 "post": {
                     "requestBody": {
@@ -666,7 +658,7 @@ def test_multipart_behind_a_reference():
                 }
             }
         },
-        "components": {
+        components={
             "requestBodies": {
                 "MultipartBody": {
                     "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}},
@@ -674,8 +666,7 @@ def test_multipart_behind_a_reference():
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
     # Then it should be correctly resolved
 
     @given(case=schema["/body"]["POST"].as_strategy())
@@ -710,12 +701,10 @@ def test_optional_form_parameters(ctx):
     test()
 
 
-def test_ref_field():
+def test_ref_field(ctx):
     # When the schema contains "$ref" field, that is not a reference (which is supported by the JSON Schema spec)
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+    schema = ctx.openapi.load_schema(
+        {
             "/body": {
                 "post": {
                     "requestBody": {
@@ -734,8 +723,7 @@ def test_ref_field():
                 }
             }
         },
-    }
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    )
 
     @given(case=schema["/body"]["POST"].as_strategy())
     @settings(max_examples=5)

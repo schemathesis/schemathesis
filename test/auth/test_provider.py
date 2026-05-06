@@ -180,7 +180,13 @@ MULTI_SCOPE_SCHEMA = {
 def test_auth_cache_with_scopes(ctx):
     # See GH-1775
     api = ctx.openapi.apps.success()
-    schema = schemathesis.openapi.from_dict(MULTI_SCOPE_SCHEMA)
+    schema = ctx.openapi.load_schema(
+        MULTI_SCOPE_SCHEMA["paths"],
+        version=MULTI_SCOPE_SCHEMA["openapi"],
+        components=MULTI_SCOPE_SCHEMA["components"],
+        servers=MULTI_SCOPE_SCHEMA["servers"],
+        tags=MULTI_SCOPE_SCHEMA["tags"],
+    )
     schema.config.update(base_url=f"{api.base_url}/api")
 
     counts = {}

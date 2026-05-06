@@ -614,7 +614,7 @@ def test_serialize_random_pattern(pattern):
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, app_runner, snapshot_cli):
+def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, snapshot_cli):
     app, _ = ctx.openapi.make_flask_app(
         {
             "/owners": {
@@ -681,12 +681,10 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, ap
     def get_owner(owner_id):
         return jsonify({"id": owner_id, "firstName": "John", "lastName": "Doe"})
 
-    port = app_runner.run_flask_app(app)
-
     # This should not crash with SchemaError about invalid regex
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--max-examples=1",
             "--phases=examples",
         )
@@ -694,7 +692,7 @@ def test_pcre_pattern_in_response_schema_during_dependency_analysis(cli, ctx, ap
     )
 
 
-def test_response_schema_is_not_mutated(cli, ctx, app_runner, snapshot_cli):
+def test_response_schema_is_not_mutated(cli, ctx, snapshot_cli):
     # See GH-2749
     raw_schema = {
         "openapi": "3.0.3",
@@ -753,13 +751,11 @@ def test_response_schema_is_not_mutated(cli, ctx, app_runner, snapshot_cli):
         response_body = {"container_image": example_value}
         return jsonify(response_body), 200
 
-    port = app_runner.run_flask_app(app)
-
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "-call", "--phases=fuzzing", "-n 1") == snapshot_cli
+    assert cli.run_openapi_app(app, "-call", "--phases=fuzzing", "-n 1") == snapshot_cli
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, app_runner, snapshot_cli):
+def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, snapshot_cli):
     # Pattern from amazonaws.com/cleanrooms schema - surrogate code points are invalid in regex
     invalid_pattern = "([\\u0020-\\uD7FF\\uE000-\\uFFFD\\uD800\\uDBFF-\\uDC00\\uDFFF\\t\\r\\n]){0,255}"
 
@@ -784,11 +780,9 @@ def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, app_runner, snap
     def test_endpoint():
         return jsonify({"status": "ok"})
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "--phases=fuzzing",
         )
@@ -797,7 +791,7 @@ def test_unicode_surrogate_pattern_in_query_parameter(cli, ctx, app_runner, snap
 
 
 @pytest.mark.snapshot(replace_reproduce_with=True)
-def test_unicode_surrogate_pattern_in_request_body(cli, ctx, app_runner, snapshot_cli):
+def test_unicode_surrogate_pattern_in_request_body(cli, ctx, snapshot_cli):
     # Surrogate code point range - invalid in regex engine
     invalid_pattern = "[\\uD800-\\uDBFF]"
 
@@ -828,11 +822,9 @@ def test_unicode_surrogate_pattern_in_request_body(cli, ctx, app_runner, snapsho
     def test_endpoint():
         return jsonify({"status": "ok"})
 
-    port = app_runner.run_flask_app(app)
-
     assert (
-        cli.run(
-            f"http://127.0.0.1:{port}/openapi.json",
+        cli.run_openapi_app(
+            app,
             "--max-examples=10",
             "--phases=fuzzing",
         )

@@ -1,16 +1,6 @@
 from __future__ import annotations
 
-import graphql
 import pytest
-
-import schemathesis
-from schemathesis.specs.graphql.schemas import GraphQLSchema
-
-
-def _build(sdl: str) -> GraphQLSchema:
-    introspection = graphql.introspection_from_schema(graphql.build_schema(sdl))
-    return schemathesis.graphql.from_dict(introspection)
-
 
 _PRODUCER_TO_READER = """
     type Book { id: ID! }
@@ -54,15 +44,15 @@ _NO_PRODUCER = """
     ],
     ids=["producer-to-reader", "no-match-different-types", "cleanup-is-not-producer", "no-producer-no-edges"],
 )
-def test_transition_edges(sdl, expected_edges):
-    transitions = _build(sdl).analysis.transitions
+def test_transition_edges(ctx, sdl, expected_edges):
+    transitions = ctx.graphql.load_sdl(sdl).analysis.transitions
     edges = [(label, edge.target.label) for label, ops in transitions.operations.items() for edge in ops.outgoing]
     assert sorted(edges) == sorted(expected_edges)
 
 
-def test_outgoing_and_incoming_are_consistent():
+def test_outgoing_and_incoming_are_consistent(ctx):
     # For each outgoing edge from operation A, operation B should list it as incoming.
-    transitions = _build(_PRODUCER_TO_READER).analysis.transitions
+    transitions = ctx.graphql.load_sdl(_PRODUCER_TO_READER).analysis.transitions
     for source, ops in transitions.operations.items():
         for edge in ops.outgoing:
             target_incoming = transitions.operations[edge.target.label].incoming
