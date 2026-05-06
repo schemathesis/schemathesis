@@ -37,6 +37,7 @@
 - Set `filename` on binary `multipart/form-data` parts; use `encoding.headers.Content-Disposition` if present, field name otherwise. [#3951](https://github.com/schemathesis/schemathesis/issues/3951)
 - Reject `.` and `..` path-parameter values; URL normalisation routes the request to a different operation.
 - Preserve trailing test scenario events when worker threads exit at a phase boundary.
+- Honor `minimum: 0` / `maximum: 0` and Draft 4 boolean `exclusiveMinimum` / `exclusiveMaximum` in coverage-phase number generation.
 
 ### :wrench: Changed
 
