@@ -30,10 +30,10 @@ This command will immediately find real bugs in a demo API and show you exactly 
 ## Why teams choose Schemathesis
 
 - 🎯 Find real bugs on the first run (commonly 5–15 in production schemas).
-- ⏱️ Point it at your schema—no per-endpoint tests to maintain.
-- 🔄 Keeps pace with the spec; new endpoints are covered automatically.
-- 🔌 Exports JUnit, HAR, and integrates with `pytest` or CI/CD.
-- 📑 Uses your OpenAPI or GraphQL schema as the single source of truth.
+- 🧠 Adapts as it runs: learns from server responses, threads real values into later requests, and shifts effort away from operations that aren't producing useful signal.
+- ⏱️ No per-endpoint tests to maintain — point it at your schema and run.
+- 🐛 Every finding ships with a minimal `curl` reproducer.
+- 🔌 Plugs into existing setups: CLI, `pytest`, GitHub Actions, plus Allure, JUnit XML, and HAR output.
 
 !!! quote "Developer feedback"
     "The tool is amazing as it can test negative scenarios instead of me and much faster!" 

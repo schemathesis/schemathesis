@@ -4,24 +4,15 @@ This document explains how Schemathesis generates test data for your API, from r
 
 ## The Generation Hierarchy
 
-Schemathesis data generation is built on the following hierarchy:
+Schemathesis is structured as four phases (Examples, Coverage, Fuzzing, Stateful), plus a feedback loop on OpenAPI that learns from server responses and influences subsequent test cases. Every phase uses Hypothesis with schema-based generators (`hypothesis-jsonschema` for OpenAPI, `hypothesis-graphql` for GraphQL) to drive values from the schema; what differs between phases is how each one chooses inputs and which validity mode it targets.
 
-```
-Hypothesis                    → Core data generation primitives
-    ↓
-hypothesis-jsonschema        → Schema-aware generation for OpenAPI
-hypothesis-graphql           → Schema-aware generation for GraphQL  
-    ↓
-Schemathesis                 → Complete API testing workflow
-```
+What each layer contributes:
 
-Each layer adds a specific capability:
+1. **Hypothesis** — primitive strategies (strings, integers, objects), shrinking, and the example database.
+2. **hypothesis-jsonschema / hypothesis-graphql** — translate JSON Schema / GraphQL fragments into Hypothesis strategies. Used by every phase as the schema-driven value source; the validity mode (positive, negative, mixed) is set by the calling phase.
+3. **Schemathesis** — the four-phase pipeline, HTTP transport, response checks, and a feedback loop that learns from what the server returns. See [Adaptive Testing](adaptive-testing.md).
 
-1. **Hypothesis** provides the foundation—strategies for generating strings, integers, objects, etc.
-2. **hypothesis-jsonschema** and **hypothesis-graphql** translate your API schemas into Hypothesis strategies
-3. **Schemathesis** orchestrates the entire process: parsing schemas, generating all request components, sending requests, and validating responses
-
-This layered approach means Schemathesis inherits Hypothesis's features (like automatic shrinking) while adding API-specific behavior.
+Schemathesis inherits Hypothesis's shrinking and example database; the feedback loop is what lets it learn server-side validation (OpenAPI) and reuse real values across operations.
 
 ## Testing Phases
 

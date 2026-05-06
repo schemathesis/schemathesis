@@ -5,8 +5,8 @@ build-backend = "hatchling.build"
 [project]
 name = "schemathesis"
 version = "4.17.0"
-description = "Property-based testing framework for Open API and GraphQL based apps"
-keywords = ["pytest", "hypothesis", "openapi", "graphql", "testing"]
+description = "Adaptive API testing for OpenAPI and GraphQL"
+keywords = ["pytest", "hypothesis", "openapi", "graphql", "testing", "fuzzing", "adaptive"]
 authors = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
 maintainers = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
 requires-python = ">=3.10"

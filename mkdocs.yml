@@ -35,6 +35,7 @@ nav:
 
   - Core Concepts:
       - explanations/data-generation.md
+      - Adaptive Testing: explanations/adaptive-testing.md
       - explanations/examples.md
       - explanations/stateful.md
       - Pytest Integration: explanations/pytest.md

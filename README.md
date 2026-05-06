@@ -21,9 +21,9 @@
 
 ## Schemathesis
 
-> **Catch API bugs before your users do.** 
+> **Catch API bugs before your users do.**
 
-Schemathesis automatically generates thousands of test cases from your OpenAPI or GraphQL schema and finds edge cases that break your API.
+Schemathesis tests OpenAPI and GraphQL APIs by generating inputs from your schema, adapting to server responses, and chaining operations into realistic workflows.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
