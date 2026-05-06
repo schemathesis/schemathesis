@@ -47,6 +47,30 @@ To use a config file from a different location, pass `--config-file` before the 
 schemathesis --config-file /path/to/config.toml run https://api.example.com/openapi.json
 ```
 
+### Editor support
+
+Schemathesis ships a JSON Schema for `schemathesis.toml` so editors and AI assistants can validate your config and offer autocompletion. It lives at:
+
+```
+https://raw.githubusercontent.com/schemathesis/schemathesis/master/src/schemathesis/config/schema.json
+```
+
+To opt in, add a `#:schema` comment at the top of `schemathesis.toml` — the convention recognised by Taplo, Even Better TOML (VS Code), and JetBrains IDEs:
+
+```toml
+#:schema https://raw.githubusercontent.com/schemathesis/schemathesis/master/src/schemathesis/config/schema.json
+
+generation.max-examples = 500
+```
+
+You can also wire it up per-editor. For example, in VS Code's `settings.json` with the Even Better TOML extension:
+
+```json
+"evenBetterToml.schema.associations": {
+  "schemathesis\\.toml$": "https://raw.githubusercontent.com/schemathesis/schemathesis/master/src/schemathesis/config/schema.json"
+}
+```
+
 ## Common configuration scenarios
 
 ### Authentication

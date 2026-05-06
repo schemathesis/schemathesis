@@ -5,6 +5,9 @@ This page lists every `schemathesis.toml` option and how it is resolved at runti
 - **Global**: These control CLI behavior, output formatting, and overall test execution. They are defined at the top level and affect the CLI invocation.
 - **Project**: Settings under `[[project]]` customize a single API. If you place project settings at the top level (without `[[project]]`), they become defaults for all projects.
 
+!!! tip "Editor autocompletion"
+    Point your editor at the [JSON Schema for `schemathesis.toml`](../configuration.md#editor-support) to get inline validation and completions while you edit.
+
 ## Configuration Resolution
 
 Schemathesis applies settings from highest to lowest precedence:
