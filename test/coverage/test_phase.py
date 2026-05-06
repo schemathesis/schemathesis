@@ -5088,6 +5088,19 @@ def test_coverage_no_recursion_for_allof_with_unmergeable_anyof_property(ctx):
     _iter_cases(operation, GenerationMode.POSITIVE, generation_config=loaded.config.generation)
 
 
+def test_coverage_positive_object_with_min_properties_no_required(ctx):
+    # Object with minProperties:1 but no required fields must never yield {} as a positive body.
+    body_schema = {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+            "accountId": {"type": "string"},
+            "domain": {"type": "string"},
+        },
+    }
+    collect_coverage_cases(ctx, body_schema, positive=True)
+
+
 def test_coverage_positive_body_anyof_const_null_excluded_by_sibling_type(ctx):
     # When anyOf has a {const: null} branch but the sibling `type` constraint forbids null,
     # POSITIVE coverage must not yield null as a valid value for that property.

@@ -19,6 +19,7 @@
 
 ### :bug: Fixed
 
+- Skip `{}` as positive coverage body for schemas with `minProperties` but no `required` fields.
 - Panic during response validation for schemas with very large `{0,N}` regex quantifiers (e.g. `{0,404600}`).
 - Positive-mode generation collapse for `readOnly` fields nested in `allOf` and listed in parent `required`.
 - Mismatched parent/child path parameters in pool draws for hierarchical operations.

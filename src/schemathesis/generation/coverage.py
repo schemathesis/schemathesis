@@ -1744,6 +1744,7 @@ def _positive_object(
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
     optional = sorted(set(properties) - required, key=str)
+    min_props = schema.get("minProperties")
 
     # A required property absent from the template makes every derived combination schema-invalid.
     template_complete = not (required - set(template))
@@ -1776,7 +1777,7 @@ def _positive_object(
     # Generate combinations with required properties and one optional property
     for name in optional:
         combo = {k: v for k, v in template.items() if k in required or k == name}
-        if combo != template:
+        if combo != template and (min_props is None or len(combo) >= min_props):
             yield PositiveValue(
                 combo,
                 scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
@@ -1785,18 +1786,23 @@ def _positive_object(
     # Generate one combination for each size from 2 to N-1
     for selection in select_combinations(optional):
         combo = {k: v for k, v in template.items() if k in required or k in selection}
-        yield PositiveValue(
-            combo,
-            scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
-            description="Object with all required and a subset of optional properties",
-        )
+        if min_props is None or len(combo) >= min_props:
+            yield PositiveValue(
+                combo,
+                scenario=CoverageScenario.OBJECT_REQUIRED_AND_OPTIONAL,
+                description="Object with all required and a subset of optional properties",
+            )
     # Generate only required properties
     if set(properties) != required:
         only_required = {k: v for k, v in template.items() if k in required}
         # Skip empty object for required form bodies - {} serializes to no content
         # which violates requestBody.required
-        if only_required or not (
-            ctx.is_required and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
+        if (min_props is None or len(only_required) >= min_props) and (
+            only_required
+            or not (
+                ctx.is_required
+                and ctx.media_type in (("application", "x-www-form-urlencoded"), ("multipart", "form-data"))
+            )
         ):
             yield PositiveValue(
                 only_required,
